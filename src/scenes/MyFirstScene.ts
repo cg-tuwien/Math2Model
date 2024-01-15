@@ -14,6 +14,9 @@ const createScene = (canvas) => {
     material.diffuseColor = Color3.Blue();
     box.material = material;
 
+    // Für Hot reloading
+    scene.markAllMaterialsAsDirty(BABYLON.Constants.MATERIAL_AllDirtyFlag)
+
     engine.runRenderLoop(() => {
         scene.render();
     });

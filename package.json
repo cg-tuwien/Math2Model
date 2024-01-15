@@ -9,9 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@monaco-editor/loader": "^1.4.0",
     "babylonjs": "^6.38.1",
     "babylonjs-inspector": "^6.38.1",
     "babylonjs-materials": "^6.38.1",
+    "monaco-editor": "^0.45.0",
+    "monaco-editor-webpack-plugin": "^7.1.0",
+    "monaco-languageclient": "^7.3.0",
     "vue": "^3.3.11"
   },
   "devDependencies": {
