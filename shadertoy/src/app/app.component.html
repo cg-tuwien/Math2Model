@@ -8,8 +8,7 @@
 
 <main class="main">
   <div class="content">
+    <ngx-monaco-editor [options]="editorOptions" [(ngModel)]="code"></ngx-monaco-editor>
     <canvas #canvas></canvas>
   </div>
 </main>
-
-<router-outlet />
