@@ -1,6 +1,7 @@
 import {AfterViewInit, Component, ElementRef, NgZone, ViewChild} from '@angular/core';
 import {Engine, Effect} from "babylonjs";
 import {MyFirstScene} from "./scenes/MyFirstScene";
+import {CodeModel} from "@ngstack/code-editor";
 
 @Component({
   selector: 'app-root',
@@ -12,8 +13,6 @@ export class AppComponent implements AfterViewInit {
   @ViewChild('canvas', {static: true}) private canvas?: ElementRef<HTMLCanvasElement>;
   private engine?: Engine;
   private scene?: MyFirstScene;
-  editorOptions = {theme: 'vs-dark', language: 'javascript'};
-  code: string = 'function x() {\nconsole.log("Hello world!");\n}';
 
   //private ngZone: NgZone = new NgZone([]);
   constructor(private ngZone: NgZone) {}
@@ -28,6 +27,25 @@ export class AppComponent implements AfterViewInit {
         });
       });
     }
+  }
+
+  theme = 'hc-black';
+
+  codeModel: CodeModel = {
+    language: 'wgsl',
+    uri: 'main.glsl',
+    value: 'void main() {\n  gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);\n}\n'
+  };
+
+  options = {
+    contextmenu: true,
+    minimap: {
+      enabled: true
+    }
+  };
+
+  onCodeChanged(value: string) {
+    console.log('CODE', value);
   }
 
   protected readonly Effect = Effect;

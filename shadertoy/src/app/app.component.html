@@ -8,7 +8,12 @@
 
 <main class="main">
   <div class="content">
-    <ngx-monaco-editor [options]="editorOptions" [(ngModel)]="code"></ngx-monaco-editor>
+    <ngs-code-editor
+      [theme]="theme"
+      [codeModel]="codeModel"
+      [options]="options"
+      (valueChanged)="onCodeChanged($event)">
+    </ngs-code-editor>
     <canvas #canvas></canvas>
   </div>
 </main>
