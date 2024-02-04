@@ -1,16 +1,19 @@
-import { Engine, Scene, FreeCamera, Vector3, MeshBuilder, StandardMaterial, Color3, HemisphericLight, ShaderMaterial } from 'babylonjs';
+import { Engine, Scene, Vector3, MeshBuilder, HemisphericLight, ShaderMaterial, FlyCamera } from 'babylonjs';
 
 export class MyFirstScene extends Scene {
+
+  private ground: any;
+
   constructor(engine: Engine) {
     super(engine);
     // This creates and positions a free camera (non-mesh)
-    var camera = new FreeCamera("camera1", new Vector3(0, 5, -10), this);
+    var camera = new FlyCamera("camera1", new Vector3(0, 5, -10), this);
 
     // This targets the camera to scene origin
-    camera.setTarget(Vector3.Zero());
+    // camera.setTarget(Vector3.Zero());
 
     // This attaches the camera to the canvas
-    camera.attachControl(this.getEngine().getRenderingCanvas());
+    camera.attachControl(true);
 
     // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
     var light = new HemisphericLight("light1", new Vector3(0, 1, 0), this);
@@ -19,14 +22,29 @@ export class MyFirstScene extends Scene {
     light.intensity = 0.7;
 
     BABYLON.Effect.ShadersStore['customVertexShader'] = `
-        precision highp float;
-        attribute vec3 position;
-        uniform mat4 worldViewProjection;
-        
-        void main() {
-            vec4 p = vec4(position, 1.);
-            gl_Position = worldViewProjection * p;
-        }
+precision highp float;
+attribute vec3 position;
+attribute vec2 uv;
+uniform mat4 worldViewProjection;
+
+void main() {
+
+    vec3 pos = vec3(uv.x, 0.0, uv.y) * 3.14159265359 * 2.;
+
+    float x = sin(pos.x) * cos(pos.z);
+    float y = sin(pos.x) * sin(pos.z);
+    float z = cos(pos.x);
+
+    float x2 = sin(pos.x) * (15. * sin(pos.z) - 4. * sin(3. * pos.z));
+    float y2 = 8. * cos(pos.x);
+    float z2 = sin(pos.x) * (15. * cos(pos.z) - 5. * cos(2. * pos.z) - 2. * cos(3. * pos.z) - cos(2. * pos.z));
+
+    vec3 sphere = vec3(x, y, z);
+    vec3 heart = vec3(x2, y2, z2);
+
+    vec4 p = vec4(mix(sphere, heart, 0.) * 1., 1.);
+    gl_Position = worldViewProjection * p;
+}
     `;
 
     BABYLON.Effect.ShadersStore['customFragmentShader'] = `
@@ -38,29 +56,30 @@ export class MyFirstScene extends Scene {
     `;
 
 
-    var shaderMaterial = new ShaderMaterial('custom', this, 'custom', {
-    });
+    var shaderMaterial = new ShaderMaterial('custom', this, 'custom', {attributes: ['uv', 'position']});
     shaderMaterial.allowShaderHotSwapping = true;
 
     // Create a built-in "box" shape; with 2 segments and a height of 1.
-    var box = MeshBuilder.CreateBox("box", {size: 2}, this);
-    const material = new StandardMaterial("box-material", this);
-    material.diffuseColor = Color3.Blue();
-    box.material = shaderMaterial;
+    //this.box = MeshBuilder.CreateBox("box", {size: 2}, this);
+    //this.box.material = shaderMaterial;
 
 
 
-    var ground = MeshBuilder.CreateGround("ground", {width: 6, height: 6}, this);
-    const groundMaterial = new StandardMaterial("ground-material", this);
-    groundMaterial.diffuseColor = Color3.Green();
-    ground.material = shaderMaterial;
+    this.ground = MeshBuilder.CreateGround("ground", {width: 3.14159265359 * 2, height: 3.14159265359 * 2, subdivisions: 50}, this);
+    this.ground.position = new Vector3(3.14159265359, 0.0, 3.14159265359);
+    this.ground.material = shaderMaterial;
 
   }
 
-  
+
     // Für Hot reloading
     resetMaterials(): void
     {
-      this.markAllMaterialsAsDirty(BABYLON.Constants.MATERIAL_AllDirtyFlag)
+      this.ground.material.dispose();
+      var shaderMaterial = new ShaderMaterial('custom', this, 'custom', {
+      });
+      console.log(shaderMaterial);
+      //this.box.material = shaderMaterial;
+      this.ground.material = shaderMaterial;
     }
 }

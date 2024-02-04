@@ -1,5 +1,5 @@
 import {AfterViewInit, Component, ElementRef, NgZone, ViewChild} from '@angular/core';
-import {Engine, Effect} from "babylonjs";
+import {Engine} from "babylonjs";
 import {MyFirstScene} from "./scenes/MyFirstScene";
 import {CodeModel} from "@ngstack/code-editor";
 
@@ -34,7 +34,31 @@ export class AppComponent implements AfterViewInit {
   codeModel: CodeModel = {
     language: 'wgsl',
     uri: 'main.glsl',
-    value: 'void main() {\n  gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);\n}\n'
+    value: `
+precision highp float;
+attribute vec3 position;
+attribute vec2 uv;
+uniform mat4 worldViewProjection;
+
+void main() {
+
+    vec3 pos = vec3(uv.x, 0.0, uv.y) * 3.14159265359 * 2.;
+
+    float x = sin(pos.x) * cos(pos.z);
+    float y = sin(pos.x) * sin(pos.z);
+    float z = cos(pos.x);
+
+    float x2 = sin(pos.x) * (15. * sin(pos.z) - 4. * sin(3. * pos.z));
+    float y2 = 8. * cos(pos.x);
+    float z2 = sin(pos.x) * (15. * cos(pos.z) - 5. * cos(2. * pos.z) - 2. * cos(3. * pos.z) - cos(2. * pos.z));
+
+    vec3 sphere = vec3(x, y, z);
+    vec3 heart = vec3(x2, y2, z2);
+
+    vec4 p = vec4(mix(sphere, heart, 0.) * 1., 1.);
+    gl_Position = worldViewProjection * p;
+}
+`
   };
 
   options = {
@@ -45,8 +69,16 @@ export class AppComponent implements AfterViewInit {
   };
 
   onCodeChanged(value: string) {
-    console.log('CODE', value);
-  }
+    console.log(value);
+    this.engine?.releaseEffects();
+    BABYLON.Effect.ShadersStore['customFragmentShader'] = `
+        precision highp float;
 
-  protected readonly Effect = Effect;
+        void main() {
+            gl_FragColor = vec4(1.,0.,0.,1.);
+        }
+    `;
+    BABYLON.Effect.ShadersStore['customVertexShader'] = value;
+    this.scene?.resetMaterials();
+  }
 }
