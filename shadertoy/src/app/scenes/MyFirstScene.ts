@@ -4,8 +4,12 @@ export class MyFirstScene extends Scene {
 
   private ground: any;
 
+  public frame: number = 0;
+  public time: number = 0;
+
   constructor(engine: Engine) {
     super(engine);
+
     // This creates and positions a free camera (non-mesh)
     var camera = new FlyCamera("camera1", new Vector3(0, 5, -10), this);
 
@@ -56,16 +60,16 @@ void main() {
     `;
 
 
-    var shaderMaterial = new ShaderMaterial('custom', this, 'custom', {attributes: ['uv', 'position']});
+    var shaderMaterial = new ShaderMaterial('custom', this, 'custom',
+      {attributes: ['uv', 'position'], uniforms: ['iTime', 'iTimeDelta', 'iFrame']});
     shaderMaterial.allowShaderHotSwapping = true;
-
     // Create a built-in "box" shape; with 2 segments and a height of 1.
     //this.box = MeshBuilder.CreateBox("box", {size: 2}, this);
     //this.box.material = shaderMaterial;
 
 
 
-    this.ground = MeshBuilder.CreateGround("ground", {width: 3.14159265359 * 2, height: 3.14159265359 * 2, subdivisions: 50}, this);
+    this.ground = MeshBuilder.CreateGround("ground", {width: 3.14159265359 * 2, height: 3.14159265359 * 2, subdivisions: 10}, this);
     this.ground.position = new Vector3(3.14159265359, 0.0, 3.14159265359);
     this.ground.material = shaderMaterial;
 
@@ -76,10 +80,18 @@ void main() {
     resetMaterials(): void
     {
       this.ground.material.dispose();
-      var shaderMaterial = new ShaderMaterial('custom', this, 'custom', {
+      var shaderMaterial = new ShaderMaterial('custom', this, 'custom',
+      {
+        attributes: ['uv', 'position'],
+        uniforms: ['iTime', 'iTimeDelta', 'iFrame', 'worldViewProjection']
       });
-      console.log(shaderMaterial);
-      //this.box.material = shaderMaterial;
+      var that = this;
       this.ground.material = shaderMaterial;
+      this.ground.material.onBind = function(m: any) {
+        shaderMaterial.setFloat("iTime",that.time/1000.);
+        shaderMaterial.setFloat("iTimeDelta",that .deltaTime/1000.);
+        shaderMaterial.setFloat("iFrame",that.frame);
+      }
     }
+
 }
