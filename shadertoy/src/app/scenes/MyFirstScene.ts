@@ -1,4 +1,33 @@
-import { Engine, Scene, Vector3, MeshBuilder, HemisphericLight, ShaderMaterial, FlyCamera } from 'babylonjs';
+import {
+  Engine,
+  Scene,
+  Vector3,
+  MeshBuilder,
+  HemisphericLight,
+  ShaderMaterial,
+  FlyCamera,
+  WebGPUEngine,
+  Effect
+} from "@babylonjs/core";
+
+import * as BABYLON from "@babylonjs/core";
+(window as any).BABYLON = BABYLON;
+
+import '@babylonjs/core/Engines/WebGPU/Extensions/';
+// shadows
+import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent';
+
+// texture loading
+import '@babylonjs/core/Materials/Textures/Loaders/envTextureLoader'
+// needed for skybox textur'
+import '@babylonjs/core/Misc/dds'
+// edge'
+import '@babylonjs/core/Rendering/edgesRenderer'
+// gltf'loadin'
+import '@babylonjs/loaders/glTF/2.0'
+// anim'tion'
+import '@babylonjs/core/Animations/animatable'
+// import {WebGPUEngine} from "@babylonjs/core";
 
 export class MyFirstScene extends Scene {
 
@@ -7,7 +36,7 @@ export class MyFirstScene extends Scene {
   public frame: number = 0;
   public time: number = 0;
 
-  constructor(engine: Engine) {
+  constructor(engine: WebGPUEngine) {
     super(engine);
 
     // This creates and positions a free camera (non-mesh)
@@ -25,7 +54,7 @@ export class MyFirstScene extends Scene {
     // Default intensity is 1. Let's dim the light a small amount
     light.intensity = 0.7;
 
-    BABYLON.Effect.ShadersStore['customVertexShader'] = `
+    Effect.ShadersStore['customVertexShader'] = `
 precision highp float;
 attribute vec3 position;
 attribute vec2 uv;
@@ -51,7 +80,7 @@ void main() {
 }
     `;
 
-    BABYLON.Effect.ShadersStore['customFragmentShader'] = `
+    Effect.ShadersStore['customFragmentShader'] = `
         precision highp float;
 
         void main() {

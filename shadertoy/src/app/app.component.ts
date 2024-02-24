@@ -1,7 +1,26 @@
 import {AfterViewInit, Component, ElementRef, NgZone, ViewChild} from '@angular/core';
-import {Engine} from "babylonjs";
+import {EngineFactory, Effect, Engine, WebGPUEngine} from "@babylonjs/core";
 import {MyFirstScene} from "./scenes/MyFirstScene";
 import {CodeModel} from "@ngstack/code-editor";
+import '@babylonjs/core/Engines/WebGPU/Extensions/';
+
+import * as BABYLON from "@babylonjs/core";
+(window as any).BABYLON = BABYLON;
+
+// shadows
+import '@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent';
+
+// texture loading
+import '@babylonjs/core/Materials/Textures/Loaders/envTextureLoader'
+// needed for skybox textur'
+import '@babylonjs/core/Misc/dds'
+// edge'
+import '@babylonjs/core/Rendering/edgesRenderer'
+// gltf'loadin'
+import '@babylonjs/loaders/glTF/2.0'
+// anim'tion'
+import '@babylonjs/core/Animations/animatable'
+// import {WebGPUEngine} from "@babylonjs/core";
 
 @Component({
   selector: 'app-root',
@@ -11,25 +30,32 @@ import {CodeModel} from "@ngstack/code-editor";
 
 export class AppComponent implements AfterViewInit {
   @ViewChild('canvas', {static: true}) private canvas?: ElementRef<HTMLCanvasElement>;
-  private engine?: Engine;
+  private engine?: WebGPUEngine;
   private scene?: MyFirstScene;
 
   //private ngZone: NgZone = new NgZone([]);
   constructor(private ngZone: NgZone) {}
-  ngAfterViewInit(): void {
+  async ngAfterViewInit(): Promise<void> {
     if (this.canvas) {
-      this.engine = new Engine(this.canvas.nativeElement);
-      this.scene = new MyFirstScene(this.engine);
-      this.onCodeChanged(this.codeModel.value);
-      this.ngZone?.runOutsideAngular(() => {
-        this.engine?.runRenderLoop(() => {
-          if (this.scene != undefined)
-          {
-            this.scene.frame++;
-            if(this.engine)
-              this.scene.time+=this.engine.getDeltaTime();
-          }
-          this.scene?.render();
+      const webGPUSupported = await WebGPUEngine.IsSupportedAsync;
+      if (!webGPUSupported) {
+        alert("WebGPU not supported");
+      }
+
+      (globalThis as any).define.amd = undefined;
+      EngineFactory.CreateAsync(this.canvas.nativeElement, {}).then((engine) => {
+        this.engine = engine as WebGPUEngine;
+        this.scene = new MyFirstScene(this.engine);
+        this.onCodeChanged(this.codeModel.value);
+        this.ngZone?.runOutsideAngular(() => {
+          this.engine?.runRenderLoop(() => {
+            if (this.scene != undefined) {
+              this.scene.frame++;
+              if (this.engine)
+                this.scene.time += this.engine.getDeltaTime();
+            }
+            this.scene?.render();
+          });
         });
       });
     }
@@ -69,7 +95,7 @@ export class AppComponent implements AfterViewInit {
   onCodeChanged(value: string) {
 //    console.log(value);
     this.engine?.releaseEffects();
-    BABYLON.Effect.ShadersStore['customFragmentShader'] = `
+    Effect.ShadersStore['customFragmentShader'] = `
         precision highp float;
 
         void main() {
@@ -78,7 +104,7 @@ export class AppComponent implements AfterViewInit {
     `;
     var code = this.assembleFullVertexShader(value);
     console.log(code);
-    BABYLON.Effect.ShadersStore['customVertexShader'] = code;
+    Effect.ShadersStore['customVertexShader'] = code;
     this.scene?.resetMaterials();
   }
 
