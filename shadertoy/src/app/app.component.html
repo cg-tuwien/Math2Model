@@ -7,13 +7,13 @@
 </style>
 
 <main class="main">
-  <div class="content" style="display: flex">
+  <div style="display: flex; min-height: 90vh">
     <canvas #canvas style="width: 50%"></canvas>
-    <ngs-code-editor style="width: 50%; height: 100%"
-      [theme]="theme"
-      [codeModel]="codeModel"
-      [options]="options"
-      (valueChanged)="onCodeChanged($event)">
-    </ngs-code-editor>
+    <!-- TODO: actually has a race condition hehe -->
+    <app-code-editor
+      style="align-self: stretch; flex: 1"
+      (codeChanged)="code = $event()"
+    >
+    </app-code-editor>
   </div>
 </main>

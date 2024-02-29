@@ -3,18 +3,11 @@ import { NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { AppComponent } from './app.component';
-import { CodeEditorModule } from '@ngstack/code-editor';
+import { CodeEditorComponent } from './code-editor/code-editor.component';
 @NgModule({
-  declarations: [
-    AppComponent
-  ],
-  imports: [
-    BrowserModule,
-    FormsModule,
-    CodeEditorModule.forRoot() // use forRoot() in main app module only.
-  ],
+  declarations: [AppComponent],
+  imports: [BrowserModule, FormsModule, CodeEditorComponent],
   providers: [],
-  bootstrap: [AppComponent]
+  bootstrap: [AppComponent],
 })
-export class AppModule {
-}
+export class AppModule {}
