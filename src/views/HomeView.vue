@@ -39,6 +39,7 @@ watch(
     engine.value?.dispose();
     EngineFactory.CreateAsync(canvas, {}).then((e) => {
       engine.value = e as WebGPUEngine;
+      e.compatibilityMode = false;
       scene.value = new MyFirstScene(engine.value);
       onCodeChanged();
 
