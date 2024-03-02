@@ -10,23 +10,6 @@ import {
   Effect,
 } from "@babylonjs/core";
 
-import * as BABYLON from "@babylonjs/core";
-(window as any).BABYLON = BABYLON; // TODO: Do I need this?
-
-import "@babylonjs/core/Engines/WebGPU/Extensions/";
-// shadows
-import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
-
-// texture loading
-import "@babylonjs/core/Materials/Textures/Loaders/envTextureLoader";
-// needed for skybox textur'
-import "@babylonjs/core/Misc/dds";
-// edge'
-import "@babylonjs/core/Rendering/edgesRenderer";
-// gltf'loadin'
-import "@babylonjs/loaders/glTF/2.0";
-// anim'tion'
-import "@babylonjs/core/Animations/animatable";
 // import {WebGPUEngine} from "@babylonjs/core";
 
 export class MyFirstScene extends Scene {

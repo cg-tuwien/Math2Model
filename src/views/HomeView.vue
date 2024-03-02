@@ -4,26 +4,7 @@ import { MyFirstScene } from "@/scenes/MyFirstScene";
 import "@babylonjs/core/Engines/WebGPU/Extensions/";
 import CodeEditor from "@/components/CodeEditor.vue";
 
-// TODO: Do we need to import all of these?
-import * as BABYLON from "@babylonjs/core";
-(window as any).BABYLON = BABYLON;
-
-// shadows
-import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
-
-// texture loading
-import "@babylonjs/core/Materials/Textures/Loaders/envTextureLoader";
-// needed for skybox textur'
-import "@babylonjs/core/Misc/dds";
-// edge'
-import "@babylonjs/core/Rendering/edgesRenderer";
-// gltf'loadin'
-import "@babylonjs/loaders/glTF/2.0";
-// anim'tion'
-import "@babylonjs/core/Animations/animatable";
-// import {WebGPUEngine} from "@babylonjs/core";
-
-import { ref, onMounted, shallowRef, watch } from "vue";
+import { ref, shallowRef, watch } from "vue";
 import debounce from "debounce";
 const canvasElement = ref<HTMLCanvasElement | null>(null);
 const code = ref(`vec4 mainImage() {
