@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { EngineFactory, Effect, WebGPUEngine } from "@babylonjs/core";
+import {
+  EngineFactory,
+  Effect,
+  WebGPUEngine,
+  ShaderStore,
+} from "@babylonjs/core";
 import { MyFirstScene } from "@/scenes/MyFirstScene";
 import "@babylonjs/core/Engines/WebGPU/Extensions/";
 import CodeEditor from "@/components/CodeEditor.vue";
@@ -7,22 +12,25 @@ import CodeEditor from "@/components/CodeEditor.vue";
 import { ref, shallowRef, watch } from "vue";
 import debounce from "debounce";
 const canvasElement = ref<HTMLCanvasElement | null>(null);
-const code = ref(`vec4 mainImage() {
-    vec3 pos = vec3(uv.x, 0.0, 2. * uv.y) * 3.14159265359;
+const code = ref(`fn mainImage(input: VertexInputs) -> vec4<f32> {
+    let pos = vec3(input.uv.x, 0.0, 2. * input.uv.y) * 3.14159265359;
 
-    float x = sin(pos.x) * cos(pos.z);
-    float y = sin(pos.x) * sin(pos.z);
-    float z = cos(pos.x);
+    let x = sin(pos.x) * cos(pos.z);
+    let y = sin(pos.x) * sin(pos.z);
+    let z = cos(pos.x);
 
-    float x2 = sin(pos.x) * (15. * sin(pos.z) - 4. * sin(3. * pos.z));
-    float y2 = 8. * cos(pos.x);
-    float z2 = sin(pos.x) * (15. * cos(pos.z) - 5. * cos(2. * pos.z) - 2. * cos(3. * pos.z) - cos(2. * pos.z));
+    let x2 = sin(pos.x) * (15. * sin(pos.z) - 4. * sin(3. * pos.z));
+    let y2 = 8. * cos(pos.x);
+    let z2 = sin(pos.x) * (15. * cos(pos.z) - 5. * cos(2. * pos.z) - 2. * cos(3. * pos.z) - cos(2. * pos.z));
 
-    vec3 sphere = vec3(x, y, z) * 3.0;
-    vec3 heart = vec3(x2, y2, z2) * 0.2;
+    let sphere = vec3(x, y, z) * 3.0;
+    let heart = vec3(x2, y2, z2) * 0.2;
 
-    vec4 p = vec4(mix(sphere, heart, 0.5) * 1., 1.);
-    return worldViewProjection * p;
+    let p = vec4(mix(sphere, heart, 0.) * 1., 1.)
+    + vec4(f32(input.instanceIndex)* 10.1, 0.0, 0.0, 1.0);
+
+    //let p = vec4(pos.x, pos.y, pos.z, 1.0) + vec4(0.0, f32(input.vertexIndex)* 0.1, 0.0, 0.0);
+    return scene.projection * scene.view * mesh.world * p;
 }`);
 const engine = shallowRef<WebGPUEngine | null>(null);
 const scene = shallowRef<MyFirstScene | null>(null);
@@ -40,8 +48,9 @@ watch(
     EngineFactory.CreateAsync(canvas, {}).then((e) => {
       engine.value = e as WebGPUEngine;
       e.compatibilityMode = false;
-      scene.value = new MyFirstScene(engine.value);
+      e.getCaps().canUseGLInstanceID = false;
       onCodeChanged();
+      scene.value = new MyFirstScene(engine.value);
 
       engine.value?.runRenderLoop(() => {
         if (scene.value === null) return;
@@ -61,30 +70,46 @@ function onCodeChanged() {
   if (!engine.value) return;
 
   engine.value.releaseEffects();
-  Effect.ShadersStore["customFragmentShader"] = `
-        precision highp float;
-
-        void main() {
-            gl_FragColor = vec4(1.,0.,0.,1.);
+  ShaderStore.ShadersStoreWGSL["customFragmentShader"] = `
+        @fragment
+        fn main(input : FragmentInputs) -> FragmentOutputs {
+            fragmentOutputs.color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
         }
-    `;
-  Effect.ShadersStore["customVertexShader"] = assembleFullVertexShader(
+   `;
+  ShaderStore.ShadersStoreWGSL["customVertexShader"] = assembleFullVertexShader(
     code.value
   );
   scene.value?.resetMaterials();
 }
 
 function assembleFullVertexShader(innerCode: string) {
-  let prefix =
-    "precision highp float;\n" +
-    "attribute vec3 position;\n" +
-    "attribute vec2 uv;\n" +
-    "uniform float iTime;\n" +
-    "uniform float iTimeDelta;\n" +
-    "uniform float iFrame;\n" +
-    "uniform mat4 worldViewProjection;\n";
-  let call = "" + "void main() {" + "gl_Position = mainImage();" + "}";
-  return prefix + "\n" + innerCode + "\n" + call;
+  return `
+#include<sceneUboDeclaration>
+#include<meshUboDeclaration>
+
+attribute position : vec3<f32>;
+attribute uv: vec2<f32>;
+
+varying vUV : vec2<f32>;
+
+// TODO: Make them global
+struct MyUBO {
+  iTime: f32,
+  iTimeDelta: f32,
+  iFrame: f32,
+};
+
+var<uniform> myUBO: MyUBO;
+
+${innerCode}
+
+@vertex
+fn main(input: VertexInputs) -> FragmentInputs {
+    vertexOutputs.position = mainImage(input);
+    vertexOutputs.vUV = vertexInputs.uv;
+}    
+  
+  `;
 }
 
 const setNewCode = debounce((newCode: () => string) => {

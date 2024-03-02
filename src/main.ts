@@ -14,14 +14,14 @@ import tsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker"
 globalThis.addEventListener("unhandledrejection", (event) => {
   Notification.error({
     title: "Unhandled Promise Rejection",
-    content: event.reason,
+    content: event.reason + "",
   });
   console.error(event);
 });
 globalThis.addEventListener("error", (event) => {
   Notification.error({
     title: "Unhandled Error",
-    content: event.message,
+    content: event.message + "",
   });
   console.error(event);
 });

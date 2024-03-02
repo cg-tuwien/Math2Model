@@ -15,6 +15,7 @@ import {
   WebGPUDataBuffer,
   Buffer,
   StorageBuffer,
+  ShaderLanguage,
 } from "@babylonjs/core";
 
 // import {WebGPUEngine} from "@babylonjs/core";
@@ -45,45 +46,6 @@ export class MyFirstScene extends Scene {
     // Default intensity is 1. Let's dim the light a small amount
     light.intensity = 0.7;
 
-    Effect.ShadersStore["customVertexShader"] = `
-precision highp float;
-attribute vec3 position;
-attribute vec2 uv;
-uniform mat4 worldViewProjection;
-
-void main() {
-
-    vec3 pos = vec3(uv.x, 0.0, uv.y) * 3.14159265359 * 2.;
-
-    float x = sin(pos.x) * cos(pos.z);
-    float y = sin(pos.x) * sin(pos.z);
-    float z = cos(pos.x);
-
-    float x2 = sin(pos.x) * (15. * sin(pos.z) - 4. * sin(3. * pos.z));
-    float y2 = 8. * cos(pos.x);
-    float z2 = sin(pos.x) * (15. * cos(pos.z) - 5. * cos(2. * pos.z) - 2. * cos(3. * pos.z) - cos(2. * pos.z));
-
-    vec3 sphere = vec3(x, y, z);
-    vec3 heart = vec3(x2, y2, z2);
-
-    vec4 p = vec4(mix(sphere, heart, 0.) * 1., 1.);
-    gl_Position = worldViewProjection * p;
-}
-    `;
-
-    Effect.ShadersStore["customFragmentShader"] = `
-        precision highp float;
-
-        void main() {
-            gl_FragColor = vec4(1.,0.,0.,1.);
-        }
-    `;
-
-    let shaderMaterial = new ShaderMaterial("custom", this, "custom", {
-      attributes: ["uv", "position"],
-      uniforms: ["iTime", "iTimeDelta", "iFrame"],
-    });
-    shaderMaterial.allowShaderHotSwapping = true;
     // Create a built-in "box" shape; with 2 segments and a height of 1.
     //this.box = MeshBuilder.CreateBox("box", {size: 2}, this);
     //this.box.material = shaderMaterial;
@@ -97,11 +59,8 @@ void main() {
     this.ground.thinInstanceAdd(
       Matrix.Translation(3.14159265359, 0.0, 3.14159265359)
     );
-    this.ground.thinInstanceAdd(
-      Matrix.Translation(3.14159265359, 0.0, -3.14159265359)
-    );
-    // this.ground.material = shaderMaterial;
     this.ground.thinInstanceCount = 1;
+    this.resetMaterials();
 
     let cs = new ComputeShader(
       "mycs",
@@ -142,7 +101,9 @@ void main() {
 
     let t = 0;
     let first = true;
+
     this.onBeforeRenderObservable.add(() => {
+      // TODO: Correctly handle resetMaterials
       const renderPassId = engine.currentRenderPassId;
       const drawWrapper = this.ground.subMeshes[0]._getDrawWrapper(
         renderPassId,
@@ -167,7 +128,7 @@ void main() {
 
           csUniformBuffer.updateUInt(
             "visibleInstances",
-            Math.floor(Math.random() * 10) + 1
+            Math.floor(Math.random() * 10) + 2
           );
           csUniformBuffer.update();
 
@@ -180,15 +141,26 @@ void main() {
   // Für Hot reloading
   resetMaterials(): void {
     this.ground.material?.dispose();
+    // TODO: code duplication
     let shaderMaterial = new ShaderMaterial("custom", this, "custom", {
       attributes: ["uv", "position"],
-      uniforms: ["iTime", "iTimeDelta", "iFrame", "worldViewProjection"],
+      uniformBuffers: ["Scene", "Mesh"],
+      // uniforms: ["iTime", "iTimeDelta", "iFrame", "worldViewProjection"],
+      shaderLanguage: ShaderLanguage.WGSL,
     });
-    // this.ground.material = shaderMaterial;
-    /*this.ground.material.onBind = (m: any) => {
-      shaderMaterial.setFloat("iTime", this.time / 1000);
-      shaderMaterial.setFloat("iTimeDelta", this.deltaTime / 1000);
-      shaderMaterial.setFloat("iFrame", this.frame);
-    };*/
+    const myUBO = new UniformBuffer(this.getEngine());
+    myUBO.addUniform("iTime", 1);
+    myUBO.addUniform("iTimeDelta", 1);
+    myUBO.addUniform("iFrame", 1);
+    myUBO.update();
+    shaderMaterial.setUniformBuffer("myUBO", myUBO);
+
+    shaderMaterial.onBind = (m: any) => {
+      myUBO.updateFloat("iTime", this.time / 1000);
+      myUBO.updateFloat("iTimeDelta", this.deltaTime / 1000);
+      myUBO.updateFloat("iFrame", this.frame);
+      myUBO.update();
+    };
+    this.ground.material = shaderMaterial;
   }
 }
