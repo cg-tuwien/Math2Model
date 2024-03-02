@@ -2,6 +2,7 @@ import "./assets/main.css";
 
 import { createApp } from "vue";
 import { createPinia } from "pinia";
+import { Notification } from "@/notification";
 
 import App from "./App.vue";
 import router from "./router";
@@ -9,6 +10,21 @@ import router from "./router";
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
 import tsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
+
+globalThis.addEventListener("unhandledrejection", (event) => {
+  Notification.error({
+    title: "Unhandled Promise Rejection",
+    content: event.reason,
+  });
+  console.error(event);
+});
+globalThis.addEventListener("error", (event) => {
+  Notification.error({
+    title: "Unhandled Error",
+    content: event.message,
+  });
+  console.error(event);
+});
 
 if (self.MonacoEnvironment) {
   console.error(

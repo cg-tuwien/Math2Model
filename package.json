@@ -20,6 +20,7 @@
     "debounce": "^2.0.0",
     "monaco-editor": "^0.46.0",
     "monaco-languageclient": "^7.3.0",
+    "naive-ui": "^2.38.1",
     "pinia": "^2.1.7",
     "vue": "^3.4.15",
     "vue-router": "^4.2.5"
