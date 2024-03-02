@@ -1,14 +1,38 @@
-import './assets/main.css'
+import "./assets/main.css";
 
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
+import { createApp } from "vue";
+import { createPinia } from "pinia";
 
-import App from './App.vue'
-import router from './router'
+import App from "./App.vue";
+import router from "./router";
 
-const app = createApp(App)
+import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
+import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
+import tsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
 
-app.use(createPinia())
-app.use(router)
+if (self.MonacoEnvironment) {
+  console.error(
+    "Monaco environment shouldn't exist yet ",
+    self.MonacoEnvironment
+  );
+}
+self.MonacoEnvironment = {
+  getWorker: function (_, label) {
+    switch (label) {
+      case "json":
+        return new jsonWorker();
+      case "typescript":
+      case "javascript":
+        return new tsWorker();
+      default:
+        return new editorWorker();
+    }
+  },
+};
 
-app.mount('#app')
+const app = createApp(App);
+
+app.use(createPinia());
+app.use(router);
+
+app.mount("#app");
