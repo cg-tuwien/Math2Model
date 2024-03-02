@@ -36,10 +36,6 @@ watch(monacoMount, (element) => {
 });
 </script>
 <template>
-  <div ref="monacoMount"></div>
+  <div ref="monacoMount" class="border border-gray-500"></div>
 </template>
-<style scoped>
-div {
-  border: 1px solid grey;
-}
-</style>
+<style scoped></style>

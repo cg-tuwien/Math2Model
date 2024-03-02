@@ -111,11 +111,11 @@ const setNewCode = debounce((newCode: () => string) => {
 </script>
 
 <template>
-  <main class="main">
-    <div style="display: flex; min-height: 90vh">
-      <canvas ref="canvasElement" style="width: 50%"></canvas>
+  <main class="min-h-full">
+    <div class="flex" style="min-height: 90vh">
+      <canvas ref="canvasElement" class="touch-non"></canvas>
       <CodeEditor
-        class="code-editor"
+        class="self-stretch flex-1 overflow-hidden"
         :start-code="code"
         @update="setNewCode($event)"
       >
@@ -128,15 +128,5 @@ const setNewCode = debounce((newCode: () => string) => {
 canvas {
   width: 50%;
   height: 50%;
-  touch-action: none;
-}
-
-.main {
-  min-height: 100%;
-}
-.code-editor {
-  align-self: stretch;
-  flex: 1;
-  overflow: hidden;
 }
 </style>
