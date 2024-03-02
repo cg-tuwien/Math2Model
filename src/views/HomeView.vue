@@ -96,6 +96,7 @@ const setNewCode = debounce((newCode: () => string) => {
   <main class="min-h-full">
     <div class="flex" style="min-height: 90vh">
       <canvas ref="canvasElement" class="touch-non"></canvas>
+      <!-- TODO: That's a glsl shader -->
       <CodeEditor
         class="self-stretch flex-1 overflow-hidden"
         :start-code="code"

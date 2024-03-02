@@ -14,7 +14,6 @@ const { width, height } = useElementSize(monacoMount);
 watch(
   [width, height],
   debounce(() => {
-    console.log("layout");
     editor.value?.layout();
   }, 100)
 );

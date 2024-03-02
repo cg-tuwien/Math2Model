@@ -8,12 +8,21 @@ import {
   FlyCamera,
   WebGPUEngine,
   Effect,
+  type GroundMesh,
+  Matrix,
+  ComputeShader,
+  UniformBuffer,
+  WebGPUDataBuffer,
+  Buffer,
+  StorageBuffer,
 } from "@babylonjs/core";
 
 // import {WebGPUEngine} from "@babylonjs/core";
 
+// TODO: Maybe hook into Vite's hot reloading?
+
 export class MyFirstScene extends Scene {
-  private ground: any;
+  private ground: GroundMesh;
 
   public frame: number = 0;
   public time: number = 0;
@@ -22,7 +31,7 @@ export class MyFirstScene extends Scene {
     super(engine);
 
     // This creates and positions a free camera (non-mesh)
-    var camera = new FlyCamera("camera1", new Vector3(0, 5, -10), this);
+    let camera = new FlyCamera("camera1", new Vector3(0, 5, -10), this);
 
     // This targets the camera to scene origin
     // camera.setTarget(Vector3.Zero());
@@ -31,7 +40,7 @@ export class MyFirstScene extends Scene {
     camera.attachControl(true);
 
     // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
-    var light = new HemisphericLight("light1", new Vector3(0, 1, 0), this);
+    let light = new HemisphericLight("light1", new Vector3(0, 1, 0), this);
 
     // Default intensity is 1. Let's dim the light a small amount
     light.intensity = 0.7;
@@ -70,7 +79,7 @@ void main() {
         }
     `;
 
-    var shaderMaterial = new ShaderMaterial("custom", this, "custom", {
+    let shaderMaterial = new ShaderMaterial("custom", this, "custom", {
       attributes: ["uv", "position"],
       uniforms: ["iTime", "iTimeDelta", "iFrame"],
     });
@@ -84,23 +93,102 @@ void main() {
       { width: 3.14159265359 * 2, height: 3.14159265359 * 2, subdivisions: 10 },
       this
     );
-    this.ground.position = new Vector3(3.14159265359, 0.0, 3.14159265359);
-    this.ground.material = shaderMaterial;
+    this.ground.thinInstanceAddSelf();
+    this.ground.thinInstanceAdd(
+      Matrix.Translation(3.14159265359, 0.0, 3.14159265359)
+    );
+    this.ground.thinInstanceAdd(
+      Matrix.Translation(3.14159265359, 0.0, -3.14159265359)
+    );
+    // this.ground.material = shaderMaterial;
+    this.ground.thinInstanceCount = 1;
+
+    let cs = new ComputeShader(
+      "mycs",
+      engine,
+      {
+        computeSource: `
+            struct IndirectDrawBuffer {
+                indexOrVertexCount: u32,
+                instanceCount: u32,
+                firstIndexOrVertex: u32,
+                tmp1: u32,
+                tmp2: u32,
+            };
+
+            struct InputBuffer {
+                visibleInstances: u32,
+            };
+
+            @group(0) @binding(0) var<storage,read_write> indirectDrawBuffer : IndirectDrawBuffer;
+            @group(0) @binding(1) var<uniform> inputBuffer : InputBuffer;
+
+            @compute @workgroup_size(1, 1, 1)
+            fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
+                indirectDrawBuffer.instanceCount = inputBuffer.visibleInstances;
+            }
+        `,
+      },
+      {
+        bindingsMapping: {
+          indirectDrawBuffer: { group: 0, binding: 0 },
+          inputBuffer: { group: 0, binding: 1 },
+        },
+      }
+    );
+    const csUniformBuffer = new UniformBuffer(engine);
+    csUniformBuffer.addUniform("visibleInstances", 1);
+    cs.setUniformBuffer("inputBuffer", csUniformBuffer);
+
+    let t = 0;
+    let first = true;
+    this.onBeforeRenderObservable.add(() => {
+      const renderPassId = engine.currentRenderPassId;
+      const drawWrapper = this.ground.subMeshes[0]._getDrawWrapper(
+        renderPassId,
+        false
+      );
+
+      if (t++ > 30) {
+        t = 0;
+        let indirectDrawBuffer: GPUBuffer = (drawWrapper?.drawContext as any)
+          ?.indirectDrawBuffer;
+        if (indirectDrawBuffer) {
+          if (first) {
+            const buffer = new Buffer(
+              engine,
+              new WebGPUDataBuffer(indirectDrawBuffer, 20),
+              true
+            );
+            // TODO: Ask babylon js peeps to add a proper API for this
+            cs.setStorageBuffer("indirectDrawBuffer", buffer as any);
+            first = false;
+          }
+
+          csUniformBuffer.updateUInt(
+            "visibleInstances",
+            Math.floor(Math.random() * 10) + 1
+          );
+          csUniformBuffer.update();
+
+          cs.dispatch(1, 1, 1);
+        }
+      }
+    });
   }
 
   // Für Hot reloading
   resetMaterials(): void {
-    this.ground.material.dispose();
-    var shaderMaterial = new ShaderMaterial("custom", this, "custom", {
+    this.ground.material?.dispose();
+    let shaderMaterial = new ShaderMaterial("custom", this, "custom", {
       attributes: ["uv", "position"],
       uniforms: ["iTime", "iTimeDelta", "iFrame", "worldViewProjection"],
     });
-    var that = this;
-    this.ground.material = shaderMaterial;
-    this.ground.material.onBind = function (m: any) {
-      shaderMaterial.setFloat("iTime", that.time / 1000);
-      shaderMaterial.setFloat("iTimeDelta", that.deltaTime / 1000);
-      shaderMaterial.setFloat("iFrame", that.frame);
-    };
+    // this.ground.material = shaderMaterial;
+    /*this.ground.material.onBind = (m: any) => {
+      shaderMaterial.setFloat("iTime", this.time / 1000);
+      shaderMaterial.setFloat("iTimeDelta", this.deltaTime / 1000);
+      shaderMaterial.setFloat("iFrame", this.frame);
+    };*/
   }
 }
