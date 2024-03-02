@@ -11,6 +11,7 @@ import CodeEditor from "@/components/CodeEditor.vue";
 
 import { ref, shallowRef, watch } from "vue";
 import debounce from "debounce";
+import { useElementSize } from "@vueuse/core";
 const canvasElement = ref<HTMLCanvasElement | null>(null);
 const code = ref(`fn mainImage(input: VertexInputs) -> vec4<f32> {
     let pos = vec3(input.uv.x, 0.0, 2. * input.uv.y) * 3.14159265359;
@@ -34,6 +35,14 @@ const code = ref(`fn mainImage(input: VertexInputs) -> vec4<f32> {
 }`);
 const engine = shallowRef<WebGPUEngine | null>(null);
 const scene = shallowRef<MyFirstScene | null>(null);
+
+const { width, height } = useElementSize(canvasElement);
+watch(
+  [width, height],
+  debounce(() => {
+    engine.value?.resize();
+  }, 100)
+);
 
 WebGPUEngine.IsSupportedAsync.then((supported) => {
   if (!supported) {
@@ -119,8 +128,11 @@ const setNewCode = debounce((newCode: () => string) => {
 
 <template>
   <main class="min-h-full">
-    <div class="flex" style="min-height: 90vh">
-      <canvas ref="canvasElement" class="touch-non"></canvas>
+    <div class="flex" style="height: 90vh">
+      <canvas
+        ref="canvasElement"
+        class="touch-non self-stretch flex-1 overflow-hidden"
+      ></canvas>
       <!-- TODO: That's a glsl shader -->
       <CodeEditor
         class="self-stretch flex-1 overflow-hidden"
@@ -132,9 +144,4 @@ const setNewCode = debounce((newCode: () => string) => {
   </main>
 </template>
 
-<style scoped>
-canvas {
-  width: 50%;
-  height: 50%;
-}
-</style>
+<style scoped></style>
