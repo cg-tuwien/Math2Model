@@ -60,7 +60,27 @@ export class MyFirstScene extends Scene {
       Matrix.Translation(3.14159265359, 0.0, 3.14159265359)
     );
     this.ground.thinInstanceCount = 1;
-    this.resetMaterials();
+
+    let shaderMaterial = new ShaderMaterial("custom", this, "custom", {
+      attributes: ["uv", "position"],
+      uniformBuffers: ["Scene", "Mesh"],
+      // uniforms: ["iTime", "iTimeDelta", "iFrame", "worldViewProjection"],
+      shaderLanguage: ShaderLanguage.WGSL,
+    });
+    const myUBO = new UniformBuffer(this.getEngine());
+    myUBO.addUniform("iTime", 1);
+    myUBO.addUniform("iTimeDelta", 1);
+    myUBO.addUniform("iFrame", 1);
+    myUBO.update();
+    shaderMaterial.setUniformBuffer("myUBO", myUBO);
+
+    shaderMaterial.onBind = (m: any) => {
+      myUBO.updateFloat("iTime", this.time / 1000);
+      myUBO.updateFloat("iTimeDelta", this.deltaTime / 1000);
+      myUBO.updateFloat("iFrame", this.frame);
+      myUBO.update();
+    };
+    this.ground.material = shaderMaterial;
 
     let cs = new ComputeShader(
       "mycs",
@@ -136,31 +156,5 @@ export class MyFirstScene extends Scene {
         }
       }
     });
-  }
-
-  // Für Hot reloading
-  resetMaterials(): void {
-    this.ground.material?.dispose();
-    // TODO: code duplication
-    let shaderMaterial = new ShaderMaterial("custom", this, "custom", {
-      attributes: ["uv", "position"],
-      uniformBuffers: ["Scene", "Mesh"],
-      // uniforms: ["iTime", "iTimeDelta", "iFrame", "worldViewProjection"],
-      shaderLanguage: ShaderLanguage.WGSL,
-    });
-    const myUBO = new UniformBuffer(this.getEngine());
-    myUBO.addUniform("iTime", 1);
-    myUBO.addUniform("iTimeDelta", 1);
-    myUBO.addUniform("iFrame", 1);
-    myUBO.update();
-    shaderMaterial.setUniformBuffer("myUBO", myUBO);
-
-    shaderMaterial.onBind = (m: any) => {
-      myUBO.updateFloat("iTime", this.time / 1000);
-      myUBO.updateFloat("iTimeDelta", this.deltaTime / 1000);
-      myUBO.updateFloat("iFrame", this.frame);
-      myUBO.update();
-    };
-    this.ground.material = shaderMaterial;
   }
 }

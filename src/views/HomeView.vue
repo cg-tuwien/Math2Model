@@ -88,7 +88,8 @@ function onCodeChanged() {
   ShaderStore.ShadersStoreWGSL["customVertexShader"] = assembleFullVertexShader(
     code.value
   );
-  scene.value?.resetMaterials();
+  scene.value?.dispose();
+  scene.value = new MyFirstScene(engine.value);
 }
 
 function assembleFullVertexShader(innerCode: string) {
