@@ -148,7 +148,7 @@ export class MyFirstScene extends Scene {
 
           csUniformBuffer.updateUInt(
             "visibleInstances",
-            Math.floor(Math.random() * 10) + 2
+              Math.max(1, Math.floor(256 / Vector3.Distance(camera.position, this.ground.position)))
           );
           csUniformBuffer.update();
 
