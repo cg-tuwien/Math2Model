@@ -9,7 +9,11 @@ As discussed during our meeting on 08.01.2024:
 
 ## Recommended IDE Setup
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
+[VSCode](https://code.visualstudio.com/) with
+
+- [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) for Vue.js support
+- [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) for code formatting
+- [Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss) for slightly better Tailwind CSS suggestions
 
 ## Project Setup
 
