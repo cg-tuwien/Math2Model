@@ -33,7 +33,8 @@ export class MyFirstScene extends Scene {
 
     // This creates and positions a free camera (non-mesh)
     let camera = new FlyCamera("camera1", new Vector3(0, 5, -10), this);
-
+    camera.minZ = 0.001;
+    camera.maxZ = 1000;
     // This targets the camera to scene origin
     // camera.setTarget(Vector3.Zero());
 
@@ -52,7 +53,7 @@ export class MyFirstScene extends Scene {
 
     this.ground = MeshBuilder.CreateGround(
       "ground",
-      { width: 3.14159265359 * 2, height: 3.14159265359 * 2, subdivisions: 10 },
+      { width: 3.14159265359 * 2, height: 3.14159265359 * 2, subdivisions: 5 },
       this
     );
     this.ground.thinInstanceAddSelf();
@@ -62,24 +63,33 @@ export class MyFirstScene extends Scene {
     this.ground.thinInstanceCount = 1;
 
     let shaderMaterial = new ShaderMaterial("custom", this, "custom", {
-      attributes: ["uv", "position"],
-      uniformBuffers: ["Scene", "Mesh"],
+      attributes: ["uv", "position","normal"],
+      uniformBuffers: ["Scene", "Mesh", "instances"],
       // uniforms: ["iTime", "iTimeDelta", "iFrame", "worldViewProjection"],
       shaderLanguage: ShaderLanguage.WGSL,
     });
+    shaderMaterial.backFaceCulling = false;
+    shaderMaterial.wireframe = true;
     const myUBO = new UniformBuffer(this.getEngine());
     myUBO.addUniform("iTime", 1);
     myUBO.addUniform("iTimeDelta", 1);
     myUBO.addUniform("iFrame", 1);
+    myUBO.addUniform("width", 1);
     myUBO.update();
     shaderMaterial.setUniformBuffer("myUBO", myUBO);
 
-    shaderMaterial.onBind = (m: any) => {
+``
+      //console.log(nextPowOf2);
+      shaderMaterial.onBind = (m: any) => {
+        var x = Math.floor(255 / Vector3.Distance(camera.position, this.ground.position));
+        var nextSquareNum = Math.pow(Math.ceil(Math.sqrt(x)),2);
       myUBO.updateFloat("iTime", this.time / 1000);
       myUBO.updateFloat("iTimeDelta", this.deltaTime / 1000);
       myUBO.updateFloat("iFrame", this.frame);
+      myUBO.updateFloat("width", nextSquareNum);
       myUBO.update();
     };
+    console.log();
     this.ground.material = shaderMaterial;
 
     let cs = new ComputeShader(
@@ -129,8 +139,8 @@ export class MyFirstScene extends Scene {
         renderPassId,
         false
       );
-
-      if (t++ > 30) {
+      let refresh = 0;
+      if (t++ > refresh) {
         t = 0;
         let indirectDrawBuffer: GPUBuffer = (drawWrapper?.drawContext as any)
           ?.indirectDrawBuffer;
@@ -146,9 +156,12 @@ export class MyFirstScene extends Scene {
             first = false;
           }
 
+          var x = Math.floor(255 / Vector3.Distance(camera.position, this.ground.position));
+          var nextSquareNum = Math.pow(Math.ceil(Math.sqrt(x)),2);
+          console.log("Mesh LOD:" + nextSquareNum + "T: " + t);
           csUniformBuffer.updateUInt(
             "visibleInstances",
-              Math.max(1, Math.floor(256 / Vector3.Distance(camera.position, this.ground.position)))
+              nextSquareNum
           );
           csUniformBuffer.update();
 
@@ -157,4 +170,6 @@ export class MyFirstScene extends Scene {
       }
     });
   }
+
+
 }

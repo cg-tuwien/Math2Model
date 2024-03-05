@@ -13,8 +13,8 @@ import { ref, shallowRef, watch } from "vue";
 import debounce from "debounce";
 import { useElementSize } from "@vueuse/core";
 const canvasElement = ref<HTMLCanvasElement | null>(null);
-const code = ref(`fn mainImage(input: VertexInputs) -> vec4<f32> {
-    let pos = vec3(input.uv.x, 0.0, 2. * input.uv.y) * 3.14159265359;
+const code = ref(`fn evaluateImage(input2: vec2f) -> vec3f {
+    let pos = vec3(input2.x, 0.0, 2. * input2.y) * 3.14159265359;
 
     let x = sin(pos.x) * cos(pos.z);
     let y = sin(pos.x) * sin(pos.z);
@@ -27,12 +27,16 @@ const code = ref(`fn mainImage(input: VertexInputs) -> vec4<f32> {
     let sphere = vec3(x, y, z) * 3.0;
     let heart = vec3(x2, y2, z2) * 0.2;
 
-    let p = vec4(mix(sphere, heart, 0.) * 1., 1.)
-    + vec4(f32(input.instanceIndex)* 10.1, 0.0, 0.0, 1.0);
+    let p = vec3(mix(sphere, heart, 0.) * 1.);
 
-    //let p = vec4(pos.x, pos.y, pos.z, 1.0) + vec4(0.0, f32(input.vertexIndex)* 0.1, 0.0, 0.0);
-    return scene.projection * scene.view * mesh.world * p;
-}`);
+    return p;
+}
+
+/*fn evaluateImage(input2: vec2f) -> vec3f {
+    let pos = vec3(input2.x, 0.0, input2.y);
+    return vec3(input2.xy,0.);
+}*/
+`);
 const engine = shallowRef<WebGPUEngine | null>(null);
 const scene = shallowRef<MyFirstScene | null>(null);
 
@@ -80,9 +84,11 @@ function onCodeChanged() {
 
   engine.value.releaseEffects();
   ShaderStore.ShadersStoreWGSL["customFragmentShader"] = `
+        varying vNormal : vec3<f32>;
+        varying vUV : vec2<f32>;
         @fragment
         fn main(input : FragmentInputs) -> FragmentOutputs {
-            fragmentOutputs.color = vec4<f32>(1.0, 0.0, 0.0, 1.0);
+            fragmentOutputs.color = vec4<f32>(input.vUV,1.0, 1.0);
         }
    `;
   ShaderStore.ShadersStoreWGSL["customVertexShader"] = assembleFullVertexShader(
@@ -93,20 +99,24 @@ function onCodeChanged() {
 }
 
 function assembleFullVertexShader(innerCode: string) {
+  // language=HTML
   return `
 #include<sceneUboDeclaration>
 #include<meshUboDeclaration>
 
 attribute position : vec3<f32>;
 attribute uv: vec2<f32>;
+attribute normal : vec3<f32>;
 
 varying vUV : vec2<f32>;
+varying vNormal : vec3<f32>;
 
 // TODO: Make them global
 struct MyUBO {
   iTime: f32,
   iTimeDelta: f32,
   iFrame: f32,
+  width: f32,
 };
 
 var<uniform> myUBO: MyUBO;
@@ -115,11 +125,23 @@ ${innerCode}
 
 @vertex
 fn main(input: VertexInputs) -> FragmentInputs {
-    vertexOutputs.position = mainImage(input);
+    let actualWidth = ceil(sqrt(myUBO.width));
+    let ind = f32(input.instanceIndex);
+
+    let cellSize = 1. / actualWidth;
+
+    var xSliced = vertexInputs.uv;
+    xSliced.x /= actualWidth;
+    xSliced.x += floor(ind/actualWidth)*cellSize;
+    xSliced.y /= actualWidth;
+    xSliced.y += (ind%actualWidth)*cellSize;
+    vertexInputs.uv = xSliced;
+
+    let pos = evaluateImage(vertexInputs.uv);
+    vertexOutputs.position = scene.projection * scene.view * mesh.world * vec4f(pos,1.);
     vertexOutputs.vUV = vertexInputs.uv;
-}    
-  
-  `;
+    vertexOutputs.vNormal = vertexInputs.normal;
+}`;
 }
 
 const setNewCode = debounce((newCode: () => string) => {
