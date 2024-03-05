@@ -69,7 +69,7 @@ export class MyFirstScene extends Scene {
       shaderLanguage: ShaderLanguage.WGSL,
     });
     shaderMaterial.backFaceCulling = false;
-    shaderMaterial.wireframe = true;
+    shaderMaterial.wireframe = false;
     const myUBO = new UniformBuffer(this.getEngine());
     myUBO.addUniform("iTime", 1);
     myUBO.addUniform("iTimeDelta", 1);
