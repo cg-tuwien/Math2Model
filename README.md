@@ -15,6 +15,13 @@ As discussed during our meeting on 08.01.2024:
 - [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) for code formatting
 - [Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss) for slightly better Tailwind CSS suggestions
 
+## Useful Documentation
+
+- Vue.js documentation
+- TailwindCSS documentation
+- [NaiveUI Components](https://www.naiveui.com/en-US/os-theme/components/button)
+- [Material Design Icons](https://icon-sets.iconify.design/mdi/), use them with `mdi-icon-name` (e.g. `<mdi-hamburger-menu />`)
+
 ## Project Setup
 
 ```sh

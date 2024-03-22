@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-import { ref, shallowRef, watch } from "vue";
-import { useElementSize } from "@vueuse/core";
-import debounce from "debounce";
+import { computed, ref, shallowRef, watch } from "vue";
+import { useDebounceFn, useElementSize } from "@vueuse/core";
 
 const monacoMount = ref<HTMLDivElement | null>(null);
-const props = defineProps<{ startCode: string }>();
+const props = defineProps<{ startCode: string; isDark: boolean }>();
 const emit = defineEmits<{ update: [code: () => string] }>();
+
+const themeName = computed(() => (props.isDark ? "vs-dark" : "vs"));
 
 const editor = shallowRef<monaco.editor.IStandaloneCodeEditor | null>(null);
 
 const { width, height } = useElementSize(monacoMount);
 watch(
   [width, height],
-  debounce(() => {
+  useDebounceFn(() => {
     editor.value?.layout();
   }, 100)
 );
@@ -27,11 +28,16 @@ watch(monacoMount, (element) => {
     minimap: {
       enabled: false,
     },
+    theme: themeName.value,
   });
 
   editor.value.onDidChangeModelContent((e) => {
     emit("update", () => editor.value?.getValue() ?? "");
   });
+});
+
+watch(themeName, (v) => {
+  monaco.editor.setTheme(v);
 });
 </script>
 <template>
