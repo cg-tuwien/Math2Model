@@ -1,5 +1,5 @@
 import { ref, computed } from "vue";
-import { defineStore } from "pinia";
+import { acceptHMRUpdate, defineStore } from "pinia";
 import { useDark } from "@vueuse/core";
 
 /**
@@ -17,3 +17,7 @@ export const useStore = defineStore("store", () => {
     },
   };
 });
+
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useStore, import.meta.hot));
+}
