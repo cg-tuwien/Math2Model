@@ -5,7 +5,6 @@ import { useDebounceFn, useElementSize } from "@vueuse/core";
 
 const monacoMount = ref<HTMLDivElement | null>(null);
 const props = defineProps<{
-  codeKey: string;
   startCode: string;
   isDark: boolean;
 }>();
@@ -24,7 +23,7 @@ watch(
 );
 
 watch(
-  () => props.codeKey,
+  () => props.startCode,
   () => {
     editor.value?.setValue(props.startCode);
   }

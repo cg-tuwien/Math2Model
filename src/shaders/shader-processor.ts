@@ -1,4 +1,4 @@
-import type { ShaderSources } from "@/scenes/editable-scene";
+import type { ReactiveSceneFiles } from "@/filesystem/scene-files";
 import { watch } from "vue";
 
 export function assembleFullVertexShader(innerCode: string) {
@@ -48,22 +48,4 @@ fn main(input: VertexInputs) -> FragmentInputs {
     vertexOutputs.vUV = vertexInputs.uv;
     vertexOutputs.vNormal = vertexInputs.normal;
 }`;
-}
-
-export function makeDerivedVertexShader(
-  shaders: ShaderSources,
-  sourceName: string,
-  targetName: string
-) {
-  watch(
-    () => shaders.shaders.value.get(sourceName),
-    (shaderSource) => {
-      shaders.setShader(
-        targetName,
-        assembleFullVertexShader(shaderSource?.source ?? ""),
-        false
-      );
-    },
-    { immediate: true, flush: "sync" }
-  );
 }

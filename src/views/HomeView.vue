@@ -14,14 +14,22 @@ import { ref, shallowRef, watch } from "vue";
 import { useDebounceFn, useElementSize } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import { assert } from "@stefnotch/typestef/assert";
+import {
+  ReactiveSceneFiles,
+  SceneFilesWithFilesystem,
+} from "@/filesystem/scene-files";
 
 const store = useStore();
 
 const canvasElement = ref<HTMLCanvasElement | null>(null);
-const codeKey = ref(``);
 const startCode = ref(``);
 const engine = shallowRef<WebGPUEngine | null>(null);
 const scene = shallowRef<MyFirstScene | null>(null);
+const sceneFiles = await SceneFilesWithFilesystem.create("some-key").then(
+  (fs) => ReactiveSceneFiles.create(fs)
+);
+
+startCode.value = sceneFiles.readFile("customVertexShader") ?? "";
 
 const { width, height } = useElementSize(canvasElement);
 watch(
@@ -51,7 +59,7 @@ watch(
       engine.value = e;
       e.getCaps().canUseGLInstanceID = false;
       reloadScene();
-      loadCode();
+      startCode.value = sceneFiles.readFile("customVertexShader") ?? "";
 
       e.runRenderLoop(() => {
         if (scene.value === null) return;
@@ -69,21 +77,7 @@ function reloadScene() {
 
   engine.value.releaseEffects();
   scene.value?.dispose();
-  scene.value = new MyFirstScene(engine.value);
-}
-
-function loadCode() {
-  codeKey.value = "";
-  startCode.value = "";
-  if (!scene.value) return;
-
-  const definitelyTheCode = scene.value.shaders.value.get(
-    "customVertexShader-source"
-  );
-  assert(definitelyTheCode !== undefined);
-  assert(definitelyTheCode.isEditable);
-  startCode.value = definitelyTheCode.source;
-  codeKey.value = scene.value.key + "-" + definitelyTheCode.name;
+  scene.value = new MyFirstScene(engine.value, sceneFiles);
 }
 
 const setNewCode = useDebounceFn((newCode: () => string) => {
@@ -93,7 +87,8 @@ const setNewCode = useDebounceFn((newCode: () => string) => {
     return;
   }
 
-  scene.value.updateShaderSource("customVertexShader-source", value);
+  sceneFiles.writeFile("customVertexShader", value);
+
   reloadScene();
 }, 500);
 </script>
@@ -108,7 +103,6 @@ const setNewCode = useDebounceFn((newCode: () => string) => {
       <!-- TODO: That's a glsl shader -->
       <CodeEditor
         class="self-stretch flex-1 overflow-hidden"
-        :code-key="codeKey"
         :start-code="startCode"
         :is-dark="store.isDark"
         @update="setNewCode($event)"

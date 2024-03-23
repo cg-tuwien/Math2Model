@@ -20,37 +20,28 @@ import {
   ShaderStore,
   Constants,
 } from "@babylonjs/core";
-import {
-  ShaderSources,
-  type EditableScene,
-  type ShaderInfo,
-  type Shaders,
-} from "./editable-scene";
-import { reactive, watch, watchEffect } from "vue";
-import {
-  assembleFullVertexShader,
-  makeDerivedVertexShader,
-} from "@/shaders/shader-processor";
+import { assembleFullVertexShader } from "@/shaders/shader-processor";
 import vertexShader from "./MyFirstScene.vert.wgsl?raw";
+import {
+  ReactiveSceneFiles,
+  readOrCreateFile,
+  type SceneFiles,
+} from "@/filesystem/scene-files";
 
 let getHotCache = makeHotCache<{
   "camera-position": Vector3;
   "camera-rotation": Vector3;
 }>(import.meta.url);
 
-export class MyFirstScene extends Scene implements EditableScene {
+export class MyFirstScene extends Scene {
   private ground: GroundMesh;
   private hotCache = getHotCache();
 
   public readonly key = MyFirstScene.name;
   public frame: number = 0;
   public time: number = 0;
-  private _shaders = new ShaderSources(this.key, ShaderStore);
-  get shaders() {
-    return this._shaders.shaders;
-  }
 
-  constructor(engine: WebGPUEngine) {
+  constructor(engine: WebGPUEngine, public files: SceneFiles) {
     super(engine);
     // This creates and positions a free camera (non-mesh)
     let camera = new FlyCamera(
@@ -93,28 +84,26 @@ export class MyFirstScene extends Scene implements EditableScene {
     );
     this.ground.thinInstanceCount = 1;
 
-    this._shaders.setShader(
+    this.readOrCreateFile(
       "customFragmentShader",
-      `
+      () => `
     varying vNormal : vec3<f32>;
     varying vUV : vec2<f32>;
     @fragment
     fn main(input : FragmentInputs) -> FragmentOutputs {
         fragmentOutputs.color = vec4<f32>(input.vUV,1.0, 1.0);
     }
-`,
-      false
+`
     );
-    this._shaders.setShader("customVertexShader-source", vertexShader, true);
-    makeDerivedVertexShader(
-      this._shaders,
-      "customVertexShader-source",
-      "customVertexShader"
+    this.readOrCreateFile(
+      "customVertexShader",
+      () => vertexShader,
+      assembleFullVertexShader
     );
     let shaderMaterial = new ShaderMaterial(
       "custom",
       this,
-      this._shaders.shaderKey("custom"),
+      this.shaderKey("custom"),
       {
         attributes: ["uv", "position", "normal"],
         uniformBuffers: ["Scene", "Mesh", "instances"],
@@ -224,12 +213,16 @@ export class MyFirstScene extends Scene implements EditableScene {
     });
   }
 
-  updateShaderSource(name: string, source: string): Promise<void> {
-    if (this._shaders.canEditShader(name)) {
-      this._shaders.setShader(name, source);
-      return Promise.resolve();
-    } else {
-      return Promise.reject(new Error("Shader is readonly"));
-    }
+  private shaderKey(name: string) {
+    return this.key + "-" + name;
+  }
+
+  private readOrCreateFile(
+    name: string,
+    defaultContent: () => string,
+    transformer: (content: string) => string = (content) => content
+  ) {
+    const content = readOrCreateFile(this.files, name, defaultContent);
+    ShaderStore.ShadersStoreWGSL[this.shaderKey(name)] = transformer(content);
   }
 }
