@@ -3,15 +3,10 @@ import "./assets/main.css";
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import { Notification } from "@/notification";
+import "@/monaco-setup";
 
 import App from "./App.vue";
 import router from "./router";
-
-import "monaco-editor/esm/vs/editor/edcore.main.js";
-import "monaco-editor/esm/vs/basic-languages/wgsl/wgsl.contribution";
-import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
-import jsonWorker from "monaco-editor/esm/vs/language/json/json.worker?worker";
-import tsWorker from "monaco-editor/esm/vs/language/typescript/ts.worker?worker";
 
 globalThis.addEventListener("unhandledrejection", (event) => {
   Notification.error({
@@ -27,26 +22,6 @@ globalThis.addEventListener("error", (event) => {
   });
   console.error(event);
 });
-
-if (self.MonacoEnvironment) {
-  console.error(
-    "Monaco environment shouldn't exist yet ",
-    self.MonacoEnvironment
-  );
-}
-self.MonacoEnvironment = {
-  getWorker: function (_, label) {
-    switch (label) {
-      case "json":
-        return new jsonWorker();
-      case "typescript":
-      case "javascript":
-        return new tsWorker();
-      default:
-        return new editorWorker();
-    }
-  },
-};
 
 const app = createApp(App);
 
