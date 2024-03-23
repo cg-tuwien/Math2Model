@@ -17,19 +17,38 @@ import {
   Buffer,
   StorageBuffer,
   ShaderLanguage,
+  ShaderStore,
+  Constants,
 } from "@babylonjs/core";
+import {
+  ShaderSources,
+  type EditableScene,
+  type ShaderInfo,
+  type Shaders,
+} from "./editable-scene";
+import { reactive, watch, watchEffect } from "vue";
+import {
+  assembleFullVertexShader,
+  makeDerivedVertexShader,
+} from "@/shaders/shader-processor";
+import vertexShader from "./MyFirstScene.vert.wgsl?raw";
 
 let getHotCache = makeHotCache<{
   "camera-position": Vector3;
   "camera-rotation": Vector3;
 }>(import.meta.url);
 
-export class MyFirstScene extends Scene {
+export class MyFirstScene extends Scene implements EditableScene {
   private ground: GroundMesh;
   private hotCache = getHotCache();
 
+  public readonly key = MyFirstScene.name;
   public frame: number = 0;
   public time: number = 0;
+  private _shaders = new ShaderSources(this.key, ShaderStore);
+  get shaders() {
+    return this._shaders.shaders;
+  }
 
   constructor(engine: WebGPUEngine) {
     super(engine);
@@ -74,12 +93,35 @@ export class MyFirstScene extends Scene {
     );
     this.ground.thinInstanceCount = 1;
 
-    let shaderMaterial = new ShaderMaterial("custom", this, "custom", {
-      attributes: ["uv", "position", "normal"],
-      uniformBuffers: ["Scene", "Mesh", "instances"],
-      // uniforms: ["iTime", "iTimeDelta", "iFrame", "worldViewProjection"],
-      shaderLanguage: ShaderLanguage.WGSL,
-    });
+    this._shaders.setShader(
+      "customFragmentShader",
+      `
+    varying vNormal : vec3<f32>;
+    varying vUV : vec2<f32>;
+    @fragment
+    fn main(input : FragmentInputs) -> FragmentOutputs {
+        fragmentOutputs.color = vec4<f32>(input.vUV,1.0, 1.0);
+    }
+`,
+      false
+    );
+    this._shaders.setShader("customVertexShader-source", vertexShader, true);
+    makeDerivedVertexShader(
+      this._shaders,
+      "customVertexShader-source",
+      "customVertexShader"
+    );
+    let shaderMaterial = new ShaderMaterial(
+      "custom",
+      this,
+      this._shaders.shaderKey("custom"),
+      {
+        attributes: ["uv", "position", "normal"],
+        uniformBuffers: ["Scene", "Mesh", "instances"],
+        // uniforms: ["iTime", "iTimeDelta", "iFrame", "worldViewProjection"],
+        shaderLanguage: ShaderLanguage.WGSL,
+      }
+    );
     shaderMaterial.backFaceCulling = false;
     shaderMaterial.wireframe = false;
     const myUBO = new UniformBuffer(this.getEngine());
@@ -89,8 +131,6 @@ export class MyFirstScene extends Scene {
     myUBO.addUniform("width", 1);
     myUBO.update();
     shaderMaterial.setUniformBuffer("myUBO", myUBO);
-
-    ``;
     //console.log(nextPowOf2);
     shaderMaterial.onBind = (m: any) => {
       var x = Math.floor(
@@ -164,13 +204,10 @@ export class MyFirstScene extends Scene {
           ?.indirectDrawBuffer;
         if (indirectDrawBuffer) {
           if (first) {
-            const buffer = new Buffer(
-              engine,
-              new WebGPUDataBuffer(indirectDrawBuffer, 20),
-              true
+            cs.setStorageBuffer(
+              "indirectDrawBuffer",
+              new WebGPUDataBuffer(indirectDrawBuffer, 20)
             );
-            // TODO: Ask babylon js peeps to add a proper API for this
-            cs.setStorageBuffer("indirectDrawBuffer", buffer as any);
             first = false;
           }
 
@@ -185,5 +222,14 @@ export class MyFirstScene extends Scene {
         }
       }
     });
+  }
+
+  updateShaderSource(name: string, source: string): Promise<void> {
+    if (this._shaders.canEditShader(name)) {
+      this._shaders.setShader(name, source);
+      return Promise.resolve();
+    } else {
+      return Promise.reject(new Error("Shader is readonly"));
+    }
   }
 }
