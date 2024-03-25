@@ -7,7 +7,7 @@ import {
   Tools,
 } from "@babylonjs/core";
 import { MyFirstScene } from "@/scenes/MyFirstScene";
-import "@babylonjs/core/Engines/WebGPU/Extensions/";
+import { BaseScene } from "@/scenes/BaseScene";
 import CodeEditor from "@/components/CodeEditor.vue";
 
 import { ref, shallowRef, watch } from "vue";
@@ -24,6 +24,7 @@ const store = useStore();
 const canvasElement = ref<HTMLCanvasElement | null>(null);
 const startCode = ref(``);
 const engine = shallowRef<WebGPUEngine | null>(null);
+const baseScene = shallowRef<BaseScene | null>(null);
 const scene = shallowRef<MyFirstScene | null>(null);
 const sceneFiles = await SceneFilesWithFilesystem.create("some-key").then(
   (fs) => ReactiveSceneFiles.create(fs)
@@ -58,26 +59,37 @@ watch(
     e.initAsync().then(() => {
       engine.value = e;
       e.getCaps().canUseGLInstanceID = false;
+      reloadBaseScene();
       reloadScene();
       startCode.value = sceneFiles.readFile("customVertexShader") ?? "";
 
       e.runRenderLoop(() => {
-        if (scene.value === null) return;
-        scene.value.frame++;
-        scene.value.time += e.getDeltaTime();
-        scene.value.render();
+        if (baseScene.value === null) return;
+        baseScene.value.update();
+        baseScene.value.render();
       });
     });
   },
   { immediate: true }
 );
 
+function reloadBaseScene() {
+  if (!engine.value) return;
+
+  baseScene.value?.dispose();
+  baseScene.value = new BaseScene(engine.value);
+}
+
 function reloadScene() {
   if (!engine.value) return;
 
-  engine.value.releaseEffects();
+  // engine.value.releaseEffects();
   scene.value?.dispose();
-  scene.value = new MyFirstScene(engine.value, sceneFiles);
+  if (baseScene.value) {
+    scene.value = new MyFirstScene(baseScene.value, sceneFiles);
+  } else {
+    scene.value = null;
+  }
 }
 
 const setNewCode = useDebounceFn((newCode: () => string) => {
@@ -100,7 +112,6 @@ const setNewCode = useDebounceFn((newCode: () => string) => {
         ref="canvasElement"
         class="touch-non self-stretch flex-1 overflow-hidden"
       ></canvas>
-      <!-- TODO: That's a glsl shader -->
       <CodeEditor
         class="self-stretch flex-1 overflow-hidden"
         :start-code="startCode"
@@ -113,3 +124,4 @@ const setNewCode = useDebounceFn((newCode: () => string) => {
 </template>
 
 <style scoped></style>
+@/scenes/BaseScene

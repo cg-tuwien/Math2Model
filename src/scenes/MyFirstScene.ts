@@ -1,90 +1,50 @@
-import { HmrCache, makeHotCache, useHotCacheStore } from "@/stores/hot-cache";
 import {
-  Engine,
-  Scene,
   Vector3,
   MeshBuilder,
   HemisphericLight,
   ShaderMaterial,
-  FlyCamera,
-  WebGPUEngine,
-  Effect,
   type GroundMesh,
   Matrix,
   ComputeShader,
   UniformBuffer,
   WebGPUDataBuffer,
-  Buffer,
-  StorageBuffer,
   ShaderLanguage,
-  ShaderStore,
-  Constants,
 } from "@babylonjs/core";
 import { assembleFullVertexShader } from "@/shaders/shader-processor";
 import vertexShader from "./MyFirstScene.vert.wgsl?raw";
-import {
-  ReactiveSceneFiles,
-  readOrCreateFile,
-  type SceneFiles,
-} from "@/filesystem/scene-files";
+import { readOrCreateFile, type SceneFiles } from "@/filesystem/scene-files";
+import type { BaseScene } from "./BaseScene";
 
-let getHotCache = makeHotCache<{
-  "camera-position": Vector3;
-  "camera-rotation": Vector3;
-}>(import.meta.url);
-
-export class MyFirstScene extends Scene {
-  private ground: GroundMesh;
-  private hotCache = getHotCache();
+export class MyFirstScene {
+  private plane: GroundMesh;
+  private _disposables: Disposable[] = [];
 
   public readonly key = MyFirstScene.name;
-  public frame: number = 0;
-  public time: number = 0;
-
-  constructor(engine: WebGPUEngine, public files: SceneFiles) {
-    super(engine);
-    // This creates and positions a free camera (non-mesh)
-    let camera = new FlyCamera(
-      "camera1",
-      this.hotCache.getOrInsert(
-        "camera-position",
-        () => new Vector3(0, 5, -10)
-      ),
-      this
+  constructor(scene: BaseScene, public files: SceneFiles) {
+    let light = this.addDisposable(
+      new HemisphericLight("light1", new Vector3(0, 1, 0), scene)
     );
-    camera.rotation = this.hotCache.getOrInsert("camera-rotation", () =>
-      Vector3.Forward()
-    );
-    camera.minZ = 0.01;
-    camera.maxZ = 1000;
-    // This targets the camera to scene origin
-    // camera.setTarget(Vector3.Zero());
-
-    // This attaches the camera to the canvas
-    camera.attachControl(true);
-
-    // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
-    let light = new HemisphericLight("light1", new Vector3(0, 1, 0), this);
-
-    // Default intensity is 1. Let's dim the light a small amount
     light.intensity = 0.7;
 
-    // Create a built-in "box" shape; with 2 segments and a height of 1.
-    //this.box = MeshBuilder.CreateBox("box", {size: 2}, this);
-    //this.box.material = shaderMaterial;
-
-    this.ground = MeshBuilder.CreateGround(
-      "ground",
-      { width: 3.14159265359 * 2, height: 3.14159265359 * 2, subdivisions: 5 },
-      this
+    this.plane = this.addDisposable(
+      MeshBuilder.CreateGround(
+        "ground",
+        {
+          width: 3.14159265359 * 2,
+          height: 3.14159265359 * 2,
+          subdivisions: 5,
+        },
+        scene
+      )
     );
-    this.ground.thinInstanceAddSelf();
-    this.ground.thinInstanceAdd(
+    this.plane.position.y = 10.1;
+    this.plane.thinInstanceAddSelf();
+    this.plane.thinInstanceAdd(
       Matrix.Translation(3.14159265359, 0.0, 3.14159265359)
     );
-    this.ground.thinInstanceCount = 1;
+    this.plane.thinInstanceCount = 1;
 
-    this.readOrCreateFile(
+    const customFragmentShader = this.readOrCreateFile(
       "customFragmentShader",
       () => `
     varying vNormal : vec3<f32>;
@@ -95,48 +55,53 @@ export class MyFirstScene extends Scene {
     }
 `
     );
-    this.readOrCreateFile(
+    const customVertexShader = this.readOrCreateFile(
       "customVertexShader",
       () => vertexShader,
       assembleFullVertexShader
     );
-    let shaderMaterial = new ShaderMaterial(
-      "custom",
-      this,
-      this.shaderKey("custom"),
-      {
-        attributes: ["uv", "position", "normal"],
-        uniformBuffers: ["Scene", "Mesh", "instances"],
-        // uniforms: ["iTime", "iTimeDelta", "iFrame", "worldViewProjection"],
-        shaderLanguage: ShaderLanguage.WGSL,
-      }
+
+    let shaderMaterial = this.addDisposable(
+      new ShaderMaterial(
+        "custom",
+        scene,
+        {
+          vertexSource: customVertexShader,
+          fragmentSource: customFragmentShader,
+        },
+        {
+          attributes: ["uv", "position", "normal"],
+          uniformBuffers: ["Scene", "Mesh", "instances"],
+          // uniforms: ["iTime", "iTimeDelta", "iFrame", "worldViewProjection"],
+          shaderLanguage: ShaderLanguage.WGSL,
+        }
+      )
     );
     shaderMaterial.backFaceCulling = false;
     shaderMaterial.wireframe = false;
-    const myUBO = new UniformBuffer(this.getEngine());
+    const myUBO = this.addDisposable(new UniformBuffer(scene.engine));
     myUBO.addUniform("iTime", 1);
     myUBO.addUniform("iTimeDelta", 1);
     myUBO.addUniform("iFrame", 1);
     myUBO.addUniform("width", 1);
     myUBO.update();
     shaderMaterial.setUniformBuffer("myUBO", myUBO);
-    //console.log(nextPowOf2);
     shaderMaterial.onBind = (m: any) => {
-      var x = Math.floor(
-        255 / Vector3.Distance(camera.position, this.ground.position)
+      let x = Math.floor(
+        255 / Vector3.Distance(scene.camera.position, this.plane.position)
       );
-      var nextSquareNum = Math.pow(Math.ceil(Math.sqrt(x)), 2);
-      myUBO.updateFloat("iTime", this.time / 1000);
-      myUBO.updateFloat("iTimeDelta", this.deltaTime / 1000);
-      myUBO.updateFloat("iFrame", this.frame);
+      let nextSquareNum = Math.pow(Math.ceil(Math.sqrt(x)), 2);
+      myUBO.updateFloat("iTime", scene.time / 1000);
+      myUBO.updateFloat("iTimeDelta", scene.deltaTime / 1000);
+      myUBO.updateFloat("iFrame", scene.frame);
       myUBO.updateFloat("width", nextSquareNum);
       myUBO.update();
     };
-    this.ground.material = shaderMaterial;
+    this.plane.material = shaderMaterial;
 
     let cs = new ComputeShader(
       "mycs",
-      engine,
+      scene.engine,
       {
         computeSource: `
             struct IndirectDrawBuffer {
@@ -167,22 +132,24 @@ export class MyFirstScene extends Scene {
         },
       }
     );
-    const csUniformBuffer = new UniformBuffer(engine);
+    /*
+    this.addDisposable({
+      dispose: () => {
+        console.log("disposing compute shader");
+        cs._effect?.dispose();
+      },
+    });*/
+    const csUniformBuffer = this.addDisposable(new UniformBuffer(scene.engine));
     csUniformBuffer.addUniform("visibleInstances", 1);
     cs.setUniformBuffer("inputBuffer", csUniformBuffer);
 
     let t = 0;
     let first = true;
 
-    this.onBeforeRenderObservable.add(() => {
-      this.hotCache.set("camera-position", camera.position.clone());
-      this.hotCache.set("camera-rotation", camera.rotation.clone());
-    });
-
-    this.onBeforeRenderObservable.add(() => {
+    const renderObserver = scene.onBeforeRenderObservable.add(() => {
       // TODO: Correctly handle resetMaterials
-      const renderPassId = engine.currentRenderPassId;
-      const drawWrapper = this.ground.subMeshes[0]._getDrawWrapper(
+      const renderPassId = scene.engine.currentRenderPassId;
+      const drawWrapper = this.plane.subMeshes[0]._getDrawWrapper(
         renderPassId,
         false
       );
@@ -201,7 +168,7 @@ export class MyFirstScene extends Scene {
           }
 
           var x = Math.floor(
-            255 / Vector3.Distance(camera.position, this.ground.position)
+            255 / Vector3.Distance(scene.camera.position, this.plane.position)
           );
           var nextSquareNum = Math.pow(Math.ceil(Math.sqrt(x)), 2);
           csUniformBuffer.updateUInt("visibleInstances", nextSquareNum);
@@ -211,6 +178,22 @@ export class MyFirstScene extends Scene {
         }
       }
     });
+    this.addDisposable({
+      dispose: () => {
+        scene.onBeforeRenderObservable.remove(renderObserver);
+      },
+    });
+  }
+
+  dispose() {
+    this._disposables.forEach((d) => d[Symbol.dispose]());
+  }
+
+  private addDisposable<T extends { dispose: () => void }>(disposable: T): T {
+    this._disposables.push({
+      [Symbol.dispose]: () => disposable.dispose(),
+    });
+    return disposable;
   }
 
   private shaderKey(name: string) {
@@ -221,8 +204,9 @@ export class MyFirstScene extends Scene {
     name: string,
     defaultContent: () => string,
     transformer: (content: string) => string = (content) => content
-  ) {
+  ): string {
     const content = readOrCreateFile(this.files, name, defaultContent);
-    ShaderStore.ShadersStoreWGSL[this.shaderKey(name)] = transformer(content);
+    // ShaderStore.ShadersStoreWGSL[this.shaderKey(name)] =
+    return transformer(content);
   }
 }
