@@ -83,7 +83,8 @@ export class SceneFilesWithFilesystem implements SceneFiles {
     const sceneDirectory = await instance.getSceneDirectory();
     // TODO: Remove "as any" once TypeScript has support for this API
     for await (const [key, value] of (sceneDirectory as any).entries()) {
-      console.log({ key, value });
+      // key: string
+      // value: FileSystemFileHandle
       const file = await value.getFile();
       const text = await file.text();
       instance.files.set(key, text);
