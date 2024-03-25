@@ -65,8 +65,7 @@ watch(
       engine.value = e as WebGPUEngine;
       e.compatibilityMode = false;
       e.getCaps().canUseGLInstanceID = false;
-      onCodeChanged();
-      scene.value = new MyFirstScene(engine.value);
+      reloadScene();
 
       engine.value?.runRenderLoop(() => {
         if (scene.value === null) return;
@@ -81,8 +80,8 @@ watch(
   { immediate: true }
 );
 
-watch(code, onCodeChanged);
-function onCodeChanged() {
+watch(code, reloadScene);
+function reloadScene() {
   if (!engine.value) return;
 
   engine.value.releaseEffects();

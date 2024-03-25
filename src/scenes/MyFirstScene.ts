@@ -1,3 +1,4 @@
+import { HmrCache, makeHotCache, useHotCacheStore } from "@/stores/hot-cache";
 import {
   Engine,
   Scene,
@@ -18,22 +19,33 @@ import {
   ShaderLanguage,
 } from "@babylonjs/core";
 
-// import {WebGPUEngine} from "@babylonjs/core";
-
-// TODO: Maybe hook into Vite's hot reloading?
+let getHotCache = makeHotCache<{
+  "camera-position": Vector3;
+  "camera-rotation": Vector3;
+}>(import.meta.url);
 
 export class MyFirstScene extends Scene {
   private ground: GroundMesh;
+  private hotCache = getHotCache();
 
   public frame: number = 0;
   public time: number = 0;
 
   constructor(engine: WebGPUEngine) {
     super(engine);
-
     // This creates and positions a free camera (non-mesh)
-    let camera = new FlyCamera("camera1", new Vector3(0, 5, -10), this);
-    camera.minZ = 0.001;
+    let camera = new FlyCamera(
+      "camera1",
+      this.hotCache.getOrInsert(
+        "camera-position",
+        () => new Vector3(0, 5, -10)
+      ),
+      this
+    );
+    camera.rotation = this.hotCache.getOrInsert("camera-rotation", () =>
+      Vector3.Forward()
+    );
+    camera.minZ = 0.01;
     camera.maxZ = 1000;
     // This targets the camera to scene origin
     // camera.setTarget(Vector3.Zero());
@@ -91,7 +103,6 @@ export class MyFirstScene extends Scene {
       myUBO.updateFloat("width", nextSquareNum);
       myUBO.update();
     };
-    console.log();
     this.ground.material = shaderMaterial;
 
     let cs = new ComputeShader(
@@ -133,6 +144,11 @@ export class MyFirstScene extends Scene {
 
     let t = 0;
     let first = true;
+
+    this.onBeforeRenderObservable.add(() => {
+      this.hotCache.set("camera-position", camera.position.clone());
+      this.hotCache.set("camera-rotation", camera.rotation.clone());
+    });
 
     this.onBeforeRenderObservable.add(() => {
       // TODO: Correctly handle resetMaterials
