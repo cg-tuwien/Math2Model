@@ -4,7 +4,10 @@ import { computed, ref, shallowRef, watch } from "vue";
 import { useDebounceFn, useElementSize } from "@vueuse/core";
 
 const monacoMount = ref<HTMLDivElement | null>(null);
-const props = defineProps<{ startCode: string; isDark: boolean }>();
+const props = defineProps<{
+  startCode: string;
+  isDark: boolean;
+}>();
 const emit = defineEmits<{ update: [code: () => string] }>();
 
 const themeName = computed(() => (props.isDark ? "vs-dark" : "vs"));
@@ -17,6 +20,13 @@ watch(
   useDebounceFn(() => {
     editor.value?.layout();
   }, 100)
+);
+
+watch(
+  () => props.startCode,
+  () => {
+    editor.value?.setValue(props.startCode);
+  }
 );
 
 watch(monacoMount, (element) => {
