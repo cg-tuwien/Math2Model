@@ -10,8 +10,11 @@ import "@babylonjs/core/Engines/WebGPU/Extensions/";
 import CodeEditor from "@/components/CodeEditor.vue";
 
 import { ref, shallowRef, watch } from "vue";
-import debounce from "debounce";
-import { useElementSize } from "@vueuse/core";
+import { useDebounceFn, useElementSize } from "@vueuse/core";
+import { useStore } from "@/stores/store";
+
+const store = useStore();
+
 const canvasElement = ref<HTMLCanvasElement | null>(null);
 const code = ref(`fn evaluateImage(input2: vec2f) -> vec3f {
     let pos = vec3(input2.x, 0.0, 2. * input2.y) * 3.14159265359;
@@ -43,7 +46,7 @@ const scene = shallowRef<MyFirstScene | null>(null);
 const { width, height } = useElementSize(canvasElement);
 watch(
   [width, height],
-  debounce(() => {
+  useDebounceFn(() => {
     engine.value?.resize();
   }, 100)
 );
@@ -144,7 +147,7 @@ fn main(input: VertexInputs) -> FragmentInputs {
 }`;
 }
 
-const setNewCode = debounce((newCode: () => string) => {
+const setNewCode = useDebounceFn((newCode: () => string) => {
   code.value = newCode();
 }, 500);
 </script>
@@ -160,6 +163,7 @@ const setNewCode = debounce((newCode: () => string) => {
       <CodeEditor
         class="self-stretch flex-1 overflow-hidden"
         :start-code="code"
+        :is-dark="store.isDark"
         @update="setNewCode($event)"
       >
       </CodeEditor>

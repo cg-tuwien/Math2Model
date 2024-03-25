@@ -63,7 +63,7 @@ export class MyFirstScene extends Scene {
     this.ground.thinInstanceCount = 1;
 
     let shaderMaterial = new ShaderMaterial("custom", this, "custom", {
-      attributes: ["uv", "position","normal"],
+      attributes: ["uv", "position", "normal"],
       uniformBuffers: ["Scene", "Mesh", "instances"],
       // uniforms: ["iTime", "iTimeDelta", "iFrame", "worldViewProjection"],
       shaderLanguage: ShaderLanguage.WGSL,
@@ -78,11 +78,13 @@ export class MyFirstScene extends Scene {
     myUBO.update();
     shaderMaterial.setUniformBuffer("myUBO", myUBO);
 
-``
-      //console.log(nextPowOf2);
-      shaderMaterial.onBind = (m: any) => {
-        var x = Math.floor(255 / Vector3.Distance(camera.position, this.ground.position));
-        var nextSquareNum = Math.pow(Math.ceil(Math.sqrt(x)),2);
+    ``;
+    //console.log(nextPowOf2);
+    shaderMaterial.onBind = (m: any) => {
+      var x = Math.floor(
+        255 / Vector3.Distance(camera.position, this.ground.position)
+      );
+      var nextSquareNum = Math.pow(Math.ceil(Math.sqrt(x)), 2);
       myUBO.updateFloat("iTime", this.time / 1000);
       myUBO.updateFloat("iTimeDelta", this.deltaTime / 1000);
       myUBO.updateFloat("iFrame", this.frame);
@@ -156,13 +158,11 @@ export class MyFirstScene extends Scene {
             first = false;
           }
 
-          var x = Math.floor(255 / Vector3.Distance(camera.position, this.ground.position));
-          var nextSquareNum = Math.pow(Math.ceil(Math.sqrt(x)),2);
-          console.log("Mesh LOD:" + nextSquareNum + "T: " + t);
-          csUniformBuffer.updateUInt(
-            "visibleInstances",
-              nextSquareNum
+          var x = Math.floor(
+            255 / Vector3.Distance(camera.position, this.ground.position)
           );
+          var nextSquareNum = Math.pow(Math.ceil(Math.sqrt(x)), 2);
+          csUniformBuffer.updateUInt("visibleInstances", nextSquareNum);
           csUniformBuffer.update();
 
           cs.dispatch(1, 1, 1);
@@ -170,6 +170,4 @@ export class MyFirstScene extends Scene {
       }
     });
   }
-
-
 }
