@@ -10,7 +10,7 @@ import { MyFirstScene } from "@/scenes/MyFirstScene";
 import { BaseScene } from "@/scenes/BaseScene";
 import CodeEditor from "@/components/CodeEditor.vue";
 
-import { ref, shallowRef, watch } from "vue";
+import { h, ref, shallowRef, watch } from "vue";
 import { useDebounceFn, useElementSize } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import { assert } from "@stefnotch/typestef/assert";
@@ -25,7 +25,10 @@ const props = defineProps<{
 
 const store = useStore();
 
-const canvasElement = ref<HTMLCanvasElement | null>(null);
+const canvasContainer = ref<HTMLDivElement | null>(null);
+const canvasElement = document.createElement("canvas");
+canvasElement.style.width = "100%";
+canvasElement.style.height = "100%";
 const startCode = ref(``);
 const engine = shallowRef<WebGPUEngine | null>(null);
 const baseScene = shallowRef<BaseScene | null>(null);
@@ -41,6 +44,11 @@ watch(
   }, 100)
 );
 
+watch(canvasContainer, (container) => {
+  if (!container) return;
+  container.appendChild(canvasElement);
+});
+
 // GDPR compliance https://forum.babylonjs.com/t/offer-alternative-to-babylon-js-cdn/48982
 Tools.ScriptBaseUrl = "/babylon";
 
@@ -50,36 +58,21 @@ WebGPUEngine.IsSupportedAsync.then((supported) => {
   }
 });
 
-watch(
-  canvasElement,
-  (canvas) => {
-    if (!canvas) return;
-    engine.value?.dispose();
-    const e = new WebGPUEngine(canvas, {});
-    e.compatibilityMode = false;
-    e.initAsync().then(() => {
-      engine.value = e;
-      e.getCaps().canUseGLInstanceID = false;
-      reloadBaseScene();
-      reloadScene();
-      startCode.value = props.files.readFile("customVertexShader") ?? "";
+const e = new WebGPUEngine(canvasElement, {});
+e.compatibilityMode = false;
+e.initAsync().then(() => {
+  engine.value = e;
+  e.getCaps().canUseGLInstanceID = false;
+  baseScene.value = new BaseScene(e);
+  reloadScene();
+  startCode.value = props.files.readFile("customVertexShader") ?? "";
 
-      e.runRenderLoop(() => {
-        if (baseScene.value === null) return;
-        baseScene.value.update();
-        baseScene.value.render();
-      });
-    });
-  },
-  { immediate: true }
-);
-
-function reloadBaseScene() {
-  if (!engine.value) return;
-
-  baseScene.value?.dispose();
-  baseScene.value = new BaseScene(engine.value);
-}
+  e.runRenderLoop(() => {
+    if (baseScene.value === null) return;
+    baseScene.value.update();
+    baseScene.value.render();
+  });
+});
 
 function reloadScene() {
   if (!engine.value) return;
@@ -109,10 +102,10 @@ const setNewCode = useDebounceFn((newCode: () => string) => {
 <template>
   <main class="min-h-full">
     <div class="flex" style="height: 90vh">
-      <canvas
-        ref="canvasElement"
-        class="touch-non self-stretch flex-1 overflow-hidden"
-      ></canvas>
+      <div
+        ref="canvasContainer"
+        class="self-stretch flex-1 overflow-hidden"
+      ></div>
       <CodeEditor
         class="self-stretch flex-1 overflow-hidden"
         :start-code="startCode"
