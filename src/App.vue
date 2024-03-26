@@ -13,16 +13,7 @@ const theme = computed(() => (store.isDark ? darkTheme : lightTheme));
     <n-config-provider :theme="theme">
       <TopBar></TopBar>
 
-      <RouterView v-slot="{ Component }">
-        <template v-if="Component">
-          <Suspense>
-            <!-- main content -->
-            <component :is="Component"></component>
-            <!-- loading state -->
-            <template #fallback> Loading... </template>
-          </Suspense>
-        </template></RouterView
-      >
+      <RouterView> </RouterView>
     </n-config-provider>
   </div>
 </template>
