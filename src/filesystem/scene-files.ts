@@ -55,6 +55,7 @@ export class ReactiveSceneFiles implements SceneFiles {
   }
 
   readFile(name: string) {
+    alert("Reading file " + name);
     return this.sceneFiles.readFile(name);
   }
 
@@ -63,6 +64,7 @@ export class ReactiveSceneFiles implements SceneFiles {
   }
 
   writeFile(name: string, content: string) {
+    alert("Writing file " + name);
     this.sceneFiles.writeFile(name, content);
     this._fileNames.set(name, (this._fileNames.get(name) ?? 0) + 1);
   }

@@ -1,4 +1,5 @@
 import { makeHotCache } from "@/stores/hot-cache";
+import { ObjectData } from "@/scenes/ObjectData";
 
 import {
   Scene,
@@ -9,6 +10,7 @@ import {
   Vector3,
   type GroundMesh,
   ArcRotateCamera,
+  GizmoManager,
   type Camera,
 } from "@babylonjs/core";
 import { GridMaterial } from "@babylonjs/materials/grid/gridMaterial";
@@ -19,6 +21,7 @@ let getHotCache = makeHotCache<{
   "camera-alpha": number;
   "camera-beta": number;
   "camera-radius": number;
+  "scene-objects": Array<ObjectData>;
 }>(import.meta.url);
 
 export type Milliseconds = number;
@@ -56,6 +59,8 @@ export class BaseScene extends Scene {
       groundColor: new Color3(0.09, 0.59, 0.85),
       skyboxColor: new Color3(0.09, 0.59, 0.85),
     });
+
+
     this.gridMesh = makeGridMesh(this);
 
     let camera = new ArcRotateCamera(

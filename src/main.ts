@@ -23,6 +23,8 @@ globalThis.addEventListener("error", (event) => {
   console.error(event);
 });
 
+
+
 const app = createApp(App);
 
 app.use(createPinia());
