@@ -63,7 +63,7 @@ export class BaseScene extends Scene {
       this.hotCache.getOrInsert("camera-alpha", () => 0),
       this.hotCache.getOrInsert("camera-beta", () => 0),
       this.hotCache.getOrInsert("camera-radius", () => 30),
-      this.hotCache.getOrInsert("camera-target", () => new Vector3(0, 5, -10)),
+      this.hotCache.getOrInsert("camera-target", () => new Vector3(0, 10, 0)),
       this
     );
     camera.minZ = 0.01;
