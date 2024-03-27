@@ -1,25 +1,24 @@
 <script setup lang="ts">
-import {
-  ReactiveSceneFiles,
-  SceneFilesWithFilesystem,
-} from "@/filesystem/scene-files";
+import { ReactiveSceneFiles } from "@/filesystem/scene-files";
 import EditorAndOutput from "@/components/EditorAndOutput.vue";
 import { markRaw, shallowRef } from "vue";
 import { WebGPUEngine } from "@babylonjs/core";
-import { canvasElement, engine } from "@/engine/engine";
+import { sceneFilesPromise, canvasElement, enginePromise } from "@/globals";
 
 const sceneFiles = shallowRef<ReactiveSceneFiles | null>(null);
+sceneFilesPromise.then((v) => {
+  sceneFiles.value = markRaw(v);
+});
+const engine = shallowRef<WebGPUEngine | null>(null);
+enginePromise.then((v) => {
+  engine.value = markRaw(v);
+});
 
 WebGPUEngine.IsSupportedAsync.then((supported) => {
   if (!supported) {
     alert("WebGPU not supported");
   }
 });
-(async () => {
-  let fs = await SceneFilesWithFilesystem.create("some-key");
-  let files = await ReactiveSceneFiles.create(fs);
-  sceneFiles.value = markRaw(files);
-})();
 </script>
 
 <template>
