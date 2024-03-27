@@ -10,7 +10,7 @@ import { MyFirstScene } from "@/scenes/MyFirstScene";
 import { BaseScene } from "@/scenes/BaseScene";
 import CodeEditor from "@/components/CodeEditor.vue";
 
-import { h, ref, shallowRef, watch } from "vue";
+import { h, ref, shallowRef, watch, watchEffect } from "vue";
 import { useDebounceFn, useElementSize } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import { assert } from "@stefnotch/typestef/assert";
@@ -21,62 +21,57 @@ import {
 
 const props = defineProps<{
   files: ReactiveSceneFiles;
+  canvas: HTMLCanvasElement;
+  engine: WebGPUEngine;
 }>();
 
 const store = useStore();
 
 const canvasContainer = ref<HTMLDivElement | null>(null);
-const canvasElement = document.createElement("canvas");
-canvasElement.style.width = "100%";
-canvasElement.style.height = "100%";
-const startCode = ref(``);
-const engine = shallowRef<WebGPUEngine | null>(null);
-const baseScene = shallowRef<BaseScene | null>(null);
+const startCode = ref(props.files.readFile("customVertexShader") ?? "");
+const baseScene = shallowRef<BaseScene>(new BaseScene(props.engine));
+watch(
+  () => props.engine,
+  (engine) => {
+    baseScene.value.dispose();
+    baseScene.value = new BaseScene(engine);
+  }
+);
 const scene = shallowRef<MyFirstScene | null>(null);
 
-startCode.value = props.files.readFile("customVertexShader") ?? "";
-
-const { width, height } = useElementSize(canvasElement);
+const { width, height } = useElementSize(() => props.canvas);
 watch(
   [width, height],
   useDebounceFn(() => {
-    engine.value?.resize();
+    props.engine.resize();
   }, 100)
 );
 
-watch(canvasContainer, (container) => {
-  if (!container) return;
-  container.appendChild(canvasElement);
+watchEffect(() => {
+  canvasContainer.value?.appendChild(props.canvas);
 });
 
 // GDPR compliance https://forum.babylonjs.com/t/offer-alternative-to-babylon-js-cdn/48982
 Tools.ScriptBaseUrl = "/babylon";
 
-WebGPUEngine.IsSupportedAsync.then((supported) => {
-  if (!supported) {
-    alert("WebGPU not supported");
+reloadScene();
+startCode.value = props.files.readFile("customVertexShader") ?? "";
+
+props.engine.runRenderLoop(renderLoop);
+watch(
+  () => props.engine,
+  (engine, oldEngine) => {
+    oldEngine.stopRenderLoop();
+    engine.runRenderLoop(renderLoop);
   }
-});
+);
 
-const e = new WebGPUEngine(canvasElement, {});
-e.compatibilityMode = false;
-e.initAsync().then(() => {
-  engine.value = e;
-  e.getCaps().canUseGLInstanceID = false;
-  baseScene.value = new BaseScene(e);
-  reloadScene();
-  startCode.value = props.files.readFile("customVertexShader") ?? "";
-
-  e.runRenderLoop(() => {
-    if (baseScene.value === null) return;
-    baseScene.value.update();
-    baseScene.value.render();
-  });
-});
+function renderLoop() {
+  baseScene.value.update();
+  baseScene.value.render();
+}
 
 function reloadScene() {
-  if (!engine.value) return;
-
   // engine.value.releaseEffects();
   scene.value?.dispose();
   if (baseScene.value) {
