@@ -1,23 +1,21 @@
 <script setup lang="ts">
-import {
-  EngineFactory,
-  Effect,
-  WebGPUEngine,
-  ShaderStore,
-  Tools,
-} from "@babylonjs/core";
+import type { WebGPUEngine } from "@babylonjs/core";
 import { MyFirstScene } from "@/scenes/MyFirstScene";
 import { BaseScene } from "@/scenes/BaseScene";
 import CodeEditor from "@/components/CodeEditor.vue";
 
-import { ref, shallowRef, watch, watchEffect, onUnmounted } from "vue";
+import {
+  ref,
+  shallowRef,
+  watch,
+  watchEffect,
+  onUnmounted,
+  computed,
+} from "vue";
 import { useDebounceFn, useElementSize } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import { assert } from "@stefnotch/typestef/assert";
-import {
-  ReactiveSceneFiles,
-  SceneFilesWithFilesystem,
-} from "@/filesystem/scene-files";
+import { ReactiveSceneFiles } from "@/filesystem/scene-files";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -26,17 +24,35 @@ const props = defineProps<{
   engine: WebGPUEngine;
 }>();
 
-console.log("created");
+interface KeyedCode {
+  readonly id: string;
+  readonly code: string;
+  readonly file: string;
+}
+function readFile(file: string): KeyedCode {
+  return {
+    id: crypto.randomUUID(),
+    code: props.files.readFile(file) ?? "",
+    file,
+  };
+}
 
 const store = useStore();
 
 const canvasContainer = ref<HTMLDivElement | null>(null);
-const startCode = ref(props.files.readFile("customVertexShader") ?? "");
+const keyedCode = ref<KeyedCode>(readFile("customVertexShader"));
 const baseScene = shallowRef(new BaseScene(props.engine));
 const scene = shallowRef(new MyFirstScene(baseScene.value, props.files));
+const fileNames = computed(() => [...props.files.fileNames.value.keys()]);
+const fileNameOptions = computed(() =>
+  fileNames.value.map((name) => ({
+    label: name,
+    value: name,
+  }))
+);
 
 // Re-read the code after loading the user's scene
-startCode.value = props.files.readFile("customVertexShader") ?? "";
+keyedCode.value = readFile(keyedCode.value.file);
 
 // Attach the canvas to the DOM
 watchEffect(() => {
@@ -51,9 +67,6 @@ watch(
     props.engine.resize();
   }, 100)
 );
-
-// GDPR compliance https://forum.babylonjs.com/t/offer-alternative-to-babylon-js-cdn/48982
-Tools.ScriptBaseUrl = "/babylon";
 
 props.engine.runRenderLoop(renderLoop);
 function renderLoop() {
@@ -73,7 +86,7 @@ const setNewCode = useDebounceFn((newCode: () => string) => {
     return;
   }
 
-  props.files.writeFile("customVertexShader", value);
+  props.files.writeFile(keyedCode.value.file, value);
 
   reloadScene();
 }, 500);
@@ -93,12 +106,23 @@ onUnmounted(() => {
       ></div>
       <CodeEditor
         class="self-stretch flex-1 overflow-hidden"
-        :start-code="startCode"
+        :keyed-code="{
+          id: keyedCode.id,
+          code: keyedCode.code,
+        }"
         :is-dark="store.isDark"
         @update="setNewCode($event)"
       >
       </CodeEditor>
     </div>
+
+    <n-select
+      :value="keyedCode.file"
+      @update:value="(v) => (keyedCode = readFile(v))"
+      filterable
+      placeholder="Select a file"
+      :options="fileNameOptions"
+    />
   </main>
 </template>
 

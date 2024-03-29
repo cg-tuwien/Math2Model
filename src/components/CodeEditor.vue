@@ -4,8 +4,12 @@ import { computed, ref, shallowRef, watch } from "vue";
 import { useDebounceFn, useElementSize } from "@vueuse/core";
 
 const monacoMount = ref<HTMLDivElement | null>(null);
+
 const props = defineProps<{
-  startCode: string;
+  keyedCode: {
+    id: string;
+    code: string;
+  };
   isDark: boolean;
 }>();
 const emit = defineEmits<{ update: [code: () => string] }>();
@@ -23,16 +27,16 @@ watch(
 );
 
 watch(
-  () => props.startCode,
+  () => props.keyedCode.id,
   () => {
-    editor.value?.setValue(props.startCode);
+    editor.value?.setValue(props.keyedCode.code);
   }
 );
 
 watch(monacoMount, (element) => {
   if (!element) return;
   editor.value = monaco.editor.create(element, {
-    value: props.startCode,
+    value: props.keyedCode.code,
     language: "wgsl",
     contextmenu: true,
     minimap: {
