@@ -2,6 +2,10 @@
 
 Features are developed in another branch or fork. After the feature is ready, a pull request to the master branch should be opened.
 
+## Prerequisites
+- Node 20 or greater. Don't install Chocolatey.
+- A code editor, like VSCode or Webstorm.
+
 ## Project Setup
 
 ```sh
@@ -33,11 +37,16 @@ npm run test:unit
 
 [VSCode](https://code.visualstudio.com/) with
 
-- [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) for Vue.js support
+- [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar) for Vue.js support
 - [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) for code formatting
-  - Settings (`Ctrl+j`) &rarr; Format On Save &rarr; Enable (`"editor.formatOnSave": true,`)
+  - Settings &rarr; Format On Save &rarr; Enable (`"editor.formatOnSave": true,`)
+  - If you are using autosave: Settings &rarr; Autosave &rarr; On Focus Change (`"files.autoSave": "onFocusChange",`)
 - [Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss) for slightly better Tailwind CSS suggestions
 
+
+I also totally recommend trying out the following browser extensions
+
+- [Vue Devtools](https://devtools.vuejs.org/) to get top-notch Vue.js debugging support
 
 ### Code Structure
 
@@ -68,53 +77,9 @@ npm run test:unit
 - [Material Design Icons](https://icon-sets.iconify.design/mdi/), use them with `mdi-icon-name` (e.g. `<mdi-hamburger-menu />`)
 
 Other libraries where one can look up the documentation as needed are
+- Typescript
 - Pinia: `src/stores/`
 - Vitest: Unit tests
 
 
-
-## High-Level Documentation
-
-### Important Terms
-
-- CAS: Computer Algebra System, this is a piece of magic that takes formulas or equations and evaluates them
-- MathJson: [A format](https://cortexjs.io/math-json/) to unambiguously represent mathematical expressions
-- Document: A document consists of a number of elements such as
-  - Mathematical Expressions
-  - Scopes
-  - Text Blocks
-
-
-
-### Design
-
-- Equation Editor (frontend)
-  - We're using mathlive, however other equation editors could also be used
-  - Every equation editor has a corresponding element in the document
-  - During typing, the backend can optionally be asked to
-    - Return the variables (values, functions, units) that are in scope
-    - Quickly evaluate the expression
-    - Suggest autocompletions
-    - Return information about expressions, such as 'variable $a$ is a vector' or 'the $\cdot$ sign here stands for dot product'
-  - When the user hits Enter (submit), then
-    - The expression gets parsed and turned into MathJson
-      - Placeholders get added where the result should go
-    - The expression gets sent to the backend
-    - Eventually, the result gets returned
-- Backend
-  - A general backend that doesn't know how to evaluate expressions. Instead, it keeps track of the entire document, including
-    - Expressions
-    - Scopes
-    - Imports
-    - Variables
-- CAS
-  - We're using Sympy, however support for more computer algebra systems is planned
-  - The CAS accepts commands
-    - id: Every command has an ID to identify it
-    - expression: Every command has some expression to evaluate
-    - gettersData: When an expression contains some variables, they will be included here
-    - callback: A function to call when the result is ready. Can be called multiple times, to return partial results
-  - It translates the MathJson expression into something the CAS understands (e.g. Sympy-Python Code)
-  - Then evaluates the expression (e.g. in a web worker)
-  - And finally, converts the result back to MathJson (e.g. A sympy printer)
-
+## High Level Structure
