@@ -83,3 +83,9 @@ Other libraries where one can look up the documentation as needed are
 
 
 ## High Level Structure
+
+The `index.html` loads the `main.ts` file, which creates a Vue.js instance.
+From there `App.vue` gets loaded, which is responsible for the overall layout of the site. It embeds a `<RouterView>`, which is where all the views/pages go. (`HomeView.vue`)
+
+`HomeView.vue` asynchronously loads the filesystem code, and Babylon.js. They're a bit slow to initialize, so we load them very early, and we're avoiding doing hot module reloading with them. Once they've finished loading, we create our `EditorAndOutput.vue` component.
+
