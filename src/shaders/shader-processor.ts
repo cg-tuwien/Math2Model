@@ -1,6 +1,3 @@
-import type { ReactiveSceneFiles } from "@/filesystem/scene-files";
-import { watch } from "vue";
-
 export function assembleFullVertexShader(innerCode: string) {
   return `
 #include<sceneUboDeclaration>
@@ -15,13 +12,17 @@ varying vNormal : vec3<f32>;
 
 // TODO: Make them global
 struct MyUBO {
-  iTime: f32,
-  iTimeDelta: f32,
-  iFrame: f32,
   width: f32,
 };
 
+struct GlobalUBO {
+  iTime: f32,
+  iTimeDelta: f32,
+  iFrame: f32,
+}
+
 var<uniform> myUBO: MyUBO;
+var<uniform> globalUBO: GlobalUBO;
 
 ${innerCode}
 
