@@ -49,13 +49,6 @@ const baseScene = shallowRef(new BaseScene(props.engine));
 const scene = shallowRef(
   new ModelDisplayVirtualScene(baseScene.value, props.files)
 );
-const fileNames = computed(() => [...props.files.fileNames.value.keys()]);
-const fileNameOptions = computed(() =>
-  fileNames.value.map((name) => ({
-    label: name,
-    value: name,
-  }))
-);
 
 // Re-read the code after loading the user's scene
 keyedCode.value = readFile(keyedCode.value.file);
@@ -103,11 +96,40 @@ onUnmounted(() => {
   scene.value[Symbol.dispose]();
   baseScene.value.dispose();
 });
+
+function openFiles(v: FilePath[]) {
+  if (v.length > 0) {
+    keyedCode.value = readFile(v[0]);
+  }
+}
+function addFiles(files: FilePath[]) {
+  files.forEach((file) => {
+    if (props.files.hasFile(file)) return;
+    props.files.writeFile(file, "");
+  });
+}
+function renameFile(oldName: FilePath, newName: FilePath) {
+  if (oldName === newName) return;
+  const fileData = props.files.readFile(oldName);
+  if (fileData === null) return;
+  props.files.deleteFile(oldName);
+  props.files.writeFile(newName, fileData);
+
+  if (oldName === keyedCode.value.file) {
+    keyedCode.value = readFile(newName);
+  }
+}
+function deleteFiles(files: FilePath[]) {
+  files.forEach((file) => {
+    props.files.deleteFile(file);
+  });
+  keyedCode.value = readFile(keyedCode.value.file);
+}
 </script>
 
 <template>
   <main class="min-h-full">
-    <div class="flex" style="height: 90vh">
+    <div class="flex" style="height: 80vh">
       <div
         ref="canvasContainer"
         class="self-stretch flex-1 overflow-hidden"
@@ -123,14 +145,14 @@ onUnmounted(() => {
       >
       </CodeEditor>
     </div>
-
-    <n-select
-      :value="keyedCode.file"
-      @update:value="(v) => (keyedCode = readFile(v))"
-      filterable
-      placeholder="Select a file"
-      :options="fileNameOptions"
-    />
+    <FileBrowser
+      :files="props.files"
+      :open-files="[keyedCode.file]"
+      @update:open-files="openFiles($event)"
+      @add-files="addFiles($event)"
+      @rename-file="(oldName, newName) => renameFile(oldName, newName)"
+      @delete-files="deleteFiles($event)"
+    ></FileBrowser>
   </main>
 </template>
 
