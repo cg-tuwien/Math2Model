@@ -56,6 +56,7 @@ function startAddFile() {
   }
 
   emit("add-files", [newFile]);
+  // TODO: Autofocus the new file
   renamingKey.value = { oldName: newFile, newName: newFile };
 }
 

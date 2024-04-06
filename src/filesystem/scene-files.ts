@@ -109,23 +109,34 @@ export class SceneFilesWithFilesystem implements SceneFiles {
 
   async writeFile(name: FilePath, content: string) {
     this.files.set(name, content);
-    this.taskQueue = this.taskQueue.then(async () => {
-      const sceneDirectory = await this.getSceneDirectory();
-      const fileHandle = await sceneDirectory.getFileHandle(name, {
-        create: true,
-      });
-      const writable = await fileHandle.createWritable();
-      await writable.write(content);
-      writable.close();
-    });
+    this.taskQueue = this.taskQueue.then(
+      async () => {
+        const sceneDirectory = await this.getSceneDirectory();
+        const fileHandle = await sceneDirectory.getFileHandle(name, {
+          create: true,
+        });
+        const writable = await fileHandle.createWritable();
+        await writable.write(content);
+        writable.close();
+      },
+      (error) => {
+        console.error(error);
+      }
+    );
   }
 
   async deleteFile(name: FilePath) {
     this.files.delete(name);
-    this.taskQueue = this.taskQueue.then(async () => {
-      const sceneDirectory = await this.getSceneDirectory();
-      await sceneDirectory.removeEntry(name);
-    });
+    this.taskQueue = this.taskQueue.then(
+      async () => {
+        console.log("Deleting file", name); // TODO: Fix this
+        const sceneDirectory = await this.getSceneDirectory();
+        await sceneDirectory.removeEntry(name);
+      },
+      (error) => {
+        console.error(error);
+      }
+    );
   }
 
   readFile(name: FilePath) {
