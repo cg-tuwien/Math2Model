@@ -27,15 +27,14 @@ const renamingKey = ref<{ oldName: FilePath; newName: FilePath } | null>(null);
 const data = ref<TreeOption[]>([]);
 watch(
   props.files.fileNames,
-  () => {
-    const filePaths = props.files.listFiles();
-    filePaths.sort();
-    data.value = filePaths.map(
+  (fileNames) => {
+    data.value = [...fileNames.keys()].toSorted().map(
       (file): TreeOption => ({
         label: file,
         key: file,
       })
     );
+    checkedKeys.value = checkedKeys.value.filter((key) => fileNames.has(key));
   },
   {
     deep: true,
@@ -82,6 +81,15 @@ function renderLabel({ option }: { option: TreeOption }) {
           );
         }
         renamingKey.value = null;
+      },
+      onKeyup: (e: KeyboardEvent) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.target instanceof HTMLElement) {
+            e.target?.blur();
+          }
+        }
       },
     });
   } else {
