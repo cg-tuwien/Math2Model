@@ -1,5 +1,5 @@
 import {
-  type AbstractMesh,
+  AbstractMesh,
   GroundMesh,
   MeshBuilder,
   Quaternion,
@@ -56,6 +56,7 @@ export class VirtualModel implements Disposable {
     );
     // Needs to be set, otherwise Babylon.js will use a Vector3 property for rotation.
     this._mesh.rotationQuaternion = Quaternion.Identity();
+    this._mesh.alwaysSelectAsActiveMesh = true;
 
     this._mesh.thinInstanceAddSelf();
     this._mesh.thinInstanceCount = 0.1; // This is a disgusting hack to tell Babylon.js "render zero instances"
@@ -85,7 +86,9 @@ export class VirtualModel implements Disposable {
     // TODO: Use a smarter encoding
     const readCounterBytes = 4 + 4; // A read start and a read end counter
     const atomicCounterBytes = 4; // A write counter
-    const patchesBytes = 4 * 10_000; // Enough for 10_000 patches
+    const patchSize = 4 * 4; // 4 bytes per float, 4 floats per patch
+    const maxPatchCount = 10_000;
+    const patchesBytes = 4 + patchSize * maxPatchCount; // 4 bytes for the length, 10_00 patches
     const patchesBuffer = this._disposables.addDisposable(
       new StorageBuffer(
         scene.engine,
@@ -94,6 +97,7 @@ export class VirtualModel implements Disposable {
       )
     );
     const patchesBufferBytes = new Float32Array([
+      0,
       0,
       0,
       0,
@@ -106,19 +110,42 @@ export class VirtualModel implements Disposable {
       0, // read start
       1, // read end (exclusive)
       1, // write
+      maxPatchCount, // patchesLength
     ]);
 
     const renderBuffer = this._disposables.addDisposable(
       new StorageBuffer(
         scene.engine,
-        atomicCounterBytes + 4 * 10_000,
+        atomicCounterBytes + patchSize * maxPatchCount,
         Constants.BUFFER_CREATIONFLAG_READWRITE
         // Constants.BUFFER_CREATIONFLAG_VERTEX
       )
     );
     const renderBufferBytes = new Uint32Array([
       0, // instanceCount
+      maxPatchCount, // patchesLength
     ]);
+    const structPatches = `
+    struct Patch {
+      min: vec2<f32>,
+      max: vec2<f32>,
+  };
+
+  struct Patches {
+    readStart: u32,
+    readEnd: u32,
+    write: atomic<u32>,
+    patchesLength: u32,
+    patches : array<Patch>,
+  };
+    `;
+    const structRenderBuffer = `
+    struct RenderBuffer {
+      instanceCount: atomic<u32>,
+      patchesLength: u32,
+      patches: array<Patch>,
+    };
+  `;
 
     let cs = new ComputeShader(
       "subdivide-cs",
@@ -129,22 +156,8 @@ export class VirtualModel implements Disposable {
                 modelViewProjection: mat4x4<f32>,
             };
 
-            struct Patch {
-                min: vec2<f32>,
-                max: vec2<f32>,
-            };
-
-            struct Patches {
-              readStart: u32,
-              readEnd: u32,
-              write: atomic<u32>,
-              patches : array<Patch>,
-            };
-
-            struct RenderBuffer {
-              instanceCount: atomic<u32>,
-              patches : array<Patch>,
-            };
+            ${structPatches}
+            ${structRenderBuffer}
 
             @group(0) @binding(1) var<uniform> inputBuffer : InputBuffer;
             @group(0) @binding(2) var<storage, read_write> patchesBuffer : Patches;
@@ -158,7 +171,7 @@ export class VirtualModel implements Disposable {
               // TODO: Do loops in compute shaders make sense?
               for (var i = 0u; i < 8u; i = i + 1u) {
 
-              let patchIndex = global_id[0] + patchesBuffer.readStart;
+              let patchIndex = global_id.x + patchesBuffer.readStart;
               if (patchIndex < patchesBuffer.readEnd) {
                 let quad = patchesBuffer.patches[patchIndex];
 
@@ -191,16 +204,18 @@ export class VirtualModel implements Disposable {
                   length(cross(cornersForArea[1] - cornersForArea[0], cornersForArea[2] - cornersForArea[0])) +
                   length(cross(cornersForArea[2] - cornersForArea[0], cornersForArea[3] - cornersForArea[0]))
                 );
-                let sizeThreshold = 0.1; // TODO: Will depend on the screen resolution (and we need different thresholds for X and Y)
+                let sizeThreshold = 0.05; // TODO: Will depend on the screen resolution (and we need different thresholds for X and Y)
 
                 if (area < sizeThreshold * sizeThreshold) {
                   // TODO: Should we do instancing, or should we directly generate vertices here?
                   // Done, please render
-                  let writeIndex = atomicAdd(&renderBuffer.instanceCount, 1);
+                  let writeIndex = min(atomicAdd(&renderBuffer.instanceCount, 1), renderBuffer.patchesLength - 1);
                   renderBuffer.patches[writeIndex] = quad;
                 } else {
                   // Split in four
-                  let writeIndex = atomicAdd(&patchesBuffer.write, 4);
+                  // TODO: Properly handle overflow
+                  let writeIndex = min(atomicAdd(&patchesBuffer.write, 4), patchesBuffer.patchesLength - 4);
+
                   let center = mix(quad.min, quad.max, 0.5);
                   patchesBuffer.patches[writeIndex + 0] = Patch(quad.min, center);
                   patchesBuffer.patches[writeIndex + 1] = Patch(vec2f(center.x, quad.min.y), vec2f(quad.max.x, center.y));
@@ -209,11 +224,12 @@ export class VirtualModel implements Disposable {
                 }
               }
               // TODO: What's the most efficient approach (multiple buffers? start-end? etc.)
-              storageBarrier();
+              storageBarrier(); // Wait for all threads to finish reading "readStart" and "readEnd"
               if(global_id.x == 0u && global_id.y == 0u && global_id.z == 0u) {
                 patchesBuffer.readStart = patchesBuffer.readEnd;
                 patchesBuffer.readEnd = min(patchesBuffer.readEnd + 64, atomicLoad(&patchesBuffer.write));
               }
+              storageBarrier(); // Wait until the writes are done before continuing
 
               } // end of for loop
             }
@@ -227,7 +243,6 @@ export class VirtualModel implements Disposable {
         },
       }
     );
-    // TODO: Whatever is left in the patchesBuffer has to be copied to the renderBuffer.
     cs.setStorageBuffer("patchesBuffer", patchesBuffer);
     cs.setStorageBuffer("renderBuffer", renderBuffer);
 
@@ -263,32 +278,52 @@ export class VirtualModel implements Disposable {
                 tmp2: u32,
             };
 
-            struct Patch {
-                min: vec2<f32>,
-                max: vec2<f32>,
-            };
-
-            struct RenderBuffer {
-              instanceCount: atomic<u32>,
-              patches : array<Patch>,
-            };
+            ${structPatches}
+            ${structRenderBuffer}
 
             @group(0) @binding(0) var<storage, read_write> indirectDrawBuffer : IndirectDrawBuffer;
+            @group(0) @binding(2) var<storage, read_write> patchesBuffer : Patches;
             @group(0) @binding(3) var<storage, read_write> renderBuffer : RenderBuffer;
 
-            @compute @workgroup_size(1, 1, 1)
+            fn ceilDiv(a: u32, b: u32) -> u32 {
+              return (a + b - 1u) / b;
+            }
+
+            @compute @workgroup_size(64, 1, 1)
             fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
-              indirectDrawBuffer.instanceCount = atomicLoad(&renderBuffer.instanceCount);
+              let renderBufferStart = atomicLoad(&renderBuffer.instanceCount);
+
+              let start = patchesBuffer.readStart;
+              var end = atomicLoad(&patchesBuffer.write);
+              end = min(end, min(end - start, renderBuffer.patchesLength) + start);
+
+              // Split into 64 segments (workgroup size)
+              let segmentSize = ceilDiv(end - start, 64);
+              let segmentStart = start + segmentSize * global_id.x;
+              let segmentEnd = min(segmentStart + segmentSize, end);
+
+              // Copy patches to render buffer
+              // Notice how we know where to put everything, so no need for synchronization with atomics
+              for (var i = segmentStart; i < segmentEnd; i = i + 1u) {
+                let quad = patchesBuffer.patches[i];
+                renderBuffer.patches[renderBufferStart + (i - start)] = quad;
+              }
+
+              if(global_id.x == 0u && global_id.y == 0u && global_id.z == 0u) {
+                indirectDrawBuffer.instanceCount = renderBufferStart + (end - start);
+              }
             }
         `,
       },
       {
         bindingsMapping: {
           indirectDrawBuffer: { group: 0, binding: 0 },
+          patchesBuffer: { group: 0, binding: 2 },
           renderBuffer: { group: 0, binding: 3 },
         },
       }
     );
+    renderCs.setStorageBuffer("patchesBuffer", patchesBuffer);
     renderCs.setStorageBuffer("renderBuffer", renderBuffer);
 
     shaderMaterial.setStorageBuffer("renderBuffer", renderBuffer);
@@ -393,6 +428,7 @@ struct Patch {
 
 struct RenderBuffer {
   _skipInstanceCount: u32, // Same size as the atomic<u32>, see https://www.w3.org/TR/WGSL/#alignment-and-size
+  patchesLength: u32,
   patches : array<Patch>,
 };
 
