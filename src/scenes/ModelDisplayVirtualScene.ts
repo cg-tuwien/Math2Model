@@ -1,19 +1,9 @@
 import {
   Vector3,
-  MeshBuilder,
   HemisphericLight,
-  ShaderMaterial,
-  type GroundMesh,
-  Matrix,
-  ComputeShader,
   UniformBuffer,
-  WebGPUDataBuffer,
-  ShaderLanguage,
   Observable,
-  GizmoManager,
-  Quaternion,
 } from "@babylonjs/core";
-import { assembleFullVertexShader } from "@/shaders/shader-processor";
 import vertexShader from "./ModelDisplayVirtualScene.vert.wgsl?raw";
 import {
   makeFilePath,
@@ -22,12 +12,7 @@ import {
   type SceneFiles,
 } from "@/filesystem/scene-files";
 import type { BaseScene } from "./BaseScene";
-import {
-  VirtualModel,
-  type SerializedActor,
-  type ShaderCodeRef,
-} from "./VirtualModel";
-import { assertUnreachable } from "@stefnotch/typestef/assert";
+import { VirtualModel, type SerializedActor } from "./VirtualModel";
 import { DisposableStack } from "../disposable-stack";
 import { showError } from "@/notification";
 
@@ -141,9 +126,7 @@ export class ShaderFileReader {
 
   readVertexShader(name: FilePath): string {
     this.referencedFiles.push(name);
-    return assembleFullVertexShader(
-      readOrCreateFile(this.files, name, () => vertexShader)
-    );
+    return readOrCreateFile(this.files, name, () => vertexShader);
   }
 
   readFragmentShader(name: FilePath): string {

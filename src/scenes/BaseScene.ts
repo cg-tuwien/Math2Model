@@ -76,7 +76,7 @@ export class BaseScene extends Scene {
     camera.attachControl(true);
     camera.lowerBetaLimit = 0.2; // Almost peak
     camera.upperBetaLimit = 1.5; // Almost straight down to xz-plane
-    camera.lowerRadiusLimit = 3; // Not tooo close
+    camera.lowerRadiusLimit = 0.1;
     this._camera = camera;
 
     this._startTime = performance.now();
