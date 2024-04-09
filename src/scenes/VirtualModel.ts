@@ -165,6 +165,10 @@ export class VirtualModel implements Disposable {
 
             ${vertexSource}
 
+            fn triangleArea(a: vec3f, b: vec3f, c: vec3f) -> f32 {
+              return 0.5 * length(cross(b - a, c - a));
+            }
+
             // assume a single work group
             @compute @workgroup_size(64, 1, 1)
             fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
@@ -175,17 +179,18 @@ export class VirtualModel implements Disposable {
               if (patchIndex < patchesBuffer.readEnd) {
                 let quad = patchesBuffer.patches[patchIndex];
 
-                let corners = array<vec2f, 4>(
-                  vec2f(quad.min.x, quad.min.y),
-                  vec2f(quad.max.x, quad.min.y),
-                  vec2f(quad.max.x, quad.max.y),
-                  vec2f(quad.min.x, quad.max.y)
+                let corners = array<vec3f, 4>(
+                  evaluateImage(vec2f(quad.min.x, quad.min.y)),
+                  evaluateImage(vec2f(quad.max.x, quad.min.y)),
+                  evaluateImage(vec2f(quad.max.x, quad.max.y)),
+                  evaluateImage(vec2f(quad.min.x, quad.max.y))
                 );
+                
                 let cornersClipSpace = array<vec4f, 4>(
-                  (inputBuffer.modelViewProjection * vec4f(evaluateImage(corners[0]), 1.0)),
-                  (inputBuffer.modelViewProjection * vec4f(evaluateImage(corners[1]), 1.0)),
-                  (inputBuffer.modelViewProjection * vec4f(evaluateImage(corners[2]), 1.0)),
-                  (inputBuffer.modelViewProjection * vec4f(evaluateImage(corners[3]), 1.0))
+                  (inputBuffer.modelViewProjection * vec4f(corners[0], 1.0)),
+                  (inputBuffer.modelViewProjection * vec4f(corners[1], 1.0)),
+                  (inputBuffer.modelViewProjection * vec4f(corners[2], 1.0)),
+                  (inputBuffer.modelViewProjection * vec4f(corners[3], 1.0))
                 );
                 // TODO: Clipping (aka discard if outside of the frustum)
                 let cornersScreenSpace = array<vec2f, 4>(
@@ -200,11 +205,16 @@ export class VirtualModel implements Disposable {
                   vec3f(cornersScreenSpace[2], 0.0),
                   vec3f(cornersScreenSpace[3], 0.0)
                 );
-                let area = 0.5 * (
-                  length(cross(cornersForArea[1] - cornersForArea[0], cornersForArea[2] - cornersForArea[0])) +
-                  length(cross(cornersForArea[2] - cornersForArea[0], cornersForArea[3] - cornersForArea[0]))
-                );
+                var area = triangleArea(cornersForArea[0], cornersForArea[1], cornersForArea[2]) + 
+                triangleArea(cornersForArea[0], cornersForArea[2], cornersForArea[3]);
+                
                 let sizeThreshold = 0.05; // TODO: Will depend on the screen resolution (and we need different thresholds for X and Y)
+
+                // Bonus check for degenerate cases
+                let centerSpot = inputBuffer.modelViewProjection * vec4f(evaluateImage(mix(quad.min, quad.max, 0.5)), 1.0);
+                if (distance(centerSpot.xyz / centerSpot.w, cornersClipSpace[0].xyz / cornersClipSpace[0].w) > 0.1) { // In screen space + depth
+                  area = 2 * sizeThreshold;
+                }
 
                 if (area < sizeThreshold * sizeThreshold) {
                   // TODO: Should we do instancing, or should we directly generate vertices here?
