@@ -107,25 +107,38 @@ export class SceneFilesWithFilesystem implements SceneFiles {
     return Array.from(this.files.keys());
   }
 
-  async writeFile(name: FilePath, content: string) {
+  writeFile(name: FilePath, content: string) {
     this.files.set(name, content);
-    this.taskQueue = this.taskQueue.then(async () => {
-      const sceneDirectory = await this.getSceneDirectory();
-      const fileHandle = await sceneDirectory.getFileHandle(name, {
-        create: true,
-      });
-      const writable = await fileHandle.createWritable();
-      await writable.write(content);
-      writable.close();
-    });
+    this.taskQueue = this.taskQueue.then(
+      async () => {
+        const sceneDirectory = await this.getSceneDirectory();
+        const fileHandle = await sceneDirectory.getFileHandle(
+          encodeFilePath(name),
+          {
+            create: true,
+          }
+        );
+        const writable = await fileHandle.createWritable();
+        await writable.write(content);
+        await writable.close();
+      },
+      (error) => {
+        console.error(error);
+      }
+    );
   }
 
-  async deleteFile(name: FilePath) {
+  deleteFile(name: FilePath) {
     this.files.delete(name);
-    this.taskQueue = this.taskQueue.then(async () => {
-      const sceneDirectory = await this.getSceneDirectory();
-      await sceneDirectory.removeEntry(name);
-    });
+    this.taskQueue = this.taskQueue.then(
+      async () => {
+        const sceneDirectory = await this.getSceneDirectory();
+        await sceneDirectory.removeEntry(encodeFilePath(name));
+      },
+      (error) => {
+        console.error(error);
+      }
+    );
   }
 
   readFile(name: FilePath) {
@@ -138,4 +151,8 @@ export class SceneFilesWithFilesystem implements SceneFiles {
   hasFile(name: FilePath) {
     return this.files.has(name);
   }
+}
+
+function encodeFilePath(name: FilePath) {
+  return name;
 }

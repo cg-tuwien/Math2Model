@@ -2,7 +2,7 @@
 import type { WebGPUEngine } from "@babylonjs/core";
 import { ModelDisplayVirtualScene } from "@/scenes/ModelDisplayVirtualScene";
 import { BaseScene } from "@/scenes/BaseScene";
-import CodeEditor from "@/components/CodeEditor.vue";
+import CodeEditor, { type KeyedCode } from "@/components/CodeEditor.vue";
 
 import {
   ref,
@@ -20,6 +20,7 @@ import {
   makeFilePath,
   type FilePath,
 } from "@/filesystem/scene-files";
+import { showError } from "@/notification";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -28,37 +29,29 @@ const props = defineProps<{
   engine: WebGPUEngine;
 }>();
 
-interface KeyedCode {
-  readonly id: string;
-  readonly code: string;
-  readonly file: FilePath;
-}
-function readFile(file: FilePath): KeyedCode {
+function readFile(name: FilePath): KeyedCode | null {
+  let code = props.files.readFile(name);
+  if (code === null) {
+    return null;
+  }
   return {
     id: crypto.randomUUID(),
-    code: props.files.readFile(file) ?? "",
-    file,
+    code,
+    name,
   };
 }
 
 const store = useStore();
 
 const canvasContainer = ref<HTMLDivElement | null>(null);
-const keyedCode = ref<KeyedCode>(readFile(makeFilePath("my-shader.vert")));
 const baseScene = shallowRef(new BaseScene(props.engine));
 const scene = shallowRef(
   new ModelDisplayVirtualScene(baseScene.value, props.files)
 );
-const fileNames = computed(() => [...props.files.fileNames.value.keys()]);
-const fileNameOptions = computed(() =>
-  fileNames.value.map((name) => ({
-    label: name,
-    value: name,
-  }))
+// Read the file after the scene is created
+const keyedCode = ref<KeyedCode | null>(
+  readFile(makeFilePath("my-shader.vert"))
 );
-
-// Re-read the code after loading the user's scene
-keyedCode.value = readFile(keyedCode.value.file);
 
 // Attach the canvas to the DOM
 watchEffect(() => {
@@ -89,12 +82,11 @@ function reloadScene() {
 
 const setNewCode = useDebounceFn((newCode: () => string) => {
   const value = newCode();
-  if (!scene.value) {
-    console.error("No scene, but want to update code");
+  if (keyedCode.value === null) {
+    showError("No file selected", new Error("No file selected"));
     return;
   }
-
-  props.files.writeFile(keyedCode.value.file, value);
+  props.files.writeFile(keyedCode.value.name, value);
 
   reloadScene();
 }, 500);
@@ -103,34 +95,62 @@ onUnmounted(() => {
   scene.value[Symbol.dispose]();
   baseScene.value.dispose();
 });
+
+function openFiles(v: FilePath[]) {
+  if (v.length > 0) {
+    keyedCode.value = readFile(v[0]);
+  }
+}
+function addFiles(files: FilePath[]) {
+  files.forEach((file) => {
+    if (props.files.hasFile(file)) return;
+    props.files.writeFile(file, "");
+  });
+}
+function renameFile(oldName: FilePath, newName: FilePath) {
+  if (oldName === newName) return;
+  const fileData = props.files.readFile(oldName);
+  if (fileData === null) return;
+  props.files.deleteFile(oldName);
+  props.files.writeFile(newName, fileData);
+
+  if (oldName === keyedCode.value?.name) {
+    keyedCode.value = readFile(newName);
+  }
+}
+function deleteFiles(files: FilePath[]) {
+  files.forEach((file) => {
+    props.files.deleteFile(file);
+    if (file === keyedCode.value?.name) {
+      keyedCode.value = null;
+    }
+  });
+}
 </script>
 
 <template>
   <main class="min-h-full">
-    <div class="flex" style="height: 90vh">
+    <div class="flex" style="height: 80vh">
       <div
         ref="canvasContainer"
         class="self-stretch flex-1 overflow-hidden"
       ></div>
       <CodeEditor
         class="self-stretch flex-1 overflow-hidden"
-        :keyed-code="{
-          id: keyedCode.id,
-          code: keyedCode.code,
-        }"
+        :keyed-code="keyedCode"
         :is-dark="store.isDark"
         @update="setNewCode($event)"
       >
       </CodeEditor>
     </div>
-
-    <n-select
-      :value="keyedCode.file"
-      @update:value="(v) => (keyedCode = readFile(v))"
-      filterable
-      placeholder="Select a file"
-      :options="fileNameOptions"
-    />
+    <FileBrowser
+      :files="props.files"
+      :open-files="keyedCode !== null ? [keyedCode.name] : []"
+      @update:open-files="openFiles($event)"
+      @add-files="addFiles($event)"
+      @rename-file="(oldName, newName) => renameFile(oldName, newName)"
+      @delete-files="deleteFiles($event)"
+    ></FileBrowser>
   </main>
 </template>
 
