@@ -57,9 +57,10 @@ I also totally recommend trying out the following browser extensions
 - `src/filesystem/` deals with saving and loading files. Uses the latest filesystem API together with a sandboxed "origin private filesystem".
 - `src/router/` contains the Vue.js router stuff, reponsible for mapping URLs to different pages/views.
 - `src/scenes/` contains the existing Babylon.js scenes. 
-- `src/shaders/` contains a shader transformer.
-- `src/stores/` contains Pina stores. They're globally accessible, reactive objects.
+- `src/stores/` contains Pinia stores. They're globally accessible, reactive objects.
 - `src/views/` contains the different pages. Currently the HomeView.vue is the only one that matters.
+- `src/App.vue/` is the main Vue.js file.
+- `src/main.ts` is the Typescript entrypoint.
 - `index.html` is the entrypoint for the website.
 - `package.json` is the dependency file. It also includes "scripts" that can be started with `npm run`.
 - `tsconfig.json` is required to tell Typescript what to do. It's split up, because there are technically multiple different Typescript configs that apply to our code.
@@ -78,8 +79,8 @@ I also totally recommend trying out the following browser extensions
 
 Other libraries where one can look up the documentation as needed are
 - Typescript
-- Pinia: `src/stores/`
-- Vitest: Unit tests
+- Pinia: For the `src/stores/`
+- Vitest: For unit tests
 
 
 ## High Level Structure
