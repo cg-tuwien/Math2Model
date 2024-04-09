@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { WebGPUEngine } from "@babylonjs/core";
-import { MyFirstScene } from "@/scenes/MyFirstScene";
+import { ModelDisplayVirtualScene } from "@/scenes/ModelDisplayVirtualScene";
 import { BaseScene } from "@/scenes/BaseScene";
 import CodeEditor from "@/components/CodeEditor.vue";
 
@@ -15,7 +15,11 @@ import {
 import { useDebounceFn, useElementSize } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import { assert } from "@stefnotch/typestef/assert";
-import { ReactiveSceneFiles } from "@/filesystem/scene-files";
+import {
+  ReactiveSceneFiles,
+  makeFilePath,
+  type FilePath,
+} from "@/filesystem/scene-files";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -27,9 +31,9 @@ const props = defineProps<{
 interface KeyedCode {
   readonly id: string;
   readonly code: string;
-  readonly file: string;
+  readonly file: FilePath;
 }
-function readFile(file: string): KeyedCode {
+function readFile(file: FilePath): KeyedCode {
   return {
     id: crypto.randomUUID(),
     code: props.files.readFile(file) ?? "",
@@ -40,9 +44,11 @@ function readFile(file: string): KeyedCode {
 const store = useStore();
 
 const canvasContainer = ref<HTMLDivElement | null>(null);
-const keyedCode = ref<KeyedCode>(readFile("customVertexShader"));
+const keyedCode = ref<KeyedCode>(readFile(makeFilePath("my-shader.vert")));
 const baseScene = shallowRef(new BaseScene(props.engine));
-const scene = shallowRef(new MyFirstScene(baseScene.value, props.files));
+const scene = shallowRef(
+  new ModelDisplayVirtualScene(baseScene.value, props.files)
+);
 const fileNames = computed(() => [...props.files.fileNames.value.keys()]);
 const fileNameOptions = computed(() =>
   fileNames.value.map((name) => ({
@@ -71,12 +77,14 @@ watch(
 props.engine.runRenderLoop(renderLoop);
 function renderLoop() {
   baseScene.value.update();
+  scene.value.update();
   baseScene.value.render();
 }
 
+// TODO: Depending on the edited file, we can also just reload a few actors instead of the whole scene
 function reloadScene() {
-  scene.value.dispose();
-  scene.value = new MyFirstScene(baseScene.value, props.files);
+  scene.value[Symbol.dispose]();
+  scene.value = new ModelDisplayVirtualScene(baseScene.value, props.files);
 }
 
 const setNewCode = useDebounceFn((newCode: () => string) => {
@@ -92,7 +100,7 @@ const setNewCode = useDebounceFn((newCode: () => string) => {
 }, 500);
 
 onUnmounted(() => {
-  scene.value.dispose();
+  scene.value[Symbol.dispose]();
   baseScene.value.dispose();
 });
 </script>

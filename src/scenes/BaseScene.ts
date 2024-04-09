@@ -10,6 +10,7 @@ import {
   type GroundMesh,
   ArcRotateCamera,
   type Camera,
+  type Mesh,
 } from "@babylonjs/core";
 import { GridMaterial } from "@babylonjs/materials/grid/gridMaterial";
 import backgroundGround from "@/assets/backgroundGround.png";
@@ -26,7 +27,7 @@ export type Seconds = number;
 
 export class BaseScene extends Scene {
   private hotCache = getHotCache();
-  private gridMesh: GroundMesh;
+  private _gridMesh: GroundMesh;
   private _camera: ArcRotateCamera;
   private _frame: number = 0;
   private _startTime: Milliseconds = 0;
@@ -44,6 +45,10 @@ export class BaseScene extends Scene {
     return this._currentTime - this._startTime;
   }
 
+  get gridMesh(): Mesh {
+    return this._gridMesh;
+  }
+
   constructor(public engine: WebGPUEngine) {
     super(engine);
 
@@ -56,7 +61,7 @@ export class BaseScene extends Scene {
       groundColor: new Color3(0.09, 0.59, 0.85),
       skyboxColor: new Color3(0.09, 0.59, 0.85),
     });
-    this.gridMesh = makeGridMesh(this);
+    this._gridMesh = makeGridMesh(this);
 
     let camera = new ArcRotateCamera(
       "camera",

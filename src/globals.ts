@@ -2,13 +2,14 @@ import { Tools, WebGPUEngine } from "@babylonjs/core";
 import {
   ReactiveSceneFiles,
   SceneFilesWithFilesystem,
+  makeFilePath,
 } from "./filesystem/scene-files";
 
 // GDPR compliance https://forum.babylonjs.com/t/offer-alternative-to-babylon-js-cdn/48982
 Tools.ScriptBaseUrl = "/babylon";
 
 export const sceneFilesPromise = (async () => {
-  const fs = await SceneFilesWithFilesystem.create("some-key");
+  const fs = await SceneFilesWithFilesystem.create(makeFilePath("some-key"));
   return await ReactiveSceneFiles.create(fs);
 })();
 
