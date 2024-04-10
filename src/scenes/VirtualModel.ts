@@ -173,6 +173,7 @@ export class VirtualModel implements Disposable {
             @compute @workgroup_size(64, 1, 1)
             fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
               // TODO: Do loops in compute shaders make sense?
+              // Answer: Nope (pls benchmark)
               for (var i = 0u; i < 8u; i = i + 1u) {
 
               let patchIndex = global_id.x + patchesBuffer.readStart;
@@ -193,6 +194,8 @@ export class VirtualModel implements Disposable {
                   (inputBuffer.modelViewProjection * vec4f(corners[3], 1.0))
                 );
                 // TODO: Clipping (aka discard if outside of the frustum)
+                // Answer: No clipping. We're only doing culling, cause clipping would be a pointless overkill
+                // Culling is done by checking if all samples are outside of exactly one of the frustum planes :)
                 let cornersScreenSpace = array<vec2f, 4>(
                   cornersClipSpace[0].xy / cornersClipSpace[0].w,
                   cornersClipSpace[1].xy / cornersClipSpace[1].w,
@@ -217,6 +220,11 @@ export class VirtualModel implements Disposable {
                 }
 
                 if (area < sizeThreshold * sizeThreshold) {
+                  // TODO: Write to different render buffers
+                  // Super duper 1x1 pixel patches => planes with 4 vertices
+                  // Slightly larger patches => plane with more vertices
+                  // etc.
+
                   // TODO: Should we do instancing, or should we directly generate vertices here?
                   // Done, please render
                   let writeIndex = min(atomicAdd(&renderBuffer.instanceCount, 1), renderBuffer.patchesLength - 1);
@@ -234,6 +242,7 @@ export class VirtualModel implements Disposable {
                 }
               }
               // TODO: What's the most efficient approach (multiple buffers? start-end? etc.)
+              // Answer: Ping pong buffer
               storageBarrier(); // Wait for all threads to finish reading "readStart" and "readEnd"
               if(global_id.x == 0u && global_id.y == 0u && global_id.z == 0u) {
                 patchesBuffer.readStart = patchesBuffer.readEnd;
@@ -292,6 +301,7 @@ export class VirtualModel implements Disposable {
             ${structRenderBuffer}
 
             @group(0) @binding(0) var<storage, read_write> indirectDrawBuffer : IndirectDrawBuffer;
+            // TODO: Make this readonly https://github.com/gpuweb/gpuweb/discussions/4438
             @group(0) @binding(2) var<storage, read_write> patchesBuffer : Patches;
             @group(0) @binding(3) var<storage, read_write> renderBuffer : RenderBuffer;
 
@@ -360,7 +370,10 @@ export class VirtualModel implements Disposable {
       patchesBuffer.update(patchesBufferBytes);
       renderBuffer.update(renderBufferBytes);
 
+      // TODO: Use https://developer.mozilla.org/en-US/docs/Web/API/GPUComputePassEncoder/dispatchWorkgroupsIndirect
+      //
       cs.dispatch(1, 1, 1);
+
       // cs.dispatch(1, 1, 1);
       // cs.dispatch(1, 1, 1);
       renderCs.dispatch(1, 1, 1);
