@@ -10,3 +10,17 @@ As discussed during our meeting on 08.01.2024:
 ## Contributing
 
 Read our [CONTRIBUTING.md](./CONTRIBUTING.md)
+
+## Project Setup
+
+```sh
+npm install
+```
+
+and run it with
+
+```sh
+npm run dev
+```
+
+and for everything else, check out our [CONTRIBUTING.md](./CONTRIBUTING.md)
