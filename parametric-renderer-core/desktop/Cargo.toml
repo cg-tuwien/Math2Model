@@ -1,0 +1,22 @@
+[package]
+name = "desktop"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+wgpu = { version = "0.19", features = ["webgpu", "wgsl", "naga"] }
+winit = { version = "0.29" }
+tracing = { version = "0.1" }
+tracing-subscriber = { version = "0.3" }
+anyhow = "1.0"
+thiserror = "1.0"
+pollster = "0.3"
+memoffset = "0.9"
+glam = "0.27"
+glamour = "0.11"
+bytemuck = { version = "1.13", features = ["derive"] }
+winit_input_helper = "0.16"
+
+[build-dependencies]
+wgsl_to_wgpu = "0.6"
