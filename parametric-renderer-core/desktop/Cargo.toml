@@ -17,6 +17,7 @@ glam = "0.27"
 glamour = "0.11"
 bytemuck = { version = "1.13", features = ["derive"] }
 winit_input_helper = "0.16"
+nanoserde = "0.1"
 
 [build-dependencies]
 wgsl_to_wgpu = "0.6"

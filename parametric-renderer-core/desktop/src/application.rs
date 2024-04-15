@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use glamour::{Matrix4, Point3, ToRaw, Vector3, Vector4};
+use glamour::{Angle, Point3, ToRaw, Vector4};
 use tracing::{error, info, warn};
 use wgpu::util::DeviceExt;
 use winit::window::Window;
@@ -8,7 +8,8 @@ use winit_input_helper::WinitInputHelper;
 
 use crate::{
     camera::{camera_settings::CameraSettings, freecam_controller::FreecamController, Camera},
-    quad,
+    config::{CacheFile, CachedCamera, ConfigFile},
+    mesh::Mesh,
     shaders::shader,
     texture::Texture,
 };
@@ -30,83 +31,29 @@ pub struct Application {
     size: winit::dpi::PhysicalSize<u32>,
     inputs: WinitInputHelper,
     window: Arc<Window>,
+    config_file: ConfigFile,
+    cache_file: CacheFile,
 }
 
-struct Transform {
-    position: Point3,
-    rotation: glam::Quat,
-    scale: f32,
-}
-
-impl Transform {
-    fn to_matrix(&self) -> Matrix4<f32> {
-        Matrix4::from_scale_rotation_translation(
-            Vector3::new(self.scale, self.scale, self.scale),
-            self.rotation,
-            self.position.to_vector(),
-        )
-    }
-}
-
-struct Mesh {
-    transform: Transform,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    instance_buffer: wgpu::Buffer,
-    num_indices: u32,
-}
-impl Mesh {
-    fn new_quad(device: &wgpu::Device) -> Self {
-        let transform = Transform {
-            position: Point3::new(0.0, 0.0, 0.0),
-            rotation: glam::Quat::IDENTITY,
-            scale: 1.0,
-        };
-        let vertex_buffer_contents = quad::QUAD_VERTICES
-            .iter()
-            .map(|&position| shader::VertexInput { position })
-            .collect::<Vec<_>>();
-
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertex_buffer_contents),
-            usage: wgpu::BufferUsages::VERTEX,
+impl Drop for Application {
+    fn drop(&mut self) {
+        self.cache_file.camera = Some(CachedCamera::FirstPerson {
+            position: self.freecam_controller.position.to_array(),
+            pitch: self.freecam_controller.pitch.radians,
+            yaw: self.freecam_controller.yaw.radians,
         });
-
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(&quad::QUAD_INDICES),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-
-        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Instance Buffer"),
-            contents: bytemuck::cast_slice(&[Mesh::get_instance_input(&transform)]),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
-        Self {
-            transform,
-            vertex_buffer,
-            index_buffer,
-            instance_buffer,
-            num_indices: quad::QUAD_INDICES.len() as u32,
-        }
-    }
-
-    fn get_instance_input(transform: &Transform) -> shader::InstanceInput {
-        let model = transform.to_matrix().to_raw();
-        shader::InstanceInput {
-            model_similarity_0: model.x_axis,
-            model_similarity_1: model.y_axis,
-            model_similarity_2: model.z_axis,
-            model_similarity_3: model.w_axis,
-        }
+        self.cache_file
+            .save_to_file(Application::CACHE_FILE)
+            .unwrap();
     }
 }
 
 impl Application {
+    const CONFIG_FILE: &'static str = "config.json";
+    const CACHE_FILE: &'static str = "cache.json";
     pub async fn new(window: Arc<Window>) -> anyhow::Result<Self> {
+        let config_file = ConfigFile::from_file(Application::CONFIG_FILE).unwrap_or_default();
+        let cache_file = CacheFile::from_file(Application::CACHE_FILE).unwrap_or_default();
         let size = window.inner_size();
 
         let camera = Camera::new(
@@ -114,7 +61,20 @@ impl Application {
             CameraSettings::default(),
         );
         let mut freecam_controller = FreecamController::new(5.0, 0.01);
-        freecam_controller.position = Point3::new(0.0, 0.0, 2.0);
+        match cache_file.camera {
+            Some(CachedCamera::FirstPerson {
+                position,
+                pitch,
+                yaw,
+            }) => {
+                freecam_controller.position = Point3::from(position);
+                freecam_controller.pitch = Angle::from(pitch);
+                freecam_controller.yaw = Angle::from(yaw);
+            }
+            _ => {
+                freecam_controller.position = Point3::new(0.0, 0.0, 2.0);
+            }
+        }
 
         let inputs = WinitInputHelper::new();
 
@@ -255,6 +215,8 @@ impl Application {
             size,
             inputs,
             window,
+            config_file,
+            cache_file,
         })
     }
 
