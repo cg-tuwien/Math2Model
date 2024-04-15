@@ -2,7 +2,7 @@
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { computed, ref, shallowRef, watch } from "vue";
 import { useDebounceFn, useElementSize } from "@vueuse/core";
-import type { FilePath } from "@/filesystem/scene-files";
+import type { FilePath } from "@/filesystem/reactive-files";
 
 const monacoMount = ref<HTMLDivElement | null>(null);
 
@@ -48,11 +48,29 @@ watch(themeName, (v) => {
   monaco.editor.setTheme(v);
 });
 
+watch(
+  () => props.keyedCode?.name,
+  (v) => {
+    const model = editor.value?.getModel();
+    if (!model) return;
+    monaco.editor.setModelLanguage(model, guessLanguage(v ?? ""));
+  }
+);
+
+function guessLanguage(name: string): "wgsl" | "json" {
+  // pop off the last extension
+  const ext = (name.match(/^[^]+\.(\w+)$/)?.[1] ?? "").toLowerCase();
+  if (ext === "wgsl" || ext == "vert" || ext == "frag") return "wgsl";
+  if (ext === "json") return "json";
+
+  return "wgsl";
+}
+
 watch(monacoMount, (element) => {
   if (!element) return;
   editor.value = monaco.editor.create(element, {
     value: props.keyedCode?.code ?? "<no code>",
-    language: "wgsl",
+    language: guessLanguage(props.keyedCode?.name ?? ""),
     contextmenu: true,
     minimap: {
       enabled: false,

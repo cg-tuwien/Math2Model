@@ -16,15 +16,15 @@ import { useDebounceFn, useElementSize } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import { assert } from "@stefnotch/typestef/assert";
 import {
-  ReactiveSceneFiles,
+  ReactiveFiles,
   makeFilePath,
   type FilePath,
-} from "@/filesystem/scene-files";
+} from "@/filesystem/reactive-files";
 import { showError } from "@/notification";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
-  files: ReactiveSceneFiles;
+  files: ReactiveFiles;
   canvas: HTMLCanvasElement;
   engine: WebGPUEngine;
 }>();

@@ -14,7 +14,7 @@ import {
   Constants,
 } from "@babylonjs/core";
 import { type ModelDisplayVirtualScene } from "./ModelDisplayVirtualScene";
-import { type FilePath } from "@/filesystem/scene-files";
+import { type FilePath } from "@/filesystem/reactive-files";
 import { DisposableStack } from "../disposable-stack";
 
 export class VirtualModel implements Disposable {

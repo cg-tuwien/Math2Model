@@ -9,8 +9,8 @@ import {
   makeFilePath,
   readOrCreateFile,
   type FilePath,
-  type SceneFiles,
-} from "@/filesystem/scene-files";
+  type WritableFiles,
+} from "@/filesystem/reactive-files";
 import type { BaseScene } from "./BaseScene";
 import { VirtualModel, type SerializedActor } from "./VirtualModel";
 import { DisposableStack } from "../disposable-stack";
@@ -26,7 +26,7 @@ export class ModelDisplayVirtualScene implements Disposable {
   public readonly updateObservable: Observable<void> = new Observable();
   public readonly globalUBO: UniformBuffer;
   public readonly key = ModelDisplayVirtualScene.name;
-  constructor(public readonly scene: BaseScene, public files: SceneFiles) {
+  constructor(public readonly scene: BaseScene, public files: WritableFiles) {
     let light = this._disposables.addDisposable(
       new HemisphericLight("light1", new Vector3(0, 1, 0), scene)
     );
@@ -122,7 +122,7 @@ export class ModelDisplayVirtualScene implements Disposable {
 
 export class ShaderFileReader {
   public readonly referencedFiles: FilePath[] = [];
-  constructor(private files: SceneFiles) {}
+  constructor(private files: WritableFiles) {}
 
   readVertexShader(name: FilePath): string {
     this.referencedFiles.push(name);
