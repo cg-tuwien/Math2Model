@@ -17,7 +17,6 @@ import {
   readCacheFile,
   writeCacheFile,
 } from "@/filesystem/cache-file";
-import type { WritableFiles } from "@/filesystem/reactive-files";
 import { mapOptional } from "@/option";
 
 export type Milliseconds = number;

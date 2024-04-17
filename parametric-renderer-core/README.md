@@ -1,5 +1,11 @@
 # Parametric Renderer Core
 
+## To update the WGSL shaders
+
+```bash
+cargo run --bin copy-includes
+```
+
 ## Developer Notes
 
 - WGPU Tutorial https://sotrh.github.io/learn-wgpu/#what-is-wgpu

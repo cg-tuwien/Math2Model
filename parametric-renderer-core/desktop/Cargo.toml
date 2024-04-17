@@ -3,6 +3,7 @@ name = "desktop"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"
+default-run = "desktop"
 
 [dependencies]
 wgpu = { version = "0.19", features = ["webgpu", "wgsl", "naga"] }
