@@ -1,33 +1,35 @@
 //#include "./Common.wgsl"
-// AUTOGEN 8f314de05189acdd25bff27345cda3548c9b99c7fa5df3ad72fc2781340b0546
+// AUTOGEN c5f9275279f235c07bee40b0b5dafdb91d723a1e24c4acb363c929645456a556
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
 };
 struct Patches {
-  readStart: u32,
-  readEnd: u32,
-  write: atomic<u32>,
-  patchesLength: u32,
+  patches_length: atomic<u32>,
+  patches_capacity: u32,
   patches : array<Patch>,
 };
 struct PatchesRead { // Is currently needed, see https://github.com/gpuweb/gpuweb/discussions/4438
-  readStart: u32,
-  readEnd: u32,
-  write: u32, // Same size and alignment as atomic<u32>. Should be legal, right?
-  patchesLength: u32,
+  patches_length: u32, // Same size and alignment as atomic<u32>. Should be legal, right?
+  patches_capacity: u32,
   patches : array<Patch>,
 };
 struct RenderBuffer {
-  instanceCount: atomic<u32>,
-  patchesLength: u32,
+  patches_length: atomic<u32>,
+  patches_capacity: u32,
   patches: array<Patch>,
 };
 struct RenderBufferRead {
-  instanceCount: u32, // Same size as atomic<u32>
-  patchesLength: u32,
+  patches_length: u32, // Same size as atomic<u32>
+  patches_capacity: u32,
   patches: array<Patch>,
 };
+struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/struct.DispatchIndirectArgs.html
+  x: u32,
+  y: u32,
+  z: u32,
+} 
+fn ceil_div(a: u32, b: u32) -> u32 { return (a + b - 1u) / b; }
 // END OF AUTOGEN
 
 alias Vec3Padded = vec4<f32>;

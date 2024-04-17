@@ -27,14 +27,17 @@ pub struct Application {
     render_pipeline: wgpu::RenderPipeline,
     render_bind_group_0: shader::bind_groups::BindGroup0,
     compute_patches_pipeline: wgpu::ComputePipeline,
-    compute_patches_bind_group_0: compute_patches::bind_groups::BindGroup0,
+    compute_patches_input_buffer: TypedBuffer<compute_patches::InputBuffer>,
+    compute_patches_bind_group_0: [compute_patches::bind_groups::BindGroup0; 2],
     copy_patches_pipeline: wgpu::ComputePipeline,
     copy_patches_bind_group_0: copy_patches::bind_groups::BindGroup0,
-    compute_patches_input_buffer: TypedBuffer<compute_patches::InputBuffer>,
-    patches_buffer_initial: compute_patches::Patches,
-    patches_buffer: TypedBuffer<compute_patches::Patches>,
+    patches_buffer_starting_patch: TypedBuffer<compute_patches::Patches>,
+    patches_buffer_reset: TypedBuffer<compute_patches::Patches>,
+    patches_buffer: [TypedBuffer<compute_patches::Patches>; 2],
     render_buffer_initial: compute_patches::RenderBuffer,
     render_buffer: TypedBuffer<compute_patches::RenderBuffer>,
+    indirect_compute_buffer_initial: compute_patches::DispatchIndirectArgs,
+    indirect_compute_buffer: [TypedBuffer<compute_patches::DispatchIndirectArgs>; 2],
     indirect_draw_buffer: TypedBuffer<copy_patches::DrawIndexedIndirectArgs>,
 
     freecam_controller: FreecamController,
@@ -128,8 +131,8 @@ impl Application {
         )?;
         let max_patch_count = 10_000;
         let render_buffer_initial = compute_patches::RenderBuffer {
-            instanceCount: 0,
-            patchesLength: max_patch_count,
+            patches_length: 0,
+            patches_capacity: max_patch_count,
             patches: vec![],
         };
         let render_buffer = TypedBuffer::new_storage_with_runtime_array(
@@ -193,52 +196,114 @@ impl Application {
             multiview: None,
         });
 
-        let compute_patches_shader = compute_patches::create_shader_module(&device);
-        let compute_patches_pipeline_layout = compute_patches::create_pipeline_layout(&device);
         let compute_patches_pipeline =
             device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
                 label: Some("Compute Patches Pipeline"),
-                layout: Some(&compute_patches_pipeline_layout),
-                module: &compute_patches_shader,
-                entry_point: "main",
+                layout: Some(&compute_patches::create_pipeline_layout(&device)),
+                module: &compute_patches::create_shader_module(&device),
+                entry_point: compute_patches::ENTRY_MAIN,
             });
 
         let compute_patches_input_buffer = TypedBuffer::new_uniform(
             &device,
             "Compute Patches Input Buffer",
             &compute_patches::InputBuffer {
-                modelViewProjection: mesh.get_model_view_projection(&camera).to_raw(),
+                model_view_projection: mesh.get_model_view_projection(&camera).to_raw(),
             },
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         )?;
-        let patches_buffer_initial = compute_patches::Patches {
-            readStart: 0,
-            readEnd: 1,
-            write: 1,
-            patchesLength: max_patch_count,
+        let patches_buffer_starting_patch = compute_patches::Patches {
+            patches_length: 1,
+            patches_capacity: max_patch_count,
             patches: vec![compute_patches::Patch {
                 min: Vector2::<f32>::ZERO.to_raw(),
                 max: Vector2::<f32>::ONE.to_raw(),
             }],
         };
-        let patches_buffer = TypedBuffer::new_storage_with_runtime_array(
+        let patches_buffer_reset = compute_patches::Patches {
+            patches_length: 0,
+            patches_capacity: max_patch_count,
+            patches: vec![],
+        };
+
+        let patches_buffer = [
+            TypedBuffer::new_storage_with_runtime_array(
+                &device,
+                "Patches Buffer 0",
+                &patches_buffer_starting_patch,
+                max_patch_count as u64,
+                wgpu::BufferUsages::STORAGE
+                    | wgpu::BufferUsages::COPY_SRC
+                    | wgpu::BufferUsages::COPY_DST,
+            )?,
+            TypedBuffer::new_storage_with_runtime_array(
+                &device,
+                "Patches Buffer 1",
+                &patches_buffer_reset,
+                max_patch_count as u64,
+                wgpu::BufferUsages::STORAGE
+                    | wgpu::BufferUsages::COPY_SRC
+                    | wgpu::BufferUsages::COPY_DST,
+            )?,
+        ];
+        let patches_buffer_starting_patch = TypedBuffer::new_storage_with_runtime_array(
             &device,
-            "Patches Buffer",
-            &patches_buffer_initial,
-            max_patch_count as u64,
-            wgpu::BufferUsages::STORAGE
-                | wgpu::BufferUsages::COPY_SRC
-                | wgpu::BufferUsages::COPY_DST,
+            "Patches Buffer Starting Patch",
+            &patches_buffer_starting_patch,
+            1,
+            wgpu::BufferUsages::COPY_SRC,
+        )?;
+        let patches_buffer_reset = TypedBuffer::new_storage_with_runtime_array(
+            &device,
+            "Patches Buffer Reset",
+            &patches_buffer_reset,
+            1,
+            wgpu::BufferUsages::COPY_SRC,
         )?;
 
-        let compute_patches_bind_group_0 = compute_patches::bind_groups::BindGroup0::from_bindings(
-            &device,
-            compute_patches::bind_groups::BindGroupLayout0 {
-                inputBuffer: compute_patches_input_buffer.as_entire_buffer_binding(),
-                patchesBuffer: patches_buffer.as_entire_buffer_binding(),
-                renderBuffer: render_buffer.as_entire_buffer_binding(),
-            },
-        );
+        let indirect_compute_buffer_initial =
+            compute_patches::DispatchIndirectArgs { x: 1, y: 0, z: 0 };
+        let indirect_compute_buffer = [
+            TypedBuffer::new_storage(
+                &device,
+                "Indirect Compute Dispatch Buffer 0",
+                &indirect_compute_buffer_initial,
+                wgpu::BufferUsages::INDIRECT
+                    | wgpu::BufferUsages::STORAGE
+                    | wgpu::BufferUsages::COPY_DST,
+            )?,
+            TypedBuffer::new_storage(
+                &device,
+                "Indirect Compute Dispatch Buffer 1",
+                &indirect_compute_buffer_initial,
+                wgpu::BufferUsages::INDIRECT
+                    | wgpu::BufferUsages::STORAGE
+                    | wgpu::BufferUsages::COPY_DST,
+            )?,
+        ];
+
+        let compute_patches_bind_group_0 = [
+            compute_patches::bind_groups::BindGroup0::from_bindings(
+                &device,
+                compute_patches::bind_groups::BindGroupLayout0 {
+                    input_buffer: compute_patches_input_buffer.as_entire_buffer_binding(),
+                    patches_from_buffer: patches_buffer[0].as_entire_buffer_binding(),
+                    patches_to_buffer: patches_buffer[1].as_entire_buffer_binding(),
+                    render_buffer: render_buffer.as_entire_buffer_binding(),
+                    dispatch_next: indirect_compute_buffer[1].as_entire_buffer_binding(),
+                },
+            ),
+            compute_patches::bind_groups::BindGroup0::from_bindings(
+                &device,
+                compute_patches::bind_groups::BindGroupLayout0 {
+                    input_buffer: compute_patches_input_buffer.as_entire_buffer_binding(),
+                    patches_from_buffer: patches_buffer[1].as_entire_buffer_binding(), // Swap the order :)
+                    patches_to_buffer: patches_buffer[0].as_entire_buffer_binding(),
+                    render_buffer: render_buffer.as_entire_buffer_binding(),
+                    dispatch_next: indirect_compute_buffer[0].as_entire_buffer_binding(),
+                },
+            ),
+        ];
 
         let indirect_draw_buffer_initial = copy_patches::DrawIndexedIndirectArgs {
             index_count: mesh.num_indices,
@@ -256,21 +321,19 @@ impl Application {
                 | wgpu::BufferUsages::COPY_SRC,
         )?;
 
-        let copy_patches_shader = copy_patches::create_shader_module(&device);
-        let copy_patches_pipeline_layout = copy_patches::create_pipeline_layout(&device);
         let copy_patches_pipeline =
             device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
                 label: Some("Copy Patches Pipeline"),
-                layout: Some(&copy_patches_pipeline_layout),
-                module: &copy_patches_shader,
+                layout: Some(&copy_patches::create_pipeline_layout(&device)),
+                module: &copy_patches::create_shader_module(&device),
                 entry_point: "main",
             });
         let copy_patches_bind_group_0 = copy_patches::bind_groups::BindGroup0::from_bindings(
             &device,
             copy_patches::bind_groups::BindGroupLayout0 {
-                indirectDrawBuffer: indirect_draw_buffer.as_entire_buffer_binding(),
-                patchesBuffer: patches_buffer.as_entire_buffer_binding(),
-                renderBuffer: render_buffer.as_entire_buffer_binding(),
+                indirect_draw_buffer: indirect_draw_buffer.as_entire_buffer_binding(),
+                patches_from_buffer: patches_buffer[0].as_entire_buffer_binding(),
+                render_buffer: render_buffer.as_entire_buffer_binding(),
             },
         );
 
@@ -281,12 +344,15 @@ impl Application {
             config,
             render_pipeline,
             render_bind_group_0,
+            indirect_compute_buffer_initial,
+            indirect_compute_buffer,
+            compute_patches_input_buffer,
             compute_patches_pipeline,
             compute_patches_bind_group_0,
             copy_patches_pipeline,
             copy_patches_bind_group_0,
-            compute_patches_input_buffer,
-            patches_buffer_initial,
+            patches_buffer_starting_patch,
+            patches_buffer_reset,
             patches_buffer,
             render_buffer_initial,
             render_buffer,
@@ -340,7 +406,10 @@ impl Application {
             .update(
                 &self.queue,
                 &compute_patches::InputBuffer {
-                    modelViewProjection: self.mesh.get_model_view_projection(&self.camera).to_raw(),
+                    model_view_projection: self
+                        .mesh
+                        .get_model_view_projection(&self.camera)
+                        .to_raw(),
                 },
             )
             .unwrap();
@@ -352,8 +421,11 @@ impl Application {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        self.patches_buffer
-            .update(&self.queue, &self.patches_buffer_initial)
+        self.indirect_compute_buffer[0]
+            .update(&self.queue, &self.indirect_compute_buffer_initial)
+            .unwrap();
+        self.indirect_compute_buffer[1]
+            .update(&self.queue, &self.indirect_compute_buffer_initial)
             .unwrap();
         self.render_buffer
             .update(&self.queue, &self.render_buffer_initial)
@@ -364,14 +436,55 @@ impl Application {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
             });
-        {
-            let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("Compute Patches"),
-                timestamp_writes: None,
-            });
-            compute_pass.set_pipeline(&self.compute_patches_pipeline);
-            compute_patches::set_bind_groups(&mut compute_pass, &self.compute_patches_bind_group_0);
-            compute_pass.dispatch_workgroups(64, 1, 1);
+
+        commands.copy_buffer_to_buffer(
+            self.patches_buffer_starting_patch.buffer(),
+            0,
+            self.patches_buffer[0].buffer(),
+            0,
+            self.patches_buffer_starting_patch.buffer().size(),
+        );
+        for i in 0..4 {
+            {
+                commands.copy_buffer_to_buffer(
+                    self.patches_buffer_reset.buffer(),
+                    0,
+                    self.patches_buffer[1].buffer(),
+                    0,
+                    self.patches_buffer_reset.buffer().size(),
+                );
+                let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: Some(&format!("Compute Patches From-To {i}")),
+                    timestamp_writes: None,
+                });
+                compute_pass.set_pipeline(&self.compute_patches_pipeline);
+                compute_patches::set_bind_groups(
+                    &mut compute_pass,
+                    &self.compute_patches_bind_group_0[0],
+                );
+                compute_pass
+                    .dispatch_workgroups_indirect(self.indirect_compute_buffer[0].buffer(), 0);
+            }
+            {
+                commands.copy_buffer_to_buffer(
+                    self.patches_buffer_reset.buffer(),
+                    0,
+                    self.patches_buffer[0].buffer(),
+                    0,
+                    self.patches_buffer_reset.buffer().size(),
+                );
+                let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: Some(&format!("Compute Patches To-From {i}")),
+                    timestamp_writes: None,
+                });
+                compute_pass.set_pipeline(&self.compute_patches_pipeline);
+                compute_patches::set_bind_groups(
+                    &mut compute_pass,
+                    &self.compute_patches_bind_group_0[1],
+                );
+                compute_pass
+                    .dispatch_workgroups_indirect(self.indirect_compute_buffer[1].buffer(), 0);
+            }
         }
 
         {
@@ -381,7 +494,7 @@ impl Application {
             });
             compute_pass.set_pipeline(&self.copy_patches_pipeline);
             copy_patches::set_bind_groups(&mut compute_pass, &self.copy_patches_bind_group_0);
-            compute_pass.dispatch_workgroups(64, 1, 1);
+            compute_pass.dispatch_workgroups_indirect(self.indirect_compute_buffer[0].buffer(), 0);
         }
 
         {

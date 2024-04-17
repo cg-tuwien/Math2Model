@@ -1,33 +1,35 @@
 //#include "./Common.wgsl"
-// AUTOGEN 8f314de05189acdd25bff27345cda3548c9b99c7fa5df3ad72fc2781340b0546
+// AUTOGEN c5f9275279f235c07bee40b0b5dafdb91d723a1e24c4acb363c929645456a556
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
 };
 struct Patches {
-  readStart: u32,
-  readEnd: u32,
-  write: atomic<u32>,
-  patchesLength: u32,
+  patches_length: atomic<u32>,
+  patches_capacity: u32,
   patches : array<Patch>,
 };
 struct PatchesRead { // Is currently needed, see https://github.com/gpuweb/gpuweb/discussions/4438
-  readStart: u32,
-  readEnd: u32,
-  write: u32, // Same size and alignment as atomic<u32>. Should be legal, right?
-  patchesLength: u32,
+  patches_length: u32, // Same size and alignment as atomic<u32>. Should be legal, right?
+  patches_capacity: u32,
   patches : array<Patch>,
 };
 struct RenderBuffer {
-  instanceCount: atomic<u32>,
-  patchesLength: u32,
+  patches_length: atomic<u32>,
+  patches_capacity: u32,
   patches: array<Patch>,
 };
 struct RenderBufferRead {
-  instanceCount: u32, // Same size as atomic<u32>
-  patchesLength: u32,
+  patches_length: u32, // Same size as atomic<u32>
+  patches_capacity: u32,
   patches: array<Patch>,
 };
+struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/struct.DispatchIndirectArgs.html
+  x: u32,
+  y: u32,
+  z: u32,
+} 
+fn ceil_div(a: u32, b: u32) -> u32 { return (a + b - 1u) / b; }
 // END OF AUTOGEN
 
 // From https://docs.rs/wgpu/latest/wgpu/util/struct.DrawIndexedIndirectArgs.html
@@ -39,35 +41,29 @@ struct DrawIndexedIndirectArgs  {
   first_instance: u32,
 };
 
-@group(0) @binding(0) var<storage, read_write> indirectDrawBuffer : DrawIndexedIndirectArgs;
-@group(0) @binding(2) var<storage, read> patchesBuffer : PatchesRead;
-@group(0) @binding(3) var<storage, read_write> renderBuffer : RenderBuffer;
+@group(0) @binding(0) var<storage, read_write> indirect_draw_buffer : DrawIndexedIndirectArgs;
+@group(0) @binding(1) var<storage, read> patches_from_buffer : PatchesRead;
+@group(0) @binding(2) var<storage, read_write> render_buffer : RenderBuffer;
 
-fn ceilDiv(a: u32, b: u32) -> u32 {
-  return (a + b - 1u) / b;
-}
+// Needs to match the ComputePatches workgroup size
+const WORKGROUP_SIZE = 64u;
 
-@compute @workgroup_size(64, 1, 1)
+@compute @workgroup_size(WORKGROUP_SIZE, 1, 1)
 fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
-  let renderBufferStart = atomicLoad(&renderBuffer.instanceCount);
-
-  let start = patchesBuffer.readStart;
-  var end = patchesBuffer.write;
-  end = min(end, min(end - start, renderBuffer.patchesLength) + start);
-
-  // Split into 64 segments (workgroup size)
-  let segmentSize = ceilDiv(end - start, 64u);
-  let segmentStart = start + segmentSize * global_id.x;
-  let segmentEnd = min(segmentStart + segmentSize, end);
-
-  // Copy patches to render buffer
-  // Notice how we know where to put everything, so no need for synchronization with atomics
-  for (var i = segmentStart; i < segmentEnd; i = i + 1u) {
-    let quad = patchesBuffer.patches[i];
-    renderBuffer.patches[renderBufferStart + (i - start)] = quad;
+  let render_buffer_start = atomicLoad(&render_buffer.patches_length);
+  let patch_index = global_id.x;
+  if (patch_index < patches_from_buffer.patches_length) {
+    let quad = patches_from_buffer.patches[patch_index];
+    
+    // Notice how we know where to put everything, so no need for synchronization with atomics
+    let write_index = render_buffer_start + patch_index;
+    render_buffer.patches[write_index] = quad;
   }
 
+  storageBarrier();
   if(global_id.x == 0u && global_id.y == 0u && global_id.z == 0u) {
-    indirectDrawBuffer.instance_count = renderBufferStart + (end - start);
+    let final_patches_length = render_buffer_start + patches_from_buffer.patches_length;
+    atomicStore(&render_buffer.patches_length, final_patches_length);
+    indirect_draw_buffer.instance_count = final_patches_length;
   }
 }

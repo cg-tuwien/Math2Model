@@ -75,7 +75,7 @@ where
     {
         let contents = write_storage_buffer(data)?;
         let size = T::calculate_size_for(count).get();
-        assert!(size > contents.len() as u64);
+        assert!(size >= contents.len() as u64);
 
         // Copied from the "create_buffer_init" function
         // Valid vulkan usage is
