@@ -96,12 +96,13 @@ fn vs_main(
     let quad = renderBuffer.patches[in.instance_index];
 
     var uv = vec2<f32>(quad.min.x, quad.min.y);
-    if (in.vertex_index == 1) {
+    if (in.vertex_index == 0) {
+        uv = vec2<f32>(quad.min.x, quad.min.y);
+    } else if (in.vertex_index == 1) {
         uv = vec2<f32>(quad.max.x, quad.min.y);
     } else if (in.vertex_index == 2) {
         uv = vec2<f32>(quad.max.x, quad.max.y);
-    } else {
-        // in.vertex_index == 3 
+    } else if (in.vertex_index == 3) {
         uv = vec2<f32>(quad.min.x, quad.max.y);
     }
 
@@ -118,7 +119,7 @@ fn vs_main(
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let object_color: vec4f = vec4f(0.3, 0.2, 0.1, 1.0);
+    let object_color: vec4f = vec4f(in.texture_coords, 0.1, 1.0);
 
     // We're doing lighting in world space for simplicity
     let ambient_strength = 0.1;

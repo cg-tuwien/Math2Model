@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use glamour::{Angle, Matrix4, Point3, ToRaw, Vector4};
+use glamour::{Angle, Matrix4, Point3, ToRaw, Vector2, Vector4};
 use tracing::{error, info, warn};
 use winit::window::Window;
 use winit_input_helper::WinitInputHelper;
@@ -176,7 +176,7 @@ impl Application {
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: None,
                 // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
-                polygon_mode: wgpu::PolygonMode::Fill,
+                polygon_mode: wgpu::PolygonMode::Line, // Wireframe mode
                 // Requires Features::DEPTH_CLIP_CONTROL
                 unclipped_depth: false,
                 // Requires Features::CONSERVATIVE_RASTERIZATION
@@ -216,7 +216,10 @@ impl Application {
             readEnd: 1,
             write: 1,
             patchesLength: max_patch_count,
-            patches: vec![],
+            patches: vec![compute_patches::Patch {
+                min: Vector2::<f32>::ZERO.to_raw(),
+                max: Vector2::<f32>::ONE.to_raw(),
+            }],
         };
         let patches_buffer = TypedBuffer::new_storage_with_runtime_array(
             &device,
@@ -505,7 +508,8 @@ impl WgpuContext {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::all_webgpu_mask(),
+                    required_features: wgpu::Features::all_webgpu_mask()
+                        | wgpu::Features::POLYGON_MODE_LINE,
                     required_limits: wgpu::Limits::default(),
                     label: None,
                 },
