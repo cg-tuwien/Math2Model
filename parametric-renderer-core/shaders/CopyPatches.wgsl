@@ -1,44 +1,45 @@
 //#include "./Common.wgsl"
-// AUTOGEN 8da34041f064de8dc1cd234d8f42053c996d4b74ec15cf08a817af40f8985abc
+// AUTOGEN 8f314de05189acdd25bff27345cda3548c9b99c7fa5df3ad72fc2781340b0546
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
 };
-
-// Is currently needed, see https://github.com/gpuweb/gpuweb/discussions/4438
-struct PatchesRead {
-  readStart: u32,
-  readEnd: u32,
-  write: u32, // Same size and alignment as atomic<u32>. Should be legal, right?
-  patchesLength: u32,
-  patches : array<Patch>,
-};
-
-struct PatchesReadWrite {
+struct Patches {
   readStart: u32,
   readEnd: u32,
   write: atomic<u32>,
   patchesLength: u32,
   patches : array<Patch>,
 };
-
+struct PatchesRead { // Is currently needed, see https://github.com/gpuweb/gpuweb/discussions/4438
+  readStart: u32,
+  readEnd: u32,
+  write: u32, // Same size and alignment as atomic<u32>. Should be legal, right?
+  patchesLength: u32,
+  patches : array<Patch>,
+};
 struct RenderBuffer {
   instanceCount: atomic<u32>,
   patchesLength: u32,
   patches: array<Patch>,
 };
+struct RenderBufferRead {
+  instanceCount: u32, // Same size as atomic<u32>
+  patchesLength: u32,
+  patches: array<Patch>,
+};
 // END OF AUTOGEN
 
-struct IndirectDrawBuffer {
-    indexOrVertexCount: u32,
-    instanceCount: u32,
-    firstIndexOrVertex: u32,
-    tmp1: u32,
-    tmp2: u32,
+// From https://docs.rs/wgpu/latest/wgpu/util/struct.DrawIndexedIndirectArgs.html
+struct DrawIndexedIndirectArgs  {
+  index_count: u32,
+  instance_count: u32,
+  first_index: u32,
+  base_vertex: i32,
+  first_instance: u32,
 };
 
-@group(0) @binding(0) var<storage, read_write> indirectDrawBuffer : IndirectDrawBuffer;
-// TODO: Make this readonly https://github.com/gpuweb/gpuweb/discussions/4438
+@group(0) @binding(0) var<storage, read_write> indirectDrawBuffer : DrawIndexedIndirectArgs;
 @group(0) @binding(2) var<storage, read> patchesBuffer : PatchesRead;
 @group(0) @binding(3) var<storage, read_write> renderBuffer : RenderBuffer;
 
@@ -67,6 +68,6 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
   }
 
   if(global_id.x == 0u && global_id.y == 0u && global_id.z == 0u) {
-    indirectDrawBuffer.instanceCount = renderBufferStart + (end - start);
+    indirectDrawBuffer.instance_count = renderBufferStart + (end - start);
   }
 }

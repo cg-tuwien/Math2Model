@@ -3,8 +3,17 @@ use wgsl_to_wgpu::{create_shader_module_embedded, MatrixVectorTypes, WriteOption
 
 // src/build.rs
 fn main() {
-    println!("cargo:rerun-if-changed=src/shader.wgsl");
-    let wgsl_source = std::fs::read_to_string("src/shader.wgsl").unwrap();
+    watch_shader("../shaders/Shader.wgsl", "Shader");
+    watch_shader("../shaders/ComputePatches.wgsl", "ComputePatches");
+    watch_shader("../shaders/CopyPatches.wgsl", "CopyPatches");
+}
+
+fn watch_shader(path: &str, output_name: &str) {
+    println!("cargo:rerun-if-changed={path}");
+    let wgsl_source = match std::fs::read_to_string(path) {
+        Ok(source) => source,
+        Err(err) => panic!("Failed to read shader file {}: {}", path, err),
+    };
 
     // Generate the Rust bindings and write to a file.
     let mut text = String::new();
@@ -13,13 +22,16 @@ fn main() {
     text += &create_shader_module_embedded(
         &wgsl_source,
         WriteOptions {
-            derive_bytemuck: true,
-            derive_encase: false,
+            // We need to use bytemuck for vertex buffer
+            derive_bytemuck_vertex: true,
+            derive_bytemuck_host_shareable: false,
+            // And encase for uniform buffers and storage buffers
+            derive_encase_host_shareable: true,
             derive_serde: false,
             matrix_vector_types: MatrixVectorTypes::Glam,
         },
     )
     .unwrap();
     let out_dir = std::env::var("OUT_DIR").unwrap();
-    std::fs::write(format!("{out_dir}/shader.rs"), text.as_bytes()).unwrap();
+    std::fs::write(format!("{out_dir}/{output_name}.rs"), text.as_bytes()).unwrap();
 }

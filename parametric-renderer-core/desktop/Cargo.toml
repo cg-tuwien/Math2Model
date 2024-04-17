@@ -14,11 +14,13 @@ anyhow = "1.0"
 thiserror = "1.0"
 pollster = "0.3"
 memoffset = "0.9"
-glam = "0.27"
+glam = { version = "0.27", features = ["bytemuck"] }
 glamour = "0.11"
 bytemuck = { version = "1.13", features = ["derive"] }
 winit_input_helper = "0.16"
 nanoserde = "0.1"
+encase = { version = "0.7", features = ["glam"] }
+
 
 [build-dependencies]
 wgsl_to_wgpu = "0.6"

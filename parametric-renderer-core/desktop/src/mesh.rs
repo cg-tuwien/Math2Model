@@ -1,5 +1,5 @@
 use glam::Vec3;
-use glamour::{Matrix4, Point3, ToRaw, Vector3};
+use glamour::{Matrix4, Point3, Vector3};
 use wgpu::util::DeviceExt;
 
 use crate::shaders::shader;
@@ -32,7 +32,6 @@ pub struct Mesh {
     pub transform: Transform,
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
-    pub instance_buffer: wgpu::Buffer,
     pub num_indices: u32,
 }
 impl Mesh {
@@ -59,28 +58,15 @@ impl Mesh {
             usage: wgpu::BufferUsages::INDEX,
         });
 
-        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Instance Buffer"),
-            contents: bytemuck::cast_slice(&[Mesh::get_instance_input(&transform)]),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-
         Self {
             transform,
             vertex_buffer,
             index_buffer,
-            instance_buffer,
             num_indices: QUAD_INDICES.len() as u32,
         }
     }
 
-    pub fn get_instance_input(transform: &Transform) -> shader::InstanceInput {
-        let model = transform.to_matrix().to_raw();
-        shader::InstanceInput {
-            model_similarity_0: model.x_axis,
-            model_similarity_1: model.y_axis,
-            model_similarity_2: model.z_axis,
-            model_similarity_3: model.w_axis,
-        }
+    pub fn get_model_matrix(&self) -> Matrix4<f32> {
+        self.transform.to_matrix()
     }
 }

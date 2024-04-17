@@ -341,6 +341,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "const_panic"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6051f239ecec86fde3410901ab7860d458d160371533842974fc61f96d15879b"
+
+[[package]]
 name = "copy-includes"
 version = "0.1.0"
 dependencies = [
@@ -436,6 +442,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytemuck",
+ "encase",
  "glam",
  "glamour",
  "memoffset",
@@ -480,6 +487,35 @@ name = "downcast-rs"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
+
+[[package]]
+name = "encase"
+version = "0.7.0"
+source = "git+https://github.com/teoxoy/encase#fc2d4e36f72b985e7276d031c92f7e0eb349f317"
+dependencies = [
+ "const_panic",
+ "encase_derive",
+ "glam",
+ "thiserror",
+]
+
+[[package]]
+name = "encase_derive"
+version = "0.7.0"
+source = "git+https://github.com/teoxoy/encase#fc2d4e36f72b985e7276d031c92f7e0eb349f317"
+dependencies = [
+ "encase_derive_impl",
+]
+
+[[package]]
+name = "encase_derive_impl"
+version = "0.7.0"
+source = "git+https://github.com/teoxoy/encase#fc2d4e36f72b985e7276d031c92f7e0eb349f317"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.58",
+]
 
 [[package]]
 name = "equivalent"
@@ -1141,12 +1177,12 @@ checksum = "e8cf8e6a8aa66ce33f63993ffc4ea4271eb5b0530a9002db8455ea6050c77bfa"
 
 [[package]]
 name = "prettyplease"
-version = "0.1.25"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c8646e95016a7a6c4adea95bafa8a16baab64b583356217f2c85db4a39d9a86"
+checksum = "8d3928fb5db768cb86f891ff014f0144589297e3c6a1aba6ed7cecfdace270c7"
 dependencies = [
  "proc-macro2",
- "syn 1.0.109",
+ "syn 2.0.58",
 ]
 
 [[package]]
@@ -1942,15 +1978,14 @@ dependencies = [
 [[package]]
 name = "wgsl_to_wgpu"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7efa7dd90928d5112569129d1bd6feef2f1deee587d5b19583ebbe4c9ac99987"
+source = "git+https://github.com/ScanMountGoat/wgsl_to_wgpu#2b94d1de77f37481f1af8f28ca1dec10faaebaf6"
 dependencies = [
  "case",
  "naga",
  "prettyplease",
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.58",
  "thiserror",
  "wgpu-types",
 ]

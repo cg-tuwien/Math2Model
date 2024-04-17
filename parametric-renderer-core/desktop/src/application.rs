@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
-use glamour::{Angle, Point3, ToRaw, Vector4};
+use glamour::{Angle, Matrix4, Point3, ToRaw, Vector4};
 use tracing::{error, info, warn};
-use wgpu::util::DeviceExt;
 use winit::window::Window;
 use winit_input_helper::WinitInputHelper;
 
 use crate::{
+    buffer::TypedBuffer,
     camera::{camera_settings::CameraSettings, freecam_controller::FreecamController, Camera},
     config::{CacheFile, CachedCamera, ConfigFile},
     mesh::Mesh,
-    shaders::shader,
+    shaders::{compute_patches, copy_patches, shader},
     texture::Texture,
 };
 
@@ -19,12 +19,24 @@ pub struct Application {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
-    render_pipeline: wgpu::RenderPipeline,
     depth_texture: Texture,
     camera: Camera,
-    camera_buffer: wgpu::Buffer,
-    bind_group_0: shader::bind_groups::BindGroup0,
-    light_buffer: wgpu::Buffer,
+    camera_buffer: TypedBuffer<shader::Camera>,
+    light_buffer: TypedBuffer<shader::Light>,
+    model_buffer: TypedBuffer<shader::Model>,
+    render_pipeline: wgpu::RenderPipeline,
+    render_bind_group_0: shader::bind_groups::BindGroup0,
+    compute_patches_pipeline: wgpu::ComputePipeline,
+    compute_patches_bind_group_0: compute_patches::bind_groups::BindGroup0,
+    copy_patches_pipeline: wgpu::ComputePipeline,
+    copy_patches_bind_group_0: copy_patches::bind_groups::BindGroup0,
+    compute_patches_input_buffer: TypedBuffer<compute_patches::InputBuffer>,
+    patches_buffer_initial: compute_patches::Patches,
+    patches_buffer: TypedBuffer<compute_patches::Patches>,
+    render_buffer_initial: compute_patches::RenderBuffer,
+    render_buffer: TypedBuffer<compute_patches::RenderBuffer>,
+    indirect_draw_buffer: TypedBuffer<copy_patches::DrawIndexedIndirectArgs>,
+
     freecam_controller: FreecamController,
     delta_time: f32,
     mesh: Mesh,
@@ -78,93 +90,76 @@ impl Application {
 
         let inputs = WinitInputHelper::new();
 
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::PRIMARY,
-            ..Default::default()
-        });
+        let WgpuContext {
+            instance: _,
+            surface,
+            adapter: _,
+            device,
+            queue,
+            config,
+        } = WgpuContext::init_wgpu(window.clone(), size).await?;
 
-        let surface = instance.create_surface(window.clone())?;
+        let mesh = Mesh::new_quad(&device);
 
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
-                compatible_surface: Some(&surface),
-                force_fallback_adapter: false,
-            })
-            .await
-            .ok_or_else(|| anyhow::anyhow!("No adapter found"))?;
-        info!("Adapter: {:?}", adapter.get_info());
+        let camera_buffer = TypedBuffer::new_uniform(
+            &device,
+            "Camera Buffer",
+            &camera.to_shader(),
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        )?;
 
-        let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::default(),
-                    label: None,
-                },
-                None,
-            )
-            .await?;
-
-        let surface_caps = surface.get_capabilities(&adapter);
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .find(|format| format.is_srgb())
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!("No sRGB format surface found"))?;
-
-        let config = wgpu::SurfaceConfiguration {
-            format: surface_format,
-            ..surface
-                .get_default_config(&adapter, size.width, size.height)
-                .ok_or_else(|| anyhow::anyhow!("No default surface config found"))?
-        };
-        surface.configure(&device, &config);
-
-        let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Camera Buffer"),
-            contents: bytemuck::cast_slice(&[shader::Camera {
-                view: camera.view_matrix().to_raw(),
-                projection: camera.projection_matrix().to_raw(),
-                view_position: camera.position.to_raw().extend(1.0),
-            }]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let light_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Light Buffer"),
-            contents: bytemuck::cast_slice(&[shader::Light {
+        let light_buffer = TypedBuffer::new_uniform(
+            &device,
+            "Light Buffer",
+            &shader::Light {
                 position: Vector4::<f32>::new(0.0, 0.0, 2.0, 0.0).to_raw(),
                 color: Vector4::<f32>::new(1.0, 1.0, 1.0, 0.0).to_raw(),
-            }]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-        let bind_group_0 = shader::bind_groups::BindGroup0::from_bindings(
+            },
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        )?;
+
+        let model_buffer = TypedBuffer::new_uniform(
+            &device,
+            "Model Buffer",
+            &shader::Model {
+                model_similarity: mesh.get_model_matrix().to_raw(),
+            },
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        )?;
+        let max_patch_count = 10_000;
+        let render_buffer_initial = compute_patches::RenderBuffer {
+            instanceCount: 0,
+            patchesLength: max_patch_count,
+            patches: vec![],
+        };
+        let render_buffer = TypedBuffer::new_storage_with_runtime_array(
+            &device,
+            "Render Buffer",
+            &render_buffer_initial,
+            max_patch_count as u64,
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        )?;
+
+        let render_bind_group_0 = shader::bind_groups::BindGroup0::from_bindings(
             &device,
             shader::bind_groups::BindGroupLayout0 {
                 camera: camera_buffer.as_entire_buffer_binding(),
                 light: light_buffer.as_entire_buffer_binding(),
+                model: model_buffer.as_entire_buffer_binding(),
+                renderBuffer: render_buffer.as_entire_buffer_binding(),
             },
         );
 
-        let mesh = Mesh::new_quad(&device);
-
-        let shader = shader::create_shader_module(&device);
-
-        let render_pipeline_layout = shader::create_pipeline_layout(&device);
-
         let depth_texture = Texture::create_depth_texture(&device, &config, "Depth Texture");
 
+        let shader = shader::create_shader_module(&device);
+        let render_pipeline_layout = shader::create_pipeline_layout(&device);
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: shader::vertex_state(
                 &shader,
-                &shader::vs_main_entry(
-                    wgpu::VertexStepMode::Vertex,
-                    wgpu::VertexStepMode::Instance,
-                ),
+                &shader::vs_main_entry(wgpu::VertexStepMode::Vertex),
             ),
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -198,17 +193,106 @@ impl Application {
             multiview: None,
         });
 
+        let compute_patches_shader = compute_patches::create_shader_module(&device);
+        let compute_patches_pipeline_layout = compute_patches::create_pipeline_layout(&device);
+        let compute_patches_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Compute Patches Pipeline"),
+                layout: Some(&compute_patches_pipeline_layout),
+                module: &compute_patches_shader,
+                entry_point: "main",
+            });
+
+        let compute_patches_input_buffer = TypedBuffer::new_uniform(
+            &device,
+            "Compute Patches Input Buffer",
+            &compute_patches::InputBuffer {
+                modelViewProjection: mesh.get_model_view_projection(&camera).to_raw(),
+            },
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        )?;
+        let patches_buffer_initial = compute_patches::Patches {
+            readStart: 0,
+            readEnd: 1,
+            write: 1,
+            patchesLength: max_patch_count,
+            patches: vec![],
+        };
+        let patches_buffer = TypedBuffer::new_storage_with_runtime_array(
+            &device,
+            "Patches Buffer",
+            &patches_buffer_initial,
+            max_patch_count as u64,
+            wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_SRC
+                | wgpu::BufferUsages::COPY_DST,
+        )?;
+
+        let compute_patches_bind_group_0 = compute_patches::bind_groups::BindGroup0::from_bindings(
+            &device,
+            compute_patches::bind_groups::BindGroupLayout0 {
+                inputBuffer: compute_patches_input_buffer.as_entire_buffer_binding(),
+                patchesBuffer: patches_buffer.as_entire_buffer_binding(),
+                renderBuffer: render_buffer.as_entire_buffer_binding(),
+            },
+        );
+
+        let indirect_draw_buffer_initial = copy_patches::DrawIndexedIndirectArgs {
+            index_count: mesh.num_indices,
+            instance_count: 0, // Our shader sets this
+            first_index: 0,
+            base_vertex: 0,
+            first_instance: 0,
+        };
+        let indirect_draw_buffer = TypedBuffer::new_storage(
+            &device,
+            "Indirect Draw Buffer",
+            &indirect_draw_buffer_initial,
+            wgpu::BufferUsages::INDIRECT
+                | wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_SRC,
+        )?;
+
+        let copy_patches_shader = copy_patches::create_shader_module(&device);
+        let copy_patches_pipeline_layout = copy_patches::create_pipeline_layout(&device);
+        let copy_patches_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Copy Patches Pipeline"),
+                layout: Some(&copy_patches_pipeline_layout),
+                module: &copy_patches_shader,
+                entry_point: "main",
+            });
+        let copy_patches_bind_group_0 = copy_patches::bind_groups::BindGroup0::from_bindings(
+            &device,
+            copy_patches::bind_groups::BindGroupLayout0 {
+                indirectDrawBuffer: indirect_draw_buffer.as_entire_buffer_binding(),
+                patchesBuffer: patches_buffer.as_entire_buffer_binding(),
+                renderBuffer: render_buffer.as_entire_buffer_binding(),
+            },
+        );
+
         Ok(Self {
             surface,
             device,
             queue,
             config,
             render_pipeline,
+            render_bind_group_0,
+            compute_patches_pipeline,
+            compute_patches_bind_group_0,
+            copy_patches_pipeline,
+            copy_patches_bind_group_0,
+            compute_patches_input_buffer,
+            patches_buffer_initial,
+            patches_buffer,
+            render_buffer_initial,
+            render_buffer,
+            indirect_draw_buffer,
             depth_texture,
             camera,
             camera_buffer,
             light_buffer,
-            bind_group_0,
+            model_buffer,
             freecam_controller,
             delta_time: 0.0,
             mesh,
@@ -218,10 +302,6 @@ impl Application {
             config_file,
             cache_file,
         })
-    }
-
-    pub fn window(&self) -> &winit::window::Window {
-        &self.window
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -242,15 +322,25 @@ impl Application {
         self.freecam_controller
             .update(&self.inputs, self.delta_time);
         self.camera.update_camera(&self.freecam_controller);
-        self.queue.write_buffer(
-            &self.camera_buffer,
-            0,
-            bytemuck::cast_slice(&[shader::Camera {
-                view: self.camera.view_matrix().to_raw(),
-                projection: self.camera.projection_matrix().to_raw(),
-                view_position: self.camera.position.to_raw().extend(1.0),
-            }]),
-        );
+        self.camera_buffer
+            .update(&self.queue, &self.camera.to_shader())
+            .unwrap();
+        self.model_buffer
+            .update(
+                &self.queue,
+                &shader::Model {
+                    model_similarity: self.mesh.get_model_matrix().to_raw(),
+                },
+            )
+            .unwrap();
+        self.compute_patches_input_buffer
+            .update(
+                &self.queue,
+                &compute_patches::InputBuffer {
+                    modelViewProjection: self.mesh.get_model_view_projection(&self.camera).to_raw(),
+                },
+            )
+            .unwrap();
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -258,11 +348,38 @@ impl Application {
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.patches_buffer
+            .update(&self.queue, &self.patches_buffer_initial)
+            .unwrap();
+        self.render_buffer
+            .update(&self.queue, &self.render_buffer_initial)
+            .unwrap();
+
         let mut commands = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
             });
+        {
+            let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Compute Patches"),
+                timestamp_writes: None,
+            });
+            compute_pass.set_pipeline(&self.compute_patches_pipeline);
+            compute_patches::set_bind_groups(&mut compute_pass, &self.compute_patches_bind_group_0);
+            compute_pass.dispatch_workgroups(64, 1, 1);
+        }
+
+        {
+            let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Copy Patches Pass"),
+                timestamp_writes: None,
+            });
+            compute_pass.set_pipeline(&self.copy_patches_pipeline);
+            copy_patches::set_bind_groups(&mut compute_pass, &self.copy_patches_bind_group_0);
+            compute_pass.dispatch_workgroups(64, 1, 1);
+        }
 
         {
             let mut render_pass = commands.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -292,12 +409,11 @@ impl Application {
                 occlusion_query_set: None,
             });
             render_pass.set_pipeline(&self.render_pipeline);
-            shader::set_bind_groups(&mut render_pass, &self.bind_group_0);
+            shader::set_bind_groups(&mut render_pass, &self.render_bind_group_0);
             render_pass.set_vertex_buffer(0, self.mesh.vertex_buffer.slice(..));
-            render_pass.set_vertex_buffer(1, self.mesh.instance_buffer.slice(..));
             render_pass
                 .set_index_buffer(self.mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.mesh.num_indices, 0, 0..1);
+            render_pass.draw_indexed_indirect(self.indirect_draw_buffer.buffer(), 0)
         }
 
         self.queue.submit(std::iter::once(commands.finish()));
@@ -353,4 +469,89 @@ pub async fn run() -> anyhow::Result<()> {
     })?;
 
     Ok(())
+}
+
+struct WgpuContext {
+    instance: wgpu::Instance,
+    surface: wgpu::Surface<'static>,
+    adapter: wgpu::Adapter,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    config: wgpu::SurfaceConfiguration,
+}
+
+impl WgpuContext {
+    async fn init_wgpu(
+        window: Arc<Window>,
+        size: winit::dpi::PhysicalSize<u32>,
+    ) -> anyhow::Result<Self> {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::PRIMARY,
+            ..Default::default()
+        });
+
+        let surface = instance.create_surface(window.clone())?;
+
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .ok_or_else(|| anyhow::anyhow!("No adapter found"))?;
+        info!("Adapter: {:?}", adapter.get_info());
+
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    required_features: wgpu::Features::all_webgpu_mask(),
+                    required_limits: wgpu::Limits::default(),
+                    label: None,
+                },
+                None,
+            )
+            .await?;
+
+        let surface_caps = surface.get_capabilities(&adapter);
+        let surface_format = surface_caps
+            .formats
+            .iter()
+            .find(|format| format.is_srgb())
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("No sRGB format surface found"))?;
+
+        let config = wgpu::SurfaceConfiguration {
+            format: surface_format,
+            ..surface
+                .get_default_config(&adapter, size.width, size.height)
+                .ok_or_else(|| anyhow::anyhow!("No default surface config found"))?
+        };
+        surface.configure(&device, &config);
+
+        Ok(WgpuContext {
+            instance,
+            surface,
+            adapter,
+            device,
+            queue,
+            config,
+        })
+    }
+}
+
+impl Camera {
+    pub fn to_shader(&self) -> shader::Camera {
+        shader::Camera {
+            view: self.view_matrix().to_raw(),
+            projection: self.projection_matrix().to_raw(),
+            view_position: self.position.to_raw().extend(1.0),
+        }
+    }
+}
+
+impl Mesh {
+    pub fn get_model_view_projection(&self, camera: &Camera) -> Matrix4<f32> {
+        camera.projection_matrix() * camera.view_matrix() * self.transform.to_matrix()
+    }
 }

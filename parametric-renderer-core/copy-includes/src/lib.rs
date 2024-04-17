@@ -27,8 +27,15 @@ pub fn copy_includes(path: impl AsRef<Path>) -> std::io::Result<()> {
 }
 
 fn insert_new_include(lines: &mut Vec<String>, include: &IncludeStatement) {
-    let include_contents =
-        fs::read_to_string(include.full_path()).expect("Failed to read include file");
+    let include_contents = match fs::read_to_string(include.full_path()) {
+        Ok(v) => v,
+        Err(e) => panic!(
+            "Failed to read include file: {} {}",
+            include.full_path().to_string_lossy(),
+            e
+        ),
+    };
+    // Here we could add more text to the include contents
     let hash = compute_hash(&include_contents.lines().collect::<Vec<_>>());
 
     let next_line = include.line_number + 1;

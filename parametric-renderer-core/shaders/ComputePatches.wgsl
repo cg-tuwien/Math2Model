@@ -1,29 +1,30 @@
 //#include "./Common.wgsl"
-// AUTOGEN 8da34041f064de8dc1cd234d8f42053c996d4b74ec15cf08a817af40f8985abc
+// AUTOGEN 8f314de05189acdd25bff27345cda3548c9b99c7fa5df3ad72fc2781340b0546
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
 };
-
-// Is currently needed, see https://github.com/gpuweb/gpuweb/discussions/4438
-struct PatchesRead {
-  readStart: u32,
-  readEnd: u32,
-  write: u32, // Same size and alignment as atomic<u32>. Should be legal, right?
-  patchesLength: u32,
-  patches : array<Patch>,
-};
-
-struct PatchesReadWrite {
+struct Patches {
   readStart: u32,
   readEnd: u32,
   write: atomic<u32>,
   patchesLength: u32,
   patches : array<Patch>,
 };
-
+struct PatchesRead { // Is currently needed, see https://github.com/gpuweb/gpuweb/discussions/4438
+  readStart: u32,
+  readEnd: u32,
+  write: u32, // Same size and alignment as atomic<u32>. Should be legal, right?
+  patchesLength: u32,
+  patches : array<Patch>,
+};
 struct RenderBuffer {
   instanceCount: atomic<u32>,
+  patchesLength: u32,
+  patches: array<Patch>,
+};
+struct RenderBufferRead {
+  instanceCount: u32, // Same size as atomic<u32>
   patchesLength: u32,
   patches: array<Patch>,
 };
@@ -34,11 +35,11 @@ struct InputBuffer {
 };
 
 @group(0) @binding(1) var<uniform> inputBuffer : InputBuffer;
-@group(0) @binding(2) var<storage, read_write> patchesBuffer : PatchesReadWrite;
+@group(0) @binding(2) var<storage, read_write> patchesBuffer : Patches;
 @group(0) @binding(3) var<storage, read_write> renderBuffer : RenderBuffer;
 
 //#include "./HeartSphere.wgsl"
-// AUTOGEN e84d0ee6fc105ba2ac366787a1da26c344ed59204771f659ad0dda335af5c535
+// AUTOGEN e752278f38b5cff0b524b4eac45aa8fe29236e32e79fa3d6bca5a871d21478e8
 fn evaluateImage(input2: vec2f) -> vec3f {
     let pos = vec3(input2.x, 0.0, 2. * input2.y) * 3.14159265359;
 
@@ -57,12 +58,6 @@ fn evaluateImage(input2: vec2f) -> vec3f {
 
     return p;
 }
-
-/*fn evaluateImage(input2: vec2f) -> vec3f {
-    let pos = vec3(input2.x, 0.0, input2.y);
-    return vec3(input2.xy, 0.);
-}*/
-
 // END OF AUTOGEN
 
 fn triangleArea(a: vec3f, b: vec3f, c: vec3f) -> f32 {
