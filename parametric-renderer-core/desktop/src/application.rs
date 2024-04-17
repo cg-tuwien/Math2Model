@@ -262,7 +262,7 @@ impl Application {
         )?;
 
         let indirect_compute_buffer_initial =
-            compute_patches::DispatchIndirectArgs { x: 1, y: 0, z: 0 };
+            compute_patches::DispatchIndirectArgs { x: 1, y: 1, z: 1 };
         let indirect_compute_buffer = [
             TypedBuffer::new_storage(
                 &device,
