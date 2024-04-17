@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "vite",
+    "start-bun": "bunx --bun vite",
     "dev": "vite --open",
+    "dev-bun": "bunx --bun vite --open",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "test:unit": "vitest",
