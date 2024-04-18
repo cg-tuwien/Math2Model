@@ -621,8 +621,7 @@ impl WgpuContext {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::all_webgpu_mask()
-                        | wgpu::Features::POLYGON_MODE_LINE,
+                    required_features: wgpu::Features::POLYGON_MODE_LINE,
                     required_limits: wgpu::Limits::default(),
                     label: None,
                 },
