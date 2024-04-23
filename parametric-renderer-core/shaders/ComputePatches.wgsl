@@ -112,6 +112,7 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     let size_threshold = 0.05; // TODO: Will depend on the screen resolution (and we need different thresholds for X and Y)
 
     // Bonus check for degenerate cases
+    // TODO: Do not check in screen space. Instead, check if the function seems to be chaotic or something. (See research paper.)
     let center_spot = input_buffer.model_view_projection * vec4f(evaluateImage(mix(quad.min, quad.max, 0.5)), 1.0);
     if (distance(center_spot.xyz / center_spot.w, corners_clip_space[0].xyz / corners_clip_space[0].w) > 0.1) { // In screen space + depth
       area = 2 * size_threshold;
