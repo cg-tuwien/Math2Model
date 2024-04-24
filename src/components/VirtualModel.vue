@@ -346,6 +346,7 @@ watch(copyPatchesShader, () => {
 });
 
 onRender(() => {
+  props.scene.engine.flushFramebuffer();
   indirectComputeBuffer.value[0].update(indirectComputeBufferInitial);
   indirectComputeBuffer.value[1].update(indirectComputeBufferInitial);
   renderBuffer.value.update(renderBufferInitial);
@@ -359,6 +360,7 @@ onRender(() => {
       computePatchesShader.value.dispatchIndirect(
         indirectComputeBuffer.value[0]
       );
+      props.scene.engine.flushFramebuffer();
     }
     {
       patchesBuffer.value[0].update(patchesBufferReset);
@@ -366,6 +368,7 @@ onRender(() => {
       computePatchesShader.value.dispatchIndirect(
         indirectComputeBuffer.value[1]
       );
+      props.scene.engine.flushFramebuffer();
     }
   }
 
@@ -394,6 +397,7 @@ onRender(() => {
   }
 
   copyPatchesShader.value.dispatchIndirect(indirectComputeBuffer.value[0]);
+  props.scene.engine.flushFramebuffer();
 });
 
 type HasDispose = { dispose: () => void };
