@@ -133,6 +133,7 @@ const shaderMaterial = babylonEffectRef<ShaderMaterial | null>(() => {
       attributes: ["uv", "position", "normal"],
       uniformBuffers: ["Scene", "Mesh", "instances"],
       shaderLanguage: ShaderLanguage.WGSL,
+      storageBuffers: ["renderBuffer"],
     }
   );
   material.backFaceCulling = false;
@@ -156,7 +157,8 @@ const renderBuffer = babylonEffectRef<StorageBuffer>(() => {
   return new StorageBuffer(
     props.scene.engine,
     renderBufferInitial.byteLength + maxPatchCount * patchByteSize,
-    Constants.BUFFER_CREATIONFLAG_READWRITE
+    Constants.BUFFER_CREATIONFLAG_READWRITE,
+    "Render Buffer"
   );
 });
 
@@ -334,6 +336,10 @@ watchEffect(() => {
   copyPatchesShader.value.setStorageBuffer("render_buffer", renderBuffer.value);
 });
 
+watchEffect(() => {
+  shaderMaterial.value?.setStorageBuffer("renderBuffer", renderBuffer.value);
+});
+
 let lastIndirectDrawBuffer: GPUBuffer | null = null;
 watch(copyPatchesShader, () => {
   lastIndirectDrawBuffer = null;
@@ -362,8 +368,6 @@ onRender(() => {
       );
     }
   }
-
-  shaderMaterial.value?.setStorageBuffer("renderBuffer", renderBuffer.value);
 
   // Copy the patches, and trigger the rendering
   {
@@ -444,21 +448,27 @@ ${innerCode}
 fn main(input: VertexInputs) -> FragmentInputs {
   let quad = renderBuffer.patches[input.instanceIndex];
 
-  vertexInputs.uv = array<vec2<f32>, 4>(
-    vec2<f32>(quad.min.x, quad.min.y),
-    vec2<f32>(quad.max.x, quad.min.y),
-    vec2<f32>(quad.max.x, quad.max.y),
-    vec2<f32>(quad.min.x, quad.max.y)
-  )[input.vertexIndex];
+  var uv = vec2<f32>(quad.min.x, quad.min.y);
+  if (input.vertexIndex == 0) {
+      uv = vec2<f32>(quad.min.x, quad.min.y);
+  } else if (input.vertexIndex == 1) {
+      uv = vec2<f32>(quad.max.x, quad.min.y);
+  } else if (input.vertexIndex == 2) {
+      uv = vec2<f32>(quad.max.x, quad.max.y);
+  } else if (input.vertexIndex == 3) {
+      uv = vec2<f32>(quad.min.x, quad.max.y);
+  }
+  
+  vertexInputs.uv = uv;
 
-    ${
-      innerCode !== ""
-        ? "let pos = evaluateImage(vertexInputs.uv);"
-        : "let pos = vec3f(vertexInputs.uv, 0.0);"
-    }
-    vertexOutputs.position = scene.projection * scene.view * mesh.world * vec4f(pos,1.);
-    vertexOutputs.vUV = vertexInputs.uv;
-    vertexOutputs.vNormal = vertexInputs.normal;
+  ${
+    innerCode !== ""
+      ? "let pos = evaluateImage(vertexInputs.uv);"
+      : "let pos = vec3f(vertexInputs.uv, 0.0);"
+  }
+  vertexOutputs.position = scene.projection * scene.view * mesh.world * vec4f(pos,1.);
+  vertexOutputs.vUV = vertexInputs.uv;
+  vertexOutputs.vNormal = vertexInputs.normal;
 }`;
 }
 </script>
