@@ -12,6 +12,10 @@ export interface WritableFiles extends ReadonlyFiles {
   deleteFile(name: FilePath): void;
 }
 
+export interface HasReactiveFiles {
+  readonly fileNames: ComputedRef<Map<FilePath, number>>;
+}
+
 export function readOrCreateFile(
   sceneFiles: WritableFiles,
   name: FilePath,
@@ -34,7 +38,7 @@ export type FilePath = string & { __filePath: never };
 /**
  * An implementation of SceneFiles that delegates to another SceneFiles implementation.
  */
-export class ReactiveFiles implements WritableFiles {
+export class ReactiveFiles implements WritableFiles, HasReactiveFiles {
   /**
    * A *reactive* map of file names and a version ID.
    */

@@ -1,4 +1,4 @@
-import { ref, computed } from "vue";
+import { readonly } from "vue";
 import { acceptHMRUpdate, defineStore } from "pinia";
 import { useDark } from "@vueuse/core";
 
@@ -10,8 +10,9 @@ export const useStore = defineStore("store", () => {
   const isDark = useDark({
     selector: "body",
   });
+
   return {
-    isDark: computed(() => isDark.value),
+    isDark: readonly(isDark),
     setIsDark: (newValue: boolean) => {
       isDark.value = newValue;
     },

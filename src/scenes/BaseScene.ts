@@ -12,12 +12,8 @@ import {
 } from "@babylonjs/core";
 import { GridMaterial } from "@babylonjs/materials/grid/gridMaterial";
 import backgroundGround from "@/assets/backgroundGround.png";
-import {
-  CacheFileSchemaUrl,
-  readCacheFile,
-  writeCacheFile,
-} from "@/filesystem/cache-file";
 import { mapOptional } from "@/option";
+import { z } from "zod";
 
 export type Milliseconds = number;
 export type Seconds = number;
@@ -80,9 +76,8 @@ export class BaseScene extends Scene {
 
     this._startTime = performance.now();
 
-    const writeCache = async () => {
+    const writeCache = () => {
       writeCacheFile({
-        $schema: CacheFileSchemaUrl,
         camera: {
           type: "arc-rotate-camera",
           alpha: camera.alpha,
@@ -133,4 +128,37 @@ function makeGridMesh(scene: Scene): GroundMesh {
   gridMesh.material = groundMaterial;
 
   return gridMesh;
+}
+
+const CacheSchema = z.object({
+  camera: z
+    .discriminatedUnion("type", [
+      z.object({
+        type: z.literal("arc-rotate-camera"),
+        target: z.tuple([z.number(), z.number(), z.number()]),
+        alpha: z.number(),
+        beta: z.number(),
+        radius: z.number(),
+      }),
+    ])
+    .optional(),
+});
+type CacheFile = z.infer<typeof CacheSchema>;
+
+const CacheKey = "base-scene-cache";
+
+function readCacheFile(): CacheFile | null {
+  let content = localStorage.getItem(CacheKey);
+  if (content === null) {
+    return null;
+  }
+  try {
+    return CacheSchema.parse(JSON.parse(content));
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeCacheFile(cache: CacheFile) {
+  localStorage.setItem(CacheKey, JSON.stringify(cache));
 }

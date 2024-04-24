@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-import { computed, ref, shallowRef, watch } from "vue";
+import { computed, ref, shallowRef, watch, type DeepReadonly } from "vue";
 import { useDebounceFn, useElementSize } from "@vueuse/core";
 import type { FilePath } from "@/filesystem/reactive-files";
 
@@ -13,7 +13,7 @@ export interface KeyedCode {
 }
 
 const props = defineProps<{
-  keyedCode: KeyedCode | null;
+  keyedCode: DeepReadonly<KeyedCode> | null;
   isDark: boolean;
 }>();
 const emit = defineEmits<{ update: [code: () => string] }>();
@@ -60,7 +60,7 @@ watch(
 function guessLanguage(name: string): "wgsl" | "json" {
   // pop off the last extension
   const ext = (name.match(/^[^]+\.(\w+)$/)?.[1] ?? "").toLowerCase();
-  if (ext === "wgsl" || ext == "vert" || ext == "frag") return "wgsl";
+  if (ext === "wgsl") return "wgsl";
   if (ext === "json") return "json";
 
   return "wgsl";

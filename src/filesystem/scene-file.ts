@@ -2,41 +2,36 @@ import { z } from "zod";
 
 export const SceneFileSchemaUrl = "http://virtual/scene-schema.json" as const;
 
-export const ShaderSchema = z.object({
-  type: z.literal("parametric-shader"),
-  main: z.string(),
-});
-
-export type Shader = z.infer<typeof ShaderSchema>;
-
-export const ActorSchema = z.object({
+export const ModelSchema = z.object({
   type: z.literal("model"),
   id: z.string(),
   name: z.string(),
   position: z.tuple([z.number(), z.number(), z.number()]),
-  rotation: z.tuple([z.number(), z.number(), z.number()]),
-  scale: z.tuple([z.number(), z.number(), z.number()]),
-  shader: z.string(),
+  rotation: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+  scale: z.number(),
+  parametricShader: z.string(),
+  fragmentShader: z.string(),
 });
 
-export type Actor = z.infer<typeof ActorSchema>;
+export type SerializedModel = z.infer<typeof ModelSchema>;
 
-export const SceneFileSchema = z
-  .object({
-    $schema: z.literal(SceneFileSchemaUrl),
-    models: z.array(ActorSchema),
-    shaders: z.record(ShaderSchema),
-  })
-  .superRefine((value, ctx) => {
-    value.models.forEach((model, index) => {
-      if (value.shaders[model.shader] === undefined) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `shader ${model.shader} is not defined`,
-          path: ["models", index, "shader"],
-        });
-      }
-    });
-  });
+// TODO: Hook this up in monaco-setup.ts
+export const SceneFileSchema = z.object({
+  $schema: z.literal(SceneFileSchemaUrl),
+  models: z.array(ModelSchema),
+});
 
-export type SceneFile = z.infer<typeof SceneFileSchema>;
+export type SerializedScene = z.infer<typeof SceneFileSchema>;
+
+export function serializeScene(scene: SerializedScene) {
+  return JSON.stringify(scene);
+}
+
+export function deserializeScene(scene: string): SerializedScene | null {
+  try {
+    return SceneFileSchema.parse(JSON.parse(scene));
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
+}
