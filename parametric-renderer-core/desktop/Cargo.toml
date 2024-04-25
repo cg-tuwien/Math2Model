@@ -19,7 +19,7 @@ glamour = "0.11"
 bytemuck = { version = "1.13", features = ["derive"] }
 winit_input_helper = "0.16"
 nanoserde = "0.1"
-encase = { version = "0.7", features = ["glam"] }
+encase = { version = "0.8", features = ["glam"] }
 
 
 [build-dependencies]

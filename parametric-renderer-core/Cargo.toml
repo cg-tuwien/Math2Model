@@ -3,7 +3,5 @@ resolver = "2"
 members = ["copy-includes", "desktop", "renderer-core"]
 
 [patch.crates-io]
-# TODO: Remove this patch once the next version of encase is released (with the latest version of glam support)
-encase = { git = "https://github.com/teoxoy/encase", features = ["glam"] }
 # TODO: Remove this patch once the next version of wgsl_to_wgpu (with a more granular API that lets us derive this only for vertex buffers)
 wgsl_to_wgpu = { git = "https://github.com/ScanMountGoat/wgsl_to_wgpu" }
