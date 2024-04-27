@@ -1,5 +1,5 @@
 //#include "./Common.wgsl"
-// AUTOGEN c5f9275279f235c07bee40b0b5dafdb91d723a1e24c4acb363c929645456a556
+// AUTOGEN d1af44c46a1cbb7b88eb3a40a108148e105bbe3d63aab3143845fbb6b5bb0256
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
@@ -25,7 +25,7 @@ struct RenderBufferRead {
   patches: array<Patch>,
 };
 struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/struct.DispatchIndirectArgs.html
-  x: u32,
+  x: atomic<u32>,
   y: u32,
   z: u32,
 } 
@@ -75,6 +75,7 @@ const WORKGROUP_SIZE = 64u;
 fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
   // TODO: Pls benchmark this compared to the previous one
   let patch_index = global_id.x;
+  var final_patches_length = 0u;
   if (patch_index < patches_from_buffer.patches_length) {
     let quad = patches_from_buffer.patches[patch_index];
 
@@ -131,7 +132,8 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     } else {
       // Split in four
       // TODO: Properly handle overflow
-      let write_index = min(atomicAdd(&patches_to_buffer.patches_length, 4u), patches_to_buffer.patches_capacity - 4u);
+      final_patches_length = atomicAdd(&patches_to_buffer.patches_length, 4u);
+      let write_index = min(final_patches_length, patches_to_buffer.patches_capacity - 4u);
 
       let center = mix(quad.min, quad.max, 0.5);
       patches_to_buffer.patches[write_index + 0] = Patch(quad.min, center);
@@ -141,12 +143,9 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     }
   }
 
+  atomicMax(&dispatch_next.x, ceil_div(final_patches_length, WORKGROUP_SIZE));
   // Well this is wrong
   // See https://stackoverflow.com/questions/72035548/what-does-storagebarrier-in-webgpu-actually-do
   // 🍎🍏 was nice. Yay.
-  storageBarrier(); // Wait for all threads to finish reading (?) before continuing
-  if(global_id.x == 0u && global_id.y == 0u && global_id.z == 0u) {
-    dispatch_next.x = ceil_div(atomicLoad(&patches_to_buffer.patches_length), WORKGROUP_SIZE);
-  }
-  storageBarrier(); // Wait until the writes (?) are done before continuing
+  // storageBarrier(); // Wait for all threads to finish reading (?) before continuing
 }

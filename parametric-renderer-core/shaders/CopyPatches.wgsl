@@ -1,5 +1,5 @@
 //#include "./Common.wgsl"
-// AUTOGEN c5f9275279f235c07bee40b0b5dafdb91d723a1e24c4acb363c929645456a556
+// AUTOGEN d1af44c46a1cbb7b88eb3a40a108148e105bbe3d63aab3143845fbb6b5bb0256
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
@@ -25,7 +25,7 @@ struct RenderBufferRead {
   patches: array<Patch>,
 };
 struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/struct.DispatchIndirectArgs.html
-  x: u32,
+  x: atomic<u32>,
   y: u32,
   z: u32,
 } 
@@ -60,12 +60,11 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     render_buffer.patches[write_index] = quad;
   }
 
-  storageBarrier();
   if(global_id.x == 0u && global_id.y == 0u && global_id.z == 0u) {
     let final_patches_length = render_buffer_start + patches_from_buffer.patches_length;
-    atomicStore(&render_buffer.patches_length, final_patches_length);
+    // The vertex shader will never read render_buffer.patches_length. It's not allowed to.
+    // So we don't need to update render_buffer.patches_length, which another bug. (see: storageBarrier being useless)
+    // atomicStore(&render_buffer.patches_length, final_patches_length);
     indirect_draw_buffer.instance_count = final_patches_length;
   }
-  // Maybe not necessary
-  storageBarrier();
 }

@@ -23,7 +23,7 @@ struct RenderBufferRead {
   patches: array<Patch>,
 };
 struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/struct.DispatchIndirectArgs.html
-  x: u32,
+  x: atomic<u32>,
   y: u32,
   z: u32,
 } 

@@ -1,5 +1,5 @@
 //#include "./Common.wgsl"
-// AUTOGEN c5f9275279f235c07bee40b0b5dafdb91d723a1e24c4acb363c929645456a556
+// AUTOGEN d1af44c46a1cbb7b88eb3a40a108148e105bbe3d63aab3143845fbb6b5bb0256
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
@@ -25,7 +25,7 @@ struct RenderBufferRead {
   patches: array<Patch>,
 };
 struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/struct.DispatchIndirectArgs.html
-  x: u32,
+  x: atomic<u32>,
   y: u32,
   z: u32,
 } 

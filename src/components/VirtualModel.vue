@@ -215,7 +215,7 @@ watchEffect(() => {
 });
 
 const patchByteSize = 16; // 4 bytes per float, 4 floats per patch
-const maxPatchCount = 10000;
+const maxPatchCount = 100000;
 const renderBuffer = babylonEffectRef<SmartStorageBuffer>(() => {
   return new SmartStorageBuffer(
     props.scene.engine,
@@ -495,7 +495,7 @@ onRender(() => {
   );
 
   // Subdivide the patches
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 4; i++) {
     {
       patchesBuffer.value[1].reset(engine);
       computePatchesShader.value[0].dispatchIndirect(
