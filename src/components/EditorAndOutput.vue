@@ -43,6 +43,20 @@ const store = useStore();
 const scenePath = makeFilePath("scene.json");
 const { sceneFile, startFile } = getOrCreateScene(props.files, scenePath);
 const scene = useVirtualScene();
+watch(
+    () => props.files.fileNames.value.get(scenePath),
+    () => {
+        try {
+            const {sceneFile, startFile} = getOrCreateScene(props.files, scenePath);
+
+            if (sceneFile !== null) {
+                scene.api.value.fromSerialized(sceneFile);
+            }
+        } catch (e) {
+            console.log("Could not deserialize scene file.");
+        }
+    }
+);
 if (sceneFile !== null) {
   scene.api.value.fromSerialized(sceneFile);
 }

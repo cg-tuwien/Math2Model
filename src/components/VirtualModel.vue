@@ -41,7 +41,7 @@ const props = defineProps<{
 }>();
 
 const dummyValue = Symbol("dummyValue");
-function shallowEffectRef<T>(effect: (oldValue: T | null) => T): ShallowRef<T> {
+function shallowEffectRef<T>(effect: (oldValue: NoInfer<T> | null) => T): ShallowRef<T> {
   const ref = shallowRef<T>(dummyValue as any);
   watchEffect(() => {
     const oldValue = ref.value;
