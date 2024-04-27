@@ -19,6 +19,7 @@ import {
   Vector3,
   WebGPUDataBuffer,
   WebGPUDrawContext,
+  WebGPUEngine,
   type GroundMesh,
 } from "@babylonjs/core";
 import { assert } from "@stefnotch/typestef/assert";
@@ -41,7 +42,9 @@ const props = defineProps<{
 }>();
 
 const dummyValue = Symbol("dummyValue");
-function shallowEffectRef<T>(effect: (oldValue: NoInfer<T> | null) => T): ShallowRef<T> {
+function shallowEffectRef<T>(
+  effect: (oldValue: NoInfer<T> | null) => T
+): ShallowRef<T> {
   const ref = shallowRef<T>(dummyValue as any);
   watchEffect(() => {
     const oldValue = ref.value;
@@ -70,6 +73,70 @@ const renderObserver = shallowEffectRef<{ dispose: () => void }>((oldValue) => {
 onUnmounted(() => {
   renderObserver.value.dispose();
 });
+
+// From https://stackoverflow.com/a/70005195/3492994
+function concatArrayBuffers(views: ArrayBufferView[]) {
+  let length = 0;
+  for (const v of views) length += v.byteLength;
+
+  let buf = new Uint8Array(length);
+  let offset = 0;
+  for (const v of views) {
+    const uint8view = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+    buf.set(uint8view, offset);
+    offset += uint8view.byteLength;
+  }
+
+  return buf;
+}
+
+class SmartStorageBuffer {
+  buffer: StorageBuffer;
+  initialBuffer: StorageBuffer;
+  initialByteSize: number;
+  constructor(
+    engine: WebGPUEngine,
+    initialData: {
+      buffers: ArrayBufferView[];
+      runtimeArray: number;
+    },
+    creationFlags: number,
+    label: string
+  ) {
+    const data = concatArrayBuffers(initialData.buffers);
+
+    this.initialByteSize = data.byteLength;
+    this.buffer = new StorageBuffer(
+      engine,
+      data.byteLength + initialData.runtimeArray,
+      creationFlags | Constants.BUFFER_CREATIONFLAG_WRITE,
+      label
+    );
+    this.buffer.update(data);
+    this.initialBuffer = new StorageBuffer(
+      engine,
+      data.byteLength,
+      Constants.BUFFER_CREATIONFLAG_READ | Constants.BUFFER_CREATIONFLAG_WRITE,
+      label
+    );
+    this.initialBuffer.update(data);
+  }
+
+  reset(engine: WebGPUEngine) {
+    engine._renderEncoder.copyBufferToBuffer(
+      this.initialBuffer.getBuffer().underlyingResource,
+      0,
+      this.buffer.getBuffer().underlyingResource,
+      0,
+      this.initialByteSize
+    );
+  }
+
+  dispose() {
+    this.buffer.dispose();
+    this.initialBuffer.dispose();
+  }
+}
 
 // TODO: Introduce a shader caching in the layer above
 // (Which keeps track of what shaders are used in the scene, and uses the fact that it can just read the required shaders from the models array)
@@ -149,14 +216,18 @@ watchEffect(() => {
 
 const patchByteSize = 16; // 4 bytes per float, 4 floats per patch
 const maxPatchCount = 10000;
-const renderBufferInitial = new Uint32Array([
-  0, // patches_length,
-  maxPatchCount, // patches_capacity
-]);
-const renderBuffer = babylonEffectRef<StorageBuffer>(() => {
-  return new StorageBuffer(
+const renderBuffer = babylonEffectRef<SmartStorageBuffer>(() => {
+  return new SmartStorageBuffer(
     props.scene.engine,
-    renderBufferInitial.byteLength + maxPatchCount * patchByteSize,
+    {
+      buffers: [
+        new Uint32Array([
+          0, // patches_length,
+          maxPatchCount, // patches_capacity
+        ]),
+      ],
+      runtimeArray: maxPatchCount * patchByteSize,
+    },
     Constants.BUFFER_CREATIONFLAG_READWRITE,
     "Render Buffer"
   );
@@ -175,141 +246,197 @@ onRender(() => {
   patchesInputBuffer.value.update();
 });
 
-const patchesBufferReset = new Uint32Array([
-  0, //patches_length
-  maxPatchCount, //patches_capacity
-]);
-const patchesBufferStartingPatch = new Uint32Array([
-  1, //patches_length
-  maxPatchCount, //patches_capacity
-  0,
-  0,
-  0,
-  0, //patch 0
-]);
-new Float32Array(patchesBufferStartingPatch.buffer).set(
-  [0.0, 0.0, 1.0, 1.0], //patch 0
-  2
-);
-const patchesBuffer = shallowEffectRef<[StorageBuffer, StorageBuffer]>(
-  (oldValue) => {
-    oldValue?.[0]?.dispose();
-    oldValue?.[1]?.dispose();
-    const buffer0 = new StorageBuffer(
-      props.scene.engine,
-      patchesBufferReset.byteLength + maxPatchCount * patchByteSize,
-      Constants.BUFFER_CREATIONFLAG_READWRITE,
-      "Patches Buffer 0"
-    );
-    buffer0.update(patchesBufferStartingPatch);
-    const buffer1 = new StorageBuffer(
-      props.scene.engine,
-      patchesBufferReset.byteLength + maxPatchCount * patchByteSize,
-      Constants.BUFFER_CREATIONFLAG_READWRITE,
-      "Patches Buffer 1"
-    );
-    buffer1.update(patchesBufferReset);
-    return [buffer0, buffer1];
-  }
-);
+const patchesBufferReset = babylonEffectRef<StorageBuffer>(() => {
+  const data = concatArrayBuffers([
+    new Uint32Array([
+      1, //patches_length
+      maxPatchCount, //patches_capacity
+    ]),
+    new Float32Array([
+      0.0,
+      0.0,
+      1.0,
+      1.0, // patch 0
+    ]),
+  ]);
+  const buffer = new StorageBuffer(
+    props.scene.engine,
+    data.byteLength,
+    Constants.BUFFER_CREATIONFLAG_READWRITE,
+    "Patches Buffer Initial Data"
+  );
+  buffer.update(data);
+  return buffer;
+});
+
+const patchesBuffer = shallowEffectRef<
+  [SmartStorageBuffer, SmartStorageBuffer]
+>((oldValue) => {
+  oldValue?.[0]?.dispose();
+  oldValue?.[1]?.dispose();
+  const buffer0 = new SmartStorageBuffer(
+    props.scene.engine,
+    {
+      buffers: [
+        new Uint32Array([
+          0, //patches_length
+          maxPatchCount, //patches_capacity
+        ]),
+      ],
+      runtimeArray: maxPatchCount * patchByteSize,
+    },
+    Constants.BUFFER_CREATIONFLAG_READWRITE,
+    "Patches Buffer 0"
+  );
+  const buffer1 = new SmartStorageBuffer(
+    props.scene.engine,
+    {
+      buffers: [
+        new Uint32Array([
+          0, //patches_length
+          maxPatchCount, //patches_capacity
+        ]),
+      ],
+      runtimeArray: maxPatchCount * patchByteSize,
+    },
+    Constants.BUFFER_CREATIONFLAG_READWRITE,
+    "Patches Buffer 1"
+  );
+  return [buffer0, buffer1];
+});
 onUnmounted(() => {
   patchesBuffer.value[0].dispose();
   patchesBuffer.value[1].dispose();
 });
 
-const indirectComputeBufferInitial = new Uint32Array([
-  1, // x
-  1, // y
-  1, // z
-]);
-const indirectComputeBuffer = shallowEffectRef<[StorageBuffer, StorageBuffer]>(
-  (oldValue) => {
-    oldValue?.[0]?.dispose();
-    oldValue?.[1]?.dispose();
-    const buffer0 = new StorageBuffer(
-      props.scene.engine,
-      indirectComputeBufferInitial.byteLength,
-      Constants.BUFFER_CREATIONFLAG_READWRITE |
-        Constants.BUFFER_CREATIONFLAG_INDIRECT,
-      "Indirect Compute Buffer 0"
-    );
-    buffer0.update(indirectComputeBufferInitial);
-    const buffer1 = new StorageBuffer(
-      props.scene.engine,
-      indirectComputeBufferInitial.byteLength,
-      Constants.BUFFER_CREATIONFLAG_READWRITE |
-        Constants.BUFFER_CREATIONFLAG_INDIRECT,
-      "Indirect Compute Buffer 1"
-    );
-    buffer1.update(indirectComputeBufferInitial);
-    return [buffer0, buffer1];
-  }
-);
+const indirectComputeBuffer = shallowEffectRef<
+  [SmartStorageBuffer, SmartStorageBuffer]
+>((oldValue) => {
+  oldValue?.[0]?.dispose();
+  oldValue?.[1]?.dispose();
+  const buffer0 = new SmartStorageBuffer(
+    props.scene.engine,
+    {
+      buffers: [
+        new Uint32Array([
+          1, // x
+          1, // y
+          1, // z
+        ]),
+      ],
+      runtimeArray: 0,
+    },
+    Constants.BUFFER_CREATIONFLAG_READWRITE |
+      Constants.BUFFER_CREATIONFLAG_INDIRECT,
+    "Indirect Compute Buffer 0"
+  );
+  const buffer1 = new SmartStorageBuffer(
+    props.scene.engine,
+    {
+      buffers: [
+        new Uint32Array([
+          1, // x
+          1, // y
+          1, // z
+        ]),
+      ],
+      runtimeArray: 0,
+    },
+    Constants.BUFFER_CREATIONFLAG_READWRITE |
+      Constants.BUFFER_CREATIONFLAG_INDIRECT,
+    "Indirect Compute Buffer 1"
+  );
+  return [buffer0, buffer1];
+});
 onUnmounted(() => {
   indirectComputeBuffer.value[0].dispose();
   indirectComputeBuffer.value[1].dispose();
 });
 
-const computePatchesShader = shallowEffectRef<ComputeShader>(() => {
-  // Apparently the compute shader cannot be disposed of.
-  const cs = new ComputeShader(
-    "Compute Patches",
-    props.scene.engine,
-    {
-      computeSource: ComputePatches,
-    },
-    {
-      bindingsMapping: {
-        input_buffer: { group: 0, binding: 0 },
-        patches_from_buffer: { group: 0, binding: 1 },
-        patches_to_buffer: { group: 0, binding: 2 },
-        render_buffer: { group: 0, binding: 3 },
-        dispatch_next: { group: 0, binding: 4 },
+const computePatchesShader = shallowEffectRef<[ComputeShader, ComputeShader]>(
+  () => {
+    // Apparently the compute shader cannot be disposed of.
+    const cs0 = new ComputeShader(
+      "Compute Patches 0",
+      props.scene.engine,
+      {
+        computeSource: ComputePatches,
       },
-    }
-  );
-  return cs;
-});
+      {
+        bindingsMapping: {
+          input_buffer: { group: 0, binding: 0 },
+          patches_from_buffer: { group: 0, binding: 1 },
+          patches_to_buffer: { group: 0, binding: 2 },
+          render_buffer: { group: 0, binding: 3 },
+          dispatch_next: { group: 0, binding: 4 },
+        },
+      }
+    );
+    const cs1 = new ComputeShader(
+      "Compute Patches 1",
+      props.scene.engine,
+      {
+        computeSource: ComputePatches,
+      },
+      {
+        bindingsMapping: {
+          input_buffer: { group: 0, binding: 0 },
+          patches_from_buffer: { group: 0, binding: 1 },
+          patches_to_buffer: { group: 0, binding: 2 },
+          render_buffer: { group: 0, binding: 3 },
+          dispatch_next: { group: 0, binding: 4 },
+        },
+      }
+    );
+    return [cs0, cs1];
+  }
+);
 watchEffect(() => {
-  computePatchesShader.value.setUniformBuffer(
+  computePatchesShader.value[0].setUniformBuffer(
     "input_buffer",
     patchesInputBuffer.value
   );
-  computePatchesShader.value.setStorageBuffer(
+  computePatchesShader.value[1].setUniformBuffer(
+    "input_buffer",
+    patchesInputBuffer.value
+  );
+  computePatchesShader.value[0].setStorageBuffer(
     "render_buffer",
-    renderBuffer.value
+    renderBuffer.value.buffer
+  );
+  computePatchesShader.value[1].setStorageBuffer(
+    "render_buffer",
+    renderBuffer.value.buffer
   );
 });
-const computePatchesBindGroups = [
-  () => {
-    computePatchesShader.value.setStorageBuffer(
-      "patches_from_buffer",
-      patchesBuffer.value[0]
-    );
-    computePatchesShader.value.setStorageBuffer(
-      "patches_to_buffer",
-      patchesBuffer.value[1]
-    );
-    computePatchesShader.value.setStorageBuffer(
-      "dispatch_next",
-      indirectComputeBuffer.value[1]
-    );
-  },
-  () => {
-    computePatchesShader.value.setStorageBuffer(
-      "patches_from_buffer",
-      patchesBuffer.value[1]
-    );
-    computePatchesShader.value.setStorageBuffer(
-      "patches_to_buffer",
-      patchesBuffer.value[0]
-    );
-    computePatchesShader.value.setStorageBuffer(
-      "dispatch_next",
-      indirectComputeBuffer.value[0]
-    );
-  },
-];
+
+watchEffect(() => {
+  computePatchesShader.value[0].setStorageBuffer(
+    "patches_from_buffer",
+    patchesBuffer.value[0].buffer
+  );
+  computePatchesShader.value[0].setStorageBuffer(
+    "patches_to_buffer",
+    patchesBuffer.value[1].buffer
+  );
+  computePatchesShader.value[0].setStorageBuffer(
+    "dispatch_next",
+    indirectComputeBuffer.value[1].buffer
+  );
+  //
+  computePatchesShader.value[1].setStorageBuffer(
+    "patches_from_buffer",
+    patchesBuffer.value[1].buffer
+  );
+  computePatchesShader.value[1].setStorageBuffer(
+    "patches_to_buffer",
+    patchesBuffer.value[0].buffer
+  );
+  computePatchesShader.value[1].setStorageBuffer(
+    "dispatch_next",
+    indirectComputeBuffer.value[0].buffer
+  );
+});
 
 const copyPatchesShader = shallowEffectRef<ComputeShader>(() => {
   const cs = new ComputeShader(
@@ -331,13 +458,19 @@ const copyPatchesShader = shallowEffectRef<ComputeShader>(() => {
 watchEffect(() => {
   copyPatchesShader.value.setStorageBuffer(
     "patches_from_buffer",
-    patchesBuffer.value[0]
+    patchesBuffer.value[0].buffer
   );
-  copyPatchesShader.value.setStorageBuffer("render_buffer", renderBuffer.value);
+  copyPatchesShader.value.setStorageBuffer(
+    "render_buffer",
+    renderBuffer.value.buffer
+  );
 });
 
 watchEffect(() => {
-  shaderMaterial.value?.setStorageBuffer("renderBuffer", renderBuffer.value);
+  shaderMaterial.value?.setStorageBuffer(
+    "renderBuffer",
+    renderBuffer.value.buffer
+  );
 });
 
 let lastIndirectDrawBuffer: GPUBuffer | null = null;
@@ -346,48 +479,34 @@ watch(copyPatchesShader, () => {
 });
 
 onRender(() => {
-  props.scene.engine.flushFramebuffer();
-  indirectComputeBuffer.value[0].update(indirectComputeBufferInitial);
-  indirectComputeBuffer.value[1].update(indirectComputeBufferInitial);
-  renderBuffer.value.update(renderBufferInitial);
-  patchesBuffer.value[0].update(patchesBufferStartingPatch);
+  const engine = props.scene.engine;
 
-  let commandBuffer = [null,null];
-  let patchesResetGPUBuffer = new StorageBuffer(
-      props.scene.engine,
-      patchesBufferReset.length,
-      Constants.BUFFER_CREATIONFLAG_READ,
-      "Patches Reset Buffer"
+  // Record commands only
+  indirectComputeBuffer.value[0].reset(engine);
+  indirectComputeBuffer.value[1].reset(engine);
+  renderBuffer.value.reset(engine);
+
+  engine._renderEncoder.copyBufferToBuffer(
+    patchesBufferReset.value.getBuffer().underlyingResource,
+    0,
+    patchesBuffer.value[0].buffer.getBuffer().underlyingResource,
+    0,
+    patchesBufferReset.value.getBuffer().capacity
   );
 
-
   // Subdivide the patches
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 2; i++) {
     {
-  // dispatch command to gpu instead of this:
-      props.scene.engine._renderEncoder.copyBufferToBuffer(
-          patchesResetGPUBuffer.getBuffer().underlyingResource,
-          0,
-          patchesBuffer.value[0].getBuffer().underlyingResource,
-          0,
-          patchesBufferReset.length
+      patchesBuffer.value[1].reset(engine);
+      computePatchesShader.value[0].dispatchIndirect(
+        indirectComputeBuffer.value[0].buffer
       );
-      computePatchesBindGroups[0]();
-
-      // Start operation on gpu
-      computePatchesShader.value.dispatchIndirect(
-        indirectComputeBuffer.value[0]
-      );
-      // wait for operation to be finished
-      // props.scene.engine.flushFramebuffer();
     }
     {
-      patchesBuffer.value[0].update(patchesBufferReset);
-      computePatchesBindGroups[1]();
-      computePatchesShader.value.dispatchIndirect(
-        indirectComputeBuffer.value[1]
+      patchesBuffer.value[0].reset(engine);
+      computePatchesShader.value[1].dispatchIndirect(
+        indirectComputeBuffer.value[1].buffer
       );
-      props.scene.engine.flushFramebuffer();
     }
   }
 
@@ -399,7 +518,6 @@ onRender(() => {
       renderPassId,
       false
     );
-    props.scene.engine.createDrawContext;
     const indirectDrawBuffer = (
       drawWrapper?.drawContext as any as WebGPUDrawContext
     )?.indirectDrawBuffer;
@@ -415,8 +533,11 @@ onRender(() => {
     }
   }
 
-  copyPatchesShader.value.dispatchIndirect(indirectComputeBuffer.value[0]);
-  props.scene.engine.flushFramebuffer();
+  copyPatchesShader.value.dispatchIndirect(
+    indirectComputeBuffer.value[0].buffer
+  );
+
+  // And Babylon.js will submit the commands
 });
 
 type HasDispose = { dispose: () => void };
@@ -481,7 +602,7 @@ fn main(input: VertexInputs) -> FragmentInputs {
   } else if (input.vertexIndex == 3) {
       uv = vec2<f32>(quad.min.x, quad.max.y);
   }
-  
+
   vertexInputs.uv = uv;
 
   ${
