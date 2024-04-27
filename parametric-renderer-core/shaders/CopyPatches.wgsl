@@ -66,4 +66,6 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     atomicStore(&render_buffer.patches_length, final_patches_length);
     indirect_draw_buffer.instance_count = final_patches_length;
   }
+  // Maybe not necessary
+  storageBarrier();
 }

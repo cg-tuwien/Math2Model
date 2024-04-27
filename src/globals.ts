@@ -16,6 +16,7 @@ export const sceneFilesPromise = (async () => {
 export const canvasElement = document.createElement("canvas");
 canvasElement.style.width = "100%";
 canvasElement.style.height = "100%";
+canvasElement.addEventListener('wheel', e => { e.preventDefault(); e.stopPropagation() });
 
 export const enginePromise = (async () => {
   const engine = new WebGPUEngine(canvasElement, {});

@@ -352,15 +352,34 @@ onRender(() => {
   renderBuffer.value.update(renderBufferInitial);
   patchesBuffer.value[0].update(patchesBufferStartingPatch);
 
+  let commandBuffer = [null,null];
+  let patchesResetGPUBuffer = new StorageBuffer(
+      props.scene.engine,
+      patchesBufferReset.length,
+      Constants.BUFFER_CREATIONFLAG_READ,
+      "Patches Reset Buffer"
+  );
+
+
   // Subdivide the patches
   for (let i = 0; i < 4; i++) {
     {
-      patchesBuffer.value[1].update(patchesBufferReset);
+  // dispatch command to gpu instead of this:
+      props.scene.engine._renderEncoder.copyBufferToBuffer(
+          patchesResetGPUBuffer.getBuffer().underlyingResource,
+          0,
+          patchesBuffer.value[0].getBuffer().underlyingResource,
+          0,
+          patchesBufferReset.length
+      );
       computePatchesBindGroups[0]();
+
+      // Start operation on gpu
       computePatchesShader.value.dispatchIndirect(
         indirectComputeBuffer.value[0]
       );
-      props.scene.engine.flushFramebuffer();
+      // wait for operation to be finished
+      // props.scene.engine.flushFramebuffer();
     }
     {
       patchesBuffer.value[0].update(patchesBufferReset);
