@@ -141,6 +141,9 @@ fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
     }
   }
 
+  // Well this is wrong
+  // See https://stackoverflow.com/questions/72035548/what-does-storagebarrier-in-webgpu-actually-do
+  // 🍎🍏 was nice. Yay.
   storageBarrier(); // Wait for all threads to finish reading (?) before continuing
   if(global_id.x == 0u && global_id.y == 0u && global_id.z == 0u) {
     dispatch_next.x = ceil_div(atomicLoad(&patches_to_buffer.patches_length), WORKGROUP_SIZE);
