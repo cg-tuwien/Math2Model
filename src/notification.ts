@@ -12,6 +12,11 @@ export function showError(msg: string, error: any) {
   message.error(msg);
 }
 
+export function showInfo(msg: string) {
+  console.info(msg);
+  message.info(msg);
+}
+
 export {
   message as Message,
   notification as Notification,

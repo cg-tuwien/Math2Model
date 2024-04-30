@@ -3,7 +3,7 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { computed, ref, shallowRef, watch, type DeepReadonly } from "vue";
 import { useDebounceFn, useElementSize } from "@vueuse/core";
 import type { FilePath } from "@/filesystem/reactive-files";
-import { showError } from "@/notification";
+import { showError, showInfo } from "@/notification";
 
 const monacoMount = ref<HTMLDivElement | null>(null);
 
@@ -81,7 +81,7 @@ watch(monacoMount, (element) => {
   });
 
     editor.value.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
-      showError("You don't need to save!", null);
+      showInfo("You don't need to save!", null);
     });
 
     editor.value.onDidChangeModelContent((e) => {

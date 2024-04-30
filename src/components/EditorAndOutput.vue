@@ -197,7 +197,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
 
 <template>
   <main class="min-h-full">
-    <div class="flex" style="height: 80vh">
+    <div class="flex" style="height: 70vh">
       <div
         ref="canvasContainer"
         class="self-stretch flex-1 overflow-hidden"
@@ -220,16 +220,30 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
       >
       </CodeEditor>
     </div>
-    <FileBrowser
-      :files="props.files"
-      :open-files="
-        openFile.code.value !== null ? [openFile.code.value.name] : []
-      "
-      @update:open-files="openFile.openFiles($event)"
-      @add-files="openFile.addFiles($event)"
-      @rename-file="(oldName, newName) => openFile.renameFile(oldName, newName)"
-      @delete-files="openFile.deleteFiles($event)"
-    ></FileBrowser>
+    <div class="flex" style="height: auto">
+      <n-tabs type="line" animated class="ml-2">
+        <n-tab-pane name="filebrowser" tab="File Browser">
+          <FileBrowser
+              :files="props.files"
+              :open-files="
+          openFile.code.value !== null ? [openFile.code.value.name] : []
+        "
+              @update:open-files="openFile.openFiles($event)"
+              @add-files="openFile.addFiles($event)"
+              @rename-file="(oldName, newName) => openFile.renameFile(oldName, newName)"
+              @delete-files="openFile.deleteFiles($event)"
+          ></FileBrowser>
+        </n-tab-pane>
+        <n-tab-pane name="sceneview" tab="Hierarchy">
+          <SceneHierarchy
+            :models="scene.state.value.models"
+          ></SceneHierarchy>
+        </n-tab-pane>
+        <n-tab-pane name="addtab" tab="+">
+          To be developed...
+        </n-tab-pane>
+      </n-tabs>
+    </div>
   </main>
 </template>
 
