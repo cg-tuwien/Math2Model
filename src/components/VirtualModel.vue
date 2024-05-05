@@ -204,7 +204,7 @@ const shaderMaterial = babylonEffectRef<ShaderMaterial | null>(() => {
     }
   );
   material.backFaceCulling = false;
-  material.wireframe = true;
+  // material.wireframe = true;
   return material;
 });
 watchEffect(() => {
@@ -355,12 +355,21 @@ onUnmounted(() => {
 
 const computePatchesShader = shallowEffectRef<[ComputeShader, ComputeShader]>(
   () => {
+    const vertexSourceId = props.files.fileNames.value.get(
+      props.model.code.vertexFile
+    );
+    const vertexSource =
+      vertexSourceId === undefined
+        ? null
+        : props.files.readFile(props.model.code.vertexFile);
+
+    const computeSource = assembleComputeShader(vertexSource);
     // Apparently the compute shader cannot be disposed of.
     const cs0 = new ComputeShader(
       "Compute Patches 0",
       props.scene.engine,
       {
-        computeSource: ComputePatches,
+        computeSource,
       },
       {
         bindingsMapping: {
@@ -376,7 +385,7 @@ const computePatchesShader = shallowEffectRef<[ComputeShader, ComputeShader]>(
       "Compute Patches 1",
       props.scene.engine,
       {
-        computeSource: ComputePatches,
+        computeSource,
       },
       {
         bindingsMapping: {
@@ -614,5 +623,22 @@ fn main(input: VertexInputs) -> FragmentInputs {
   vertexOutputs.vUV = vertexInputs.uv;
   vertexOutputs.vNormal = vertexInputs.normal;
 }`;
+}
+
+function assembleComputeShader(innerCode: string | null) {
+  const computeSource = ComputePatches;
+  const autogenRegex = /\/\/ AUTOGEN[^]+?\/\/ END OF AUTOGEN/g;
+
+  if (innerCode === null || innerCode === "") {
+    return computeSource;
+  }
+
+  return computeSource.replaceAll(autogenRegex, (v) => {
+    if (/fn\s+evaluateImage/.test(v)) {
+      return innerCode;
+    } else {
+      return v;
+    }
+  });
 }
 </script>
