@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use glamour::{Angle, Matrix4, Point3, ToRaw, Vector2, Vector4};
+use pollster::FutureExt;
 use tracing::{error, info, warn};
-use winit::window::Window;
-use winit_input_helper::WinitInputHelper;
+use winit::{application::ApplicationHandler, window::Window};
+use winit_input_helper::{WinitInputApp, WinitInputHelper, WinitInputUpdate};
 
 use crate::{
     buffer::TypedBuffer,
@@ -14,13 +15,9 @@ use crate::{
     texture::Texture,
 };
 
-pub struct Application {
-    surface: wgpu::Surface<'static>,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
+pub struct GpuApplication {
+    context: WgpuContext,
     depth_texture: Texture,
-    camera: Camera,
     camera_buffer: TypedBuffer<shader::Camera>,
     light_buffer: TypedBuffer<shader::Light>,
     model_buffer: TypedBuffer<shader::Model>,
@@ -39,68 +36,13 @@ pub struct Application {
     indirect_compute_buffer_initial: compute_patches::DispatchIndirectArgs,
     indirect_compute_buffer: [TypedBuffer<compute_patches::DispatchIndirectArgs>; 2],
     indirect_draw_buffer: TypedBuffer<copy_patches::DrawIndexedIndirectArgs>,
-
-    freecam_controller: FreecamController,
-    delta_time: f32,
     mesh: Mesh,
-    size: winit::dpi::PhysicalSize<u32>,
-    inputs: WinitInputHelper,
-    window: Arc<Window>,
-    config_file: ConfigFile,
-    cache_file: CacheFile,
 }
 
-impl Drop for Application {
-    fn drop(&mut self) {
-        self.cache_file.camera = Some(CachedCamera::FirstPerson {
-            position: self.freecam_controller.position.to_array(),
-            pitch: self.freecam_controller.pitch.radians,
-            yaw: self.freecam_controller.yaw.radians,
-        });
-        self.cache_file
-            .save_to_file(Application::CACHE_FILE)
-            .unwrap();
-    }
-}
-
-impl Application {
-    const CONFIG_FILE: &'static str = "config.json";
-    const CACHE_FILE: &'static str = "cache.json";
-    pub async fn new(window: Arc<Window>) -> anyhow::Result<Self> {
-        let config_file = ConfigFile::from_file(Application::CONFIG_FILE).unwrap_or_default();
-        let cache_file = CacheFile::from_file(Application::CACHE_FILE).unwrap_or_default();
-        let size = window.inner_size();
-
-        let camera = Camera::new(
-            size.width as f32 / size.height as f32,
-            CameraSettings::default(),
-        );
-        let mut freecam_controller = FreecamController::new(5.0, 0.01);
-        match cache_file.camera {
-            Some(CachedCamera::FirstPerson {
-                position,
-                pitch,
-                yaw,
-            }) => {
-                freecam_controller.position = Point3::from(position);
-                freecam_controller.pitch = Angle::from(pitch);
-                freecam_controller.yaw = Angle::from(yaw);
-            }
-            _ => {
-                freecam_controller.position = Point3::new(0.0, 0.0, 2.0);
-            }
-        }
-
-        let inputs = WinitInputHelper::new();
-
-        let WgpuContext {
-            instance: _,
-            surface,
-            adapter: _,
-            device,
-            queue,
-            config,
-        } = WgpuContext::init_wgpu(window.clone(), size).await?;
+impl GpuApplication {
+    pub async fn new(window: Window, camera: &Camera) -> anyhow::Result<Self> {
+        let context = WgpuContext::new(window).await?;
+        let device = &context.device;
 
         let mesh = Mesh::new_quad(&device);
 
@@ -153,7 +95,8 @@ impl Application {
             },
         );
 
-        let depth_texture = Texture::create_depth_texture(&device, &config, "Depth Texture");
+        let depth_texture =
+            Texture::create_depth_texture(&device, &context.config, "Depth Texture");
 
         let shader = shader::create_shader_module(&device);
         let render_pipeline_layout = shader::create_pipeline_layout(&device);
@@ -168,10 +111,11 @@ impl Application {
                 module: &shader,
                 entry_point: shader::ENTRY_FS_MAIN,
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
+                    format: context.config.format,
                     blend: Some(wgpu::BlendState::REPLACE),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
+                compilation_options: Default::default(),
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -202,6 +146,7 @@ impl Application {
                 layout: Some(&compute_patches::create_pipeline_layout(&device)),
                 module: &compute_patches::create_shader_module(&device),
                 entry_point: compute_patches::ENTRY_MAIN,
+                compilation_options: Default::default(),
             });
 
         let compute_patches_input_buffer = TypedBuffer::new_uniform(
@@ -327,6 +272,7 @@ impl Application {
                 layout: Some(&copy_patches::create_pipeline_layout(&device)),
                 module: &copy_patches::create_shader_module(&device),
                 entry_point: "main",
+                compilation_options: Default::default(),
             });
         let copy_patches_bind_group_0 = copy_patches::bind_groups::BindGroup0::from_bindings(
             &device,
@@ -338,10 +284,7 @@ impl Application {
         );
 
         Ok(Self {
-            surface,
-            device,
-            queue,
-            config,
+            context,
             render_pipeline,
             render_bind_group_0,
             indirect_compute_buffer_initial,
@@ -358,45 +301,51 @@ impl Application {
             render_buffer,
             indirect_draw_buffer,
             depth_texture,
-            camera,
             camera_buffer,
             light_buffer,
             model_buffer,
-            freecam_controller,
-            delta_time: 0.0,
             mesh,
-            size,
-            inputs,
-            window,
-            config_file,
-            cache_file,
         })
     }
 
-    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+    #[must_use]
+    fn resize(
+        &mut self,
+        new_size: winit::dpi::PhysicalSize<u32>,
+    ) -> Option<winit::dpi::PhysicalSize<u32>> {
         if new_size.width > 0 && new_size.height > 0 {
-            self.size = new_size;
-            self.config.width = new_size.width;
-            self.config.height = new_size.height;
-            self.surface.configure(&self.device, &self.config);
-            self.depth_texture =
-                Texture::create_depth_texture(&self.device, &self.config, "Depth Texture");
-
-            self.camera
-                .update_aspect_ratio(new_size.width as f32 / new_size.height as f32);
+            self.context.size = new_size;
+            self.context.config.width = new_size.width;
+            self.context.config.height = new_size.height;
+            self.context
+                .surface
+                .configure(&self.context.device, &self.context.config);
+            self.depth_texture = Texture::create_depth_texture(
+                &self.context.device,
+                &self.context.config,
+                "Depth Texture",
+            );
+            Some(new_size)
+        } else {
+            None
         }
     }
 
-    pub fn update(&mut self) {
-        self.freecam_controller
-            .update(&self.inputs, self.delta_time);
-        self.camera.update_camera(&self.freecam_controller);
+    #[must_use]
+    pub fn render(&mut self, render_data: RenderData) -> Result<(), wgpu::SurfaceError> {
+        let surface = &self.context.surface;
+        let queue = &self.context.queue;
+        let output = surface.get_current_texture()?;
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
         self.camera_buffer
-            .update(&self.queue, &self.camera.to_shader())
+            .update(queue, &render_data.camera.to_shader())
             .unwrap();
         self.model_buffer
             .update(
-                &self.queue,
+                &queue,
                 &shader::Model {
                     model_similarity: self.mesh.get_model_matrix().to_raw(),
                 },
@@ -404,38 +353,32 @@ impl Application {
             .unwrap();
         self.compute_patches_input_buffer
             .update(
-                &self.queue,
+                queue,
                 &compute_patches::InputBuffer {
                     model_view_projection: self
                         .mesh
-                        .get_model_view_projection(&self.camera)
+                        .get_model_view_projection(&render_data.camera)
                         .to_raw(),
                 },
             )
             .unwrap();
-    }
-
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let output = self.surface.get_current_texture()?;
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
 
         self.indirect_compute_buffer[0]
-            .update(&self.queue, &self.indirect_compute_buffer_initial)
+            .update(queue, &self.indirect_compute_buffer_initial)
             .unwrap();
         self.indirect_compute_buffer[1]
-            .update(&self.queue, &self.indirect_compute_buffer_initial)
+            .update(queue, &self.indirect_compute_buffer_initial)
             .unwrap();
         self.render_buffer
-            .update(&self.queue, &self.render_buffer_initial)
+            .update(queue, &self.render_buffer_initial)
             .unwrap();
 
-        let mut commands = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
+        let mut commands =
+            self.context
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+                });
 
         commands.copy_buffer_to_buffer(
             self.patches_buffer_starting_patch.buffer(),
@@ -532,59 +475,188 @@ impl Application {
             render_pass.draw_indexed_indirect(self.indirect_draw_buffer.buffer(), 0)
         }
 
-        self.queue.submit(std::iter::once(commands.finish()));
+        self.context
+            .queue
+            .submit(std::iter::once(commands.finish()));
         output.present();
 
         Ok(())
     }
 }
 
-pub async fn run() -> anyhow::Result<()> {
-    use winit::{
-        event_loop::{ControlFlow, EventLoop},
-        keyboard::{Key, NamedKey},
-        window::WindowBuilder,
-    };
+pub struct Application {
+    gpu: Option<GpuApplication>,
+    camera: Camera,
+    freecam_controller: FreecamController,
+    delta_time: f32,
+    config_file: ConfigFile,
+    cache_file: CacheFile,
+}
 
-    let event_loop = EventLoop::new()?;
-    let window = Arc::new(WindowBuilder::new().build(&event_loop)?);
-    event_loop.set_control_flow(ControlFlow::Poll);
+impl Drop for Application {
+    fn drop(&mut self) {
+        self.cache_file.camera = Some(CachedCamera::FirstPerson {
+            position: self.freecam_controller.position.to_array(),
+            pitch: self.freecam_controller.pitch.radians,
+            yaw: self.freecam_controller.yaw.radians,
+        });
+        self.cache_file
+            .save_to_file(Application::CACHE_FILE)
+            .unwrap();
+    }
+}
 
-    let mut application = Application::new(window.clone()).await?;
+impl Application {
+    const CONFIG_FILE: &'static str = "config.json";
+    const CACHE_FILE: &'static str = "cache.json";
+    pub fn new() -> anyhow::Result<Self> {
+        let config_file = ConfigFile::from_file(Application::CONFIG_FILE).unwrap_or_default();
+        let cache_file = CacheFile::from_file(Application::CACHE_FILE).unwrap_or_default();
 
-    event_loop.run(move |event, elwt| {
-        let input = &mut application.inputs;
-        if input.update(&event) {
-            if input.key_released_logical(Key::Named(NamedKey::Escape))
-                || input.close_requested()
-                || input.destroyed()
-            {
-                info!("Stopping the application.");
-                elwt.exit();
-                return;
+        let camera = Camera::new(1.0, CameraSettings::default());
+        let mut freecam_controller = FreecamController::new(5.0, 0.01);
+        match cache_file.camera {
+            Some(CachedCamera::FirstPerson {
+                position,
+                pitch,
+                yaw,
+            }) => {
+                freecam_controller.position = Point3::from(position);
+                freecam_controller.pitch = Angle::from(pitch);
+                freecam_controller.yaw = Angle::from(yaw);
             }
-            application.delta_time = input.delta_time().unwrap_or_default().as_secs_f32();
-            if let Some((width, height)) = input.resolution() {
-                application.resize(winit::dpi::PhysicalSize { width, height });
-            }
-            application.update();
-            match application.render() {
-                Ok(_) => (),
-                Err(wgpu::SurfaceError::Lost) => {
-                    application.resize(application.size);
-                }
-                Err(wgpu::SurfaceError::OutOfMemory) => {
-                    error!("Out of memory");
-                    elwt.exit();
-                }
-                Err(e) => {
-                    warn!("Unexpected error: {:?}", e);
-                }
+            _ => {
+                freecam_controller.position = Point3::new(0.0, 0.0, 2.0);
             }
         }
-    })?;
 
+        Ok(Self {
+            gpu: None,
+            camera,
+            freecam_controller,
+            delta_time: 0.0,
+            config_file,
+            cache_file,
+        })
+    }
+
+    fn create_surface(&mut self, window: Window) {
+        if self.gpu.is_some() {
+            return;
+        }
+        let gpu = GpuApplication::new(window, &self.camera)
+            .block_on()
+            .unwrap();
+        self.gpu = Some(gpu);
+    }
+
+    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        if let Some(gpu) = &mut self.gpu {
+            let new_size = gpu.resize(new_size);
+            if let Some(new_size) = new_size {
+                self.camera
+                    .update_aspect_ratio(new_size.width as f32 / new_size.height as f32);
+            }
+        }
+    }
+
+    pub fn update(&mut self, inputs: &WinitInputHelper) {
+        self.freecam_controller.update(inputs, self.delta_time);
+        self.camera.update_camera(&self.freecam_controller);
+    }
+
+    fn render_data(&self) -> RenderData<'_> {
+        RenderData {
+            camera: &self.camera,
+        }
+    }
+
+    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        if let Some(mut gpu) = self.gpu.take() {
+            gpu.render(self.render_data())?;
+            self.gpu = Some(gpu);
+        }
+        Ok(())
+    }
+}
+
+pub struct RenderData<'a> {
+    camera: &'a Camera,
+}
+
+pub async fn run() -> anyhow::Result<()> {
+    let event_loop = winit::event_loop::EventLoop::new()?;
+    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+    let application = Application::new()?;
+    event_loop.run_app(&mut WinitInputApp::new(application))?;
     Ok(())
+}
+
+impl ApplicationHandler<()> for Application {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let _ = self.create_surface(
+            event_loop
+                .create_window(Window::default_attributes())
+                .unwrap(),
+        );
+    }
+
+    fn window_event(
+        &mut self,
+        _event_loop: &winit::event_loop::ActiveEventLoop,
+        _window_id: winit::window::WindowId,
+        event: winit::event::WindowEvent,
+    ) {
+        match &event {
+            winit::event::WindowEvent::RedrawRequested => {
+                // Shouldn't need anything here
+                match self.gpu {
+                    Some(ref mut gpu) => gpu.context.window.request_redraw(),
+                    None => {}
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+impl WinitInputUpdate for Application {
+    fn update(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        input: &WinitInputHelper,
+    ) {
+        use winit::keyboard::{Key, NamedKey};
+
+        if input.key_released_logical(Key::Named(NamedKey::Escape))
+            || input.close_requested()
+            || input.destroyed()
+        {
+            info!("Stopping the application.");
+            event_loop.exit();
+            return;
+        }
+        self.delta_time = input.delta_time().unwrap_or_default().as_secs_f32();
+        if let Some((width, height)) = input.resolution() {
+            self.resize(winit::dpi::PhysicalSize { width, height });
+        }
+        self.update(input);
+        match self.render() {
+            Ok(_) => (),
+            Err(wgpu::SurfaceError::Lost) => {
+                if let Some(gpu) = &mut self.gpu {
+                    let _ = gpu.resize(gpu.context.size);
+                }
+            }
+            Err(wgpu::SurfaceError::OutOfMemory) => {
+                error!("Out of memory");
+                event_loop.exit();
+            }
+            Err(e) => {
+                warn!("Unexpected error: {:?}", e);
+            }
+        }
+    }
 }
 
 struct WgpuContext {
@@ -594,13 +666,14 @@ struct WgpuContext {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
+    window: Arc<Window>,
+    size: winit::dpi::PhysicalSize<u32>,
 }
 
 impl WgpuContext {
-    async fn init_wgpu(
-        window: Arc<Window>,
-        size: winit::dpi::PhysicalSize<u32>,
-    ) -> anyhow::Result<Self> {
+    async fn new(window: Window) -> anyhow::Result<Self> {
+        let window = Arc::new(window);
+        let size = window.inner_size();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             ..Default::default()
@@ -652,6 +725,8 @@ impl WgpuContext {
             device,
             queue,
             config,
+            window,
+            size,
         })
     }
 }
