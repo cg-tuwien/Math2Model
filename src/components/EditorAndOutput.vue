@@ -193,6 +193,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
     setNewCode,
   };
 }
+
 </script>
 
 <template>
@@ -237,6 +238,9 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
         <n-tab-pane name="sceneview" tab="Hierarchy">
           <SceneHierarchy
             :models="scene.state.value.models"
+            :scene="scene.api.value"
+            :files="props.files"
+            :scene-path="scenePath"
           ></SceneHierarchy>
         </n-tab-pane>
         <n-tab-pane name="addtab" tab="+">
