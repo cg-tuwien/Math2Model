@@ -241,6 +241,11 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
             :scene="scene.api.value"
             :files="props.files"
             :scene-path="scenePath"
+            @update="(model) => {
+              scene.api.value.updateModel(model.id, model);
+              const sceneContent = scene.api.value.serialize();
+              props.files.writeFile(scenePath, JSON.stringify(sceneContent, null, 2));
+            }"
           ></SceneHierarchy>
         </n-tab-pane>
         <n-tab-pane name="addtab" tab="+">

@@ -7,7 +7,7 @@ import {
   type VirtualModelState,
   VirtualScene, type VirtualSceneState
 } from "@/scenes/VirtualScene";
-import {h, ref, watch} from "vue";
+import {computed, type ComputedRef, h, ref, watch} from "vue";
 import {NInput, type TreeOption} from "naive-ui";
 import {showInfo} from "@/notification";
 import {Quaternion, Vector3} from "@babylonjs/core";
@@ -28,12 +28,12 @@ export interface WriteableModelState {
   scale: number;
 }
 
-function toWriteableModelState(model: VirtualModelState | undefined): WriteableModelState | null {
+function toWriteableModelState(model: VirtualModelState | undefined): ComputedRef<WriteableModelState | null> {
   if (model === undefined)
-    return null;
+    return computed(() => null);
   const pos = model.position.toVector3();
   const rot = model.rotation.toQuaternion();
-  return {
+  return computed(() => { return {
     id: model.id.valueOf(),
     name: model.name.valueOf(),
     code: model.code,
@@ -45,6 +45,25 @@ function toWriteableModelState(model: VirtualModelState | undefined): WriteableM
     rotZ: rot.z.valueOf(),
     rotW: rot.w.valueOf(),
     scale: model.scale.valueOf()
+  } });
+}
+
+function setCurrentModel(model: VirtualModelState): void {
+  console.log("Set current Model (" + JSON.stringify(model) + ");");
+  if (!currentModel.value)
+    currentModel = toWriteableModelState(model);
+  else {
+    currentModel.value.id = model.id.valueOf();
+    currentModel.value.name = model.name.valueOf();
+    currentModel.value.code = model.code;
+    currentModel.value.posX = model.position.x.valueOf();
+    currentModel.value.posY = model.position.y.valueOf();
+    currentModel.value.posZ = model.position.z.valueOf();
+    currentModel.value.rotX = model.rotation.x.valueOf();
+    currentModel.value.rotY = model.rotation.y.valueOf();
+    currentModel.value.rotZ = model.rotation.z.valueOf();
+    currentModel.value.rotW = model.rotation.w.valueOf();
+    currentModel.value.scale = model.scale.valueOf();
   }
 }
 
@@ -59,6 +78,8 @@ function fromWritableModelState(model: WriteableModelState): VirtualModelState {
   }
 }
 
+const emit = defineEmits(['update'])
+
 const props = defineProps<{
   models: Array<VirtualModelState>;
   scene: VirtualScene;
@@ -72,11 +93,9 @@ const selectedKeys = ref<Array<string>>([]);
 const checkedKeys = ref<Array<string>>([]);
 const data = ref<TreeOption[]>([]);
 
-let currentModel = toWriteableModelState(props.models.at(0));
+let currentModel = toWriteableModelState(props.models[0] ?? undefined);
 
-const x = ref(0);
-
-data.value = [...props.models.values()].toSorted().map(
+data.value = [...props.models.values()].map(
     (model): TreeOption => ({
       label: model.name,
       key: model.id,
@@ -90,18 +109,26 @@ function renderLabel({ option }: { option: TreeOption }) {
 watch(() => selectedKeys.value,
   () => {
       if (selectedKeys.value.length == 1) {
-        currentModel = props.models.find((model) => model.id === selectedKeys.value[0]) === null ? currentModel :
-            toWriteableModelState(props.models.find((model) => model.id === selectedKeys.value[0]));
+        const model = props.models.find((model) => model.id === selectedKeys.value[0]);
+        if (model)
+          setCurrentModel(model);
       }
       return;
 });
 
 function change() {
-  if (!currentModel)
+  if (!currentModel.value)
     return;
-  props.scene.updateModel(currentModel.id, fromWritableModelState(currentModel));
-  const sceneContent = props.scene.serialize();
-  props.files.writeFile(props.scenePath, serializeScene(sceneContent));
+  if (Object.values(currentModel.value).includes(null))
+    return;
+  const updated = fromWritableModelState(currentModel.value);
+  emit("update", updated);
+  data.value = [...props.models.values()].map(
+      (model): TreeOption => ({
+        label: model.name,
+        key: model.id,
+      })
+  );
 }
 
 </script>
@@ -125,34 +152,44 @@ function change() {
     </div>
 
     <div v-if="currentModel">
-      Name <n-input v-model:value="currentModel.name" clearable v-model:on-update:value="change"></n-input>
+      Name <n-input v-model:value="currentModel.name" type="text" clearable v-on:input="change" @change="(value) => {
+        if (currentModel)
+          currentModel.name = value;
+      }"></n-input>
       <br /><br />
       <n-flex justify="space-between">
         <div>
           Position
           x <n-input-number
-            v-model:value="currentModel.posX" v-on:input="change"
+            v-model:value="currentModel.posX" clearable v-on:input="change" :show-button=false
         ></n-input-number>
           Position y <n-input-number
-            v-model:value="currentModel.posY" clearable v-on:input="change"
+            v-model:value="currentModel.posY" clearable v-on:input="change" :show-button=false
             ></n-input-number>
           Position z <n-input-number
-            v-model:value="currentModel.posZ" clearable v-on:input="change"
+            v-model:value="currentModel.posZ" clearable v-on:input="change" :show-button=false
             ></n-input-number>
         </div>
         <div>
           Rotation
           x <n-input-number
-            v-model:value="currentModel.rotX" clearable v-on:input="change"
+            v-model:value="currentModel.rotX" clearable v-on:input="change" :show-button=false
           ></n-input-number>
             Rotation y <n-input-number
-              v-model:value="currentModel.rotY" clearable v-on:input="change"
+              v-model:value="currentModel.rotY" clearable v-on:input="change" :show-button=false
           ></n-input-number>
+        </div>
+        <div>
             Rotation z <n-input-number
-              v-model:value="currentModel.rotZ" clearable v-on:input="change"
+              v-model:value="currentModel.rotZ" clearable v-on:input="change" :show-button=false
           ></n-input-number>
             Rotation w <n-input-number
-              v-model:value="currentModel.rotW" clearable v-on:input="change"
+              v-model:value="currentModel.rotW" clearable v-on:input="change" :show-button=false
+          ></n-input-number>
+        </div>
+        <div>
+          Scale <n-input-number
+                v-model:value="currentModel.scale" clearable v-on:input="change" :show-button=false
           ></n-input-number>
         </div>
       </n-flex>
