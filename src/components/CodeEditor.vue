@@ -81,7 +81,7 @@ watch(monacoMount, (element) => {
   });
 
     editor.value.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
-      showInfo("You don't need to save!", null);
+      showInfo("You don't need to save!");
     });
 
     editor.value.onDidChangeModelContent((e) => {

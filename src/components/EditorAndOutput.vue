@@ -16,6 +16,7 @@ import {
   watchEffect,
   onUnmounted,
   readonly,
+  computed,
 } from "vue";
 import { useDebounceFn, useElementSize } from "@vueuse/core";
 import { useStore } from "@/stores/store";
@@ -44,18 +45,18 @@ const scenePath = makeFilePath("scene.json");
 const { sceneFile, startFile } = getOrCreateScene(props.files, scenePath);
 const scene = useVirtualScene();
 watch(
-    () => props.files.fileNames.value.get(scenePath),
-    () => {
-        try {
-            const {sceneFile, startFile} = getOrCreateScene(props.files, scenePath);
+  () => props.files.fileNames.value.get(scenePath),
+  () => {
+    try {
+      const { sceneFile, startFile } = getOrCreateScene(props.files, scenePath);
 
-            if (sceneFile !== null) {
-                scene.api.value.fromSerialized(sceneFile);
-            }
-        } catch (e) {
-            console.log("Could not deserialize scene file.");
-        }
+      if (sceneFile !== null) {
+        scene.api.value.fromSerialized(sceneFile);
+      }
+    } catch (e) {
+      console.log("Could not deserialize scene file.");
     }
+  }
 );
 if (sceneFile !== null) {
   scene.api.value.fromSerialized(sceneFile);
@@ -185,7 +186,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
   }, 500);
 
   return {
-    code: readonly(keyedCode),
+    code: computed(() => keyedCode.value),
     openFiles,
     addFiles,
     renameFile,
@@ -193,7 +194,6 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
     setNewCode,
   };
 }
-
 </script>
 
 <template>
@@ -225,14 +225,16 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
       <n-tabs type="line" animated class="ml-2">
         <n-tab-pane name="filebrowser" tab="File Browser">
           <FileBrowser
-              :files="props.files"
-              :open-files="
-          openFile.code.value !== null ? [openFile.code.value.name] : []
-        "
-              @update:open-files="openFile.openFiles($event)"
-              @add-files="openFile.addFiles($event)"
-              @rename-file="(oldName, newName) => openFile.renameFile(oldName, newName)"
-              @delete-files="openFile.deleteFiles($event)"
+            :files="props.files"
+            :open-files="
+              openFile.code.value !== null ? [openFile.code.value.name] : []
+            "
+            @update:open-files="openFile.openFiles($event)"
+            @add-files="openFile.addFiles($event)"
+            @rename-file="
+              (oldName, newName) => openFile.renameFile(oldName, newName)
+            "
+            @delete-files="openFile.deleteFiles($event)"
           ></FileBrowser>
         </n-tab-pane>
         <n-tab-pane name="sceneview" tab="Hierarchy">
@@ -241,16 +243,19 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
             :scene="scene.api.value"
             :files="props.files"
             :scene-path="scenePath"
-            @update="(model) => {
-              scene.api.value.updateModel(model.id, model);
-              const sceneContent = scene.api.value.serialize();
-              props.files.writeFile(scenePath, JSON.stringify(sceneContent, null, 2));
-            }"
+            @update="
+              (model) => {
+                scene.api.value.updateModel(model.id, model);
+                const sceneContent = scene.api.value.serialize();
+                props.files.writeFile(
+                  scenePath,
+                  JSON.stringify(sceneContent, null, 2)
+                );
+              }
+            "
           ></SceneHierarchy>
         </n-tab-pane>
-        <n-tab-pane name="addtab" tab="+">
-          To be developed...
-        </n-tab-pane>
+        <n-tab-pane name="addtab" tab="+"> To be developed... </n-tab-pane>
       </n-tabs>
     </div>
   </main>
