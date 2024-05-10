@@ -8,7 +8,8 @@ import {
 } from "@babylonjs/core";
 import { BaseScene } from "@/scenes/BaseScene";
 import CodeEditor, { type KeyedCode } from "@/components/CodeEditor.vue";
-
+import IconFolderMultipleOutline from "~icons/mdi/folder-multiple-outline";
+import IconFileTreeOutline from "~icons/mdi/file-tree-outline";
 import {
   ref,
   shallowRef,
@@ -17,6 +18,7 @@ import {
   onUnmounted,
   readonly,
   computed,
+  h,
 } from "vue";
 import { useDebounceFn, useElementSize } from "@vueuse/core";
 import { useStore } from "@/stores/store";
@@ -56,7 +58,7 @@ watch(
     } catch (e) {
       console.log("Could not deserialize scene file.");
     }
-  }
+  },
 );
 if (sceneFile !== null) {
   scene.api.value.fromSerialized(sceneFile);
@@ -88,7 +90,7 @@ onUnmounted(() => {
 let light = new HemisphericLight(
   "light1",
   new Vector3(0, 1, 0),
-  baseScene.value
+  baseScene.value,
 );
 light.intensity = 0.7;
 onUnmounted(() => {
@@ -113,7 +115,7 @@ watch(
   [width, height],
   useDebounceFn(() => {
     props.engine.resize();
-  }, 100)
+  }, 100),
 );
 
 props.engine.runRenderLoop(renderLoop);
@@ -128,7 +130,7 @@ onUnmounted(() => {
 
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
   const keyedCode = ref<KeyedCode | null>(
-    startFile !== null ? readFile(startFile) : null
+    startFile !== null ? readFile(startFile) : null,
   );
 
   function readFile(name: FilePath): KeyedCode | null {
@@ -194,70 +196,88 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
     setNewCode,
   };
 }
+
+function renderTabIcon(iconName: "Files" | "Scene") {
+  if (iconName == "Files") {
+    return h(IconFolderMultipleOutline);
+  } else if (iconName == "Scene") {
+    return h(IconFileTreeOutline);
+  }
+}
 </script>
 
 <template>
   <main class="min-h-full">
-    <div class="flex" style="height: 70vh">
-      <div
-        ref="canvasContainer"
-        class="self-stretch flex-1 overflow-hidden"
-      ></div>
-      <div>
-        <VirtualModel
-          v-for="model in scene.state.value.models"
-          :key="model.id"
-          :scene="baseScene"
-          :files="props.files"
-          :globalUBO="globalUBO"
-          :model="model"
-        ></VirtualModel>
-      </div>
-      <CodeEditor
-        class="self-stretch flex-1 overflow-hidden"
-        :keyed-code="openFile.code.value"
-        :is-dark="store.isDark"
-        @update="openFile.setNewCode($event)"
-      >
-      </CodeEditor>
-    </div>
-    <div class="flex" style="height: auto">
-      <n-tabs type="line" animated class="ml-2">
-        <n-tab-pane name="filebrowser" tab="File Browser">
-          <FileBrowser
-            :files="props.files"
-            :open-files="
-              openFile.code.value !== null ? [openFile.code.value.name] : []
-            "
-            @update:open-files="openFile.openFiles($event)"
-            @add-files="openFile.addFiles($event)"
-            @rename-file="
-              (oldName, newName) => openFile.renameFile(oldName, newName)
-            "
-            @delete-files="openFile.deleteFiles($event)"
-          ></FileBrowser>
-        </n-tab-pane>
-        <n-tab-pane name="sceneview" tab="Hierarchy">
-          <SceneHierarchy
-            :models="scene.state.value.models"
-            :scene="scene.api.value"
-            :files="props.files"
-            :scene-path="scenePath"
-            @update="
-              (model) => {
-                scene.api.value.updateModel(model.id, model);
-                const sceneContent = scene.api.value.serialize();
-                props.files.writeFile(
-                  scenePath,
-                  JSON.stringify(sceneContent, null, 2)
-                );
-              }
-            "
-          ></SceneHierarchy>
-        </n-tab-pane>
-        <n-tab-pane name="addtab" tab="+"> To be developed... </n-tab-pane>
-      </n-tabs>
-    </div>
+    <n-split
+      direction="horizontal"
+      style="height: 100vh"
+      :max="0.75"
+      :min="0.1"
+      :default-size="0.2"
+    >
+      <template #1>
+        <n-tabs type="line" animated placement="left" size="small">
+          <n-tab-pane name="filebrowser" :tab="renderTabIcon('Files')">
+            <FileBrowser
+              :files="props.files"
+              :open-files="
+                openFile.code.value !== null ? [openFile.code.value.name] : []
+              "
+              @update:open-files="openFile.openFiles($event)"
+              @add-files="openFile.addFiles($event)"
+              @rename-file="
+                (oldName, newName) => openFile.renameFile(oldName, newName)
+              "
+              @delete-files="openFile.deleteFiles($event)"
+            ></FileBrowser>
+          </n-tab-pane>
+          <n-tab-pane name="sceneview" :tab="renderTabIcon('Scene')">
+            <SceneHierarchy
+              :models="scene.state.value.models"
+              :scene="scene.api.value"
+              :files="props.files"
+              :scene-path="scenePath"
+              @update="
+                (model) => {
+                  scene.api.value.updateModel(model.id, model);
+                  const sceneContent = scene.api.value.serialize();
+                  props.files.writeFile(
+                    scenePath,
+                    JSON.stringify(sceneContent, null, 2),
+                  );
+                }
+              "
+            ></SceneHierarchy>
+          </n-tab-pane>
+          <n-tab-pane name="addtab" tab=""> To be developed... </n-tab-pane>
+        </n-tabs>
+      </template>
+      <template #2>
+        <div class="flex" style="height: 100vh; width: 100%">
+          <div
+            ref="canvasContainer"
+            class="self-stretch overflow-hidden flex-1"
+          ></div>
+          <div>
+            <VirtualModel
+              v-for="model in scene.state.value.models"
+              :key="model.id"
+              :scene="baseScene"
+              :files="props.files"
+              :globalUBO="globalUBO"
+              :model="model"
+            ></VirtualModel>
+          </div>
+          <CodeEditor
+            class="self-stretch overflow-hidden flex-1"
+            :keyed-code="openFile.code.value"
+            :is-dark="store.isDark"
+            @update="openFile.setNewCode($event)"
+          >
+          </CodeEditor>
+        </div>
+      </template>
+    </n-split>
   </main>
 </template>
 

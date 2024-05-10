@@ -36,7 +36,7 @@ export interface WriteableModelState {
 }
 
 function toWriteableModelState(
-  model: VirtualModelState | undefined
+  model: VirtualModelState | undefined,
 ): ComputedRef<WriteableModelState | null> {
   if (model === undefined) return computed(() => null);
   const pos = model.position.toVector3();
@@ -82,10 +82,10 @@ function fromWritableModelState(model: WriteableModelState): VirtualModelState {
     name: model.name,
     code: model.code,
     position: ReadonlyVector3.fromVector3(
-      new Vector3(model.posX, model.posY, model.posZ)
+      new Vector3(model.posX, model.posY, model.posZ),
     ),
     rotation: ReadonlyQuaternion.fromQuaternion(
-      new Quaternion(model.rotX, model.rotY, model.rotZ, model.rotW)
+      new Quaternion(model.rotX, model.rotY, model.rotZ, model.rotW),
     ),
     scale: model.scale,
   };
@@ -112,7 +112,7 @@ data.value = [...props.models.values()].map(
   (model): TreeOption => ({
     label: model.name,
     key: model.id,
-  })
+  }),
 );
 
 function renderLabel({ option }: { option: TreeOption }) {
@@ -124,12 +124,12 @@ watch(
   () => {
     if (selectedKeys.value.length == 1) {
       const model = props.models.find(
-        (model) => model.id === selectedKeys.value[0]
+        (model) => model.id === selectedKeys.value[0],
       );
       if (model) setCurrentModel(model);
     }
     return;
-  }
+  },
 );
 
 function change() {
@@ -141,7 +141,7 @@ function change() {
     (model): TreeOption => ({
       label: model.name,
       key: model.id,
-    })
+    }),
   );
 }
 </script>
