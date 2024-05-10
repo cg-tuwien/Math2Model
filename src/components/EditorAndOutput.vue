@@ -33,6 +33,11 @@ import { getOrCreateScene } from "@/filesystem/start-files";
 import { ShaderFiles } from "@/filesystem/shader-files";
 import VirtualModel from "@/components/VirtualModel.vue";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
+import {
+  fromWriteableModelState,
+  toWriteableModelState,
+  type WriteableModelState,
+} from "@/sceneview/writeablemodelstate";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -59,7 +64,7 @@ watch(
     } catch (e) {
       console.log("Could not deserialize scene file.");
     }
-  }
+  },
 );
 if (sceneFile !== null) {
   scene.api.value.fromSerialized(sceneFile);
@@ -91,7 +96,7 @@ onUnmounted(() => {
 let light = new HemisphericLight(
   "light1",
   new Vector3(0, 1, 0),
-  baseScene.value
+  baseScene.value,
 );
 light.intensity = 0.7;
 onUnmounted(() => {
@@ -116,7 +121,7 @@ watch(
   [width, height],
   useDebounceFn(() => {
     props.engine.resize();
-  }, 100)
+  }, 100),
 );
 
 props.engine.runRenderLoop(renderLoop);
@@ -131,7 +136,7 @@ onUnmounted(() => {
 
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
   const keyedCode = ref<KeyedCode | null>(
-    startFile !== null ? readFile(startFile) : null
+    startFile !== null ? readFile(startFile) : null,
   );
 
   function readFile(name: FilePath): KeyedCode | null {
@@ -221,6 +226,34 @@ function toggleTabSize() {
 
   lastSelectedTab.value = selectedTab.value;
 }
+
+function updateModels<T extends keyof WriteableModelState>(
+  key: T,
+  value: WriteableModelState[T],
+  ids: string[],
+) {
+  for (const id of ids) {
+    const model = scene.state.value.models.find((model) => model.id === id);
+    if (!model) continue;
+    const writeable = toWriteableModelState(model).value;
+    if (!writeable) continue;
+    console.log(key, value);
+    writeable[key] = value;
+
+    scene.api.value.updateModel(model.id, fromWriteableModelState(writeable));
+  }
+
+  const sceneContent = scene.api.value.serialize();
+  props.files.writeFile(scenePath, JSON.stringify(sceneContent, null, 2));
+
+  /**scene.api.value.updateModel(model.id, model);
+    const sceneContent = scene.api.value.serialize();
+    props.files.writeFile(
+      scenePath,
+      JSON.stringify(sceneContent, null, 2)
+    );
+  }*/
+}
 </script>
 
 <template>
@@ -273,16 +306,7 @@ function toggleTabSize() {
             :scene="scene.api.value"
             :files="props.files"
             :scene-path="scenePath"
-            @update="
-              (model) => {
-                scene.api.value.updateModel(model.id, model);
-                const sceneContent = scene.api.value.serialize();
-                props.files.writeFile(
-                  scenePath,
-                  JSON.stringify(sceneContent, null, 2)
-                );
-              }
-            "
+            @update="(key, value, ids) => updateModels(key, value, ids)"
           ></SceneHierarchy>
         </div>
         <div v-else>
