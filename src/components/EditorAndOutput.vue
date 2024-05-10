@@ -32,6 +32,7 @@ import { useVirtualScene } from "@/scenes/VirtualScene";
 import { getOrCreateScene } from "@/filesystem/start-files";
 import { ShaderFiles } from "@/filesystem/shader-files";
 import VirtualModel from "@/components/VirtualModel.vue";
+import { assertUnreachable } from "@stefnotch/typestef/assert";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -58,7 +59,7 @@ watch(
     } catch (e) {
       console.log("Could not deserialize scene file.");
     }
-  },
+  }
 );
 if (sceneFile !== null) {
   scene.api.value.fromSerialized(sceneFile);
@@ -90,7 +91,7 @@ onUnmounted(() => {
 let light = new HemisphericLight(
   "light1",
   new Vector3(0, 1, 0),
-  baseScene.value,
+  baseScene.value
 );
 light.intensity = 0.7;
 onUnmounted(() => {
@@ -115,7 +116,7 @@ watch(
   [width, height],
   useDebounceFn(() => {
     props.engine.resize();
-  }, 100),
+  }, 100)
 );
 
 props.engine.runRenderLoop(renderLoop);
@@ -130,7 +131,7 @@ onUnmounted(() => {
 
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
   const keyedCode = ref<KeyedCode | null>(
-    startFile !== null ? readFile(startFile) : null,
+    startFile !== null ? readFile(startFile) : null
   );
 
   function readFile(name: FilePath): KeyedCode | null {
@@ -197,60 +198,96 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
   };
 }
 
+const splitSize = ref(0.2);
+
+type TabNames = "filebrowser" | "sceneview";
+const selectedTab = ref<TabNames>("filebrowser");
 function renderTabIcon(iconName: "Files" | "Scene") {
-  if (iconName == "Files") {
+  if (iconName === "Files") {
     return h(IconFolderMultipleOutline);
-  } else if (iconName == "Scene") {
+  } else if (iconName === "Scene") {
     return h(IconFileTreeOutline);
+  } else {
+    assertUnreachable(iconName);
   }
+}
+
+const lastSelectedTab = ref<TabNames | null>(null);
+function toggleTabSize() {
+  if (lastSelectedTab.value === selectedTab.value) {
+    const isTabBig = splitSize.value > 0.01;
+    splitSize.value = isTabBig ? 0.0 : 0.2;
+  }
+
+  lastSelectedTab.value = selectedTab.value;
 }
 </script>
 
 <template>
-  <main class="min-h-full">
+  <main class="min-h-full flex">
+    <n-tabs
+      type="line"
+      animated
+      placement="left"
+      size="small"
+      class="flex-1"
+      v-model:value="selectedTab"
+    >
+      <n-tab
+        name="filebrowser"
+        :tab="renderTabIcon('Files')"
+        @click="toggleTabSize()"
+      ></n-tab>
+      <n-tab
+        name="sceneview"
+        :tab="renderTabIcon('Scene')"
+        @click="toggleTabSize()"
+      ></n-tab>
+    </n-tabs>
     <n-split
       direction="horizontal"
       style="height: 100vh"
       :max="0.75"
-      :min="0.1"
+      :min="0"
       :default-size="0.2"
+      v-model:size="splitSize"
     >
       <template #1>
-        <n-tabs type="line" animated placement="left" size="small">
-          <n-tab-pane name="filebrowser" :tab="renderTabIcon('Files')">
-            <FileBrowser
-              :files="props.files"
-              :open-files="
-                openFile.code.value !== null ? [openFile.code.value.name] : []
-              "
-              @update:open-files="openFile.openFiles($event)"
-              @add-files="openFile.addFiles($event)"
-              @rename-file="
-                (oldName, newName) => openFile.renameFile(oldName, newName)
-              "
-              @delete-files="openFile.deleteFiles($event)"
-            ></FileBrowser>
-          </n-tab-pane>
-          <n-tab-pane name="sceneview" :tab="renderTabIcon('Scene')">
-            <SceneHierarchy
-              :models="scene.state.value.models"
-              :scene="scene.api.value"
-              :files="props.files"
-              :scene-path="scenePath"
-              @update="
-                (model) => {
-                  scene.api.value.updateModel(model.id, model);
-                  const sceneContent = scene.api.value.serialize();
-                  props.files.writeFile(
-                    scenePath,
-                    JSON.stringify(sceneContent, null, 2),
-                  );
-                }
-              "
-            ></SceneHierarchy>
-          </n-tab-pane>
-          <n-tab-pane name="addtab" tab=""> To be developed... </n-tab-pane>
-        </n-tabs>
+        <div v-if="selectedTab === 'filebrowser'">
+          <FileBrowser
+            :files="props.files"
+            :open-files="
+              openFile.code.value !== null ? [openFile.code.value.name] : []
+            "
+            @update:open-files="openFile.openFiles($event)"
+            @add-files="openFile.addFiles($event)"
+            @rename-file="
+              (oldName, newName) => openFile.renameFile(oldName, newName)
+            "
+            @delete-files="openFile.deleteFiles($event)"
+          ></FileBrowser>
+        </div>
+        <div v-else-if="selectedTab === 'sceneview'">
+          <SceneHierarchy
+            :models="scene.state.value.models"
+            :scene="scene.api.value"
+            :files="props.files"
+            :scene-path="scenePath"
+            @update="
+              (model) => {
+                scene.api.value.updateModel(model.id, model);
+                const sceneContent = scene.api.value.serialize();
+                props.files.writeFile(
+                  scenePath,
+                  JSON.stringify(sceneContent, null, 2)
+                );
+              }
+            "
+          ></SceneHierarchy>
+        </div>
+        <div v-else>
+          <p>Unknown tab</p>
+        </div>
       </template>
       <template #2>
         <div class="flex" style="height: 100vh; width: 100%">
