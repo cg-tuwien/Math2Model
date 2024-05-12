@@ -23,8 +23,14 @@ export const SceneFileSchema = z.object({
 
 export type SerializedScene = z.infer<typeof SceneFileSchema>;
 
-export function serializeScene(scene: SerializedScene) {
-  return JSON.stringify(scene);
+export function serializeScene(scene: SerializedScene, pretty = false) {
+  const result = SceneFileSchema.safeParse(scene);
+  if (result.success) {
+    return JSON.stringify(result.data, null, pretty ? 2 : undefined);
+  } else {
+    console.error(result.error);
+    return null;
+  }
 }
 
 export function deserializeScene(scene: string): SerializedScene | null {

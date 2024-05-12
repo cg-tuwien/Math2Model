@@ -69,6 +69,14 @@ export interface VirtualModelState {
   scale: number;
 }
 
+export interface VirtualModelUpdate {
+  name?: string;
+  code?: ShaderCodeRef;
+  position?: ReadonlyVector3;
+  rotation?: ReadonlyQuaternion;
+  scale?: number;
+}
+
 export interface ShaderCodeRef {
   readonly vertexFile: FilePath;
   readonly fragmentFile: FilePath;
@@ -119,17 +127,27 @@ export class VirtualScene {
     return false;
   }
 
-  // Theoretically we could do better by using the fact that our VirtualModelState is a reactive object
-  // We would just cast away the readonly-ness, and then update the model directly
-  updateModel(key: string, model: VirtualModelState) {
-    const index = this.state.value.models.findIndex(
-      (model) => model.id === key
-    );
-    if (index !== -1) {
-      this.state.value.models[index] = model;
-      return true;
+  updateModels(keys: string[], update: VirtualModelUpdate) {
+    const keysMap = new Set(keys);
+    for (const model of this.state.value.models) {
+      if (keysMap.has(model.id)) {
+        if (update.name !== undefined) {
+          model.name = update.name;
+        }
+        if (update.code !== undefined) {
+          model.code = update.code;
+        }
+        if (update.position !== undefined) {
+          model.position = update.position;
+        }
+        if (update.rotation !== undefined) {
+          model.rotation = update.rotation;
+        }
+        if (update.scale !== undefined) {
+          model.scale = update.scale;
+        }
+      }
     }
-    return false;
   }
 }
 

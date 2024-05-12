@@ -28,16 +28,15 @@ import {
   type FilePath,
 } from "@/filesystem/reactive-files";
 import { showError } from "@/notification";
-import { useVirtualScene } from "@/scenes/VirtualScene";
+import {
+  useVirtualScene,
+  type VirtualModelUpdate,
+} from "@/scenes/VirtualScene";
 import { getOrCreateScene } from "@/filesystem/start-files";
 import { ShaderFiles } from "@/filesystem/shader-files";
 import VirtualModel from "@/components/VirtualModel.vue";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
-import {
-  fromWriteableModelState,
-  toWriteableModelState,
-  type WriteableModelState,
-} from "@/sceneview/writeablemodelstate";
+import { serializeScene } from "@/filesystem/scene-file";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -64,7 +63,7 @@ watch(
     } catch (e) {
       console.log("Could not deserialize scene file.");
     }
-  },
+  }
 );
 if (sceneFile !== null) {
   scene.api.value.fromSerialized(sceneFile);
@@ -96,7 +95,7 @@ onUnmounted(() => {
 let light = new HemisphericLight(
   "light1",
   new Vector3(0, 1, 0),
-  baseScene.value,
+  baseScene.value
 );
 light.intensity = 0.7;
 onUnmounted(() => {
@@ -121,7 +120,7 @@ watch(
   [width, height],
   useDebounceFn(() => {
     props.engine.resize();
-  }, 100),
+  }, 100)
 );
 
 props.engine.runRenderLoop(renderLoop);
@@ -136,7 +135,7 @@ onUnmounted(() => {
 
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
   const keyedCode = ref<KeyedCode | null>(
-    startFile !== null ? readFile(startFile) : null,
+    startFile !== null ? readFile(startFile) : null
   );
 
   function readFile(name: FilePath): KeyedCode | null {
@@ -203,56 +202,51 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
   };
 }
 
-const splitSize = ref(0.2);
-
-type TabNames = "filebrowser" | "sceneview";
-const selectedTab = ref<TabNames>("filebrowser");
-function renderTabIcon(iconName: "Files" | "Scene") {
-  if (iconName === "Files") {
-    return h(IconFolderMultipleOutline);
-  } else if (iconName === "Scene") {
-    return h(IconFileTreeOutline);
-  } else {
-    assertUnreachable(iconName);
+type TabName = "filebrowser" | "sceneview";
+function useTabs() {
+  const splitSize = ref(0.2);
+  const selectedTab = ref<TabName>("filebrowser");
+  function renderTabIcon(name: TabName) {
+    if (name === "filebrowser") {
+      return h(IconFolderMultipleOutline);
+    } else if (name === "sceneview") {
+      return h(IconFileTreeOutline);
+    } else {
+      assertUnreachable(name);
+    }
   }
-}
 
-const lastSelectedTab = ref<TabNames | null>(null);
-function toggleTabSize() {
-  if (lastSelectedTab.value === selectedTab.value) {
+  const lastSelectedTab = ref<TabName | null>(null);
+  function toggleTabSize() {
     const isTabBig = splitSize.value > 0.01;
-    splitSize.value = isTabBig ? 0.0 : 0.2;
-  }
+    if (!isTabBig) {
+      splitSize.value = 0.2;
+    } else if (isTabBig && lastSelectedTab.value === selectedTab.value) {
+      splitSize.value = 0.0;
+    }
 
-  lastSelectedTab.value = selectedTab.value;
+    lastSelectedTab.value = selectedTab.value;
+  }
+  return {
+    splitSize,
+    selectedTab,
+    renderTabIcon,
+    toggleTabSize,
+  };
 }
+const tabs = useTabs();
 
-function updateModels<T extends keyof WriteableModelState>(
-  key: T,
-  value: WriteableModelState[T],
-  ids: string[],
-) {
-  for (const id of ids) {
-    const model = scene.state.value.models.find((model) => model.id === id);
-    if (!model) continue;
-    const writeable = toWriteableModelState(model).value;
-    if (!writeable) continue;
-    console.log(key, value);
-    writeable[key] = value;
-
-    scene.api.value.updateModel(model.id, fromWriteableModelState(writeable));
-  }
-
-  const sceneContent = scene.api.value.serialize();
-  props.files.writeFile(scenePath, JSON.stringify(sceneContent, null, 2));
-
-  /**scene.api.value.updateModel(model.id, model);
-    const sceneContent = scene.api.value.serialize();
-    props.files.writeFile(
-      scenePath,
-      JSON.stringify(sceneContent, null, 2)
+function updateModels(ids: string[], update: VirtualModelUpdate) {
+  scene.api.value.updateModels(ids, update);
+  const sceneContent = serializeScene(scene.api.value.serialize(), true);
+  if (sceneContent === null) {
+    showError(
+      "Could not serialize scene",
+      new Error("Could not serialize scene")
     );
-  }*/
+  } else {
+    props.files.writeFile(scenePath, sceneContent);
+  }
 }
 </script>
 
@@ -264,17 +258,17 @@ function updateModels<T extends keyof WriteableModelState>(
       placement="left"
       size="small"
       class="flex-1"
-      v-model:value="selectedTab"
+      v-model:value="tabs.selectedTab.value"
     >
       <n-tab
         name="filebrowser"
-        :tab="renderTabIcon('Files')"
-        @click="toggleTabSize()"
+        :tab="tabs.renderTabIcon('filebrowser')"
+        @click="tabs.toggleTabSize()"
       ></n-tab>
       <n-tab
         name="sceneview"
-        :tab="renderTabIcon('Scene')"
-        @click="toggleTabSize()"
+        :tab="tabs.renderTabIcon('sceneview')"
+        @click="tabs.toggleTabSize()"
       ></n-tab>
     </n-tabs>
     <n-split
@@ -283,10 +277,10 @@ function updateModels<T extends keyof WriteableModelState>(
       :max="0.75"
       :min="0"
       :default-size="0.2"
-      v-model:size="splitSize"
+      v-model:size="tabs.splitSize.value"
     >
       <template #1>
-        <div v-if="selectedTab === 'filebrowser'">
+        <div v-if="tabs.selectedTab.value === 'filebrowser'">
           <FileBrowser
             :files="props.files"
             :open-files="
@@ -300,13 +294,13 @@ function updateModels<T extends keyof WriteableModelState>(
             @delete-files="openFile.deleteFiles($event)"
           ></FileBrowser>
         </div>
-        <div v-else-if="selectedTab === 'sceneview'">
+        <div v-else-if="tabs.selectedTab.value === 'sceneview'">
           <SceneHierarchy
             :models="scene.state.value.models"
             :scene="scene.api.value"
             :files="props.files"
             :scene-path="scenePath"
-            @update="(key, value, ids) => updateModels(key, value, ids)"
+            @update="(keys, update) => updateModels(keys, update)"
           ></SceneHierarchy>
         </div>
         <div v-else>

@@ -2,125 +2,114 @@
 import {
   ReadonlyQuaternion,
   ReadonlyVector3,
-  type ShaderCodeRef,
   type VirtualModelState,
-  VirtualScene,
-  type VirtualSceneState,
+  type VirtualModelUpdate,
 } from "@/scenes/VirtualScene";
-import {
-  computed,
-  type ComputedRef,
-  h,
-  ref,
-  watch,
-  type DeepReadonly,
-} from "vue";
+import { computed, h, ref, watch, watchEffect, type DeepReadonly } from "vue";
 import { NInput, type TreeOption } from "naive-ui";
-import { showInfo } from "@/notification";
-import { Quaternion, Vector3 } from "@babylonjs/core";
-import type { FilePath, ReactiveFiles } from "@/filesystem/reactive-files";
-import { serializeScene } from "@/filesystem/scene-file";
+import { showError } from "@/notification";
 import {
   toWriteableModelState,
   type WriteableModelState,
 } from "@/sceneview/writeablemodelstate";
-
-function setCurrentModel(model: VirtualModelState): void {
-  console.log("Set current Model (" + JSON.stringify(model) + ");");
-  if (!currentModel.value) currentModel = toWriteableModelState(model);
-  else {
-    currentModel.value.id = model.id.valueOf();
-    currentModel.value.name = model.name.valueOf();
-    currentModel.value.code = model.code;
-    currentModel.value.posX = model.position.x.valueOf();
-    currentModel.value.posY = model.position.y.valueOf();
-    currentModel.value.posZ = model.position.z.valueOf();
-    currentModel.value.rotX = model.rotation.x.valueOf();
-    currentModel.value.rotY = model.rotation.y.valueOf();
-    currentModel.value.rotZ = model.rotation.z.valueOf();
-    currentModel.value.rotW = model.rotation.w.valueOf();
-    currentModel.value.scale = model.scale.valueOf();
-  }
-}
+import { assertUnreachable } from "@stefnotch/typestef/assert";
 
 const emit = defineEmits({
-  update<T extends keyof WriteableModelState>(
-    key: T,
-    value: WriteableModelState[T],
-    ids: string[],
-  ) {
+  update(ids: string[], update: VirtualModelUpdate) {
     return true;
   },
 });
 
 const props = defineProps<{
   models: DeepReadonly<VirtualModelState>[];
-  scene: VirtualScene;
-  files: ReactiveFiles;
-  scenePath: FilePath;
 }>();
 
-const selectedModels = ref<Array<string>>([props.models[0].id]);
 const pattern = ref("");
-const selectedKeys = ref<Array<string>>([]);
-const checkedKeys = ref<Array<string>>([]);
-const data = ref<TreeOption[]>([]);
-
-let currentModel = toWriteableModelState(props.models[0] ?? undefined);
-
-data.value = [...props.models.values()].map(
-  (model): TreeOption => ({
-    label: model.name,
-    key: model.id,
-  }),
+const selectedKeys = ref<string[]>(
+  props.models.length > 0 ? [props.models[0].id] : []
 );
+const checkedKeys = ref<string[]>([]);
+const data = computed(() =>
+  props.models.map(
+    (model): TreeOption => ({
+      label: model.name,
+      key: model.id,
+    })
+  )
+);
+
+let currentModel = ref<WriteableModelState | null>(null);
+watchEffect(() => {
+  const keys = selectedKeys.value;
+  if (keys.length == 1) {
+    const model = props.models.find((model) => model.id === keys[0]);
+    if (model) {
+      currentModel.value = toWriteableModelState(model);
+    }
+  } else if (keys.length > 1) {
+    // TODO: Multi model editing
+    currentModel.value = null;
+  }
+});
 
 function renderLabel({ option }: { option: TreeOption }) {
   return h("span", option.label);
 }
 
-watch(
-  () => selectedKeys.value,
-  () => {
-    if (selectedKeys.value.length == 1) {
-      const model = props.models.find(
-        (model) => model.id === selectedKeys.value[0],
-      );
-      if (model) setCurrentModel(model);
-    } else if (selectedKeys.value.length > 1) {
-      const model = props.models.find(
-        (model) => model.id === selectedKeys.value[0],
-      );
-      if (model)
-        setCurrentModel({
-          id: "",
-          name: "...",
-          code: model.code,
-          position: ReadonlyVector3.fromVector3(new Vector3(0, 0, 0)),
-          rotation: ReadonlyQuaternion.fromQuaternion(
-            new Quaternion(0, 0, 0, 0),
-          ),
-          scale: 0,
-        });
-    }
-  },
-);
+function change(key: keyof WriteableModelState) {
+  const model = currentModel.value;
+  if (!model) return;
+  let keys = selectedKeys.value;
+  if (selectedKeys.value.length === 0) {
+    console.warn("No model selected");
+    return;
+  }
 
-function change<T extends keyof WriteableModelState>(key: T) {
-  if (!currentModel.value) return;
-  if (Object.values(currentModel.value).includes(null)) return;
-  emit("update", key, currentModel.value[key], selectedKeys.value);
-  data.value = [...props.models.values()].map(
-    (model): TreeOption => ({
-      label: model.name,
-      key: model.id,
-    }),
-  );
+  if (key === "name") {
+    emit("update", keys, {
+      name: model.name ?? "",
+    });
+  } else if (key === "code") {
+    emit("update", keys, {
+      code: model.code ?? "",
+    });
+  } else if (key === "posX" || key === "posY" || key === "posZ") {
+    emit("update", keys, {
+      position: new ReadonlyVector3(
+        model.posX ?? 0,
+        model.posY ?? 0,
+        model.posZ ?? 0
+      ),
+    });
+  } else if (
+    key === "rotX" ||
+    key === "rotY" ||
+    key === "rotZ" ||
+    key === "rotW"
+  ) {
+    emit("update", keys, {
+      rotation: new ReadonlyQuaternion(
+        model.rotX ?? 0,
+        model.rotY ?? 0,
+        model.rotZ ?? 0,
+        model.rotW ?? 0
+      ),
+    });
+  } else if (key === "scale") {
+    emit("update", keys, {
+      scale: model.scale ?? 0,
+    });
+  } else if (key === "id") {
+    showError("Cannot change id", new Error("Cannot change id"));
+  } else {
+    assertUnreachable(key);
+  }
 }
 </script>
 <template>
   <n-flex justify="">
     <div>
+      <h2 class="underline">Scene</h2>
       <n-tree
         block-line
         cascade
@@ -128,28 +117,22 @@ function change<T extends keyof WriteableModelState>(key: T) {
         show-line
         multiple
         :show-irrelevant-nodes="false"
-        :default-selected-keys="selectedModels"
-        :selected-keys="selectedKeys"
+        v-model:selected-keys="selectedKeys"
         :pattern="pattern"
         :data="data"
         :checked-keys="checkedKeys"
         :render-label="renderLabel"
-        @update:selected-keys="(v: string[]) => (selectedKeys = v)"
       />
     </div>
     <n-divider></n-divider>
     <div v-if="currentModel" class="mr-1 ml-1">
+      <h2 class="underline">Inspector</h2>
       <n-text>Name</n-text>
       <n-input
         v-model:value="currentModel.name"
         type="text"
         clearable
         v-on:input="change('name')"
-        @change="
-          (value) => {
-            if (currentModel) currentModel.name = value;
-          }
-        "
       ></n-input>
       <br /><br />
       <n-flex justify="space-between">
@@ -221,4 +204,3 @@ function change<T extends keyof WriteableModelState>(key: T) {
     </div>
   </n-flex>
 </template>
-<style scoped></style>
