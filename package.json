@@ -5,9 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "vite",
-    "start-bun": "bunx --bun vite",
     "dev": "vite --open",
-    "dev-bun": "bunx --bun vite --open",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "test:unit": "vitest",
@@ -21,11 +19,12 @@
     "@stefnotch/typestef": "^1.0.3",
     "@vueuse/core": "^10.9.0",
     "monaco-editor": "^0.48.0",
-    "naive-ui": "^2.38.1",
+    "naive-ui": "^2.38.2",
     "pinia": "^2.1.7",
-    "vue": "^3.4.25",
+    "vue": "^3.4.27",
     "vue-router": "^4.3.2",
-    "zod": "^3.23.4",
+    "wgpu-matrix": "^2.8.1",
+    "zod": "^3.23.8",
     "zod-to-json-schema": "^3.23.0"
   },
   "devDependencies": {
@@ -34,7 +33,7 @@
     "@types/jsdom": "^21.1.6",
     "@types/node": "^20.11.30",
     "@vitejs/plugin-vue": "^5.0.4",
-    "@vue/test-utils": "^2.4.5",
+    "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.5.1",
     "autoprefixer": "^10.4.19",
     "jsdom": "^24.0.0",
@@ -43,11 +42,11 @@
     "prettier": "3.2.5",
     "tailwindcss": "^3.4.3",
     "typescript": "~5.4.5",
-    "unplugin-icons": "^0.18.5",
-    "unplugin-vue-components": "^0.26.0",
-    "vite": "^5.2.10",
-    "vitest": "^1.5.1",
-    "vue-tsc": "^2.0.14"
+    "unplugin-icons": "^0.19.0",
+    "unplugin-vue-components": "^0.27.0",
+    "vite": "^5.2.11",
+    "vitest": "^1.6.0",
+    "vue-tsc": "^2.0.17"
   },
   "browserslist": [
     "defaults"

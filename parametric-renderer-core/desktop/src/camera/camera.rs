@@ -49,7 +49,7 @@ impl Camera {
     }
 
     pub fn update_aspect_ratio(&mut self, aspect_ratio: f32) {
-        // See https://docs.rs/glam/0.27.0/src/glam/f32/sse2/mat4.rs.html#969-982
+        // See https://docs.rs/glam/0.27.0/src/glam/f32/sse2/mat4.rs.html#969-98
         self.proj.as_cols_mut()[0][0] = -self.proj.as_cols()[1][1] / aspect_ratio;
     }
 

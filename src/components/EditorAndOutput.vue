@@ -33,7 +33,6 @@ import {
   type VirtualModelUpdate,
 } from "@/scenes/VirtualScene";
 import { getOrCreateScene } from "@/filesystem/start-files";
-import { ShaderFiles } from "@/filesystem/shader-files";
 import VirtualModel from "@/components/VirtualModel.vue";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { serializeScene } from "@/filesystem/scene-file";
@@ -70,7 +69,6 @@ if (sceneFile !== null) {
 }
 const openFile = useOpenFile(startFile, props.files);
 
-const shaderFiles = new ShaderFiles(props.files);
 // The BabylonJS scene
 const canvasContainer = ref<HTMLDivElement | null>(null);
 const baseScene = shallowRef(new BaseScene(props.engine));
