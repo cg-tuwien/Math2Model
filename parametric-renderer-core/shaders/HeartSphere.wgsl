@@ -16,8 +16,3 @@ fn evaluateImage(input2: vec2f) -> vec3f {
 
     return p;
 }
-
-/*fn evaluateImage(input2: vec2f) -> vec3f {
-    let pos = vec3(input2.x, 0.0, input2.y);
-    return vec3(input2.xy, 0.);
-}*/

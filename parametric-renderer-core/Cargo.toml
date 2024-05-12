@@ -1,0 +1,7 @@
+[workspace]
+resolver = "2"
+members = ["copy-includes", "desktop", "renderer-core"]
+
+[patch.crates-io]
+# TODO: Remove this patch once my PRs are merged, or the issue is fixed in the original crate
+winit_input_helper = { git = "https://github.com/stefnotch/winit_input_helper" }

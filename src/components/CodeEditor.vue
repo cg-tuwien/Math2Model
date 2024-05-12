@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
-import { computed, ref, shallowRef, watch } from "vue";
+import { computed, ref, shallowRef, watch, type DeepReadonly } from "vue";
 import { useDebounceFn, useElementSize } from "@vueuse/core";
-import type { FilePath } from "@/filesystem/scene-files";
+import type { FilePath } from "@/filesystem/reactive-files";
+import { showError, showInfo } from "@/notification";
 
 const monacoMount = ref<HTMLDivElement | null>(null);
 
@@ -13,7 +14,7 @@ export interface KeyedCode {
 }
 
 const props = defineProps<{
-  keyedCode: KeyedCode | null;
+  keyedCode: DeepReadonly<KeyedCode> | null;
   isDark: boolean;
 }>();
 const emit = defineEmits<{ update: [code: () => string] }>();
@@ -48,11 +49,29 @@ watch(themeName, (v) => {
   monaco.editor.setTheme(v);
 });
 
+watch(
+  () => props.keyedCode?.name,
+  (v) => {
+    const model = editor.value?.getModel();
+    if (!model) return;
+    monaco.editor.setModelLanguage(model, guessLanguage(v ?? ""));
+  }
+);
+
+function guessLanguage(name: string): "wgsl" | "json" {
+  // pop off the last extension
+  const ext = (name.match(/^[^]+\.(\w+)$/)?.[1] ?? "").toLowerCase();
+  if (ext === "wgsl") return "wgsl";
+  if (ext === "json") return "json";
+
+  return "wgsl";
+}
+
 watch(monacoMount, (element) => {
   if (!element) return;
   editor.value = monaco.editor.create(element, {
     value: props.keyedCode?.code ?? "<no code>",
-    language: "wgsl",
+    language: guessLanguage(props.keyedCode?.name ?? ""),
     contextmenu: true,
     minimap: {
       enabled: false,
@@ -61,7 +80,11 @@ watch(monacoMount, (element) => {
     readOnly: isReadonly.value,
   });
 
-  editor.value.onDidChangeModelContent((e) => {
+    editor.value.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
+      showInfo("You don't need to save!");
+    });
+
+    editor.value.onDidChangeModelContent((e) => {
     if (surpressChange) return;
     emit("update", () => editor.value?.getValue() ?? "");
   });

@@ -1,0 +1,748 @@
+use std::sync::Arc;
+
+use glamour::{Angle, Matrix4, Point3, ToRaw, Vector2, Vector4};
+use pollster::FutureExt;
+use tracing::{error, info, warn};
+use winit::{application::ApplicationHandler, window::Window};
+use winit_input_helper::{WinitInputApp, WinitInputHelper, WinitInputUpdate};
+
+use crate::{
+    buffer::TypedBuffer,
+    camera::{camera_settings::CameraSettings, freecam_controller::FreecamController, Camera},
+    config::{CacheFile, CachedCamera, ConfigFile},
+    mesh::Mesh,
+    shaders::{compute_patches, copy_patches, shader},
+    texture::Texture,
+};
+
+pub struct GpuApplication {
+    context: WgpuContext,
+    depth_texture: Texture,
+    camera_buffer: TypedBuffer<shader::Camera>,
+    light_buffer: TypedBuffer<shader::Light>,
+    model_buffer: TypedBuffer<shader::Model>,
+    render_pipeline: wgpu::RenderPipeline,
+    render_bind_group_0: shader::bind_groups::BindGroup0,
+    compute_patches_pipeline: wgpu::ComputePipeline,
+    compute_patches_input_buffer: TypedBuffer<compute_patches::InputBuffer>,
+    compute_patches_bind_group_0: [compute_patches::bind_groups::BindGroup0; 2],
+    copy_patches_pipeline: wgpu::ComputePipeline,
+    copy_patches_bind_group_0: copy_patches::bind_groups::BindGroup0,
+    patches_buffer_starting_patch: TypedBuffer<compute_patches::Patches>,
+    patches_buffer_reset: TypedBuffer<compute_patches::Patches>,
+    patches_buffer: [TypedBuffer<compute_patches::Patches>; 2],
+    render_buffer_initial: compute_patches::RenderBuffer,
+    render_buffer: TypedBuffer<compute_patches::RenderBuffer>,
+    indirect_compute_buffer_initial: compute_patches::DispatchIndirectArgs,
+    indirect_compute_buffer: [TypedBuffer<compute_patches::DispatchIndirectArgs>; 2],
+    indirect_draw_buffer: TypedBuffer<copy_patches::DrawIndexedIndirectArgs>,
+    mesh: Mesh,
+}
+
+impl GpuApplication {
+    pub async fn new(window: Window, camera: &Camera) -> anyhow::Result<Self> {
+        let context = WgpuContext::new(window).await?;
+        let device = &context.device;
+
+        let mesh = Mesh::new_quad(&device);
+
+        let camera_buffer = TypedBuffer::new_uniform(
+            &device,
+            "Camera Buffer",
+            &camera.to_shader(),
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        )?;
+
+        let light_buffer = TypedBuffer::new_uniform(
+            &device,
+            "Light Buffer",
+            &shader::Light {
+                position: Vector4::<f32>::new(0.0, 0.0, 2.0, 0.0).to_raw(),
+                color: Vector4::<f32>::new(1.0, 1.0, 1.0, 0.0).to_raw(),
+            },
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        )?;
+
+        let model_buffer = TypedBuffer::new_uniform(
+            &device,
+            "Model Buffer",
+            &shader::Model {
+                model_similarity: mesh.get_model_matrix().to_raw(),
+            },
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        )?;
+        let max_patch_count = 10_000;
+        let render_buffer_initial = compute_patches::RenderBuffer {
+            patches_length: 0,
+            patches_capacity: max_patch_count,
+            patches: vec![],
+        };
+        let render_buffer = TypedBuffer::new_storage_with_runtime_array(
+            &device,
+            "Render Buffer",
+            &render_buffer_initial,
+            max_patch_count as u64,
+            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+        )?;
+
+        let render_bind_group_0 = shader::bind_groups::BindGroup0::from_bindings(
+            &device,
+            shader::bind_groups::BindGroupLayout0 {
+                camera: camera_buffer.as_entire_buffer_binding(),
+                light: light_buffer.as_entire_buffer_binding(),
+                model: model_buffer.as_entire_buffer_binding(),
+                renderBuffer: render_buffer.as_entire_buffer_binding(),
+            },
+        );
+
+        let depth_texture =
+            Texture::create_depth_texture(&device, &context.config, "Depth Texture");
+
+        let shader = shader::create_shader_module(&device);
+        let render_pipeline_layout = shader::create_pipeline_layout(&device);
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: shader::vertex_state(
+                &shader,
+                &shader::vs_main_entry(wgpu::VertexStepMode::Vertex),
+            ),
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: shader::ENTRY_FS_MAIN,
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: context.config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+                polygon_mode: wgpu::PolygonMode::Line, // Wireframe mode
+                // Requires Features::DEPTH_CLIP_CONTROL
+                unclipped_depth: false,
+                // Requires Features::CONSERVATIVE_RASTERIZATION
+                conservative: false,
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Greater,
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: Default::default(),
+            multiview: None,
+        });
+
+        let compute_patches_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Compute Patches Pipeline"),
+                layout: Some(&compute_patches::create_pipeline_layout(&device)),
+                module: &compute_patches::create_shader_module(&device),
+                entry_point: compute_patches::ENTRY_MAIN,
+                compilation_options: Default::default(),
+            });
+
+        let compute_patches_input_buffer = TypedBuffer::new_uniform(
+            &device,
+            "Compute Patches Input Buffer",
+            &compute_patches::InputBuffer {
+                model_view_projection: mesh.get_model_view_projection(&camera).to_raw(),
+            },
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        )?;
+        let patches_buffer_starting_patch = compute_patches::Patches {
+            patches_length: 1,
+            patches_capacity: max_patch_count,
+            patches: vec![compute_patches::Patch {
+                min: Vector2::<f32>::ZERO.to_raw(),
+                max: Vector2::<f32>::ONE.to_raw(),
+            }],
+        };
+        let patches_buffer_reset = compute_patches::Patches {
+            patches_length: 0,
+            patches_capacity: max_patch_count,
+            patches: vec![],
+        };
+
+        let patches_buffer = [
+            TypedBuffer::new_storage_with_runtime_array(
+                &device,
+                "Patches Buffer 0",
+                &patches_buffer_starting_patch,
+                max_patch_count as u64,
+                wgpu::BufferUsages::STORAGE
+                    | wgpu::BufferUsages::COPY_SRC
+                    | wgpu::BufferUsages::COPY_DST,
+            )?,
+            TypedBuffer::new_storage_with_runtime_array(
+                &device,
+                "Patches Buffer 1",
+                &patches_buffer_reset,
+                max_patch_count as u64,
+                wgpu::BufferUsages::STORAGE
+                    | wgpu::BufferUsages::COPY_SRC
+                    | wgpu::BufferUsages::COPY_DST,
+            )?,
+        ];
+        let patches_buffer_starting_patch = TypedBuffer::new_storage_with_runtime_array(
+            &device,
+            "Patches Buffer Starting Patch",
+            &patches_buffer_starting_patch,
+            1,
+            wgpu::BufferUsages::COPY_SRC,
+        )?;
+        let patches_buffer_reset = TypedBuffer::new_storage_with_runtime_array(
+            &device,
+            "Patches Buffer Reset",
+            &patches_buffer_reset,
+            1,
+            wgpu::BufferUsages::COPY_SRC,
+        )?;
+
+        let indirect_compute_buffer_initial =
+            compute_patches::DispatchIndirectArgs { x: 1, y: 1, z: 1 };
+        let indirect_compute_buffer = [
+            TypedBuffer::new_storage(
+                &device,
+                "Indirect Compute Dispatch Buffer 0",
+                &indirect_compute_buffer_initial,
+                wgpu::BufferUsages::INDIRECT
+                    | wgpu::BufferUsages::STORAGE
+                    | wgpu::BufferUsages::COPY_DST,
+            )?,
+            TypedBuffer::new_storage(
+                &device,
+                "Indirect Compute Dispatch Buffer 1",
+                &indirect_compute_buffer_initial,
+                wgpu::BufferUsages::INDIRECT
+                    | wgpu::BufferUsages::STORAGE
+                    | wgpu::BufferUsages::COPY_DST,
+            )?,
+        ];
+
+        let compute_patches_bind_group_0 = [
+            compute_patches::bind_groups::BindGroup0::from_bindings(
+                &device,
+                compute_patches::bind_groups::BindGroupLayout0 {
+                    input_buffer: compute_patches_input_buffer.as_entire_buffer_binding(),
+                    patches_from_buffer: patches_buffer[0].as_entire_buffer_binding(),
+                    patches_to_buffer: patches_buffer[1].as_entire_buffer_binding(),
+                    render_buffer: render_buffer.as_entire_buffer_binding(),
+                    dispatch_next: indirect_compute_buffer[1].as_entire_buffer_binding(),
+                },
+            ),
+            compute_patches::bind_groups::BindGroup0::from_bindings(
+                &device,
+                compute_patches::bind_groups::BindGroupLayout0 {
+                    input_buffer: compute_patches_input_buffer.as_entire_buffer_binding(),
+                    patches_from_buffer: patches_buffer[1].as_entire_buffer_binding(), // Swap the order :)
+                    patches_to_buffer: patches_buffer[0].as_entire_buffer_binding(),
+                    render_buffer: render_buffer.as_entire_buffer_binding(),
+                    dispatch_next: indirect_compute_buffer[0].as_entire_buffer_binding(),
+                },
+            ),
+        ];
+
+        let indirect_draw_buffer_initial = copy_patches::DrawIndexedIndirectArgs {
+            index_count: mesh.num_indices,
+            instance_count: 0, // Our shader sets this
+            first_index: 0,
+            base_vertex: 0,
+            first_instance: 0,
+        };
+        let indirect_draw_buffer = TypedBuffer::new_storage(
+            &device,
+            "Indirect Draw Buffer",
+            &indirect_draw_buffer_initial,
+            wgpu::BufferUsages::INDIRECT
+                | wgpu::BufferUsages::STORAGE
+                | wgpu::BufferUsages::COPY_SRC,
+        )?;
+
+        let copy_patches_pipeline =
+            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                label: Some("Copy Patches Pipeline"),
+                layout: Some(&copy_patches::create_pipeline_layout(&device)),
+                module: &copy_patches::create_shader_module(&device),
+                entry_point: "main",
+                compilation_options: Default::default(),
+            });
+        let copy_patches_bind_group_0 = copy_patches::bind_groups::BindGroup0::from_bindings(
+            &device,
+            copy_patches::bind_groups::BindGroupLayout0 {
+                indirect_draw_buffer: indirect_draw_buffer.as_entire_buffer_binding(),
+                patches_from_buffer: patches_buffer[0].as_entire_buffer_binding(),
+                render_buffer: render_buffer.as_entire_buffer_binding(),
+            },
+        );
+
+        Ok(Self {
+            context,
+            render_pipeline,
+            render_bind_group_0,
+            indirect_compute_buffer_initial,
+            indirect_compute_buffer,
+            compute_patches_input_buffer,
+            compute_patches_pipeline,
+            compute_patches_bind_group_0,
+            copy_patches_pipeline,
+            copy_patches_bind_group_0,
+            patches_buffer_starting_patch,
+            patches_buffer_reset,
+            patches_buffer,
+            render_buffer_initial,
+            render_buffer,
+            indirect_draw_buffer,
+            depth_texture,
+            camera_buffer,
+            light_buffer,
+            model_buffer,
+            mesh,
+        })
+    }
+
+    #[must_use]
+    fn resize(
+        &mut self,
+        new_size: winit::dpi::PhysicalSize<u32>,
+    ) -> Option<winit::dpi::PhysicalSize<u32>> {
+        if new_size.width > 0 && new_size.height > 0 {
+            self.context.size = new_size;
+            self.context.config.width = new_size.width;
+            self.context.config.height = new_size.height;
+            self.context
+                .surface
+                .configure(&self.context.device, &self.context.config);
+            self.depth_texture = Texture::create_depth_texture(
+                &self.context.device,
+                &self.context.config,
+                "Depth Texture",
+            );
+            Some(new_size)
+        } else {
+            None
+        }
+    }
+
+    #[must_use]
+    pub fn render(&mut self, render_data: RenderData) -> Result<(), wgpu::SurfaceError> {
+        let surface = &self.context.surface;
+        let queue = &self.context.queue;
+        let output = surface.get_current_texture()?;
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.camera_buffer
+            .update(queue, &render_data.camera.to_shader())
+            .unwrap();
+        self.model_buffer
+            .update(
+                &queue,
+                &shader::Model {
+                    model_similarity: self.mesh.get_model_matrix().to_raw(),
+                },
+            )
+            .unwrap();
+        self.compute_patches_input_buffer
+            .update(
+                queue,
+                &compute_patches::InputBuffer {
+                    model_view_projection: self
+                        .mesh
+                        .get_model_view_projection(&render_data.camera)
+                        .to_raw(),
+                },
+            )
+            .unwrap();
+
+        self.indirect_compute_buffer[0]
+            .update(queue, &self.indirect_compute_buffer_initial)
+            .unwrap();
+        self.indirect_compute_buffer[1]
+            .update(queue, &self.indirect_compute_buffer_initial)
+            .unwrap();
+        self.render_buffer
+            .update(queue, &self.render_buffer_initial)
+            .unwrap();
+
+        let mut commands =
+            self.context
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+                });
+
+        commands.copy_buffer_to_buffer(
+            self.patches_buffer_starting_patch.buffer(),
+            0,
+            self.patches_buffer[0].buffer(),
+            0,
+            self.patches_buffer_starting_patch.buffer().size(),
+        );
+        for i in 0..4 {
+            {
+                commands.copy_buffer_to_buffer(
+                    self.patches_buffer_reset.buffer(),
+                    0,
+                    self.patches_buffer[1].buffer(),
+                    0,
+                    self.patches_buffer_reset.buffer().size(),
+                );
+                let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: Some(&format!("Compute Patches From-To {i}")),
+                    timestamp_writes: None,
+                });
+                compute_pass.set_pipeline(&self.compute_patches_pipeline);
+                compute_patches::set_bind_groups(
+                    &mut compute_pass,
+                    &self.compute_patches_bind_group_0[0],
+                );
+                compute_pass
+                    .dispatch_workgroups_indirect(self.indirect_compute_buffer[0].buffer(), 0);
+            }
+            {
+                commands.copy_buffer_to_buffer(
+                    self.patches_buffer_reset.buffer(),
+                    0,
+                    self.patches_buffer[0].buffer(),
+                    0,
+                    self.patches_buffer_reset.buffer().size(),
+                );
+                let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                    label: Some(&format!("Compute Patches To-From {i}")),
+                    timestamp_writes: None,
+                });
+                compute_pass.set_pipeline(&self.compute_patches_pipeline);
+                compute_patches::set_bind_groups(
+                    &mut compute_pass,
+                    &self.compute_patches_bind_group_0[1],
+                );
+                compute_pass
+                    .dispatch_workgroups_indirect(self.indirect_compute_buffer[1].buffer(), 0);
+            }
+        }
+
+        {
+            let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                label: Some("Copy Patches Pass"),
+                timestamp_writes: None,
+            });
+            compute_pass.set_pipeline(&self.copy_patches_pipeline);
+            copy_patches::set_bind_groups(&mut compute_pass, &self.copy_patches_bind_group_0);
+            compute_pass.dispatch_workgroups_indirect(self.indirect_compute_buffer[0].buffer(), 0);
+        }
+
+        {
+            let mut render_pass = commands.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.1,
+                            g: 0.2,
+                            b: 0.3,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(0.0), // Reverse Z checklist https://iolite-engine.com/blog_posts/reverse_z_cheatsheet
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            render_pass.set_pipeline(&self.render_pipeline);
+            shader::set_bind_groups(&mut render_pass, &self.render_bind_group_0);
+            render_pass.set_vertex_buffer(0, self.mesh.vertex_buffer.slice(..));
+            render_pass
+                .set_index_buffer(self.mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+            render_pass.draw_indexed_indirect(self.indirect_draw_buffer.buffer(), 0)
+        }
+
+        self.context
+            .queue
+            .submit(std::iter::once(commands.finish()));
+        output.present();
+
+        Ok(())
+    }
+}
+
+pub struct Application {
+    gpu: Option<GpuApplication>,
+    camera: Camera,
+    freecam_controller: FreecamController,
+    delta_time: f32,
+    config_file: ConfigFile,
+    cache_file: CacheFile,
+}
+
+impl Drop for Application {
+    fn drop(&mut self) {
+        self.cache_file.camera = Some(CachedCamera::FirstPerson {
+            position: self.freecam_controller.position.to_array(),
+            pitch: self.freecam_controller.pitch.radians,
+            yaw: self.freecam_controller.yaw.radians,
+        });
+        self.cache_file
+            .save_to_file(Application::CACHE_FILE)
+            .unwrap();
+    }
+}
+
+impl Application {
+    const CONFIG_FILE: &'static str = "config.json";
+    const CACHE_FILE: &'static str = "cache.json";
+    pub fn new() -> anyhow::Result<Self> {
+        let config_file = ConfigFile::from_file(Application::CONFIG_FILE).unwrap_or_default();
+        let cache_file = CacheFile::from_file(Application::CACHE_FILE).unwrap_or_default();
+
+        let camera = Camera::new(1.0, CameraSettings::default());
+        let mut freecam_controller = FreecamController::new(5.0, 0.01);
+        match cache_file.camera {
+            Some(CachedCamera::FirstPerson {
+                position,
+                pitch,
+                yaw,
+            }) => {
+                freecam_controller.position = Point3::from(position);
+                freecam_controller.pitch = Angle::from(pitch);
+                freecam_controller.yaw = Angle::from(yaw);
+            }
+            _ => {
+                freecam_controller.position = Point3::new(0.0, 0.0, 2.0);
+            }
+        }
+
+        Ok(Self {
+            gpu: None,
+            camera,
+            freecam_controller,
+            delta_time: 0.0,
+            config_file,
+            cache_file,
+        })
+    }
+
+    fn create_surface(&mut self, window: Window) {
+        if self.gpu.is_some() {
+            return;
+        }
+        let gpu = GpuApplication::new(window, &self.camera)
+            .block_on()
+            .unwrap();
+        self.gpu = Some(gpu);
+    }
+
+    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        if let Some(gpu) = &mut self.gpu {
+            let new_size = gpu.resize(new_size);
+            if let Some(new_size) = new_size {
+                self.camera
+                    .update_aspect_ratio(new_size.width as f32 / new_size.height as f32);
+            }
+        }
+    }
+
+    pub fn update(&mut self, inputs: &WinitInputHelper) {
+        self.freecam_controller.update(inputs, self.delta_time);
+        self.camera.update_camera(&self.freecam_controller);
+    }
+
+    fn render_data(&self) -> RenderData<'_> {
+        RenderData {
+            camera: &self.camera,
+        }
+    }
+
+    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        if let Some(mut gpu) = self.gpu.take() {
+            gpu.render(self.render_data())?;
+            self.gpu = Some(gpu);
+        }
+        Ok(())
+    }
+}
+
+pub struct RenderData<'a> {
+    camera: &'a Camera,
+}
+
+pub async fn run() -> anyhow::Result<()> {
+    let event_loop = winit::event_loop::EventLoop::new()?;
+    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
+    let application = Application::new()?;
+    event_loop.run_app(&mut WinitInputApp::new(application))?;
+    Ok(())
+}
+
+impl ApplicationHandler<()> for Application {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        let _ = self.create_surface(
+            event_loop
+                .create_window(Window::default_attributes())
+                .unwrap(),
+        );
+    }
+
+    fn window_event(
+        &mut self,
+        _event_loop: &winit::event_loop::ActiveEventLoop,
+        _window_id: winit::window::WindowId,
+        event: winit::event::WindowEvent,
+    ) {
+        match &event {
+            winit::event::WindowEvent::RedrawRequested => {
+                // Shouldn't need anything here
+                match self.gpu {
+                    Some(ref mut gpu) => gpu.context.window.request_redraw(),
+                    None => {}
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+impl WinitInputUpdate for Application {
+    fn update(
+        &mut self,
+        event_loop: &winit::event_loop::ActiveEventLoop,
+        input: &WinitInputHelper,
+    ) {
+        use winit::keyboard::{Key, NamedKey};
+
+        if input.key_released_logical(Key::Named(NamedKey::Escape))
+            || input.close_requested()
+            || input.destroyed()
+        {
+            info!("Stopping the application.");
+            event_loop.exit();
+            return;
+        }
+        self.delta_time = input.delta_time().unwrap_or_default().as_secs_f32();
+        if let Some((width, height)) = input.resolution() {
+            self.resize(winit::dpi::PhysicalSize { width, height });
+        }
+        self.update(input);
+        match self.render() {
+            Ok(_) => (),
+            Err(wgpu::SurfaceError::Lost) => {
+                if let Some(gpu) = &mut self.gpu {
+                    let _ = gpu.resize(gpu.context.size);
+                }
+            }
+            Err(wgpu::SurfaceError::OutOfMemory) => {
+                error!("Out of memory");
+                event_loop.exit();
+            }
+            Err(e) => {
+                warn!("Unexpected error: {:?}", e);
+            }
+        }
+    }
+}
+
+struct WgpuContext {
+    instance: wgpu::Instance,
+    surface: wgpu::Surface<'static>,
+    adapter: wgpu::Adapter,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    config: wgpu::SurfaceConfiguration,
+    window: Arc<Window>,
+    size: winit::dpi::PhysicalSize<u32>,
+}
+
+impl WgpuContext {
+    async fn new(window: Window) -> anyhow::Result<Self> {
+        let window = Arc::new(window);
+        let size = window.inner_size();
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::PRIMARY,
+            ..Default::default()
+        });
+
+        let surface = instance.create_surface(window.clone())?;
+
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::HighPerformance,
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .ok_or_else(|| anyhow::anyhow!("No adapter found"))?;
+        info!("Adapter: {:?}", adapter.get_info());
+
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    required_features: wgpu::Features::POLYGON_MODE_LINE,
+                    required_limits: wgpu::Limits::default(),
+                    label: None,
+                },
+                None,
+            )
+            .await?;
+
+        let surface_caps = surface.get_capabilities(&adapter);
+        let surface_format = surface_caps
+            .formats
+            .iter()
+            .find(|format| format.is_srgb())
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("No sRGB format surface found"))?;
+
+        let config = wgpu::SurfaceConfiguration {
+            format: surface_format,
+            ..surface
+                .get_default_config(&adapter, size.width, size.height)
+                .ok_or_else(|| anyhow::anyhow!("No default surface config found"))?
+        };
+        surface.configure(&device, &config);
+
+        Ok(WgpuContext {
+            instance,
+            surface,
+            adapter,
+            device,
+            queue,
+            config,
+            window,
+            size,
+        })
+    }
+}
+
+impl Camera {
+    pub fn to_shader(&self) -> shader::Camera {
+        shader::Camera {
+            view: self.view_matrix().to_raw(),
+            projection: self.projection_matrix().to_raw(),
+            view_position: self.position.to_raw().extend(1.0),
+        }
+    }
+}
+
+impl Mesh {
+    pub fn get_model_view_projection(&self, camera: &Camera) -> Matrix4<f32> {
+        camera.projection_matrix() * camera.view_matrix() * self.transform.to_matrix()
+    }
+}

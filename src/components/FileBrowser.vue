@@ -4,12 +4,12 @@ import { type TreeOption, NButton, NInput } from "naive-ui";
 import {
   makeFilePath,
   type FilePath,
-  type ReactiveSceneFiles,
-} from "@/filesystem/scene-files";
+  type ReactiveFiles,
+} from "@/filesystem/reactive-files";
 import { assert } from "@stefnotch/typestef/assert";
 
 const props = defineProps<{
-  files: ReactiveSceneFiles;
+  files: ReactiveFiles;
 }>();
 
 const openFiles = defineModel<FilePath[]>("openFiles", { required: true });

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ReactiveSceneFiles } from "@/filesystem/scene-files";
+import { ReactiveFiles } from "@/filesystem/reactive-files";
 import EditorAndOutput from "@/components/EditorAndOutput.vue";
 import { markRaw, shallowRef } from "vue";
 import { WebGPUEngine } from "@babylonjs/core";
 import { sceneFilesPromise, canvasElement, enginePromise } from "@/globals";
 
-const sceneFiles = shallowRef<ReactiveSceneFiles | null>(null);
+const sceneFiles = shallowRef<ReactiveFiles | null>(null);
 sceneFilesPromise.then((v) => {
   sceneFiles.value = markRaw(v);
 });

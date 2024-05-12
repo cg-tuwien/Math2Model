@@ -1,5 +1,3 @@
-import { makeHotCache } from "@/stores/hot-cache";
-
 import {
   Scene,
   type WebGPUEngine,
@@ -14,19 +12,13 @@ import {
 } from "@babylonjs/core";
 import { GridMaterial } from "@babylonjs/materials/grid/gridMaterial";
 import backgroundGround from "@/assets/backgroundGround.png";
-
-let getHotCache = makeHotCache<{
-  "camera-target": Vector3;
-  "camera-alpha": number;
-  "camera-beta": number;
-  "camera-radius": number;
-}>(import.meta.url);
+import { mapOptional } from "@/option";
+import { z } from "zod";
 
 export type Milliseconds = number;
 export type Seconds = number;
 
 export class BaseScene extends Scene {
-  private hotCache = getHotCache();
   private _gridMesh: GroundMesh;
   private _camera: ArcRotateCamera;
   private _frame: number = 0;
@@ -51,6 +43,7 @@ export class BaseScene extends Scene {
 
   constructor(public engine: WebGPUEngine) {
     super(engine);
+    const cacheFile = readCacheFile();
 
     this.createDefaultEnvironment({
       enableGroundShadow: true,
@@ -65,11 +58,13 @@ export class BaseScene extends Scene {
 
     let camera = new ArcRotateCamera(
       "camera",
-      this.hotCache.getOrInsert("camera-alpha", () => 0),
-      this.hotCache.getOrInsert("camera-beta", () => 0),
-      this.hotCache.getOrInsert("camera-radius", () => 30),
-      this.hotCache.getOrInsert("camera-target", () => new Vector3(0, 10, 0)),
-      this
+      cacheFile?.camera?.alpha ?? 0,
+      cacheFile?.camera?.beta ?? 0,
+      cacheFile?.camera?.radius ?? 30,
+      mapOptional(
+        cacheFile?.camera?.target,
+        ([a, b, c]) => new Vector3(a, b, c)
+      ) ?? new Vector3(0, 10, 0)
     );
     camera.minZ = 0.01;
     camera.maxZ = 1000;
@@ -80,16 +75,25 @@ export class BaseScene extends Scene {
     this._camera = camera;
 
     this._startTime = performance.now();
+
+    const writeCache = () => {
+      writeCacheFile({
+        camera: {
+          type: "arc-rotate-camera",
+          alpha: camera.alpha,
+          beta: camera.beta,
+          radius: camera.radius,
+          target: [camera.target.x, camera.target.y, camera.target.z],
+        },
+      });
+    };
+    this.onDisposeObservable.add(() => writeCache());
+    globalThis.addEventListener("beforeunload", () => writeCache());
   }
 
   update() {
     this._currentTime = performance.now();
     this._frame++;
-
-    this.hotCache.set("camera-target", this._camera.target.clone());
-    this.hotCache.set("camera-alpha", this._camera.alpha);
-    this.hotCache.set("camera-beta", this._camera.beta);
-    this.hotCache.set("camera-radius", this._camera.radius);
   }
 }
 
@@ -124,4 +128,37 @@ function makeGridMesh(scene: Scene): GroundMesh {
   gridMesh.material = groundMaterial;
 
   return gridMesh;
+}
+
+const CacheSchema = z.object({
+  camera: z
+    .discriminatedUnion("type", [
+      z.object({
+        type: z.literal("arc-rotate-camera"),
+        target: z.tuple([z.number(), z.number(), z.number()]),
+        alpha: z.number(),
+        beta: z.number(),
+        radius: z.number(),
+      }),
+    ])
+    .optional(),
+});
+type CacheFile = z.infer<typeof CacheSchema>;
+
+const CacheKey = "base-scene-cache";
+
+function readCacheFile(): CacheFile | null {
+  let content = localStorage.getItem(CacheKey);
+  if (content === null) {
+    return null;
+  }
+  try {
+    return CacheSchema.parse(JSON.parse(content));
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeCacheFile(cache: CacheFile) {
+  localStorage.setItem(CacheKey, JSON.stringify(cache));
 }

@@ -29,3 +29,5 @@ coverage
 
 *.tsbuildinfo
 components.d.ts
+
+bun.lockb

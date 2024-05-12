@@ -1,18 +1,23 @@
 import { reactive, type ComputedRef, computed } from "vue";
 
-export interface ReadonlySceneFiles {
+export interface ReadonlyFiles {
   listFiles(): FilePath[];
   readFile(name: FilePath): string | null;
   hasFile(name: FilePath): boolean;
+  waitFinished(): Promise<void>;
 }
 
-export interface SceneFiles extends ReadonlySceneFiles {
+export interface WritableFiles extends ReadonlyFiles {
   writeFile(name: FilePath, content: string): void;
   deleteFile(name: FilePath): void;
 }
 
+export interface HasReactiveFiles {
+  readonly fileNames: ComputedRef<Map<FilePath, number>>;
+}
+
 export function readOrCreateFile(
-  sceneFiles: SceneFiles,
+  sceneFiles: WritableFiles,
   name: FilePath,
   defaultContent: () => string
 ): string {
@@ -33,7 +38,7 @@ export type FilePath = string & { __filePath: never };
 /**
  * An implementation of SceneFiles that delegates to another SceneFiles implementation.
  */
-export class ReactiveSceneFiles implements SceneFiles {
+export class ReactiveFiles implements WritableFiles, HasReactiveFiles {
   /**
    * A *reactive* map of file names and a version ID.
    */
@@ -42,13 +47,13 @@ export class ReactiveSceneFiles implements SceneFiles {
     () => this._fileNames
   );
 
-  private constructor(public readonly sceneFiles: SceneFiles) {}
+  private constructor(public readonly sceneFiles: WritableFiles) {}
 
   /**
    * Create a new ReactiveSceneFiles instance that delegates to the given SceneFiles instance.
    */
-  static async create(sceneFiles: SceneFiles) {
-    const instance = new ReactiveSceneFiles(sceneFiles);
+  static async create(sceneFiles: WritableFiles) {
+    const instance = new ReactiveFiles(sceneFiles);
     const files = instance.listFiles();
     for (const file of files) {
       instance._fileNames.set(file, 0);
@@ -77,15 +82,19 @@ export class ReactiveSceneFiles implements SceneFiles {
     this.sceneFiles.deleteFile(name);
     this._fileNames.delete(name);
   }
+
+  waitFinished() {
+    return this.sceneFiles.waitFinished();
+  }
 }
 
-export class SceneFilesWithFilesystem implements SceneFiles {
+export class FilesWithFilesystem implements WritableFiles {
   private files: Map<FilePath, string> = new Map();
   private taskQueue: Promise<void> = Promise.resolve();
   private constructor(public readonly name: FilePath) {}
 
   static async create(name: FilePath) {
-    const instance = new SceneFilesWithFilesystem(name);
+    const instance = new FilesWithFilesystem(name);
     const sceneDirectory = await instance.getSceneDirectory();
     // TODO: Remove "as any" once TypeScript has support for this API
     for await (const [key, value] of (sceneDirectory as any).entries()) {
@@ -150,6 +159,10 @@ export class SceneFilesWithFilesystem implements SceneFiles {
 
   hasFile(name: FilePath) {
     return this.files.has(name);
+  }
+
+  waitFinished() {
+    return this.taskQueue.finally(() => {});
   }
 }
 
