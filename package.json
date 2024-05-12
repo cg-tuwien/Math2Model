@@ -13,9 +13,6 @@
     "type-check": "vue-tsc --build --force"
   },
   "dependencies": {
-    "@babylonjs/core": "^7.3.3",
-    "@babylonjs/loaders": "^7.3.3",
-    "@babylonjs/materials": "^7.3.3",
     "@stefnotch/typestef": "^1.0.3",
     "@vueuse/core": "^10.9.0",
     "monaco-editor": "^0.48.0",

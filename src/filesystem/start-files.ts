@@ -1,4 +1,4 @@
-import { ReadonlyQuaternion } from "@/scenes/VirtualScene";
+import { ReadonlyQuaternion } from "@/engine/VirtualScene";
 import {
   makeFilePath,
   readOrCreateFile,

@@ -4,7 +4,7 @@ import {
   ReadonlyVector3,
   type VirtualModelState,
   type VirtualModelUpdate,
-} from "@/scenes/VirtualScene";
+} from "@/engine/VirtualScene";
 import { computed, h, ref, watch, watchEffect, type DeepReadonly } from "vue";
 import { NInput, type TreeOption } from "naive-ui";
 import { showError } from "@/notification";

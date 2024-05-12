@@ -4,8 +4,8 @@ import type {
   HasReactiveFiles,
   ReadonlyFiles,
 } from "@/filesystem/reactive-files";
-import type { BaseScene } from "@/scenes/BaseScene";
-import type { VirtualModelState } from "@/scenes/VirtualScene";
+import type { BaseScene } from "@/engine/BaseScene";
+import type { VirtualModelState } from "@/engine/VirtualScene";
 import {
   ComputeShader,
   Constants,

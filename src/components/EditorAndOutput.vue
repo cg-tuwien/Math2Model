@@ -6,7 +6,7 @@ import {
   Vector3,
   type WebGPUEngine,
 } from "@babylonjs/core";
-import { BaseScene } from "@/scenes/BaseScene";
+import { BaseScene } from "@/engine/BaseScene";
 import CodeEditor, { type KeyedCode } from "@/components/CodeEditor.vue";
 import IconFolderMultipleOutline from "~icons/mdi/folder-multiple-outline";
 import IconFileTreeOutline from "~icons/mdi/file-tree-outline";
@@ -31,7 +31,7 @@ import { showError } from "@/notification";
 import {
   useVirtualScene,
   type VirtualModelUpdate,
-} from "@/scenes/VirtualScene";
+} from "@/engine/VirtualScene";
 import { getOrCreateScene } from "@/filesystem/start-files";
 import VirtualModel from "@/components/VirtualModel.vue";
 import { assertUnreachable } from "@stefnotch/typestef/assert";

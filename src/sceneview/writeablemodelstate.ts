@@ -1,7 +1,7 @@
 import {
   type ShaderCodeRef,
   type VirtualModelState,
-} from "@/scenes/VirtualScene";
+} from "@/engine/VirtualScene";
 
 export interface WriteableModelState {
   name: string;
