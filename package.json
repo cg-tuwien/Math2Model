@@ -20,6 +20,7 @@
     "pinia": "^2.1.7",
     "vue": "^3.4.27",
     "vue-router": "^4.3.2",
+    "webgpu-utils": "^1.7.1",
     "wgpu-matrix": "^2.8.1",
     "zod": "^3.23.8",
     "zod-to-json-schema": "^3.23.0"
