@@ -1,5 +1,5 @@
 import { createRouter, createWebHashHistory } from "vue-router";
-import HomeView from "../views/HomeView.vue";
+import NotFoundView from "../views/NotFoundView.vue";
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -7,7 +7,12 @@ const router = createRouter({
     {
       path: "/",
       name: "home",
-      component: HomeView,
+      component: () => import("../views/HomeView.vue"),
+    },
+    {
+      path: "/wgpu",
+      name: "wgpu",
+      component: () => import("../views/WgpuHomeView.vue"),
     },
     {
       path: "/about",
@@ -17,7 +22,7 @@ const router = createRouter({
       // which is lazy-loaded when the route is visited.
       component: () => import("../views/AboutView.vue"),
     },
-    { path: "/:pathMatch(.*)*", name: "NotFound", component: HomeView },
+    { path: "/:pathMatch(.*)*", name: "NotFound", component: NotFoundView },
   ],
 });
 

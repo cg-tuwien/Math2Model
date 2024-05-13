@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, h, ref, shallowRef, watch } from "vue";
+import { h, ref, watch } from "vue";
 import { type TreeOption, NButton, NInput } from "naive-ui";
 import {
   makeFilePath,
   type FilePath,
   type ReactiveFiles,
 } from "@/filesystem/reactive-files";
-import { assert } from "@stefnotch/typestef/assert";
 
 const props = defineProps<{
   files: ReactiveFiles;
@@ -139,7 +138,7 @@ function renderLabel({ option }: { option: TreeOption }) {
       :checked-keys="checkedKeys"
       :render-label="renderLabel"
       @update:checked-keys="(v: string[]) => (checkedKeys = toFilePaths(v))"
-      @update:selected-keys="(v: string[]) => openFiles = toFilePaths(v)"
+      @update:selected-keys="(v: string[]) => (openFiles = toFilePaths(v))"
     />
   </n-flex>
 </template>

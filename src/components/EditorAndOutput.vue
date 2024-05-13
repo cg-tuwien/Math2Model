@@ -11,7 +11,7 @@ import {
   computed,
   h,
 } from "vue";
-import { useDebounceFn, useElementSize } from "@vueuse/core";
+import { useDebounceFn } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import {
   ReactiveFiles,
@@ -28,7 +28,6 @@ import VirtualModel from "@/components/VirtualModel.vue";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { serializeScene } from "@/filesystem/scene-file";
 import type { Engine } from "@/engine/engine";
-import { BabylonBaseScene } from "@/scenes/BaseScene";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -207,7 +206,7 @@ function updateModels(ids: string[], update: VirtualModelUpdate) {
 </script>
 
 <template>
-  <main class="min-h-full flex">
+  <main class="flex">
     <n-tabs
       type="line"
       animated
@@ -229,7 +228,7 @@ function updateModels(ids: string[], update: VirtualModelUpdate) {
     </n-tabs>
     <n-split
       direction="horizontal"
-      style="height: 100vh"
+      style="height: 80vh"
       :max="0.75"
       :min="0"
       :default-size="0.2"
@@ -264,7 +263,7 @@ function updateModels(ids: string[], update: VirtualModelUpdate) {
         </div>
       </template>
       <template #2>
-        <div class="flex" style="height: 100vh; width: 100%">
+        <div class="flex" style="height: 80vh; width: 100%">
           <div
             ref="canvasContainer"
             class="self-stretch overflow-hidden flex-1"

@@ -9,6 +9,5 @@ export interface BaseScene {
   render(): void;
   [Symbol.dispose](): void;
 
-  // TODO: Temporary hack
   asBabylon(): any | null;
 }

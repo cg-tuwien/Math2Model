@@ -43,7 +43,8 @@ function handleHamburger(key: MyDropdownOption["key"]) {
 <template>
   <n-page-header class="mx-2">
     <template #title>
-      <RouterLink to="/">Home</RouterLink>
+      <RouterLink to="/" class="mx-2">Home</RouterLink>
+      <RouterLink to="/wgpu" class="mx-2">Wgpu</RouterLink>
     </template>
 
     <template #extra>

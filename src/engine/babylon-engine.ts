@@ -1,7 +1,7 @@
 import { Tools, WebGPUEngine } from "@babylonjs/core";
 import type { Engine } from "./engine";
 import { BabylonBaseScene } from "@/scenes/BaseScene";
-import { useDebounceFn, useElementSize } from "@vueuse/core";
+import { useDebounceFn } from "@vueuse/core";
 
 WebGPUEngine.IsSupportedAsync.then((supported) => {
   if (!supported) {

@@ -9,8 +9,11 @@ const theme = computed(() => (store.isDark ? darkTheme : lightTheme));
 </script>
 
 <template>
-  <div class="bg-white dark:bg-slate-800">
-    <n-config-provider :theme="theme">
+  <div class="bg-white dark:bg-slate-800 h-full">
+    <n-config-provider
+      :theme="theme"
+      class="h-full flex items-stretch flex-col"
+    >
       <TopBar></TopBar>
 
       <RouterView> </RouterView>
