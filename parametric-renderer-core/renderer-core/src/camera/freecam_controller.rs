@@ -34,7 +34,7 @@ impl FreecamController {
     fn update_orientation(&mut self, mouse_delta: Vector2) {
         self.set_pitch_yaw(
             self.pitch + Angle::new(mouse_delta.y * self.sensitivity),
-            self.yaw - Angle::new(mouse_delta.x * self.sensitivity),
+            self.yaw + Angle::new(mouse_delta.x * self.sensitivity),
         );
     }
 

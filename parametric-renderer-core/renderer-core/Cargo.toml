@@ -2,5 +2,19 @@
 name = "renderer-core"
 version = "0.1.0"
 edition = "2021"
+build = "build.rs"
 
 [dependencies]
+anyhow = "1.0.83"
+bytemuck = { workspace = true }
+encase = { workspace = true }
+glam = { workspace = true }
+glamour = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+wgpu = { workspace = true }
+winit = { workspace = true }
+winit_input_helper = { workspace = true }
+
+[build-dependencies]
+wgsl_to_wgpu = "0.8.0"

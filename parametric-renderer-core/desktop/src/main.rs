@@ -1,10 +1,5 @@
 mod application;
-mod buffer;
-mod camera;
 mod config;
-mod mesh;
-mod shaders;
-mod texture;
 
 use application::run;
 

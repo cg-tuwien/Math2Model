@@ -2,26 +2,19 @@
 name = "desktop"
 version = "0.1.0"
 edition = "2021"
-build = "build.rs"
 default-run = "desktop"
 
 [dependencies]
-wgpu = { version = "0.20.0", features = ["webgpu", "wgsl", "naga"] }
-winit = { version = "0.30.0" }
-tracing = { version = "0.1.40" }
-tracing-subscriber = { version = "0.3.18" }
-anyhow = "1.0.82"
-thiserror = "1.0.59"
+anyhow = "1.0.83"
+glam = { workspace = true }
+glamour = { workspace = true }
+nanoserde = { workspace = true }
 pollster = "0.3"
-glam = { version = "0.27", features = ["bytemuck"] }
-glamour = "0.11.1"
-bytemuck = { version = "1.15.0", features = ["derive"] }
-winit_input_helper = "0.16"
-nanoserde = "0.1.37"
-encase = { version = "0.8", features = ["glam"] }
-wgpu-profiler = "0.16.2"
-
-
-[build-dependencies]
-# TODO: Remove this patch once my PRs are merged, or the issue is fixed in the original crate
-wgsl_to_wgpu = { git = "https://github.com/stefnotch/wgsl_to_wgpu", version = "0.8.0" }
+renderer-core = { path = "../renderer-core" }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3.18" }
+wgpu = { workspace = true }
+wgpu-profiler = "0.17.0"
+winit = { workspace = true }
+winit_input_helper = { workspace = true }

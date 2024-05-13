@@ -1,6 +1,6 @@
 use glamour::Angle;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CameraSettings {
     pub z_near: f32,
     pub z_far: f32,
