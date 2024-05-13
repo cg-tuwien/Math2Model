@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["copy-includes", "desktop", "renderer-core", "web"]
+members = ["copy-includes", "desktop", "renderer-core", "wasm"]
 
 [workspace.dependencies]
 wgpu = { version = "0.20.0", default-features = false, features = [

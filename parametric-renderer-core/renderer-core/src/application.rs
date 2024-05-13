@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use glamour::{Angle, Matrix4, Point3, ToRaw, Vector2, Vector4};
-use tracing::{error, info, warn};
+use glamour::{Matrix4, Point3, ToRaw, Vector2, Vector4};
+use tracing::info;
 use winit::window::Window;
 use winit_input_helper::WinitInputHelper;
 
@@ -598,7 +598,8 @@ impl WgpuContext {
                 },
                 None,
             )
-            .await?;
+            .await
+            .unwrap();
 
         let surface_caps = surface.get_capabilities(&adapter);
         let surface_format = surface_caps

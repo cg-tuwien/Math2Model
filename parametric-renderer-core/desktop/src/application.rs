@@ -1,9 +1,6 @@
 use glamour::{Angle, Point3};
 use pollster::FutureExt;
-use renderer_core::{
-    application::{CpuApplication, GpuApplication, RenderData},
-    camera::{camera_settings::CameraSettings, freecam_controller::FreecamController, Camera},
-};
+use renderer_core::application::CpuApplication;
 use tracing::{error, info, warn};
 use winit::{application::ApplicationHandler, window::Window};
 use winit_input_helper::{WinitInputApp, WinitInputHelper, WinitInputUpdate};

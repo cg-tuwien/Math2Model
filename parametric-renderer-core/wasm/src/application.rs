@@ -1,27 +1,22 @@
-use std::{
-    ops::DerefMut,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
-use glamour::{Angle, Point3};
-use renderer_core::{
-    application::{CpuApplication, GpuApplication, RenderData},
-    camera::{camera_settings::CameraSettings, freecam_controller::FreecamController, Camera},
-};
+use renderer_core::application::CpuApplication;
 use tracing::{error, info, warn};
+use web_sys::HtmlCanvasElement;
 use winit::{application::ApplicationHandler, window::Window};
 use winit_input_helper::{WinitInputApp, WinitInputHelper, WinitInputUpdate};
 
 pub struct Application {
     app: Arc<Mutex<CpuApplication>>,
+    canvas: HtmlCanvasElement,
 }
 
 impl Application {
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new(canvas: HtmlCanvasElement) -> anyhow::Result<Self> {
         let app = CpuApplication::new()?;
-
         Ok(Self {
             app: Arc::new(Mutex::new(app)),
+            canvas,
         })
     }
 
@@ -75,21 +70,23 @@ impl Application {
     }
 }
 
-pub async fn run() -> anyhow::Result<()> {
+pub async fn run(canvas: HtmlCanvasElement) -> anyhow::Result<()> {
     let event_loop = winit::event_loop::EventLoop::new()?;
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
-    let application = Application::new()?;
+    let application = Application::new(canvas)?;
     event_loop.run_app(&mut WinitInputApp::new(application))?;
     Ok(())
 }
 
 impl ApplicationHandler<()> for Application {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let _ = self.create_surface(
-            event_loop
-                .create_window(Window::default_attributes())
-                .unwrap(),
-        );
+        let window_attributes = Window::default_attributes();
+        #[cfg(target_arch = "wasm32")]
+        let window_attributes = {
+            use winit::platform::web::WindowAttributesExtWebSys;
+            window_attributes.with_canvas(Some(self.canvas.clone()))
+        };
+        let _ = self.create_surface(event_loop.create_window(window_attributes).unwrap());
     }
 
     fn window_event(

@@ -4,6 +4,7 @@ use tracing_subscriber::fmt::{format::Pretty, time::UtcTime};
 use tracing_subscriber::prelude::*;
 use tracing_web::{performance_layer, MakeWebConsoleWriter};
 use wasm_bindgen::prelude::*;
+use web_sys::HtmlCanvasElement;
 
 #[wasm_bindgen(start)]
 pub fn run() {
@@ -18,4 +19,17 @@ pub fn run() {
         .with(fmt_layer)
         .with(perf_layer)
         .init();
+}
+
+#[wasm_bindgen]
+pub fn init_engine(canvas: HtmlCanvasElement) -> Result<(), JsValue> {
+    wasm_bindgen_futures::spawn_local(async move {
+        match application::run(canvas).await {
+            Ok(_) => (),
+            Err(e) => {
+                tracing::error!("Error running application: {:?}", e);
+            }
+        }
+    });
+    Ok(())
 }

@@ -1,5 +1,5 @@
 use glam::Quat;
-use glamour::{Angle, Matrix4, Point3, Vector3};
+use glamour::{Matrix4, Point3, Vector3};
 
 use super::{camera_controller::CameraController, camera_settings::CameraSettings};
 
