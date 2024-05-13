@@ -1,12 +1,4 @@
 <script setup lang="ts">
-import {
-  HemisphericLight,
-  Observable,
-  UniformBuffer,
-  Vector3,
-  type WebGPUEngine,
-} from "@babylonjs/core";
-import { BaseScene } from "@/scenes/BaseScene";
 import CodeEditor, { type KeyedCode } from "@/components/CodeEditor.vue";
 import IconFolderMultipleOutline from "~icons/mdi/folder-multiple-outline";
 import IconFileTreeOutline from "~icons/mdi/file-tree-outline";
@@ -16,7 +8,6 @@ import {
   watch,
   watchEffect,
   onUnmounted,
-  readonly,
   computed,
   h,
 } from "vue";
@@ -33,16 +24,17 @@ import {
   type VirtualModelUpdate,
 } from "@/scenes/VirtualScene";
 import { getOrCreateScene } from "@/filesystem/start-files";
-import { ShaderFiles } from "@/filesystem/shader-files";
 import VirtualModel from "@/components/VirtualModel.vue";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { serializeScene } from "@/filesystem/scene-file";
+import type { Engine } from "@/engine";
+import { BabylonBaseScene } from "@/scenes/BaseScene";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
   files: ReactiveFiles;
   canvas: HTMLCanvasElement;
-  engine: WebGPUEngine;
+  engine: Engine;
 }>();
 
 const store = useStore();
@@ -70,36 +62,10 @@ if (sceneFile !== null) {
 }
 const openFile = useOpenFile(startFile, props.files);
 
-const shaderFiles = new ShaderFiles(props.files);
-// The BabylonJS scene
 const canvasContainer = ref<HTMLDivElement | null>(null);
-const baseScene = shallowRef(new BaseScene(props.engine));
+const baseScene = shallowRef(props.engine.createBaseScene());
 onUnmounted(() => {
-  baseScene.value.dispose();
-});
-const updateObservable: Observable<void> = new Observable();
-const globalUBO = shallowRef(new UniformBuffer(props.engine));
-globalUBO.value.addUniform("iTime", 1);
-globalUBO.value.addUniform("iTimeDelta", 1);
-globalUBO.value.addUniform("iFrame", 1);
-globalUBO.value.update();
-updateObservable.add(() => {
-  globalUBO.value.updateFloat("iTime", baseScene.value.time / 1000);
-  globalUBO.value.updateFloat("iTimeDelta", baseScene.value.deltaTime / 1000);
-  globalUBO.value.updateFloat("iFrame", baseScene.value.frame);
-  globalUBO.value.update();
-});
-onUnmounted(() => {
-  globalUBO.value.dispose();
-});
-let light = new HemisphericLight(
-  "light1",
-  new Vector3(0, 1, 0),
-  baseScene.value
-);
-light.intensity = 0.7;
-onUnmounted(() => {
-  light.dispose();
+  baseScene.value[Symbol.dispose]();
 });
 
 // TODO: Gizmo
@@ -123,14 +89,13 @@ watch(
   }, 100)
 );
 
-props.engine.runRenderLoop(renderLoop);
+let stopRenderLoop = props.engine.startRenderLoop(renderLoop);
 function renderLoop() {
   baseScene.value.update();
-  updateObservable.notifyObservers();
   baseScene.value.render();
 }
 onUnmounted(() => {
-  props.engine.stopRenderLoop(renderLoop);
+  stopRenderLoop.stop();
 });
 
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
@@ -313,13 +278,12 @@ function updateModels(ids: string[], update: VirtualModelUpdate) {
             ref="canvasContainer"
             class="self-stretch overflow-hidden flex-1"
           ></div>
-          <div>
+          <div v-if="baseScene.asBabylon() !== null">
             <VirtualModel
               v-for="model in scene.state.value.models"
               :key="model.id"
-              :scene="baseScene"
+              :scene="baseScene.asBabylon()"
               :files="props.files"
-              :globalUBO="globalUBO"
               :model="model"
             ></VirtualModel>
           </div>

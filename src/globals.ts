@@ -1,12 +1,9 @@
-import { Tools, WebGPUEngine } from "@babylonjs/core";
 import {
   ReactiveFiles,
   FilesWithFilesystem,
   makeFilePath,
 } from "./filesystem/reactive-files";
-
-// GDPR compliance https://forum.babylonjs.com/t/offer-alternative-to-babylon-js-cdn/48982
-Tools.ScriptBaseUrl = "/babylon";
+import { BabylonEngine } from "./babylon";
 
 export const sceneFilesPromise = (async () => {
   const fs = await FilesWithFilesystem.create(makeFilePath("some-key"));
@@ -27,14 +24,4 @@ canvasElement.addEventListener(
   }
 );
 
-export const enginePromise = (async () => {
-  const engine = new WebGPUEngine(canvasElement, {});
-  engine.compatibilityMode = false;
-  engine.onContextRestoredObservable.add(() => {
-    engine.getCaps().canUseGLInstanceID = false;
-  });
-
-  await engine.initAsync();
-  engine.getCaps().canUseGLInstanceID = false;
-  return engine;
-})();
+export const enginePromise = BabylonEngine.createEngine(canvasElement);

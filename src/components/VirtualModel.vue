@@ -4,7 +4,7 @@ import type {
   HasReactiveFiles,
   ReadonlyFiles,
 } from "@/filesystem/reactive-files";
-import type { BaseScene } from "@/scenes/BaseScene";
+import type { BabylonBaseScene } from "@/scenes/BaseScene";
 import type { VirtualModelState } from "@/scenes/VirtualScene";
 import {
   ComputeShader,
@@ -35,9 +35,8 @@ import ComputePatches from "../../parametric-renderer-core/shaders/ComputePatche
 import CopyPatches from "../../parametric-renderer-core/shaders/CopyPatches.wgsl?raw";
 
 const props = defineProps<{
-  scene: BaseScene;
+  scene: BabylonBaseScene;
   files: ReadonlyFiles & HasReactiveFiles;
-  globalUBO: UniformBuffer;
   model: DeepReadonly<VirtualModelState>;
 }>();
 
@@ -208,7 +207,7 @@ const shaderMaterial = babylonEffectRef<ShaderMaterial | null>(() => {
   return material;
 });
 watchEffect(() => {
-  shaderMaterial.value?.setUniformBuffer("globalUBO", props.globalUBO);
+  shaderMaterial.value?.setUniformBuffer("globalUBO", props.scene.globalUBO);
 });
 watchEffect(() => {
   mesh.value.material = shaderMaterial.value;
