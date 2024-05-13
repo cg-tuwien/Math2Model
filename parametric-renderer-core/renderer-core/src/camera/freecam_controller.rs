@@ -85,10 +85,10 @@ fn input_to_direction(input: &WinitInputHelper) -> Vector3 {
     }
 
     if input.key_held(KeyCode::KeyD) {
-        direction -= Camera::right();
+        direction += Camera::right();
     }
     if input.key_held(KeyCode::KeyA) {
-        direction += Camera::right();
+        direction -= Camera::right();
     }
 
     if input.key_held(KeyCode::Space) {

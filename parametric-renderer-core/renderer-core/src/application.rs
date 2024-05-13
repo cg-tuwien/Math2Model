@@ -152,7 +152,7 @@ impl GpuApplication {
                 camera: camera_buffer.as_entire_buffer_binding(),
                 light: light_buffer.as_entire_buffer_binding(),
                 model: model_buffer.as_entire_buffer_binding(),
-                renderBuffer: render_buffer.as_entire_buffer_binding(),
+                render_buffer: render_buffer.as_entire_buffer_binding(),
             },
         );
 
@@ -184,7 +184,7 @@ impl GpuApplication {
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: None,
                 // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
-                polygon_mode: wgpu::PolygonMode::Line, // Wireframe mode
+                polygon_mode: wgpu::PolygonMode::Fill, // Wireframe mode can be toggled here
                 // Requires Features::DEPTH_CLIP_CONTROL
                 unclipped_depth: false,
                 // Requires Features::CONSERVATIVE_RASTERIZATION
@@ -592,7 +592,9 @@ impl WgpuContext {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::POLYGON_MODE_LINE,
+                    // TODO: Only enable this on the desktop backend
+                    // required_features: wgpu::Features::POLYGON_MODE_LINE,
+                    required_features: wgpu::Features::default(),
                     required_limits: wgpu::Limits::default(),
                     label: None,
                 },
@@ -601,11 +603,13 @@ impl WgpuContext {
             .await
             .unwrap();
 
+        // TODO: Srgb support https://sotrh.github.io/learn-wgpu/intermediate/tutorial13-hdr/#output-too-dark-on-webgpu
         let surface_caps = surface.get_capabilities(&adapter);
         let surface_format = surface_caps
             .formats
             .iter()
-            .find(|format| format.is_srgb())
+            .find(|_format| true)
+            // .find(|format| format.is_srgb())
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("No sRGB format surface found"))?;
 

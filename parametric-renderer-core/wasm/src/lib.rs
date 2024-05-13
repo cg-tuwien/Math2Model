@@ -7,7 +7,8 @@ use wasm_bindgen::prelude::*;
 use web_sys::HtmlCanvasElement;
 
 #[wasm_bindgen(start)]
-pub fn run() {
+pub fn run() { 
+    console_error_panic_hook::set_once();
     // https://crates.io/crates/tracing-web
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_ansi(false)

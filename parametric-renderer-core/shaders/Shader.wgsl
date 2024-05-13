@@ -59,7 +59,7 @@ struct Model {
 }
 @group(0) @binding(2) var<uniform> model: Model;
 
-@group(0) @binding(3) var<storage, read> renderBuffer: RenderBuffer;
+@group(0) @binding(3) var<storage, read> render_buffer: RenderBufferRead;
 
 
 //#include "./HeartSphere.wgsl"
@@ -95,7 +95,7 @@ struct VertexOutput {
 fn vs_main(
     in: VertexInput,
 ) -> VertexOutput {
-    let quad = renderBuffer.patches[in.instance_index];
+    let quad = render_buffer.patches[in.instance_index];
 
     var uv = vec2<f32>(quad.min.x, quad.min.y);
     if (in.vertex_index == 0) {

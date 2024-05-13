@@ -27,7 +27,7 @@ import { getOrCreateScene } from "@/filesystem/start-files";
 import VirtualModel from "@/components/VirtualModel.vue";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { serializeScene } from "@/filesystem/scene-file";
-import type { Engine } from "@/engine";
+import type { Engine } from "@/engine/engine";
 import { BabylonBaseScene } from "@/scenes/BaseScene";
 
 // Unchanging props! No need to watch them.
@@ -79,15 +79,6 @@ onUnmounted(() => {
 watchEffect(() => {
   canvasContainer.value?.appendChild(props.canvas);
 });
-
-// Resize the engine when the canvas size changes
-const { width, height } = useElementSize(() => props.canvas);
-watch(
-  [width, height],
-  useDebounceFn(() => {
-    props.engine.resize();
-  }, 100)
-);
 
 let stopRenderLoop = props.engine.startRenderLoop(renderLoop);
 function renderLoop() {

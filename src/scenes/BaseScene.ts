@@ -17,7 +17,7 @@ import { GridMaterial } from "@babylonjs/materials/grid/gridMaterial";
 import backgroundGround from "@/assets/backgroundGround.png";
 import { mapOptional } from "@/option";
 import { z } from "zod";
-import type { BaseScene } from "@/engine";
+import type { BaseScene } from "@/engine/engine";
 
 export type Milliseconds = number;
 export type Seconds = number;

@@ -3,7 +3,9 @@ import {
   FilesWithFilesystem,
   makeFilePath,
 } from "./filesystem/reactive-files";
-import { BabylonEngine } from "./babylon";
+import { BabylonEngine } from "./engine/babylon-engine";
+import { WgpuEngine } from "./engine/wgpu-engine";
+import type { Engine } from "./engine/engine";
 
 export const sceneFilesPromise = (async () => {
   const fs = await FilesWithFilesystem.create(makeFilePath("some-key"));
@@ -24,4 +26,5 @@ canvasElement.addEventListener(
   }
 );
 
-export const enginePromise = BabylonEngine.createEngine(canvasElement);
+export const enginePromise: Promise<Engine> =
+  BabylonEngine.createEngine(canvasElement);

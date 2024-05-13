@@ -3,7 +3,7 @@ import { ReactiveFiles } from "@/filesystem/reactive-files";
 import EditorAndOutput from "@/components/EditorAndOutput.vue";
 import { markRaw, shallowRef } from "vue";
 import { sceneFilesPromise, canvasElement, enginePromise } from "@/globals";
-import type { Engine } from "@/engine";
+import type { Engine } from "@/engine/engine";
 
 const sceneFiles = shallowRef<ReactiveFiles | null>(null);
 sceneFilesPromise.then((v) => {

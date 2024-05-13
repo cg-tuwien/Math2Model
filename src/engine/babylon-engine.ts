@@ -1,6 +1,7 @@
 import { Tools, WebGPUEngine } from "@babylonjs/core";
 import type { Engine } from "./engine";
 import { BabylonBaseScene } from "@/scenes/BaseScene";
+import { useDebounceFn, useElementSize } from "@vueuse/core";
 
 WebGPUEngine.IsSupportedAsync.then((supported) => {
   if (!supported) {
@@ -22,11 +23,14 @@ export class BabylonEngine implements Engine {
 
     await engine.initAsync();
     engine.getCaps().canUseGLInstanceID = false;
-    return new BabylonEngine(engine);
-  }
 
-  resize(): void {
-    this.engine.resize();
+    const resizeObserver = new ResizeObserver(
+      useDebounceFn(() => {
+        engine.resize();
+      }, 100)
+    );
+    resizeObserver.observe(canvasElement);
+    return new BabylonEngine(engine);
   }
 
   createBaseScene() {

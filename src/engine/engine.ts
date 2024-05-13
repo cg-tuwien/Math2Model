@@ -1,6 +1,5 @@
 export interface Engine {
   createBaseScene(): BaseScene;
-  resize(): void;
   startRenderLoop(value: () => void): {
     stop: () => void;
   };
