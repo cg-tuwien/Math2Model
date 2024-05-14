@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import {
+  ComputeShader,
   HemisphericLight,
   Observable,
+  Quaternion,
   UniformBuffer,
   Vector3,
   type WebGPUEngine,
@@ -26,9 +28,12 @@ import {
   ReactiveFiles,
   makeFilePath,
   type FilePath,
+  readOrCreateFile,
 } from "@/filesystem/reactive-files";
 import { showError } from "@/notification";
 import {
+  ReadonlyQuaternion,
+  ReadonlyVector3,
   useVirtualScene,
   type VirtualModelUpdate,
 } from "@/scenes/VirtualScene";
@@ -37,6 +42,7 @@ import { ShaderFiles } from "@/filesystem/shader-files";
 import VirtualModel from "@/components/VirtualModel.vue";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { serializeScene } from "@/filesystem/scene-file";
+import HeartSphere from "../../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -63,7 +69,7 @@ watch(
     } catch (e) {
       console.log("Could not deserialize scene file.");
     }
-  }
+  },
 );
 if (sceneFile !== null) {
   scene.api.value.fromSerialized(sceneFile);
@@ -95,7 +101,7 @@ onUnmounted(() => {
 let light = new HemisphericLight(
   "light1",
   new Vector3(0, 1, 0),
-  baseScene.value
+  baseScene.value,
 );
 light.intensity = 0.7;
 onUnmounted(() => {
@@ -120,7 +126,7 @@ watch(
   [width, height],
   useDebounceFn(() => {
     props.engine.resize();
-  }, 100)
+  }, 100),
 );
 
 props.engine.runRenderLoop(renderLoop);
@@ -135,7 +141,7 @@ onUnmounted(() => {
 
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
   const keyedCode = ref<KeyedCode | null>(
-    startFile !== null ? readFile(startFile) : null
+    startFile !== null ? readFile(startFile) : null,
   );
 
   function readFile(name: FilePath): KeyedCode | null {
@@ -242,10 +248,54 @@ function updateModels(ids: string[], update: VirtualModelUpdate) {
   if (sceneContent === null) {
     showError(
       "Could not serialize scene",
-      new Error("Could not serialize scene")
+      new Error("Could not serialize scene"),
     );
   } else {
     props.files.writeFile(scenePath, sceneContent);
+  }
+}
+
+function addModel(name: string, shaderName: string | undefined) {
+  if (shaderName) {
+    const vertexSource = makeFilePath(shaderName + ".vert.wgsl");
+    const fragmentSource = makeFilePath(shaderName + ".frag.wgsl");
+
+    props.files.writeFile(vertexSource, HeartSphere);
+    props.files.writeFile(
+      fragmentSource,
+      `
+    varying vNormal : vec3<f32>;
+    varying vUV : vec2<f32>;
+    @fragment
+    fn main(input : FragmentInputs) -> FragmentOutputs {
+        fragmentOutputs.color = vec4<f32>(input.vUV,1.0, 1.0);
+    }
+`,
+    );
+
+    const newModel = {
+      id: crypto.randomUUID(),
+      name: name,
+      code: {
+        vertexFile: vertexSource,
+        fragmentFile: fragmentSource,
+      },
+      position: ReadonlyVector3.fromVector3(new Vector3(0, 0, 0)),
+      rotation: ReadonlyQuaternion.identity,
+      scale: 1,
+    };
+
+    scene.api.value.addModel(newModel);
+
+    const sceneContent = serializeScene(scene.api.value.serialize(), true);
+    if (sceneContent === null) {
+      showError(
+        "Could not serialize scene",
+        new Error("Could not serialize scene"),
+      );
+    } else {
+      props.files.writeFile(scenePath, sceneContent);
+    }
   }
 }
 </script>
@@ -301,6 +351,9 @@ function updateModels(ids: string[], update: VirtualModelUpdate) {
             :files="props.files"
             :scene-path="scenePath"
             @update="(keys, update) => updateModels(keys, update)"
+            @addModel="
+              (modelName, shaderName) => addModel(modelName, shaderName)
+            "
           ></SceneHierarchy>
         </div>
         <div v-else>

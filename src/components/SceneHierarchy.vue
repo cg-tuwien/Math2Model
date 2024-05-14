@@ -6,16 +6,39 @@ import {
   type VirtualModelUpdate,
 } from "@/scenes/VirtualScene";
 import { computed, h, ref, watch, watchEffect, type DeepReadonly } from "vue";
-import { NInput, type TreeOption } from "naive-ui";
+import { NButton, NInput, type TreeOption } from "naive-ui";
 import { showError } from "@/notification";
 import {
   toWriteableModelState,
   type WriteableModelState,
 } from "@/sceneview/writeablemodelstate";
+import { ShaderFiles } from "@/filesystem/shader-files";
+
+function setCurrentModel(model: VirtualModelState): void {
+  console.log("Set current Model (" + JSON.stringify(model) + ");");
+  if (!currentModel.value)
+    currentModel = computed(() => toWriteableModelState(model));
+  else {
+    // currentModel.value.id = model.id.valueOf();
+    currentModel.value.name = model.name.valueOf();
+    currentModel.value.code = model.code;
+    currentModel.value.posX = model.position.x.valueOf();
+    currentModel.value.posY = model.position.y.valueOf();
+    currentModel.value.posZ = model.position.z.valueOf();
+    currentModel.value.rotX = model.rotation.x.valueOf();
+    currentModel.value.rotY = model.rotation.y.valueOf();
+    currentModel.value.rotZ = model.rotation.z.valueOf();
+    currentModel.value.rotW = model.rotation.w.valueOf();
+    currentModel.value.scale = model.scale.valueOf();
+  }
+}
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 
 const emit = defineEmits({
   update(ids: string[], update: VirtualModelUpdate) {
+    return true;
+  },
+  addModel(modelName: string, shaderName: string) {
     return true;
   },
 });
@@ -26,7 +49,7 @@ const props = defineProps<{
 
 const pattern = ref("");
 const selectedKeys = ref<string[]>(
-  props.models.length > 0 ? [props.models[0].id] : []
+  props.models.length > 0 ? [props.models[0].id] : [],
 );
 const checkedKeys = ref<string[]>([]);
 const data = computed(() =>
@@ -34,8 +57,8 @@ const data = computed(() =>
     (model): TreeOption => ({
       label: model.name,
       key: model.id,
-    })
-  )
+    }),
+  ),
 );
 
 let currentModel = ref<WriteableModelState | null>(null);
@@ -78,7 +101,7 @@ function change(key: keyof WriteableModelState) {
       position: new ReadonlyVector3(
         model.posX ?? 0,
         model.posY ?? 0,
-        model.posZ ?? 0
+        model.posZ ?? 0,
       ),
     });
   } else if (
@@ -92,7 +115,7 @@ function change(key: keyof WriteableModelState) {
         model.rotX ?? 0,
         model.rotY ?? 0,
         model.rotZ ?? 0,
-        model.rotW ?? 0
+        model.rotW ?? 0,
       ),
     });
   } else if (key === "scale") {
@@ -105,9 +128,16 @@ function change(key: keyof WriteableModelState) {
     assertUnreachable(key);
   }
 }
+
+function addModel() {
+  emit("addModel", "Model 1", "model-1-shader");
+}
 </script>
 <template>
   <n-flex justify="">
+    <n-flex>
+      <n-button @click="addModel()"> Add </n-button>
+    </n-flex>
     <div>
       <h2 class="underline">Scene</h2>
       <n-tree
