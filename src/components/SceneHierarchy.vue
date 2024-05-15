@@ -9,6 +9,7 @@ import { computed, h, ref, watch, watchEffect, type DeepReadonly } from "vue";
 import { NButton, NInput, type TreeOption } from "naive-ui";
 import { showError } from "@/notification";
 import {
+  commonWriteableModelState,
   toWriteableModelState,
   type WriteableModelState,
 } from "@/sceneview/writeablemodelstate";
@@ -70,8 +71,14 @@ watchEffect(() => {
       currentModel.value = toWriteableModelState(model);
     }
   } else if (keys.length > 1) {
-    // TODO: Multi model editing
-    currentModel.value = null;
+    const models: VirtualModelState[] = [];
+    for (let key of keys) {
+      const model = props.models.find((model) => model.id == key);
+      if (model) models.push(model);
+    }
+    console.log(keys);
+    console.log(models);
+    currentModel.value = commonWriteableModelState(models);
   }
 });
 

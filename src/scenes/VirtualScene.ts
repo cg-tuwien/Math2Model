@@ -12,7 +12,7 @@ export class ReadonlyVector3 {
   constructor(
     public readonly x: number,
     public readonly y: number,
-    public readonly z: number
+    public readonly z: number,
   ) {}
 
   static readonly zero = new ReadonlyVector3(0, 0, 0);
@@ -38,7 +38,7 @@ export class ReadonlyQuaternion {
     public readonly x: number,
     public readonly y: number,
     public readonly z: number,
-    public readonly w: number
+    public readonly w: number,
   ) {}
 
   static readonly identity = new ReadonlyQuaternion(0, 0, 0, 1);
@@ -118,7 +118,7 @@ export class VirtualScene {
 
   removeModel(key: string): boolean {
     const index = this.state.value.models.findIndex(
-      (model) => model.id === key
+      (model) => model.id === key,
     );
     if (index !== -1) {
       this.state.value.models.splice(index, 1);
