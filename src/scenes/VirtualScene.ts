@@ -73,7 +73,7 @@ export interface VirtualModelUpdate {
   name?: string;
   code?: ShaderCodeRef;
   position?: ReadonlyVector3;
-  rotation?: ReadonlyQuaternion;
+  rotation?: ReadonlyVector3;
   scale?: number;
 }
 
@@ -141,7 +141,13 @@ export class VirtualScene {
           model.position = update.position;
         }
         if (update.rotation !== undefined) {
-          model.rotation = update.rotation;
+          model.rotation = ReadonlyQuaternion.fromQuaternion(
+            Quaternion.FromEulerAngles(
+              update.rotation.x,
+              update.rotation.y,
+              update.rotation.z,
+            ),
+          );
         }
         if (update.scale !== undefined) {
           model.scale = update.scale;

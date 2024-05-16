@@ -14,6 +14,7 @@ import {
   type WriteableModelState,
 } from "@/sceneview/writeablemodelstate";
 import { ShaderFiles } from "@/filesystem/shader-files";
+import { type FilePath } from "@/filesystem/reactive-files";
 
 function setCurrentModel(model: VirtualModelState): void {
   console.log("Set current Model (" + JSON.stringify(model) + ");");
@@ -29,17 +30,23 @@ function setCurrentModel(model: VirtualModelState): void {
     currentModel.value.rotX = model.rotation.x.valueOf();
     currentModel.value.rotY = model.rotation.y.valueOf();
     currentModel.value.rotZ = model.rotation.z.valueOf();
-    currentModel.value.rotW = model.rotation.w.valueOf();
     currentModel.value.scale = model.scale.valueOf();
   }
 }
 import { assertUnreachable } from "@stefnotch/typestef/assert";
+import { Angle, Quaternion, Tools } from "@babylonjs/core";
 
 const emit = defineEmits({
   update(ids: string[], update: VirtualModelUpdate) {
     return true;
   },
   addModel(modelName: string, shaderName: string) {
+    return true;
+  },
+  removeModel(ids: string[]) {
+    return true;
+  },
+  select(vertex: FilePath) {
     return true;
   },
 });
@@ -63,12 +70,17 @@ const data = computed(() =>
 );
 
 let currentModel = ref<WriteableModelState | null>(null);
+let toAddModel = ref<[string, string] | null>(null);
+
 watchEffect(() => {
   const keys = selectedKeys.value;
-  if (keys.length == 1) {
+  if (keys.length == 0) {
+    currentModel.value = null;
+  } else if (keys.length == 1) {
     const model = props.models.find((model) => model.id === keys[0]);
     if (model) {
       currentModel.value = toWriteableModelState(model);
+      emit("select", model.code.vertexFile);
     }
   } else if (keys.length > 1) {
     const models: VirtualModelState[] = [];
@@ -76,8 +88,6 @@ watchEffect(() => {
       const model = props.models.find((model) => model.id == key);
       if (model) models.push(model);
     }
-    console.log(keys);
-    console.log(models);
     currentModel.value = commonWriteableModelState(models);
   }
 });
@@ -95,6 +105,11 @@ function change(key: keyof WriteableModelState) {
     return;
   }
 
+  //const degX = new Angle(euler.x).degrees();
+  //const degY = new Angle(euler.y).degrees();
+  //const degZ = new Angle(euler.z).degrees();
+  //console.log(degX, degY, degZ);
+
   if (key === "name") {
     emit("update", keys, {
       name: model.name ?? "",
@@ -111,18 +126,12 @@ function change(key: keyof WriteableModelState) {
         model.posZ ?? 0,
       ),
     });
-  } else if (
-    key === "rotX" ||
-    key === "rotY" ||
-    key === "rotZ" ||
-    key === "rotW"
-  ) {
+  } else if (key === "rotX" || key === "rotY" || key === "rotZ") {
     emit("update", keys, {
-      rotation: new ReadonlyQuaternion(
-        model.rotX ?? 0,
-        model.rotY ?? 0,
-        model.rotZ ?? 0,
-        model.rotW ?? 0,
+      rotation: new ReadonlyVector3(
+        Tools.ToRadians(model.rotX ?? 0),
+        Tools.ToRadians(model.rotY ?? 0),
+        Tools.ToRadians(model.rotZ ?? 0),
       ),
     });
   } else if (key === "scale") {
@@ -136,17 +145,45 @@ function change(key: keyof WriteableModelState) {
   }
 }
 
+function startAddModel() {
+  toAddModel.value = ["New Model", "new-shader"];
+}
+
+function stopAddModel() {
+  toAddModel.value = null;
+}
+
 function addModel() {
-  emit("addModel", "Model 1", "model-1-shader");
+  if (!toAddModel.value) {
+    showError("Illegal State!", null);
+    return;
+  }
+  if (!toAddModel.value[1]) {
+    showError("Please add a filename for the generated shaderfiles.", null);
+    return;
+  }
+
+  emit("addModel", toAddModel.value[0], toAddModel.value[1]);
+  toAddModel.value = null;
+}
+
+function removeModel() {
+  if (selectedKeys.value.length < 1) {
+    showError("Select at least one Model to remove.", null);
+    return;
+  }
+  emit("removeModel", selectedKeys.value);
+  selectedKeys.value = [];
 }
 </script>
 <template>
   <n-flex justify="">
-    <n-flex>
-      <n-button @click="addModel()"> Add </n-button>
-    </n-flex>
-    <div>
-      <h2 class="underline">Scene</h2>
+    <n-flex vertical class="mr-1 ml-1">
+      <n-h3 class="underline">Scene</n-h3>
+      <n-flex>
+        <n-button @click="startAddModel()"> Add </n-button>
+        <n-button @click="removeModel()"> Delete </n-button>
+      </n-flex>
       <n-tree
         block-line
         cascade
@@ -160,10 +197,10 @@ function addModel() {
         :checked-keys="checkedKeys"
         :render-label="renderLabel"
       />
-    </div>
+    </n-flex>
     <n-divider></n-divider>
-    <div v-if="currentModel" class="mr-1 ml-1">
-      <h2 class="underline">Inspector</h2>
+    <div v-if="currentModel && !toAddModel" class="mr-1 ml-1">
+      <n-h3 class="underline">Inspector</n-h3>
       <n-text>Name</n-text>
       <n-input
         v-model:value="currentModel.name"
@@ -220,13 +257,6 @@ function addModel() {
             v-on:input="change('rotZ')"
             :show-button="false"
           ></n-input-number>
-          <n-text>Rotation w</n-text>
-          <n-input-number
-            v-model:value="currentModel.rotW"
-            clearable
-            v-on:input="change('rotW')"
-            :show-button="false"
-          ></n-input-number>
         </div>
         <div>
           <n-text>Scale</n-text>
@@ -237,6 +267,19 @@ function addModel() {
             :show-button="false"
           ></n-input-number>
         </div>
+      </n-flex>
+    </div>
+    <div v-if="toAddModel" class="mr-1 ml-1">
+      <n-flex>
+        <n-text>Name</n-text>
+        <n-input v-model:value="toAddModel[0]" type="text" clearable></n-input>
+        <n-text>Shader Name</n-text>
+        <n-input v-model:value="toAddModel[1]" type="text" clearable></n-input>
+      </n-flex>
+      <br />
+      <n-flex justify="space-between">
+        <n-button @click="stopAddModel()">Cancel</n-button>
+        <n-button @click="addModel()">Confirm</n-button>
       </n-flex>
     </div>
   </n-flex>

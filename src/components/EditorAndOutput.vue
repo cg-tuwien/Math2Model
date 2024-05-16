@@ -242,8 +242,7 @@ function useTabs() {
 }
 const tabs = useTabs();
 
-function updateModels(ids: string[], update: VirtualModelUpdate) {
-  scene.api.value.updateModels(ids, update);
+function updateScene() {
   const sceneContent = serializeScene(scene.api.value.serialize(), true);
   if (sceneContent === null) {
     showError(
@@ -253,6 +252,11 @@ function updateModels(ids: string[], update: VirtualModelUpdate) {
   } else {
     props.files.writeFile(scenePath, sceneContent);
   }
+}
+
+function updateModels(ids: string[], update: VirtualModelUpdate) {
+  scene.api.value.updateModels(ids, update);
+  updateScene();
 }
 
 function addModel(name: string, shaderName: string | undefined) {
@@ -286,17 +290,18 @@ function addModel(name: string, shaderName: string | undefined) {
     };
 
     scene.api.value.addModel(newModel);
+    updateScene();
+  }
+}
 
-    const sceneContent = serializeScene(scene.api.value.serialize(), true);
-    if (sceneContent === null) {
-      showError(
-        "Could not serialize scene",
-        new Error("Could not serialize scene"),
-      );
-    } else {
-      props.files.writeFile(scenePath, sceneContent);
+function removeModel(ids: string[]) {
+  for (let id of ids) {
+    if (!scene.api.value.removeModel(id)) {
+      showError("Could not delete model of id: " + id, null);
     }
   }
+
+  updateScene();
 }
 </script>
 
@@ -354,6 +359,8 @@ function addModel(name: string, shaderName: string | undefined) {
             @addModel="
               (modelName, shaderName) => addModel(modelName, shaderName)
             "
+            @select="(vertex) => openFile.openFiles([vertex])"
+            @removeModel="(ids) => removeModel(ids)"
           ></SceneHierarchy>
         </div>
         <div v-else>

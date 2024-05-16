@@ -5,7 +5,7 @@ import {
   type VirtualModelState,
 } from "@/scenes/VirtualScene";
 import VirtualModel from "@/components/VirtualModel.vue";
-import { Quaternion, Vector3 } from "@babylonjs/core";
+import { Angle, Quaternion, Vector3 } from "@babylonjs/core";
 
 export interface WriteableModelState {
   name: string;
@@ -16,7 +16,6 @@ export interface WriteableModelState {
   rotX: number;
   rotY: number;
   rotZ: number;
-  rotW: number;
   scale: number;
 }
 
@@ -24,17 +23,16 @@ export function toWriteableModelState(
   model: VirtualModelState,
 ): WriteableModelState {
   const pos = model.position.toVector3();
-  const rot = model.rotation.toQuaternion();
+  const rot = model.rotation.toQuaternion().toEulerAngles();
   return {
     name: model.name,
     code: model.code,
     posX: pos.x,
     posY: pos.y,
     posZ: pos.z,
-    rotX: rot.x,
-    rotY: rot.y,
-    rotZ: rot.z,
-    rotW: rot.w,
+    rotX: parseFloat(new Angle(rot.x).degrees().toFixed(2)),
+    rotY: parseFloat(new Angle(rot.y).degrees().toFixed(2)),
+    rotZ: parseFloat(new Angle(rot.z).degrees().toFixed(2)),
     scale: model.scale,
   };
 }
