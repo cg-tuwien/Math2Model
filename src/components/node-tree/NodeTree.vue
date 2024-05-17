@@ -139,6 +139,25 @@ function onNodeExpand(path: NodePath) {
   emit("setExpanded", path, !isExpanded);
 }
 
+function onKeyDown(event: KeyboardEvent) {
+  if (event.key === "ArrowRight") {
+    onNodeExpand(selection.value.base);
+  } else if (event.key === "ArrowLeft") {
+    onNodeExpand(selection.value.base);
+  } else if (event.key === "Enter") {
+    onNodeExpand(selection.value.base);
+  } else if (event.key === " ") {
+    onNodeExpand(selection.value.base);
+  } else if (event.key == "Escape") {
+    selection.value = {
+      base: [],
+      generation: makeSelectionGeneration(selection.value.generation + 1),
+    };
+    console.log("Escape");
+  }
+  // We could also handle arrow up, down and shift + arrow up, down here
+}
+
 const slots = defineSlots<{
   node(node: TreeNode): any;
 }>();
@@ -155,7 +174,7 @@ const selectedColorHover = computed(() => {
 });
 </script>
 <template>
-  <div>
+  <div @keydown="onKeyDown" tabindex="-1" class="outline-0">
     <NodeTreeRender
       :data="props.root.children ?? []"
       :selection="selection"
