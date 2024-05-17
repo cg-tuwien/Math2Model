@@ -1,50 +1,102 @@
 <script setup lang="ts">
-import { computed, h, ref, shallowRef, watch } from "vue";
-import { type TreeOption, NButton, NInput } from "naive-ui";
+import { computed, h, ref, watch } from "vue";
+import { NButton, NInput } from "naive-ui";
+import NodeTree from "./node-tree/NodeTree.vue";
+import {
+  makeSelectionGeneration,
+  NodeTreeHelper,
+  type NodePath,
+  type SelectionGeneration,
+  type TreeNode,
+  type TreeSelection,
+} from "./node-tree/NodeTreeHelper";
 import {
   makeFilePath,
   type FilePath,
   type ReactiveFiles,
 } from "@/filesystem/reactive-files";
-import { assert } from "@stefnotch/typestef/assert";
 
 const props = defineProps<{
   files: ReactiveFiles;
 }>();
 
-const openFiles = defineModel<FilePath[]>("openFiles", { required: true });
-
 const emit = defineEmits<{
-  "add-files": [files: FilePath[]];
-  "delete-files": [files: FilePath[]];
-  "rename-file": [oldName: FilePath, newName: FilePath];
+  openFile: [file: FilePath];
+  addFiles: [files: Set<FilePath>];
+  deleteFiles: [files: Set<FilePath>];
+  renameFile: [oldName: FilePath, newName: FilePath];
 }>();
+function openFile(file: FilePath) {
+  emit("openFile", file);
+}
+function addFiles(files: Set<FilePath>) {
+  emit("addFiles", files);
+}
+function deleteFiles(files: Set<FilePath>) {
+  emit("deleteFiles", files);
+}
+function renameFile(oldName: FilePath, newName: FilePath) {
+  emit("renameFile", oldName, newName);
+}
 
-const pattern = ref("");
-const checkedKeys = ref<FilePath[]>([]);
 const renamingKey = ref<{ oldName: FilePath; newName: FilePath } | null>(null);
-
-const data = ref<TreeOption[]>([]);
+const pattern = ref("");
+function matchesPattern(node: TreeNode) {
+  if (pattern.value === "") {
+    return true;
+  }
+  return node.label.includes(pattern.value);
+}
+const data = ref<TreeNode>({
+  key: "root",
+  label: "Root",
+  children: [],
+});
 watch(
   props.files.fileNames,
   (fileNames) => {
-    data.value = [...fileNames.keys()].toSorted().map(
-      (file): TreeOption => ({
-        label: file,
-        key: file,
-      })
+    const oldDataMap = new Map(
+      (data.value.children ?? []).map((node) => [node.key, node])
     );
-    checkedKeys.value = checkedKeys.value.filter((key) => fileNames.has(key));
+
+    data.value.children = [...fileNames.keys()]
+      .toSorted()
+      .map((file): TreeNode => {
+        const newNode = oldDataMap.get(file) ?? {
+          label: file,
+          key: file,
+        };
+        return newNode;
+      });
   },
   {
     deep: true,
     immediate: true,
   }
 );
-
-function toFilePaths(v: string[]) {
-  return v.map((key) => makeFilePath(key));
-}
+const fileSelection = ref<TreeSelection>({
+  base: [],
+  generation: makeSelectionGeneration(0),
+});
+watch(
+  () => fileSelection.value.generation,
+  () => {
+    const selectedFile = selectedFiles.value.at(0);
+    if (selectedFile !== undefined) {
+      openFile(selectedFile);
+    }
+  }
+);
+const selectedFiles = computed(() => {
+  const selectedFiles: FilePath[] = [];
+  const generation = fileSelection.value.generation;
+  for (const [node, path] of NodeTreeHelper.visibleNodesIter(data.value)) {
+    if (NodeTreeHelper.isSelected(node, generation)) {
+      selectedFiles.push(makeFilePath(node.key));
+    }
+  }
+  return selectedFiles;
+});
 
 function startAddFile() {
   let newFile = makeFilePath("untitled");
@@ -54,12 +106,12 @@ function startAddFile() {
     i++;
   }
 
-  emit("add-files", [newFile]);
+  addFiles(new Set([newFile]));
   // TODO: Autofocus the new file
   renamingKey.value = { oldName: newFile, newName: newFile };
 }
 
-function renderLabel({ option }: { option: TreeOption }) {
+function renderLabel({ option }: { option: TreeNode }) {
   if (renamingKey.value !== null && option.key === renamingKey.value.oldName) {
     return h(NInput, {
       value: renamingKey.value.newName,
@@ -74,8 +126,7 @@ function renderLabel({ option }: { option: TreeOption }) {
           renamingKey.value.newName !== renamingKey.value.oldName &&
           renamingKey.value.newName !== ""
         ) {
-          emit(
-            "rename-file",
+          renameFile(
             makeFilePath(renamingKey.value.oldName),
             makeFilePath(renamingKey.value.newName)
           );
@@ -93,7 +144,28 @@ function renderLabel({ option }: { option: TreeOption }) {
       },
     });
   } else {
-    return h("span", option.label);
+    return h(
+      "span",
+      {
+        style: {
+          userSelect: "none",
+        },
+      },
+      option.label
+    );
+  }
+}
+
+function onNodeExpand(path: NodePath, value: boolean) {
+  let node = NodeTreeHelper.getNode(data.value, path);
+  if (node !== null) {
+    node.isExpanded = value;
+  }
+}
+function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
+  let node = NodeTreeHelper.getNode(data.value, path);
+  if (node !== null) {
+    node.isSelected = value;
   }
 }
 </script>
@@ -101,46 +173,46 @@ function renderLabel({ option }: { option: TreeOption }) {
   <n-flex vertical>
     <n-flex justify="space-between">
       <n-flex>
-        <n-button @click="startAddFile()" :disabled="checkedKeys.length > 0">
-          Add
-        </n-button>
+        <n-button @click="startAddFile()"> Add </n-button>
         <n-button
-          :disabled="checkedKeys.length !== 1"
+          :disabled="selectedFiles.length !== 1"
           @click="
-            renamingKey = { oldName: checkedKeys[0], newName: checkedKeys[0] }
+            {
+              let oldName = makeFilePath(selectedFiles[0]);
+              renamingKey = {
+                oldName,
+                newName: oldName,
+              };
+            }
           "
         >
           Rename
         </n-button>
         <n-popconfirm
-          @positive-click="emit('delete-files', checkedKeys)"
+          @positive-click="deleteFiles(new Set(selectedFiles))"
           @negative-click="() => {}"
         >
           <template #trigger>
-            <n-button :disabled="checkedKeys.length < 1"> Delete </n-button>
+            <n-button :disabled="selectedFiles.length < 1"> Delete </n-button>
           </template>
-          Are you sure you want to delete {{ checkedKeys.join(", ") }}?
+          Are you sure you want to delete
+          {{ selectedFiles.join(", ") }}?
         </n-popconfirm>
       </n-flex>
       <n-flex>
         <n-input v-model:value="pattern" placeholder="Search" clearable
       /></n-flex>
     </n-flex>
-    <n-tree
-      block-line
-      checkable
-      cascade
-      expand-on-click
-      show-line
-      :show-irrelevant-nodes="false"
-      :default-selected-keys="openFiles"
-      :pattern="pattern"
-      :data="data"
-      :checked-keys="checkedKeys"
-      :render-label="renderLabel"
-      @update:checked-keys="(v: string[]) => (checkedKeys = toFilePaths(v))"
-      @update:selected-keys="(v: string[]) => openFiles = toFilePaths(v)"
-    />
+    <NodeTree
+      :root="data"
+      v-model:selection="fileSelection"
+      @setExpanded="onNodeExpand"
+      @setIsSelected="onNodeSelect"
+    >
+      <template #node="node">
+        <renderLabel :option="node" />
+      </template>
+    </NodeTree>
   </n-flex>
 </template>
 <style scoped></style>

@@ -69,7 +69,7 @@ watch(
     } catch (e) {
       console.log("Could not deserialize scene file.");
     }
-  },
+  }
 );
 if (sceneFile !== null) {
   scene.api.value.fromSerialized(sceneFile);
@@ -101,7 +101,7 @@ onUnmounted(() => {
 let light = new HemisphericLight(
   "light1",
   new Vector3(0, 1, 0),
-  baseScene.value,
+  baseScene.value
 );
 light.intensity = 0.7;
 onUnmounted(() => {
@@ -126,7 +126,7 @@ watch(
   [width, height],
   useDebounceFn(() => {
     props.engine.resize();
-  }, 100),
+  }, 100)
 );
 
 props.engine.runRenderLoop(renderLoop);
@@ -141,7 +141,7 @@ onUnmounted(() => {
 
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
   const keyedCode = ref<KeyedCode | null>(
-    startFile !== null ? readFile(startFile) : null,
+    startFile !== null ? readFile(startFile) : null
   );
 
   function readFile(name: FilePath): KeyedCode | null {
@@ -156,12 +156,10 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
     };
   }
 
-  function openFiles(v: FilePath[]) {
-    if (v.length > 0) {
-      keyedCode.value = readFile(v[0]);
-    }
+  function openFile(v: FilePath) {
+    keyedCode.value = readFile(v);
   }
-  function addFiles(files: FilePath[]) {
+  function addFiles(files: Set<FilePath>) {
     files.forEach((file) => {
       if (fs.hasFile(file)) return;
       fs.writeFile(file, "");
@@ -178,7 +176,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
       keyedCode.value = readFile(newName);
     }
   }
-  function deleteFiles(files: FilePath[]) {
+  function deleteFiles(files: Set<FilePath>) {
     files.forEach((file) => {
       fs.deleteFile(file);
       if (file === keyedCode.value?.name) {
@@ -200,7 +198,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
 
   return {
     code: computed(() => keyedCode.value),
-    openFiles,
+    openFile,
     addFiles,
     renameFile,
     deleteFiles,
@@ -247,7 +245,7 @@ function updateScene() {
   if (sceneContent === null) {
     showError(
       "Could not serialize scene",
-      new Error("Could not serialize scene"),
+      new Error("Could not serialize scene")
     );
   } else {
     props.files.writeFile(scenePath, sceneContent);
@@ -274,7 +272,7 @@ function addModel(name: string, shaderName: string | undefined) {
     fn main(input : FragmentInputs) -> FragmentOutputs {
         fragmentOutputs.color = vec4<f32>(input.vUV,1.0, 1.0);
     }
-`,
+`
     );
 
     const newModel = {
@@ -338,10 +336,7 @@ function removeModel(ids: string[]) {
         <div v-if="tabs.selectedTab.value === 'filebrowser'">
           <FileBrowser
             :files="props.files"
-            :open-files="
-              openFile.code.value !== null ? [openFile.code.value.name] : []
-            "
-            @update:open-files="openFile.openFiles($event)"
+            @open-file="openFile.openFile($event)"
             @add-files="openFile.addFiles($event)"
             @rename-file="
               (oldName, newName) => openFile.renameFile(oldName, newName)
@@ -359,7 +354,7 @@ function removeModel(ids: string[]) {
             @addModel="
               (modelName, shaderName) => addModel(modelName, shaderName)
             "
-            @select="(vertex) => openFile.openFiles([vertex])"
+            @select="(vertex) => openFile.openFile(vertex)"
             @removeModel="(ids) => removeModel(ids)"
           ></SceneHierarchy>
         </div>
