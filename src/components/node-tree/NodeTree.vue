@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import NodeTreeRender from "./NodeTreeRender.vue";
-import { computed, ref, watch, watchEffect } from "vue";
+import { computed } from "vue";
 import { changeColor } from "seemly";
 import { useThemeVars } from "naive-ui";
 import {
@@ -45,6 +45,7 @@ function onNodeClick(event: MouseEvent, path: NodePath) {
       node,
       selection.value.generation
     );
+    selection.value.base = path;
     emit("setIsSelected", path, [selection.value.generation, !isSelected]);
   } else if (isShiftClick) {
     const unselectedPaths: NodePath[] = [];
@@ -157,7 +158,7 @@ const selectedColorHover = computed(() => {
   <div>
     <NodeTreeRender
       :data="props.root.children ?? []"
-      :selectionGeneration="selection.generation"
+      :selection="selection"
       :path="[]"
       :selectedColor="selectedColor"
       :selectedColorHover="selectedColorHover"

@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import {
   type NodeKey,
   type NodePath,
   type SelectionGeneration,
   NodeTreeHelper,
   type TreeNode,
+  type TreeSelection,
 } from "./NodeTreeHelper";
 import { useThemeVars } from "naive-ui";
 
@@ -14,7 +16,7 @@ const themeVars = useThemeVars();
 
 const props = defineProps<{
   data: TreeNode[];
-  selectionGeneration: SelectionGeneration;
+  selection: TreeSelection;
   path: NodePath;
   selectedColor: string;
 }>();
@@ -28,22 +30,30 @@ const emit = defineEmits<{
 const slots = defineSlots<{
   node(node: TreeNode): any;
 }>();
+
+const nodePaths = computed(() => {
+  return props.data.map((node) => props.path.concat([node.key]));
+});
 </script>
 <template>
   <!-- https://vuejs.org/guide/components/slots.html#fancy-list-example -->
 
   <ul>
     <li
-      v-for="node in props.data"
+      v-for="(node, index) in props.data"
       :key="node.key"
-      @click.stop.prevent="emit('node-click', $event, path.concat([node.key]))"
+      @click.stop.prevent="emit('node-click', $event, nodePaths[index])"
     >
       <div
         class="flex tree-node"
         :class="{
           'is-selected': NodeTreeHelper.isSelected(
             node,
-            props.selectionGeneration
+            props.selection.generation
+          ),
+          'is-selection-base': NodeTreeHelper.pathEquals(
+            props.selection.base,
+            nodePaths[index]
           ),
         }"
       >
@@ -53,11 +63,11 @@ const slots = defineSlots<{
           class="depth-spacer select-none"
         ></span>
         <span
-          @click="emit('node-expand', path.concat([node.key]))"
+          @click="emit('node-expand', nodePaths[index])"
           class="flex flex-col justify-center select-none w-4"
         >
           <span v-if="(node.children?.length ?? 0) <= 0">
-            <mdi-circle-medium></mdi-circle-medium>
+            <mdi-circle-small></mdi-circle-small>
           </span>
           <span v-else-if="node.isExpanded">
             <mdi-chevron-down></mdi-chevron-down>
@@ -72,8 +82,8 @@ const slots = defineSlots<{
         <NodeTreeRender
           v-if="node.children && node.isExpanded"
           :data="node.children"
-          :selectionGeneration="props.selectionGeneration"
-          :path="path.concat([node.key])"
+          :selection="props.selection"
+          :path="nodePaths[index]"
           :selectedColor="props.selectedColor"
           @node-click="(ev, path) => emit('node-click', ev, path)"
           @node-expand="(path) => emit('node-expand', path)"
@@ -105,6 +115,9 @@ const slots = defineSlots<{
     v-bind("themeVars.successColor") 15%,
     transparent
   );
+}
+.tree-node.is-selection-base {
+  outline: 1px solid v-bind("themeVars.successColor");
 }
 .depth-spacer {
   padding-left: 1rem;
