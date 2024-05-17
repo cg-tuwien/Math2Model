@@ -4,7 +4,6 @@ export type NodePath = NodeKey[];
 export interface TreeNode {
   key: NodeKey;
   label: string;
-  isVisible?: boolean;
   isExpanded?: boolean;
   isSelected?: [SelectionGeneration, boolean];
   children?: TreeNode[];

@@ -2,6 +2,7 @@
 import { computed, h, ref, watch } from "vue";
 import { NButton, NInput } from "naive-ui";
 import NodeTree from "./node-tree/NodeTree.vue";
+import SingleFile from "./SingleFile.vue";
 import {
   makeSelectionGeneration,
   NodeTreeHelper,
@@ -41,11 +42,29 @@ function renameFile(oldName: FilePath, newName: FilePath) {
 
 const renamingKey = ref<{ oldName: FilePath; newName: FilePath } | null>(null);
 const pattern = ref("");
-function matchesPattern(node: TreeNode) {
+function matchesPattern(node: TreeNode): { start: number; end: number } | null {
   if (pattern.value === "") {
-    return true;
+    return { start: 0, end: node.label.length };
   }
-  return node.label.includes(pattern.value);
+  const start = node.label.indexOf(pattern.value);
+  if (start === -1) {
+    return null;
+  }
+  return { start, end: start + pattern.value.length };
+}
+function filterNodes(node: TreeNode): [TreeNode] | [] {
+  const children = (node.children ?? []).flatMap(filterNodes);
+  const matches = matchesPattern(node);
+  if (children.length === 0 && matches === null) {
+    return [];
+  } else {
+    return [
+      {
+        ...node,
+        children,
+      },
+    ];
+  }
 }
 const data = ref<TreeNode>({
   key: "root",
@@ -74,6 +93,16 @@ watch(
     immediate: true,
   }
 );
+const filteredData = computed(() => {
+  if (pattern.value === "") {
+    return data.value;
+  }
+  const filteredData = { ...data.value };
+  filteredData.children = (data.value.children ?? []).flatMap((node) =>
+    filterNodes(node)
+  );
+  return filteredData;
+});
 const fileSelection = ref<TreeSelection>({
   base: [],
   generation: makeSelectionGeneration(0),
@@ -90,7 +119,7 @@ watch(
 const selectedFiles = computed(() => {
   const selectedFiles: FilePath[] = [];
   const generation = fileSelection.value.generation;
-  for (const [node, path] of NodeTreeHelper.visibleNodesIter(data.value)) {
+  for (const [node, _] of NodeTreeHelper.visibleNodesIter(filteredData.value)) {
     if (NodeTreeHelper.isSelected(node, generation)) {
       selectedFiles.push(makeFilePath(node.key));
     }
@@ -143,16 +172,18 @@ function renderLabel({ option }: { option: TreeNode }) {
         }
       },
     });
+  } else if (pattern.value === "") {
+    // No filtering
+    return h(SingleFile, {
+      node: option,
+      highlight: null,
+    });
   } else {
-    return h(
-      "span",
-      {
-        style: {
-          userSelect: "none",
-        },
-      },
-      option.label
-    );
+    const matches = matchesPattern(option);
+    return h(SingleFile, {
+      node: option,
+      highlight: matches,
+    });
   }
 }
 
@@ -204,7 +235,7 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
       /></n-flex>
     </n-flex>
     <NodeTree
-      :root="data"
+      :root="filteredData"
       v-model:selection="fileSelection"
       @setExpanded="onNodeExpand"
       @setIsSelected="onNodeSelect"

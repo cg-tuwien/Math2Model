@@ -153,7 +153,6 @@ function onKeyDown(event: KeyboardEvent) {
       base: [],
       generation: makeSelectionGeneration(selection.value.generation + 1),
     };
-    console.log("Escape");
   }
   // We could also handle arrow up, down and shift + arrow up, down here
 }
