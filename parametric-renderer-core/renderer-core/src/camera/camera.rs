@@ -1,9 +1,9 @@
 use glam::Quat;
-use glamour::{Angle, Matrix4, Point3, Vector3};
+use glamour::{Matrix4, Point3, Vector3};
 
 use super::{camera_controller::CameraController, camera_settings::CameraSettings};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Camera {
     pub position: Point3,
     pub orientation: Quat,
@@ -19,7 +19,7 @@ impl Camera {
         let orientation = Quat::IDENTITY;
 
         let proj =
-            calculate_projection(aspect_ratio, settings.fov, settings.z_near, settings.z_far);
+            Matrix4::perspective_infinite_reverse_rh(settings.fov, aspect_ratio, settings.z_near);
 
         let view = calculate_view(position, orientation);
 
@@ -50,7 +50,7 @@ impl Camera {
 
     pub fn update_aspect_ratio(&mut self, aspect_ratio: f32) {
         // See https://docs.rs/glam/0.27.0/src/glam/f32/sse2/mat4.rs.html#969-982
-        self.proj.as_cols_mut()[0][0] = -self.proj.as_cols()[1][1] / aspect_ratio;
+        self.proj.as_cols_mut()[0][0] = self.proj.as_cols()[1][1] / aspect_ratio;
     }
 
     /// in world-space
@@ -67,11 +67,6 @@ impl Camera {
     pub const fn up() -> Vector3 {
         Vector3::new(0.0, 1.0, 0.0)
     }
-}
-
-/// fov is expected to be in radians
-fn calculate_projection(aspect_ratio: f32, fov: Angle, near: f32, _far: f32) -> Matrix4<f32> {
-    Matrix4::perspective_infinite_reverse_rh(fov, aspect_ratio, near)
 }
 
 fn calculate_view(position: Point3, orientation: Quat) -> Matrix4<f32> {

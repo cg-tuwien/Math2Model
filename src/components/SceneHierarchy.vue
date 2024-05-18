@@ -1,40 +1,21 @@
 <script setup lang="ts">
 import {
-  ReadonlyQuaternion,
+  ReadonlyEulerAngles,
   ReadonlyVector3,
   type VirtualModelState,
   type VirtualModelUpdate,
 } from "@/scenes/VirtualScene";
-import { computed, h, ref, watch, watchEffect, type DeepReadonly } from "vue";
+import { computed, h, ref, watchEffect, type DeepReadonly } from "vue";
 import { NButton, NInput, type TreeOption } from "naive-ui";
+import AngleInput from "@/components/input/AngleInput.vue";
 import { showError } from "@/notification";
 import {
   commonWriteableModelState,
   toWriteableModelState,
   type WriteableModelState,
 } from "@/sceneview/writeablemodelstate";
-import { ShaderFiles } from "@/filesystem/shader-files";
 import { type FilePath } from "@/filesystem/reactive-files";
-
-function setCurrentModel(model: VirtualModelState): void {
-  console.log("Set current Model (" + JSON.stringify(model) + ");");
-  if (!currentModel.value)
-    currentModel = computed(() => toWriteableModelState(model));
-  else {
-    // currentModel.value.id = model.id.valueOf();
-    currentModel.value.name = model.name.valueOf();
-    currentModel.value.code = model.code;
-    currentModel.value.posX = model.position.x.valueOf();
-    currentModel.value.posY = model.position.y.valueOf();
-    currentModel.value.posZ = model.position.z.valueOf();
-    currentModel.value.rotX = model.rotation.x.valueOf();
-    currentModel.value.rotY = model.rotation.y.valueOf();
-    currentModel.value.rotZ = model.rotation.z.valueOf();
-    currentModel.value.scale = model.scale.valueOf();
-  }
-}
 import { assertUnreachable } from "@stefnotch/typestef/assert";
-import { Angle, Quaternion, Tools } from "@babylonjs/core";
 
 const emit = defineEmits({
   update(ids: string[], update: VirtualModelUpdate) {
@@ -57,7 +38,7 @@ const props = defineProps<{
 
 const pattern = ref("");
 const selectedKeys = ref<string[]>(
-  props.models.length > 0 ? [props.models[0].id] : [],
+  props.models.length > 0 ? [props.models[0].id] : []
 );
 const checkedKeys = ref<string[]>([]);
 const data = computed(() =>
@@ -65,8 +46,8 @@ const data = computed(() =>
     (model): TreeOption => ({
       label: model.name,
       key: model.id,
-    }),
-  ),
+    })
+  )
 );
 
 let currentModel = ref<WriteableModelState | null>(null);
@@ -123,15 +104,15 @@ function change(key: keyof WriteableModelState) {
       position: new ReadonlyVector3(
         model.posX ?? 0,
         model.posY ?? 0,
-        model.posZ ?? 0,
+        model.posZ ?? 0
       ),
     });
   } else if (key === "rotX" || key === "rotY" || key === "rotZ") {
     emit("update", keys, {
-      rotation: new ReadonlyVector3(
-        Tools.ToRadians(model.rotX ?? 0),
-        Tools.ToRadians(model.rotY ?? 0),
-        Tools.ToRadians(model.rotZ ?? 0),
+      rotation: new ReadonlyEulerAngles(
+        model.rotX ?? 0,
+        model.rotY ?? 0,
+        model.rotZ ?? 0
       ),
     });
   } else if (key === "scale") {
@@ -235,28 +216,20 @@ function removeModel() {
         </div>
         <div>
           <n-text>Rotation x</n-text>
-          <n-input-number
-            v-model:value="currentModel.rotX"
-            clearable
-            v-on:input="change('rotX')"
-            :show-button="false"
-          ></n-input-number>
+          <AngleInput
+            v-model="currentModel.rotX"
+            @update:modelValue="change('rotX')"
+          ></AngleInput>
           <n-text>Rotation y</n-text>
-          <n-input-number
-            v-model:value="currentModel.rotY"
-            clearable
-            v-on:input="change('rotY')"
-            :show-button="false"
-          ></n-input-number>
-        </div>
-        <div>
+          <AngleInput
+            v-model="currentModel.rotY"
+            @update:modelValue="change('rotY')"
+          ></AngleInput>
           <n-text>Rotation z</n-text>
-          <n-input-number
-            v-model:value="currentModel.rotZ"
-            clearable
-            v-on:input="change('rotZ')"
-            :show-button="false"
-          ></n-input-number>
+          <AngleInput
+            v-model="currentModel.rotZ"
+            @update:modelValue="change('rotZ')"
+          ></AngleInput>
         </div>
         <div>
           <n-text>Scale</n-text>

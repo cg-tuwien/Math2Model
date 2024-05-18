@@ -1,5 +1,4 @@
-import { Quaternion, Vector3 } from "@babylonjs/core";
-import { computed, readonly, ref, shallowRef, type Ref } from "vue";
+import { computed, ref, shallowRef, type Ref } from "vue";
 import {
   SceneFileSchemaUrl,
   type SerializedModel,
@@ -12,18 +11,10 @@ export class ReadonlyVector3 {
   constructor(
     public readonly x: number,
     public readonly y: number,
-    public readonly z: number,
+    public readonly z: number
   ) {}
 
   static readonly zero = new ReadonlyVector3(0, 0, 0);
-
-  static fromVector3(v: Vector3) {
-    return new ReadonlyVector3(v.x, v.y, v.z);
-  }
-
-  toVector3() {
-    return new Vector3(this.x, this.y, this.z);
-  }
 
   serialize(): [number, number, number] {
     return [this.x, this.y, this.z];
@@ -33,23 +24,32 @@ export class ReadonlyVector3 {
     return new ReadonlyVector3(data[0], data[1], data[2]);
   }
 }
+export class ReadonlyEulerAngles {
+  constructor(
+    public readonly x: number,
+    public readonly y: number,
+    public readonly z: number
+  ) {}
+
+  static readonly identity = new ReadonlyEulerAngles(0, 0, 0);
+
+  serialize(): [number, number, number] {
+    return [this.x, this.y, this.z];
+  }
+
+  static fromSerialized(data: [number, number, number]) {
+    return new ReadonlyEulerAngles(data[0], data[1], data[2]);
+  }
+}
 export class ReadonlyQuaternion {
   constructor(
     public readonly x: number,
     public readonly y: number,
     public readonly z: number,
-    public readonly w: number,
+    public readonly w: number
   ) {}
 
   static readonly identity = new ReadonlyQuaternion(0, 0, 0, 1);
-
-  static fromQuaternion(q: Quaternion) {
-    return new ReadonlyQuaternion(q.x, q.y, q.z, q.w);
-  }
-
-  toQuaternion() {
-    return new Quaternion(this.x, this.y, this.z, this.w);
-  }
 
   serialize(): [number, number, number, number] {
     return [this.x, this.y, this.z, this.w];
@@ -65,7 +65,7 @@ export interface VirtualModelState {
   name: string;
   code: ShaderCodeRef;
   position: ReadonlyVector3;
-  rotation: ReadonlyQuaternion;
+  rotation: ReadonlyEulerAngles;
   scale: number;
 }
 
@@ -73,7 +73,7 @@ export interface VirtualModelUpdate {
   name?: string;
   code?: ShaderCodeRef;
   position?: ReadonlyVector3;
-  rotation?: ReadonlyVector3;
+  rotation?: ReadonlyEulerAngles;
   scale?: number;
 }
 
@@ -118,7 +118,7 @@ export class VirtualScene {
 
   removeModel(key: string): boolean {
     const index = this.state.value.models.findIndex(
-      (model) => model.id === key,
+      (model) => model.id === key
     );
     if (index !== -1) {
       this.state.value.models.splice(index, 1);
@@ -130,28 +130,23 @@ export class VirtualScene {
   updateModels(keys: string[], update: VirtualModelUpdate) {
     const keysMap = new Set(keys);
     for (const model of this.state.value.models) {
-      if (keysMap.has(model.id)) {
-        if (update.name !== undefined) {
-          model.name = update.name;
-        }
-        if (update.code !== undefined) {
-          model.code = update.code;
-        }
-        if (update.position !== undefined) {
-          model.position = update.position;
-        }
-        if (update.rotation !== undefined) {
-          model.rotation = ReadonlyQuaternion.fromQuaternion(
-            Quaternion.FromEulerAngles(
-              update.rotation.x,
-              update.rotation.y,
-              update.rotation.z,
-            ),
-          );
-        }
-        if (update.scale !== undefined) {
-          model.scale = update.scale;
-        }
+      if (!keysMap.has(model.id)) {
+        continue;
+      }
+      if (update.name !== undefined) {
+        model.name = update.name;
+      }
+      if (update.code !== undefined) {
+        model.code = update.code;
+      }
+      if (update.position !== undefined) {
+        model.position = update.position;
+      }
+      if (update.rotation !== undefined) {
+        model.rotation = update.rotation;
+      }
+      if (update.scale !== undefined) {
+        model.scale = update.scale;
       }
     }
   }
@@ -192,7 +187,7 @@ function deserializeModel(data: SerializedModel): VirtualModelState {
       fragmentFile: makeFilePath(data.fragmentShader),
     },
     position: ReadonlyVector3.fromSerialized(data.position),
-    rotation: ReadonlyQuaternion.fromSerialized(data.rotation),
+    rotation: ReadonlyEulerAngles.fromSerialized(data.rotation),
     scale: data.scale,
   };
 }

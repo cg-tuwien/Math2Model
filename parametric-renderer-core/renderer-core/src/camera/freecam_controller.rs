@@ -34,7 +34,7 @@ impl FreecamController {
     fn update_orientation(&mut self, mouse_delta: Vector2) {
         self.set_pitch_yaw(
             self.pitch + Angle::new(mouse_delta.y * self.sensitivity),
-            self.yaw - Angle::new(mouse_delta.x * self.sensitivity),
+            self.yaw + Angle::new(mouse_delta.x * self.sensitivity),
         );
     }
 
@@ -85,10 +85,10 @@ fn input_to_direction(input: &WinitInputHelper) -> Vector3 {
     }
 
     if input.key_held(KeyCode::KeyD) {
-        direction -= Camera::right();
+        direction += Camera::right();
     }
     if input.key_held(KeyCode::KeyA) {
-        direction += Camera::right();
+        direction -= Camera::right();
     }
 
     if input.key_held(KeyCode::Space) {

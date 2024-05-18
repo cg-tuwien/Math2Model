@@ -4,8 +4,13 @@ import type {
   HasReactiveFiles,
   ReadonlyFiles,
 } from "@/filesystem/reactive-files";
-import type { BaseScene } from "@/scenes/BaseScene";
-import type { VirtualModelState } from "@/scenes/VirtualScene";
+import type { BabylonBaseScene } from "@/scenes/BaseScene";
+import type {
+  ReadonlyEulerAngles,
+  ReadonlyQuaternion,
+  ReadonlyVector3,
+  VirtualModelState,
+} from "@/scenes/VirtualScene";
 import {
   ComputeShader,
   Constants,
@@ -35,9 +40,8 @@ import ComputePatches from "../../parametric-renderer-core/shaders/ComputePatche
 import CopyPatches from "../../parametric-renderer-core/shaders/CopyPatches.wgsl?raw";
 
 const props = defineProps<{
-  scene: BaseScene;
+  scene: BabylonBaseScene;
   files: ReadonlyFiles & HasReactiveFiles;
-  globalUBO: UniformBuffer;
   model: DeepReadonly<VirtualModelState>;
 }>();
 
@@ -158,8 +162,8 @@ const mesh = babylonEffectRef<GroundMesh>(() => {
   return mesh;
 });
 watchEffect(() => {
-  mesh.value.position = props.model.position.toVector3();
-  mesh.value.rotationQuaternion = props.model.rotation.toQuaternion();
+  mesh.value.position = toVector3(props.model.position);
+  mesh.value.rotationQuaternion = eulerToQuaternion(props.model.rotation);
   mesh.value.scaling = new Vector3(
     props.model.scale,
     props.model.scale,
@@ -208,7 +212,7 @@ const shaderMaterial = babylonEffectRef<ShaderMaterial | null>(() => {
   return material;
 });
 watchEffect(() => {
-  shaderMaterial.value?.setUniformBuffer("globalUBO", props.globalUBO);
+  shaderMaterial.value?.setUniformBuffer("globalUBO", props.scene.globalUBO);
 });
 watchEffect(() => {
   mesh.value.material = shaderMaterial.value;
@@ -640,5 +644,15 @@ function assembleComputeShader(innerCode: string | null) {
       return v;
     }
   });
+}
+
+function toVector3(v: ReadonlyVector3) {
+  return new Vector3(v.x, v.y, v.z);
+}
+function toQuaternion(v: ReadonlyQuaternion) {
+  return new Quaternion(v.x, v.y, v.z, v.w);
+}
+function eulerToQuaternion(v: ReadonlyEulerAngles) {
+  return Quaternion.FromEulerAngles(v.x, v.y, v.z);
 }
 </script>

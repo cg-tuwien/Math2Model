@@ -202,38 +202,40 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
 </script>
 <template>
   <n-flex vertical>
-    <n-flex justify="space-between">
-      <n-flex>
-        <n-button @click="startAddFile()"> Add </n-button>
-        <n-button
-          :disabled="selectedFiles.length !== 1"
-          @click="
-            {
-              let oldName = makeFilePath(selectedFiles[0]);
-              renamingKey = {
-                oldName,
-                newName: oldName,
-              };
-            }
-          "
-        >
-          Rename
-        </n-button>
-        <n-popconfirm
-          @positive-click="deleteFiles(new Set(selectedFiles))"
-          @negative-click="() => {}"
-        >
-          <template #trigger>
-            <n-button :disabled="selectedFiles.length < 1"> Delete </n-button>
-          </template>
-          Are you sure you want to delete
-          {{ selectedFiles.join(", ") }}?
-        </n-popconfirm>
-      </n-flex>
-      <n-flex>
-        <n-input v-model:value="pattern" placeholder="Search" clearable
-      /></n-flex>
+    <n-flex class="mx-2">
+      <n-button @click="startAddFile()"> Add </n-button>
+      <n-button
+        :disabled="selectedFiles.length !== 1"
+        @click="
+          {
+            let oldName = makeFilePath(selectedFiles[0]);
+            renamingKey = {
+              oldName,
+              newName: oldName,
+            };
+          }
+        "
+      >
+        Rename
+      </n-button>
+      <n-popconfirm
+        @positive-click="deleteFiles(new Set(selectedFiles))"
+        @negative-click="() => {}"
+      >
+        <template #trigger>
+          <n-button :disabled="selectedFiles.length < 1"> Delete </n-button>
+        </template>
+        Are you sure you want to delete
+        {{ selectedFiles.join(", ") }}?
+      </n-popconfirm>
     </n-flex>
+    <n-flex class="mx-2">
+      <n-input
+        v-model:value="pattern"
+        placeholder="Search"
+        clearable
+        size="small"
+    /></n-flex>
     <NodeTree
       :root="filteredData"
       v-model:selection="fileSelection"

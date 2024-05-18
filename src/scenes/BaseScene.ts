@@ -9,21 +9,27 @@ import {
   ArcRotateCamera,
   type Camera,
   type Mesh,
+  HemisphericLight,
+  UniformBuffer,
+  Observable,
 } from "@babylonjs/core";
 import { GridMaterial } from "@babylonjs/materials/grid/gridMaterial";
 import backgroundGround from "@/assets/backgroundGround.png";
 import { mapOptional } from "@/option";
 import { z } from "zod";
+import type { BaseScene } from "@/engine/engine";
 
 export type Milliseconds = number;
 export type Seconds = number;
 
-export class BaseScene extends Scene {
+export class BabylonBaseScene extends Scene implements BaseScene {
   private _gridMesh: GroundMesh;
   private _camera: ArcRotateCamera;
   private _frame: number = 0;
   private _startTime: Milliseconds = 0;
   private _currentTime: Milliseconds = 0;
+  private _updateObservable: Observable<void> = new Observable();
+  public globalUBO: UniformBuffer;
 
   get camera(): Camera {
     return this._camera;
@@ -56,6 +62,9 @@ export class BaseScene extends Scene {
     });
     this._gridMesh = makeGridMesh(this);
 
+    let light = new HemisphericLight("light1", new Vector3(0, 1, 0), this);
+    light.intensity = 0.7;
+
     let camera = new ArcRotateCamera(
       "camera",
       cacheFile?.camera?.alpha ?? 0,
@@ -73,6 +82,21 @@ export class BaseScene extends Scene {
     camera.upperBetaLimit = 1.5; // Almost straight down to xz-plane
     camera.lowerRadiusLimit = 0.1;
     this._camera = camera;
+
+    this.globalUBO = new UniformBuffer(engine);
+    this.globalUBO.addUniform("iTime", 1);
+    this.globalUBO.addUniform("iTimeDelta", 1);
+    this.globalUBO.addUniform("iFrame", 1);
+    this.globalUBO.update();
+    this._updateObservable.add(() => {
+      this.globalUBO.updateFloat("iTime", this.time / 1000);
+      this.globalUBO.updateFloat("iTimeDelta", this.deltaTime / 1000);
+      this.globalUBO.updateFloat("iFrame", this.frame);
+      this.globalUBO.update();
+    });
+    this.onDisposeObservable.add(() => {
+      this.globalUBO.dispose();
+    });
 
     this._startTime = performance.now();
 
@@ -94,6 +118,15 @@ export class BaseScene extends Scene {
   update() {
     this._currentTime = performance.now();
     this._frame++;
+    this._updateObservable.notifyObservers();
+  }
+
+  [Symbol.dispose]() {
+    this.dispose();
+  }
+
+  asBabylon() {
+    return this;
   }
 }
 

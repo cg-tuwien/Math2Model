@@ -1,14 +1,4 @@
 <script setup lang="ts">
-import {
-  ComputeShader,
-  HemisphericLight,
-  Observable,
-  Quaternion,
-  UniformBuffer,
-  Vector3,
-  type WebGPUEngine,
-} from "@babylonjs/core";
-import { BaseScene } from "@/scenes/BaseScene";
 import CodeEditor, { type KeyedCode } from "@/components/CodeEditor.vue";
 import IconFolderMultipleOutline from "~icons/mdi/folder-multiple-outline";
 import IconFileTreeOutline from "~icons/mdi/file-tree-outline";
@@ -18,37 +8,35 @@ import {
   watch,
   watchEffect,
   onUnmounted,
-  readonly,
   computed,
   h,
 } from "vue";
-import { useDebounceFn, useElementSize } from "@vueuse/core";
+import { useDebounceFn } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import {
   ReactiveFiles,
   makeFilePath,
   type FilePath,
-  readOrCreateFile,
 } from "@/filesystem/reactive-files";
 import { showError } from "@/notification";
 import {
-  ReadonlyQuaternion,
+  ReadonlyEulerAngles,
   ReadonlyVector3,
   useVirtualScene,
   type VirtualModelUpdate,
 } from "@/scenes/VirtualScene";
 import { getOrCreateScene } from "@/filesystem/start-files";
-import { ShaderFiles } from "@/filesystem/shader-files";
 import VirtualModel from "@/components/VirtualModel.vue";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { serializeScene } from "@/filesystem/scene-file";
+import type { Engine } from "@/engine/engine";
 import HeartSphere from "../../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
   files: ReactiveFiles;
   canvas: HTMLCanvasElement;
-  engine: WebGPUEngine;
+  engine: Engine;
 }>();
 
 const store = useStore();
@@ -76,36 +64,10 @@ if (sceneFile !== null) {
 }
 const openFile = useOpenFile(startFile, props.files);
 
-const shaderFiles = new ShaderFiles(props.files);
-// The BabylonJS scene
 const canvasContainer = ref<HTMLDivElement | null>(null);
-const baseScene = shallowRef(new BaseScene(props.engine));
+const baseScene = shallowRef(props.engine.createBaseScene());
 onUnmounted(() => {
-  baseScene.value.dispose();
-});
-const updateObservable: Observable<void> = new Observable();
-const globalUBO = shallowRef(new UniformBuffer(props.engine));
-globalUBO.value.addUniform("iTime", 1);
-globalUBO.value.addUniform("iTimeDelta", 1);
-globalUBO.value.addUniform("iFrame", 1);
-globalUBO.value.update();
-updateObservable.add(() => {
-  globalUBO.value.updateFloat("iTime", baseScene.value.time / 1000);
-  globalUBO.value.updateFloat("iTimeDelta", baseScene.value.deltaTime / 1000);
-  globalUBO.value.updateFloat("iFrame", baseScene.value.frame);
-  globalUBO.value.update();
-});
-onUnmounted(() => {
-  globalUBO.value.dispose();
-});
-let light = new HemisphericLight(
-  "light1",
-  new Vector3(0, 1, 0),
-  baseScene.value
-);
-light.intensity = 0.7;
-onUnmounted(() => {
-  light.dispose();
+  baseScene.value[Symbol.dispose]();
 });
 
 // TODO: Gizmo
@@ -120,23 +82,13 @@ watchEffect(() => {
   canvasContainer.value?.appendChild(props.canvas);
 });
 
-// Resize the engine when the canvas size changes
-const { width, height } = useElementSize(() => props.canvas);
-watch(
-  [width, height],
-  useDebounceFn(() => {
-    props.engine.resize();
-  }, 100)
-);
-
-props.engine.runRenderLoop(renderLoop);
+let stopRenderLoop = props.engine.startRenderLoop(renderLoop);
 function renderLoop() {
   baseScene.value.update();
-  updateObservable.notifyObservers();
   baseScene.value.render();
 }
 onUnmounted(() => {
-  props.engine.stopRenderLoop(renderLoop);
+  stopRenderLoop.stop();
 });
 
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
@@ -282,8 +234,8 @@ function addModel(name: string, shaderName: string | undefined) {
         vertexFile: vertexSource,
         fragmentFile: fragmentSource,
       },
-      position: ReadonlyVector3.fromVector3(new Vector3(0, 0, 0)),
-      rotation: ReadonlyQuaternion.identity,
+      position: ReadonlyVector3.zero,
+      rotation: ReadonlyEulerAngles.identity,
       scale: 1,
     };
 
@@ -304,7 +256,7 @@ function removeModel(ids: string[]) {
 </script>
 
 <template>
-  <main class="min-h-full flex">
+  <main class="flex">
     <n-tabs
       type="line"
       animated
@@ -326,55 +278,56 @@ function removeModel(ids: string[]) {
     </n-tabs>
     <n-split
       direction="horizontal"
-      style="height: 100vh"
+      style="height: 80vh"
       :max="0.75"
       :min="0"
       :default-size="0.2"
       v-model:size="tabs.splitSize.value"
     >
       <template #1>
-        <div v-if="tabs.selectedTab.value === 'filebrowser'">
-          <FileBrowser
-            :files="props.files"
-            @open-file="openFile.openFile($event)"
-            @add-files="openFile.addFiles($event)"
-            @rename-file="
-              (oldName, newName) => openFile.renameFile(oldName, newName)
-            "
-            @delete-files="openFile.deleteFiles($event)"
-          ></FileBrowser>
-        </div>
-        <div v-else-if="tabs.selectedTab.value === 'sceneview'">
-          <SceneHierarchy
-            :models="scene.state.value.models"
-            :scene="scene.api.value"
-            :files="props.files"
-            :scene-path="scenePath"
-            @update="(keys, update) => updateModels(keys, update)"
-            @addModel="
-              (modelName, shaderName) => addModel(modelName, shaderName)
-            "
-            @select="(vertex) => openFile.openFile(vertex)"
-            @removeModel="(ids) => removeModel(ids)"
-          ></SceneHierarchy>
-        </div>
-        <div v-else>
-          <p>Unknown tab</p>
+        <div class="pt-2 h-full w-full overflow-y-auto">
+          <div v-if="tabs.selectedTab.value === 'filebrowser'">
+            <FileBrowser
+              :files="props.files"
+              @open-file="openFile.openFile($event)"
+              @add-files="openFile.addFiles($event)"
+              @rename-file="
+                (oldName, newName) => openFile.renameFile(oldName, newName)
+              "
+              @delete-files="openFile.deleteFiles($event)"
+            ></FileBrowser>
+          </div>
+          <div v-else-if="tabs.selectedTab.value === 'sceneview'">
+            <SceneHierarchy
+              :models="scene.state.value.models"
+              :scene="scene.api.value"
+              :files="props.files"
+              :scene-path="scenePath"
+              @update="(keys, update) => updateModels(keys, update)"
+              @addModel="
+                (modelName, shaderName) => addModel(modelName, shaderName)
+              "
+              @select="(vertex) => openFile.openFile(vertex)"
+              @removeModel="(ids) => removeModel(ids)"
+            ></SceneHierarchy>
+          </div>
+          <div v-else>
+            <p>Unknown tab</p>
+          </div>
         </div>
       </template>
       <template #2>
-        <div class="flex" style="height: 100vh; width: 100%">
+        <div class="flex h-full w-full">
           <div
             ref="canvasContainer"
             class="self-stretch overflow-hidden flex-1"
           ></div>
-          <div>
+          <div v-if="baseScene.asBabylon() !== null">
             <VirtualModel
               v-for="model in scene.state.value.models"
               :key="model.id"
-              :scene="baseScene"
+              :scene="baseScene.asBabylon()"
               :files="props.files"
-              :globalUBO="globalUBO"
               :model="model"
             ></VirtualModel>
           </div>

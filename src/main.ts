@@ -16,6 +16,12 @@ globalThis.addEventListener("unhandledrejection", (event) => {
   console.error(event);
 });
 globalThis.addEventListener("error", (event) => {
+  if (
+    event.error?.message ===
+    "Using exceptions for control flow, don't mind me. This isn't actually an error!"
+  ) {
+    return;
+  }
   Notification.error({
     title: "Unhandled Error",
     content: event.message + "",
