@@ -5,7 +5,12 @@ import type {
   ReadonlyFiles,
 } from "@/filesystem/reactive-files";
 import type { BabylonBaseScene } from "@/scenes/BaseScene";
-import type { VirtualModelState } from "@/scenes/VirtualScene";
+import type {
+  ReadonlyEulerAngles,
+  ReadonlyQuaternion,
+  ReadonlyVector3,
+  VirtualModelState,
+} from "@/scenes/VirtualScene";
 import {
   ComputeShader,
   Constants,
@@ -157,8 +162,8 @@ const mesh = babylonEffectRef<GroundMesh>(() => {
   return mesh;
 });
 watchEffect(() => {
-  mesh.value.position = props.model.position.toVector3();
-  mesh.value.rotationQuaternion = props.model.rotation.toQuaternion();
+  mesh.value.position = toVector3(props.model.position);
+  mesh.value.rotationQuaternion = eulerToQuaternion(props.model.rotation);
   mesh.value.scaling = new Vector3(
     props.model.scale,
     props.model.scale,
@@ -639,5 +644,15 @@ function assembleComputeShader(innerCode: string | null) {
       return v;
     }
   });
+}
+
+function toVector3(v: ReadonlyVector3) {
+  return new Vector3(v.x, v.y, v.z);
+}
+function toQuaternion(v: ReadonlyQuaternion) {
+  return new Quaternion(v.x, v.y, v.z, v.w);
+}
+function eulerToQuaternion(v: ReadonlyEulerAngles) {
+  return Quaternion.FromEulerAngles(v.x, v.y, v.z);
 }
 </script>

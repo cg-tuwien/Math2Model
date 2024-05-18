@@ -7,7 +7,7 @@ export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   position: z.tuple([z.number(), z.number(), z.number()]),
-  rotation: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+  rotation: z.tuple([z.number(), z.number(), z.number()]),
   scale: z.number(),
   parametricShader: z.string(),
   fragmentShader: z.string(),
@@ -15,7 +15,6 @@ export const ModelSchema = z.object({
 
 export type SerializedModel = z.infer<typeof ModelSchema>;
 
-// TODO: Hook this up in monaco-setup.ts
 export const SceneFileSchema = z.object({
   $schema: z.literal(SceneFileSchemaUrl),
   models: z.array(ModelSchema),

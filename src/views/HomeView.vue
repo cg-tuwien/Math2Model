@@ -2,7 +2,7 @@
 import { ReactiveFiles } from "@/filesystem/reactive-files";
 import EditorAndOutput from "@/components/EditorAndOutput.vue";
 import { markRaw, shallowRef } from "vue";
-import { sceneFilesPromise, takeCanvas } from "@/globals";
+import { sceneFilesPromise } from "@/globals";
 import type { Engine } from "@/engine/engine";
 import { getEngine } from "@/engine/babylon-engine-promise";
 

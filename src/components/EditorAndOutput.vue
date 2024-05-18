@@ -17,11 +17,10 @@ import {
   ReactiveFiles,
   makeFilePath,
   type FilePath,
-  readOrCreateFile,
 } from "@/filesystem/reactive-files";
 import { showError } from "@/notification";
 import {
-  ReadonlyQuaternion,
+  ReadonlyEulerAngles,
   ReadonlyVector3,
   useVirtualScene,
   type VirtualModelUpdate,
@@ -31,6 +30,7 @@ import VirtualModel from "@/components/VirtualModel.vue";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { serializeScene } from "@/filesystem/scene-file";
 import type { Engine } from "@/engine/engine";
+import HeartSphere from "../../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -234,8 +234,8 @@ function addModel(name: string, shaderName: string | undefined) {
         vertexFile: vertexSource,
         fragmentFile: fragmentSource,
       },
-      position: ReadonlyVector3.fromVector3(new Vector3(0, 0, 0)),
-      rotation: ReadonlyQuaternion.identity,
+      position: ReadonlyVector3.zero,
+      rotation: ReadonlyEulerAngles.identity,
       scale: 1,
     };
 
@@ -285,37 +285,39 @@ function removeModel(ids: string[]) {
       v-model:size="tabs.splitSize.value"
     >
       <template #1>
-        <div v-if="tabs.selectedTab.value === 'filebrowser'">
-          <FileBrowser
-            :files="props.files"
-            @open-file="openFile.openFile($event)"
-            @add-files="openFile.addFiles($event)"
-            @rename-file="
-              (oldName, newName) => openFile.renameFile(oldName, newName)
-            "
-            @delete-files="openFile.deleteFiles($event)"
-          ></FileBrowser>
-        </div>
-        <div v-else-if="tabs.selectedTab.value === 'sceneview'">
-          <SceneHierarchy
-            :models="scene.state.value.models"
-            :scene="scene.api.value"
-            :files="props.files"
-            :scene-path="scenePath"
-            @update="(keys, update) => updateModels(keys, update)"
-            @addModel="
-              (modelName, shaderName) => addModel(modelName, shaderName)
-            "
-            @select="(vertex) => openFile.openFile(vertex)"
-            @removeModel="(ids) => removeModel(ids)"
-          ></SceneHierarchy>
-        </div>
-        <div v-else>
-          <p>Unknown tab</p>
+        <div class="h-full w-full overflow-y-auto">
+          <div v-if="tabs.selectedTab.value === 'filebrowser'">
+            <FileBrowser
+              :files="props.files"
+              @open-file="openFile.openFile($event)"
+              @add-files="openFile.addFiles($event)"
+              @rename-file="
+                (oldName, newName) => openFile.renameFile(oldName, newName)
+              "
+              @delete-files="openFile.deleteFiles($event)"
+            ></FileBrowser>
+          </div>
+          <div v-else-if="tabs.selectedTab.value === 'sceneview'">
+            <SceneHierarchy
+              :models="scene.state.value.models"
+              :scene="scene.api.value"
+              :files="props.files"
+              :scene-path="scenePath"
+              @update="(keys, update) => updateModels(keys, update)"
+              @addModel="
+                (modelName, shaderName) => addModel(modelName, shaderName)
+              "
+              @select="(vertex) => openFile.openFile(vertex)"
+              @removeModel="(ids) => removeModel(ids)"
+            ></SceneHierarchy>
+          </div>
+          <div v-else>
+            <p>Unknown tab</p>
+          </div>
         </div>
       </template>
       <template #2>
-        <div class="flex" style="height: 80vh; width: 100%">
+        <div class="flex h-full w-full">
           <div
             ref="canvasContainer"
             class="self-stretch overflow-hidden flex-1"

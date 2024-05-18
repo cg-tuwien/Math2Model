@@ -1,4 +1,4 @@
-import { ReadonlyQuaternion } from "@/scenes/VirtualScene";
+import { ReadonlyEulerAngles } from "@/scenes/VirtualScene";
 import {
   makeFilePath,
   readOrCreateFile,
@@ -67,7 +67,7 @@ function createDefaults(files: ReactiveFiles, scenePath: FilePath) {
             fragmentShader: defaultFragmentShader.name,
             parametricShader: defaultParametricShader.name,
             position: [0, 0, 0],
-            rotation: ReadonlyQuaternion.identity.serialize(),
+            rotation: ReadonlyEulerAngles.identity.serialize(),
             scale: 1,
           },
         ],

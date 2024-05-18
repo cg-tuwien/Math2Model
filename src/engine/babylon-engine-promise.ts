@@ -14,7 +14,9 @@ export async function getEngine() {
     window.location.reload();
     throw new Error("Canvas element already used, reloading the site.");
   }
-  let engine = await BabylonEngine.createEngine(canvasElement);
-  babylonEngine = { engine, canvas: canvasElement };
+  babylonEngine = {
+    engine: await BabylonEngine.createEngine(canvasElement),
+    canvas: canvasElement,
+  };
   return babylonEngine;
 }
