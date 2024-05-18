@@ -28,6 +28,7 @@ where
     where
         T: encase::ShaderType + encase::internal::WriteInto,
     {
+        let usage = usage | wgpu::BufferUsages::UNIFORM;
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(label),
             contents: &write_uniform_buffer(data)?,
@@ -50,6 +51,7 @@ where
     where
         T: encase::ShaderType + encase::internal::WriteInto,
     {
+        let usage = usage | wgpu::BufferUsages::STORAGE;
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(label),
             contents: &write_storage_buffer(data)?,
@@ -73,6 +75,7 @@ where
     where
         T: encase::ShaderType + encase::internal::WriteInto + encase::CalculateSizeFor,
     {
+        let usage = usage | wgpu::BufferUsages::STORAGE;
         let contents = write_storage_buffer(data)?;
         let size = T::calculate_size_for(count).get();
         assert!(size >= contents.len() as u64);

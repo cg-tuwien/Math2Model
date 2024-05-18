@@ -35,18 +35,26 @@ fn ceil_div(a: u32, b: u32) -> u32 { return (a + b - 1u) / b; }
 alias Vec3Padded = vec4<f32>;
 
 struct Camera {
-    view_position: Vec3Padded,
+    world_position: Vec3Padded,
     view: mat4x4<f32>,
     projection: mat4x4<f32>,
 }
-@group(0) @binding(0) var<uniform> camera: Camera;
 
-// A point light without attenuation
-struct Light {
-    position: Vec3Padded,
-    color: Vec3Padded
+struct PointLight {
+    // position.xyz is the position of the light in world space
+    // position.w is the range of the light
+    position_range: vec4<f32>,
+    // color.rgb is the color of the light
+    // color.a is the intensity of the light
+    color_intensity: vec4<f32>,
 }
-@group(0) @binding(1) var<uniform> light: Light;
+
+struct Lights {
+    ambient: Vec3Padded,
+    // TODO: Directional light
+    points_length: u32,
+    points: array<PointLight>,
+}
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
@@ -57,10 +65,21 @@ struct VertexInput {
 struct Model {
     model_similarity: mat4x4<f32>,
 }
+
+struct Material {
+    // color.rgb is the color of the material
+    // color.a is the roughness of the material
+    color_roughness: vec4<f32>,
+    // emissive_metallic.rgb is the emissive color of the material
+    // emissive_metallic.a is the metallicness of the material
+    emissive_metallic: vec4<f32>,
+}
+
+@group(0) @binding(0) var<uniform> camera: Camera;
+@group(0) @binding(1) var<storage, read> lights: Lights;
 @group(0) @binding(2) var<uniform> model: Model;
-
 @group(0) @binding(3) var<storage, read> render_buffer: RenderBufferRead;
-
+@group(0) @binding(4) var<uniform> material: Material;
 
 //#include "./HeartSphere.wgsl"
 // AUTOGEN e752278f38b5cff0b524b4eac45aa8fe29236e32e79fa3d6bca5a871d21478e8
@@ -83,6 +102,84 @@ fn evaluateImage(input2: vec2f) -> vec3f {
     return p;
 }
 // END OF AUTOGEN
+
+
+const PI = 3.14159265359;
+
+fn distributionGGXTrowbridgeReitz(n: vec3f, h: vec3f, alpha: f32) -> f32 {
+    let alphaSquared = alpha * alpha;
+
+    let nDoth = max(dot(n,h), 0.0);
+    let nDothSquared = nDoth * nDoth;
+
+    let partDenom = nDothSquared * (alphaSquared - 1.0) + 1.0;
+
+    return alphaSquared / (PI * partDenom * partDenom);
+}
+
+// x: in this context only v or l are allowed to be x
+fn geometrySchlickBeckmann(n: vec3f, x: vec3f, alpha: f32) -> f32 {
+    let k = alpha / 2.0; // there are other options for this
+    let nDotx = max(dot(n, x), 0.0);
+
+    return nDotx / max(nDotx * (1.0 - k) + k, 0.000001);
+}
+
+
+fn geometrySmith(n: vec3f, v: vec3f, l: vec3f, alpha: f32) -> f32  {
+    return geometrySchlickBeckmann(n, v, alpha) * geometrySchlickBeckmann(n, l, alpha);
+}
+
+fn fresnelSchlick(f0: vec3f, v: vec3f, h: vec3f) -> vec3f {
+    let vDoth = max(dot(v, h), 0.0);
+
+    return f0 + (1.0 - f0) * pow(1.0 - vDoth, 5.0);
+}
+
+fn pbr_common(lightIntensity: vec3f, l: vec3f, n: vec3f, v: vec3f, albedo: vec3f, f0: vec3f) -> vec3f {
+    let h = normalize(v + l);
+
+    let fLambert = albedo / PI;
+
+    let alpha = material.color_roughness.a * material.color_roughness.a;
+
+    // D: Normal Distribution Function (GGX/Trowbridge-Reitz)
+    let D = distributionGGXTrowbridgeReitz(n, h, alpha);
+
+    // G: Geometry Function (Smith Model using Schlick-Beckmann)
+    let G = geometrySmith(n, v, l, alpha);
+
+    // F: Fresnel Function
+    let F = fresnelSchlick(f0, v, h);
+
+    let fCookTorranceNumerator: vec3f = D * G * F;
+    var fCookTorranceDenominator = 4.0 * max(dot(n, l), 0.0) * max(dot(n, v), 0.0);
+    fCookTorranceDenominator = max(fCookTorranceDenominator, 0.000001);
+
+    let fCookTorrance: vec3f =  fCookTorranceNumerator / fCookTorranceDenominator;
+
+    let ks = F;
+    var kd = vec3f(1.0) - ks;
+    kd *= 1.0-material.emissive_metallic.a;
+
+    let diffuseBRDF = kd * fLambert;
+    let specularBRDF: vec3f = /* ks + */ fCookTorrance;
+    let nDotL: f32 = max(dot(n, l), 0.0);
+
+    return (diffuseBRDF + specularBRDF) * lightIntensity * nDotL;
+}
+
+fn pbr(pointLight: PointLight, n: vec3f, v: vec3f, worldPos: vec3f, albedo: vec3f, f0: vec3f) -> vec3f {
+    let positionToLight = pointLight.position_range.xyz - worldPos;
+    let l = normalize(positionToLight);
+    let dSquared = max(dot(positionToLight, positionToLight), 0.000001);
+
+    let attenuation = 1.0 / dSquared;
+    let lightIntensity = pointLight.color_intensity.rgb * pointLight.color_intensity.a * attenuation;
+    return pbr_common(lightIntensity, l, n, v, albedo, f0);
+}
+
+
 
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
@@ -109,37 +206,42 @@ fn vs_main(
     }
 
     let pos = evaluateImage(uv);
+    let world_pos = model.model_similarity * vec4<f32>(pos, 1.0);
 
     var out: VertexOutput;
-    out.clip_position = camera.projection * camera.view * model.model_similarity * vec4<f32>(pos, 1.0);
-    out.world_position = pos;
+    out.clip_position = camera.projection * camera.view * world_pos;
+    out.world_position = world_pos.xyz;
     out.texture_coords = uv;
-    let normal = vec3<f32>(0.0, 0.0, 1.0); // TODO: We'll compute this later
+    let normal = vec3<f32>(0.0, -1.0, 0.0); // TODO: We'll compute this later
     out.world_normal = (model.model_similarity * vec4<f32>(normal, 0.0)).xyz; // Only uniform scaling
     return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let object_color: vec4f = vec4f(in.texture_coords, 0.1, 1.0);
+    let world_pos = in.world_position;
+    let n = normalize(in.world_normal);
+    let v = normalize(camera.world_position.xyz - world_pos);
 
-    // We're doing lighting in world space for simplicity
-    let ambient_strength = 0.1;
-    let ambient_color = light.color.rgb * ambient_strength;
+    // Debug color
+    // let albedo: vec3f = vec3f(in.texture_coords, 0.1);
+    let albedo: vec3f = material.color_roughness.rgb;
 
-    let light_dir = normalize(light.position.xyz - in.world_position);
-    let view_dir = normalize(camera.view_position.xyz - in.world_position);
-    let halfway_dir = normalize(light_dir + view_dir);
+    // reflectance at normal incidence (base reflectance)
+    // if dia-electric (like plastic) use F0 of 0.04 and if it's a metal, use the albedo as F0 (metallic workflow)
+    let f0 = mix(vec3f(0.04), albedo, material.emissive_metallic.a);
 
-    let diffuse_strength = max(dot(in.world_normal, light_dir), 0.0);
-    let diffuse_color = light.color.rgb * diffuse_strength;
+    // out going light
+    var Lo = vec3f(0.0);
+    for (var i: u32 = 0u; i < lights.points_length; i = i + 1u) {
+        Lo += pbr(lights.points[i], n, v, world_pos, albedo, f0);
+    }
 
-    let specular_strength = pow(max(dot(in.world_normal, halfway_dir), 0.0), 32.0);
-    let specular_color = light.color.rgb * specular_strength;
+    let ambient: vec3f = lights.ambient.rgb * albedo;
 
-    let result = (ambient_color + diffuse_color + specular_color) * object_color.rgb;
+    let color: vec3f = Lo + ambient + material.emissive_metallic.rgb;
 
-    return vec4<f32>(result, object_color.a);
+    return vec4<f32>(pbr(lights.points[0], n, v, world_pos, albedo, f0), 1.0);
 }
 
  

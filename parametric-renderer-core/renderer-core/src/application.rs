@@ -80,7 +80,7 @@ pub struct GpuApplication {
     context: WgpuContext,
     depth_texture: Texture,
     camera_buffer: TypedBuffer<shader::Camera>,
-    light_buffer: TypedBuffer<shader::Light>,
+    light_buffer: TypedBuffer<shader::Lights>,
     model_buffer: TypedBuffer<shader::Model>,
     render_pipeline: wgpu::RenderPipeline,
     render_bind_group_0: shader::bind_groups::BindGroup0,
@@ -111,17 +111,21 @@ impl GpuApplication {
             &device,
             "Camera Buffer",
             &camera.to_shader(),
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            wgpu::BufferUsages::COPY_DST,
         )?;
 
-        let light_buffer = TypedBuffer::new_uniform(
+        let light_buffer = TypedBuffer::new_storage(
             &device,
             "Light Buffer",
-            &shader::Light {
-                position: Vector4::<f32>::new(0.0, 0.0, 2.0, 0.0).to_raw(),
-                color: Vector4::<f32>::new(1.0, 1.0, 1.0, 0.0).to_raw(),
+            &shader::Lights {
+                ambient: Vector4::<f32>::new(0.1, 0.1, 0.1, 0.0).to_raw(),
+                points_length: 1,
+                points: vec![shader::PointLight {
+                    position_range: Vector4::<f32>::new(0.0, 0.0, 2.0, 50.0).to_raw(),
+                    color_intensity: Vector4::<f32>::new(1.0, 1.0, 1.0, 3.0).to_raw(),
+                }],
             },
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            wgpu::BufferUsages::COPY_DST,
         )?;
 
         let model_buffer = TypedBuffer::new_uniform(
@@ -130,7 +134,7 @@ impl GpuApplication {
             &shader::Model {
                 model_similarity: mesh.get_model_matrix().to_raw(),
             },
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            wgpu::BufferUsages::COPY_DST,
         )?;
         let max_patch_count = 10_000;
         let render_buffer_initial = compute_patches::RenderBuffer {
@@ -143,16 +147,27 @@ impl GpuApplication {
             "Render Buffer",
             &render_buffer_initial,
             max_patch_count as u64,
-            wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+            wgpu::BufferUsages::COPY_DST,
+        )?;
+
+        let material_buffer = TypedBuffer::new_uniform(
+            &device,
+            "Material Buffer",
+            &shader::Material {
+                color_roughness: Vector4::<f32>::new(0.6, 1.0, 1.0, 0.7).to_raw(),
+                emissive_metallic: Vector4::<f32>::new(0.0, 0.0, 0.0, 0.1).to_raw(),
+            },
+            wgpu::BufferUsages::COPY_DST,
         )?;
 
         let render_bind_group_0 = shader::bind_groups::BindGroup0::from_bindings(
             &device,
             shader::bind_groups::BindGroupLayout0 {
                 camera: camera_buffer.as_entire_buffer_binding(),
-                light: light_buffer.as_entire_buffer_binding(),
+                lights: light_buffer.as_entire_buffer_binding(),
                 model: model_buffer.as_entire_buffer_binding(),
                 render_buffer: render_buffer.as_entire_buffer_binding(),
+                material: material_buffer.as_entire_buffer_binding(),
             },
         );
 
@@ -216,7 +231,7 @@ impl GpuApplication {
             &compute_patches::InputBuffer {
                 model_view_projection: mesh.get_model_view_projection(&camera).to_raw(),
             },
-            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            wgpu::BufferUsages::COPY_DST,
         )?;
         let patches_buffer_starting_patch = compute_patches::Patches {
             patches_length: 1,
@@ -641,7 +656,7 @@ impl Camera {
         shader::Camera {
             view: self.view_matrix().to_raw(),
             projection: self.projection_matrix().to_raw(),
-            view_position: self.position.to_raw().extend(1.0),
+            world_position: self.position.to_raw().extend(1.0),
         }
     }
 }
