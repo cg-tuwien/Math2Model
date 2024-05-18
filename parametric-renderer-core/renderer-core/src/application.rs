@@ -105,7 +105,8 @@ impl GpuApplication {
         let context = WgpuContext::new(window).await?;
         let device = &context.device;
 
-        let mesh = Mesh::new_quad(&device);
+        let mut mesh = Mesh::new_quad(&device);
+        mesh.transform.position = Point3::new(0.0, 10.0, 0.0);
 
         let camera_buffer = TypedBuffer::new_uniform(
             &device,
@@ -121,7 +122,7 @@ impl GpuApplication {
                 ambient: Vector4::<f32>::new(0.1, 0.1, 0.1, 0.0).to_raw(),
                 points_length: 1,
                 points: vec![shader::PointLight {
-                    position_range: Vector4::<f32>::new(0.0, 0.0, 2.0, 50.0).to_raw(),
+                    position: Vector4::<f32>::new(0.0, 11.0, 2.0, 0.0).to_raw(),
                     color_intensity: Vector4::<f32>::new(1.0, 1.0, 1.0, 3.0).to_raw(),
                 }],
             },

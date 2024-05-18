@@ -42,8 +42,7 @@ struct Camera {
 
 struct PointLight {
     // position.xyz is the position of the light in world space
-    // position.w is the range of the light
-    position_range: vec4<f32>,
+    position: Vec3Padded,
     // color.rgb is the color of the light
     // color.a is the intensity of the light
     color_intensity: vec4<f32>,
@@ -170,7 +169,7 @@ fn pbr_common(lightIntensity: vec3f, l: vec3f, n: vec3f, v: vec3f, albedo: vec3f
 }
 
 fn pbr(pointLight: PointLight, n: vec3f, v: vec3f, worldPos: vec3f, albedo: vec3f, f0: vec3f) -> vec3f {
-    let positionToLight = pointLight.position_range.xyz - worldPos;
+    let positionToLight = pointLight.position.xyz - worldPos;
     let l = normalize(positionToLight);
     let dSquared = max(dot(positionToLight, positionToLight), 0.000001);
 
@@ -241,7 +240,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let color: vec3f = Lo + ambient + material.emissive_metallic.rgb;
 
-    return vec4<f32>(pbr(lights.points[0], n, v, world_pos, albedo, f0), 1.0);
+    return vec4<f32>(color, 1.0);
 }
 
  

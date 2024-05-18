@@ -13,9 +13,9 @@ pub const QUAD_VERTICES: [Vec3; 4] = [
 pub const QUAD_INDICES: [u16; 6] = [0, 1, 2, 2, 3, 0];
 
 pub struct Transform {
-    position: Point3,
-    rotation: glam::Quat,
-    scale: f32,
+    pub position: Point3,
+    pub rotation: glam::Quat,
+    pub scale: f32,
 }
 
 impl Transform {
