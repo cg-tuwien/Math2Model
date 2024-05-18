@@ -17,9 +17,12 @@ import {
   ReactiveFiles,
   makeFilePath,
   type FilePath,
+  readOrCreateFile,
 } from "@/filesystem/reactive-files";
 import { showError } from "@/notification";
 import {
+  ReadonlyQuaternion,
+  ReadonlyVector3,
   useVirtualScene,
   type VirtualModelUpdate,
 } from "@/scenes/VirtualScene";
@@ -105,12 +108,10 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
     };
   }
 
-  function openFiles(v: FilePath[]) {
-    if (v.length > 0) {
-      keyedCode.value = readFile(v[0]);
-    }
+  function openFile(v: FilePath) {
+    keyedCode.value = readFile(v);
   }
-  function addFiles(files: FilePath[]) {
+  function addFiles(files: Set<FilePath>) {
     files.forEach((file) => {
       if (fs.hasFile(file)) return;
       fs.writeFile(file, "");
@@ -127,7 +128,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
       keyedCode.value = readFile(newName);
     }
   }
-  function deleteFiles(files: FilePath[]) {
+  function deleteFiles(files: Set<FilePath>) {
     files.forEach((file) => {
       fs.deleteFile(file);
       if (file === keyedCode.value?.name) {
@@ -149,7 +150,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
 
   return {
     code: computed(() => keyedCode.value),
-    openFiles,
+    openFile,
     addFiles,
     renameFile,
     deleteFiles,
@@ -191,8 +192,7 @@ function useTabs() {
 }
 const tabs = useTabs();
 
-function updateModels(ids: string[], update: VirtualModelUpdate) {
-  scene.api.value.updateModels(ids, update);
+function updateScene() {
   const sceneContent = serializeScene(scene.api.value.serialize(), true);
   if (sceneContent === null) {
     showError(
@@ -202,6 +202,56 @@ function updateModels(ids: string[], update: VirtualModelUpdate) {
   } else {
     props.files.writeFile(scenePath, sceneContent);
   }
+}
+
+function updateModels(ids: string[], update: VirtualModelUpdate) {
+  scene.api.value.updateModels(ids, update);
+  updateScene();
+}
+
+function addModel(name: string, shaderName: string | undefined) {
+  if (shaderName) {
+    const vertexSource = makeFilePath(shaderName + ".vert.wgsl");
+    const fragmentSource = makeFilePath(shaderName + ".frag.wgsl");
+
+    props.files.writeFile(vertexSource, HeartSphere);
+    props.files.writeFile(
+      fragmentSource,
+      `
+    varying vNormal : vec3<f32>;
+    varying vUV : vec2<f32>;
+    @fragment
+    fn main(input : FragmentInputs) -> FragmentOutputs {
+        fragmentOutputs.color = vec4<f32>(input.vUV,1.0, 1.0);
+    }
+`
+    );
+
+    const newModel = {
+      id: crypto.randomUUID(),
+      name: name,
+      code: {
+        vertexFile: vertexSource,
+        fragmentFile: fragmentSource,
+      },
+      position: ReadonlyVector3.fromVector3(new Vector3(0, 0, 0)),
+      rotation: ReadonlyQuaternion.identity,
+      scale: 1,
+    };
+
+    scene.api.value.addModel(newModel);
+    updateScene();
+  }
+}
+
+function removeModel(ids: string[]) {
+  for (let id of ids) {
+    if (!scene.api.value.removeModel(id)) {
+      showError("Could not delete model of id: " + id, null);
+    }
+  }
+
+  updateScene();
 }
 </script>
 
@@ -238,10 +288,7 @@ function updateModels(ids: string[], update: VirtualModelUpdate) {
         <div v-if="tabs.selectedTab.value === 'filebrowser'">
           <FileBrowser
             :files="props.files"
-            :open-files="
-              openFile.code.value !== null ? [openFile.code.value.name] : []
-            "
-            @update:open-files="openFile.openFiles($event)"
+            @open-file="openFile.openFile($event)"
             @add-files="openFile.addFiles($event)"
             @rename-file="
               (oldName, newName) => openFile.renameFile(oldName, newName)
@@ -256,6 +303,11 @@ function updateModels(ids: string[], update: VirtualModelUpdate) {
             :files="props.files"
             :scene-path="scenePath"
             @update="(keys, update) => updateModels(keys, update)"
+            @addModel="
+              (modelName, shaderName) => addModel(modelName, shaderName)
+            "
+            @select="(vertex) => openFile.openFile(vertex)"
+            @removeModel="(ids) => removeModel(ids)"
           ></SceneHierarchy>
         </div>
         <div v-else>
