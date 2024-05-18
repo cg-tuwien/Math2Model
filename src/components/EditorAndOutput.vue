@@ -285,7 +285,7 @@ function removeModel(ids: string[]) {
       v-model:size="tabs.splitSize.value"
     >
       <template #1>
-        <div class="h-full w-full overflow-y-auto">
+        <div class="pt-2 h-full w-full overflow-y-auto">
           <div v-if="tabs.selectedTab.value === 'filebrowser'">
             <FileBrowser
               :files="props.files"
