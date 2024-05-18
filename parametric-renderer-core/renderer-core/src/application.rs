@@ -24,7 +24,7 @@ impl CpuApplication {
     pub fn new() -> anyhow::Result<Self> {
         let camera = Camera::new(1.0, CameraSettings::default());
         let mut freecam_controller = FreecamController::new(5.0, 0.01);
-        freecam_controller.position = Point3::new(0.0, 0.0, 2.0);
+        freecam_controller.position = Point3::new(0.0, 0.0, 4.0);
 
         Ok(Self {
             gpu: None,
@@ -106,7 +106,7 @@ impl GpuApplication {
         let device = &context.device;
 
         let mut mesh = Mesh::new_quad(&device);
-        mesh.transform.position = Point3::new(0.0, 10.0, 0.0);
+        mesh.transform.position = Point3::new(0.0, 1.0, 0.0);
 
         let camera_buffer = TypedBuffer::new_uniform(
             &device,
@@ -122,7 +122,7 @@ impl GpuApplication {
                 ambient: Vector4::<f32>::new(0.1, 0.1, 0.1, 0.0).to_raw(),
                 points_length: 1,
                 points: vec![shader::PointLight {
-                    position: Vector4::<f32>::new(0.0, 11.0, 2.0, 0.0).to_raw(),
+                    position_range: Vector4::<f32>::new(0.0, 4.0, 2.0, 40.0).to_raw(),
                     color_intensity: Vector4::<f32>::new(1.0, 1.0, 1.0, 3.0).to_raw(),
                 }],
             },
