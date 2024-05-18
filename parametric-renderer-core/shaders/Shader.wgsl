@@ -219,7 +219,9 @@ fn vs_main(
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let world_pos = in.world_position;
-    let n = normalize(in.world_normal);
+    // let n = normalize(in.world_normal);
+    let n = normalize(cross(dpdxFine(in.world_position), dpdyFine(in.world_position)));
+
     let v = normalize(camera.world_position.xyz - world_pos);
 
     // Debug color
