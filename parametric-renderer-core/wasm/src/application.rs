@@ -8,7 +8,8 @@ use winit_input_helper::{WinitInputApp, WinitInputHelper, WinitInputUpdate};
 
 pub struct Application {
     app: Arc<Mutex<CpuApplication>>,
-    canvas: HtmlCanvasElement,
+    /** For wasm32 */
+    _canvas: HtmlCanvasElement,
 }
 
 impl Application {
@@ -16,7 +17,7 @@ impl Application {
         let app = CpuApplication::new()?;
         Ok(Self {
             app: Arc::new(Mutex::new(app)),
-            canvas,
+            _canvas: canvas,
         })
     }
 
@@ -40,7 +41,7 @@ impl Application {
         let mut app = match self.app.try_lock() {
             Ok(app) => app,
             Err(_) => {
-                warn!("Failed to lock the application");
+                warn!("Failed to lock the application for resize");
                 return;
             }
         };
@@ -51,7 +52,6 @@ impl Application {
         let mut app = match self.app.try_lock() {
             Ok(app) => app,
             Err(_) => {
-                warn!("Failed to lock the application");
                 return;
             }
         };
@@ -62,7 +62,6 @@ impl Application {
         let mut app = match self.app.try_lock() {
             Ok(app) => app,
             Err(_) => {
-                warn!("Failed to lock the application");
                 return Ok(());
             }
         };
@@ -84,7 +83,7 @@ impl ApplicationHandler<()> for Application {
         #[cfg(target_arch = "wasm32")]
         let window_attributes = {
             use winit::platform::web::WindowAttributesExtWebSys;
-            window_attributes.with_canvas(Some(self.canvas.clone()))
+            window_attributes.with_canvas(Some(self._canvas.clone()))
         };
         let _ = self.create_surface(event_loop.create_window(window_attributes).unwrap());
     }
@@ -101,7 +100,6 @@ impl ApplicationHandler<()> for Application {
                 let mut app = match self.app.try_lock() {
                     Ok(app) => app,
                     Err(_) => {
-                        warn!("Failed to lock the application");
                         return;
                     }
                 };
@@ -133,7 +131,6 @@ impl WinitInputUpdate for Application {
             let mut app = match self.app.try_lock() {
                 Ok(app) => app,
                 Err(_) => {
-                    warn!("Failed to lock the application");
                     return;
                 }
             };
@@ -149,7 +146,6 @@ impl WinitInputUpdate for Application {
                 let mut app = match self.app.try_lock() {
                     Ok(app) => app,
                     Err(_) => {
-                        warn!("Failed to lock the application");
                         return;
                     }
                 };

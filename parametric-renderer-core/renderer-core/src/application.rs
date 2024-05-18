@@ -621,6 +621,8 @@ impl WgpuContext {
         };
         surface.configure(&device, &config);
 
+        window.request_redraw();
+
         Ok(WgpuContext {
             instance,
             surface,
