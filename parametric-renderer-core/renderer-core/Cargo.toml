@@ -16,5 +16,13 @@ wgpu = { workspace = true }
 winit = { workspace = true }
 winit_input_helper = { workspace = true }
 
+[dev-dependencies]
+criterion = "0.3"
+pollster = "0.3"
+
+[[bench]]
+name = "gpu_bench"
+harness = false
+
 [build-dependencies]
 wgsl_to_wgpu = "0.8.0"

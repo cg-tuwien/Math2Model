@@ -18,6 +18,3 @@ wgpu = { workspace = true }
 wgpu-profiler = "0.17.0"
 winit = { workspace = true }
 winit_input_helper = { workspace = true }
-
-[dev-dependencies]
-criterion = "0.3"

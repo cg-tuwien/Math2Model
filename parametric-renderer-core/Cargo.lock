@@ -570,7 +570,6 @@ name = "desktop"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "criterion",
  "glam",
  "glamour",
  "nanoserde",
@@ -1586,9 +1585,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytemuck",
+ "criterion",
  "encase",
  "glam",
  "glamour",
+ "pollster",
  "thiserror",
  "tracing",
  "wgpu",
