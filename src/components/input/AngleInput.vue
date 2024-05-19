@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
+import NumberInput from "./NumberInput.vue";
 
 const props = defineProps<{
   modelValue: number;
@@ -25,12 +26,5 @@ function degToRad(deg: number): number {
 }
 </script>
 <template>
-  <n-input-number
-    v-model:value="angleInDegrees"
-    :update-value-on-input="false"
-    type="number"
-    clearable
-    :show-button="false"
-    size="small"
-  />
+  <NumberInput v-model:modelValue="angleInDegrees"></NumberInput>
 </template>

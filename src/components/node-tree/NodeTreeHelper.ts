@@ -9,6 +9,7 @@ export interface TreeNode {
   children?: TreeNode[];
   disabled?: boolean;
 }
+
 export const NodeTreeHelper = {
   getNode(root: TreeNode, path: NodePath): TreeNode | null {
     if (path.length === 0) {
@@ -75,6 +76,26 @@ export const NodeTreeHelper = {
       }
     }
     return true;
+  },
+
+  filterNodes(
+    node: TreeNode,
+    pattern: (node: TreeNode) => boolean
+  ): [TreeNode] | [] {
+    const children = (node.children ?? []).flatMap((v) =>
+      NodeTreeHelper.filterNodes(v, pattern)
+    );
+    const matches = pattern(node);
+    if (children.length === 0 && matches === null) {
+      return [];
+    } else {
+      return [
+        {
+          ...node,
+          children,
+        },
+      ];
+    }
   },
 };
 export interface TreeSelection {

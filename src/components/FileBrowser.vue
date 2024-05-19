@@ -52,20 +52,6 @@ function matchesPattern(node: TreeNode): { start: number; end: number } | null {
   }
   return { start, end: start + pattern.value.length };
 }
-function filterNodes(node: TreeNode): [TreeNode] | [] {
-  const children = (node.children ?? []).flatMap(filterNodes);
-  const matches = matchesPattern(node);
-  if (children.length === 0 && matches === null) {
-    return [];
-  } else {
-    return [
-      {
-        ...node,
-        children,
-      },
-    ];
-  }
-}
 const data = ref<TreeNode>({
   key: "root",
   label: "Root",
@@ -90,7 +76,6 @@ watch(
   },
   {
     deep: true,
-    immediate: true,
   }
 );
 const filteredData = computed(() => {
@@ -99,7 +84,7 @@ const filteredData = computed(() => {
   }
   const filteredData = { ...data.value };
   filteredData.children = (data.value.children ?? []).flatMap((node) =>
-    filterNodes(node)
+    NodeTreeHelper.filterNodes(node, (v) => matchesPattern(v) !== null)
   );
   return filteredData;
 });

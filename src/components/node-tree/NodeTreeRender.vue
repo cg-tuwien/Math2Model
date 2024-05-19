@@ -64,7 +64,7 @@ const nodePaths = computed(() => {
         ></span>
         <span
           @click="emit('node-expand', nodePaths[index])"
-          class="flex flex-col justify-center select-none w-4"
+          class="flex items-center select-none w-4"
         >
           <span v-if="(node.children?.length ?? 0) <= 0">
             <mdi-circle-small></mdi-circle-small>

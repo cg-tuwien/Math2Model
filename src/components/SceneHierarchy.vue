@@ -8,6 +8,7 @@ import {
 import { computed, h, ref, watchEffect, type DeepReadonly } from "vue";
 import { NButton, NInput, type TreeOption } from "naive-ui";
 import AngleInput from "@/components/input/AngleInput.vue";
+import NumberInput from "@/components/input/NumberInput.vue";
 import { showError } from "@/notification";
 import {
   commonWriteableModelState,
@@ -193,26 +194,21 @@ function removeModel() {
       <n-flex justify="space-between">
         <div>
           <n-text>Position x</n-text>
-          <n-input-number
-            v-model:value="currentModel.posX"
-            clearable
-            v-on:input="change('posX')"
-            :show-button="false"
-          ></n-input-number>
+          <NumberInput
+            v-model="currentModel.posX"
+            @update:modelValue="change('posX')"
+          ></NumberInput>
           <n-text>Position y</n-text>
-          <n-input-number
-            v-model:value="currentModel.posY"
-            clearable
-            v-on:input="change('posY')"
-            :show-button="false"
-          ></n-input-number>
+          <NumberInput
+            v-model="currentModel.posY"
+            @update:modelValue="change('posY')"
+          ></NumberInput>
           <n-text>Position z</n-text>
-          <n-input-number
-            v-model:value="currentModel.posZ"
-            clearable
-            v-on:input="change('posZ')"
+          <NumberInput
+            v-model="currentModel.posZ"
+            @update:modelValue="change('posZ')"
             :show-button="false"
-          ></n-input-number>
+          ></NumberInput>
         </div>
         <div>
           <n-text>Rotation x</n-text>
@@ -233,12 +229,10 @@ function removeModel() {
         </div>
         <div>
           <n-text>Scale</n-text>
-          <n-input-number
-            v-model:value="currentModel.scale"
-            clearable
-            v-on:input="change('scale')"
-            :show-button="false"
-          ></n-input-number>
+          <NumberInput
+            v-model="currentModel.scale"
+            @update:modelValue="change('scale')"
+          ></NumberInput>
         </div>
       </n-flex>
     </div>
