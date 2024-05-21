@@ -57,7 +57,7 @@ watch(
     } catch (e) {
       console.log("Could not deserialize scene file.");
     }
-  }
+  },
 );
 if (sceneFile !== null) {
   scene.api.value.fromSerialized(sceneFile);
@@ -93,7 +93,7 @@ onUnmounted(() => {
 
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
   const keyedCode = ref<KeyedCode | null>(
-    startFile !== null ? readFile(startFile) : null
+    startFile !== null ? readFile(startFile) : null,
   );
 
   function readFile(name: FilePath): KeyedCode | null {
@@ -197,7 +197,7 @@ function updateScene() {
   if (sceneContent === null) {
     showError(
       "Could not serialize scene",
-      new Error("Could not serialize scene")
+      new Error("Could not serialize scene"),
     );
   } else {
     props.files.writeFile(scenePath, sceneContent);
@@ -209,23 +209,29 @@ function updateModels(ids: string[], update: VirtualModelUpdate) {
   updateScene();
 }
 
-function addModel(name: string, shaderName: string | undefined) {
+function addModel(name: string, shaderName: FilePath) {
   if (shaderName) {
-    const vertexSource = makeFilePath(shaderName + ".vert.wgsl");
-    const fragmentSource = makeFilePath(shaderName + ".frag.wgsl");
+    const vertexSource = shaderName;
+    const fragmentSource = makeFilePath(
+      shaderName.replaceAll(".vert.wgsl", ".frag.wgsl"),
+    );
 
-    props.files.writeFile(vertexSource, HeartSphere);
-    props.files.writeFile(
-      fragmentSource,
-      `
+    if (!props.files.hasFile(vertexSource)) {
+      props.files.writeFile(vertexSource, HeartSphere);
+    }
+    if (!props.files.hasFile(fragmentSource)) {
+      props.files.writeFile(
+        fragmentSource,
+        `
     varying vNormal : vec3<f32>;
     varying vUV : vec2<f32>;
     @fragment
     fn main(input : FragmentInputs) -> FragmentOutputs {
         fragmentOutputs.color = vec4<f32>(input.vUV,1.0, 1.0);
     }
-`
-    );
+`,
+      );
+    }
 
     const newModel = {
       id: crypto.randomUUID(),
@@ -303,6 +309,26 @@ function removeModel(ids: string[]) {
               :scene="scene.api.value"
               :files="props.files"
               :scene-path="scenePath"
+              :shaders="
+                props.files
+                  .listFiles()
+                  .filter((fileName) => fileName.endsWith('.vert.wgsl'))
+                  .map((fileName) => {
+                    return {
+                      label: fileName
+                        .valueOf()
+                        .substring(
+                          0,
+                          fileName.valueOf().length - '.vert.wgsl'.length,
+                        ),
+                      value: fileName,
+                    };
+                  })
+                  .concat({
+                    label: 'New Shader...',
+                    value: makeFilePath('NEW...'),
+                  })
+              "
               @update="(keys, update) => updateModels(keys, update)"
               @addModel="
                 (modelName, shaderName) => addModel(modelName, shaderName)

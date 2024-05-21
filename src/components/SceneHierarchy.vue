@@ -15,8 +15,9 @@ import {
   toWriteableModelState,
   type WriteableModelState,
 } from "@/sceneview/writeablemodelstate";
-import { type FilePath } from "@/filesystem/reactive-files";
+import { type FilePath, makeFilePath } from "@/filesystem/reactive-files";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
+import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 
 const emit = defineEmits({
   update(ids: string[], update: VirtualModelUpdate) {
@@ -35,11 +36,12 @@ const emit = defineEmits({
 
 const props = defineProps<{
   models: DeepReadonly<VirtualModelState>[];
+  shaders: DeepReadonly<SelectMixedOption>[];
 }>();
 
 const pattern = ref("");
 const selectedKeys = ref<string[]>(
-  props.models.length > 0 ? [props.models[0].id] : []
+  props.models.length > 0 ? [props.models[0].id] : [],
 );
 const checkedKeys = ref<string[]>([]);
 const data = computed(() =>
@@ -47,12 +49,13 @@ const data = computed(() =>
     (model): TreeOption => ({
       label: model.name,
       key: model.id,
-    })
-  )
+    }),
+  ),
 );
 
 let currentModel = ref<WriteableModelState | null>(null);
-let toAddModel = ref<[string, string] | null>(null);
+let toAddModel = ref<[string, FilePath] | null>(null);
+let customShader = ref<string | null>(null);
 
 watchEffect(() => {
   const keys = selectedKeys.value;
@@ -105,7 +108,7 @@ function change(key: keyof WriteableModelState) {
       position: new ReadonlyVector3(
         model.posX ?? 0,
         model.posY ?? 0,
-        model.posZ ?? 0
+        model.posZ ?? 0,
       ),
     });
   } else if (key === "rotX" || key === "rotY" || key === "rotZ") {
@@ -113,7 +116,7 @@ function change(key: keyof WriteableModelState) {
       rotation: new ReadonlyEulerAngles(
         model.rotX ?? 0,
         model.rotY ?? 0,
-        model.rotZ ?? 0
+        model.rotZ ?? 0,
       ),
     });
   } else if (key === "scale") {
@@ -128,7 +131,12 @@ function change(key: keyof WriteableModelState) {
 }
 
 function startAddModel() {
-  toAddModel.value = ["New Model", "new-shader"];
+  if (props.shaders.length > 0) {
+    const filePath = props.shaders[0].value as FilePath;
+    toAddModel.value = ["New Model", filePath ?? makeFilePath("new-shader")];
+  } else {
+    toAddModel.value = ["New Model", makeFilePath("new-shader")];
+  }
 }
 
 function stopAddModel() {
@@ -145,8 +153,24 @@ function addModel() {
     return;
   }
 
+  if (toAddModel.value[1] == "NEW...") {
+    if (!customShader) {
+      showError("Invalid State!", null);
+      return;
+    }
+    if (customShader.value === null) {
+      showError(
+        "Please enter a name for the new shader or select an existing shader.",
+        null,
+      );
+      return;
+    }
+    toAddModel.value[1] = makeFilePath(customShader.value + ".vert.wgsl");
+  }
+
   emit("addModel", toAddModel.value[0], toAddModel.value[1]);
   toAddModel.value = null;
+  customShader.value = null;
 }
 
 function removeModel() {
@@ -240,8 +264,20 @@ function removeModel() {
       <n-flex>
         <n-text>Name</n-text>
         <n-input v-model:value="toAddModel[0]" type="text" clearable></n-input>
-        <n-text>Shader Name</n-text>
-        <n-input v-model:value="toAddModel[1]" type="text" clearable></n-input>
+        <n-text>Shader</n-text>
+        <n-select
+          placeholder="Select a shader for the model"
+          :options="props.shaders"
+          v-model:value="toAddModel[1]"
+        ></n-select>
+        <n-input
+          v-if="toAddModel[1] === 'NEW...'"
+          v-model:value="customShader"
+          type="text"
+          placeholder="Please input a name for the new Shader"
+          clearable
+        >
+        </n-input>
       </n-flex>
       <br />
       <n-flex justify="space-between">
