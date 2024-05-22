@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use glamour::{Matrix4, Point3, ToRaw, Vector2, Vector4};
 use tracing::info;
+use wgpu_profiler::{GpuProfiler, GpuProfilerSettings};
 use winit::window::Window;
 use winit_input_helper::WinitInputHelper;
 
@@ -13,11 +14,17 @@ use crate::{
     texture::Texture,
 };
 
+#[derive(Debug, Clone, Default)]
+pub struct ProfilerSettings {
+    pub gpu: bool,
+}
+
 pub struct CpuApplication {
     pub gpu: Option<GpuApplication>,
     camera: Camera,
     pub freecam_controller: FreecamController,
     pub delta_time: f32,
+    profiler_settings: ProfilerSettings,
 }
 
 impl CpuApplication {
@@ -31,7 +38,25 @@ impl CpuApplication {
             camera,
             freecam_controller,
             delta_time: 0.0,
+            profiler_settings: ProfilerSettings::default(),
         })
+    }
+
+    pub fn get_profiling(&self) -> ProfilerSettings {
+        self.profiler_settings.clone()
+    }
+
+    pub fn set_profiling(&mut self, new_settings: ProfilerSettings) {
+        self.profiler_settings = new_settings;
+        if let Some(gpu) = &mut self.gpu {
+            gpu.context
+                .profiler
+                .change_settings(GpuProfilerSettings {
+                    enable_timer_queries: self.profiler_settings.gpu,
+                    ..GpuProfilerSettings::default()
+                })
+                .unwrap();
+        }
     }
 
     pub async fn create_surface(&mut self, window: Window) -> anyhow::Result<()> {
@@ -41,8 +66,9 @@ impl CpuApplication {
         let size = window.inner_size();
         self.camera
             .update_aspect_ratio(size.width as f32 / size.height as f32);
-        let gpu = GpuApplication::new(window, &self.camera).await?;
+        let gpu = GpuApplication::new(window, &self.camera, &self.profiler_settings).await?;
         self.gpu = Some(gpu);
+        self.set_profiling(self.profiler_settings.clone());
         Ok(())
     }
 
@@ -74,6 +100,16 @@ impl CpuApplication {
         }
         Ok(())
     }
+
+    pub fn get_profiling_data(&mut self) -> Option<Vec<wgpu_profiler::GpuTimerQueryResult>> {
+        assert!(self.gpu.is_some());
+        assert!(self.profiler_settings.gpu);
+        self.gpu.as_mut().and_then(|gpu| {
+            gpu.context
+                .profiler
+                .process_finished_frame(gpu.context.queue.get_timestamp_period())
+        })
+    }
 }
 
 pub struct GpuApplication {
@@ -101,8 +137,12 @@ pub struct GpuApplication {
 }
 
 impl GpuApplication {
-    pub async fn new(window: Window, camera: &Camera) -> anyhow::Result<Self> {
-        let context = WgpuContext::new(window).await?;
+    pub async fn new(
+        window: Window,
+        camera: &Camera,
+        profiler_settings: &ProfilerSettings,
+    ) -> anyhow::Result<Self> {
+        let context = WgpuContext::new(window, profiler_settings).await?;
         let device = &context.device;
 
         let mut mesh = Mesh::new_quad(&device);
@@ -450,12 +490,17 @@ impl GpuApplication {
             .update(queue, &self.render_buffer_initial)
             .unwrap();
 
-        let mut commands =
+        let mut command_encoder =
             self.context
                 .device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("Render Encoder"),
                 });
+        // Profiling
+        let mut commands =
+            self.context
+                .profiler
+                .scope("Render", &mut command_encoder, &self.context.device);
 
         commands.copy_buffer_to_buffer(
             self.patches_buffer_starting_patch.buffer(),
@@ -473,10 +518,10 @@ impl GpuApplication {
                     0,
                     self.patches_buffer_reset.buffer().size(),
                 );
-                let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                    label: Some(&format!("Compute Patches From-To {i}")),
-                    timestamp_writes: None,
-                });
+                let mut compute_pass = commands.scoped_compute_pass(
+                    format!("Compute Patches From-To {i}"),
+                    &self.context.device,
+                );
                 compute_pass.set_pipeline(&self.compute_patches_pipeline);
                 compute_patches::set_bind_groups(
                     &mut compute_pass,
@@ -508,42 +553,44 @@ impl GpuApplication {
         }
 
         {
-            let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some("Copy Patches Pass"),
-                timestamp_writes: None,
-            });
+            let mut compute_pass =
+                commands.scoped_compute_pass("Copy Patches Pass", &self.context.device);
             compute_pass.set_pipeline(&self.copy_patches_pipeline);
             copy_patches::set_bind_groups(&mut compute_pass, &self.copy_patches_bind_group_0);
             compute_pass.dispatch_workgroups_indirect(self.indirect_compute_buffer[0].buffer(), 0);
         }
 
         {
-            let mut render_pass = commands.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
-                            a: 1.0,
+            let mut render_pass = commands.scoped_render_pass(
+                "Render Pass",
+                &self.context.device,
+                wgpu::RenderPassDescriptor {
+                    label: Some("Render Pass"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(wgpu::Color {
+                                r: 0.1,
+                                g: 0.2,
+                                b: 0.3,
+                                a: 1.0,
+                            }),
+                            store: wgpu::StoreOp::Store,
+                        },
+                    })],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: &self.depth_texture.view,
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(0.0), // Reverse Z checklist https://iolite-engine.com/blog_posts/reverse_z_cheatsheet
+                            store: wgpu::StoreOp::Store,
                         }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_texture.view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(0.0), // Reverse Z checklist https://iolite-engine.com/blog_posts/reverse_z_cheatsheet
-                        store: wgpu::StoreOp::Store,
+                        stencil_ops: None,
                     }),
-                    stencil_ops: None,
-                }),
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                },
+            );
             render_pass.set_pipeline(&self.render_pipeline);
             shader::set_bind_groups(&mut render_pass, &self.render_bind_group_0);
             render_pass.set_vertex_buffer(0, self.mesh.vertex_buffer.slice(..));
@@ -552,11 +599,17 @@ impl GpuApplication {
             render_pass.draw_indexed_indirect(self.indirect_draw_buffer.buffer(), 0)
         }
 
+        // Finish the profiler
+        std::mem::drop(commands);
+        self.context.profiler.resolve_queries(&mut command_encoder);
+        // Submit the commands
         self.context
             .queue
-            .submit(std::iter::once(commands.finish()));
+            .submit(std::iter::once(command_encoder.finish()));
         output.present();
 
+        // Finish the frame after all commands have been submitted
+        self.context.profiler.end_frame().unwrap();
         Ok(())
     }
 
@@ -580,12 +633,13 @@ struct WgpuContext {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
+    profiler: GpuProfiler,
     window: Arc<Window>,
     size: winit::dpi::PhysicalSize<u32>,
 }
 
 impl WgpuContext {
-    async fn new(window: Window) -> anyhow::Result<Self> {
+    async fn new(window: Window, profiler_settings: &ProfilerSettings) -> anyhow::Result<Self> {
         let window = Arc::new(window);
         let size = window.inner_size();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -610,7 +664,8 @@ impl WgpuContext {
                 &wgpu::DeviceDescriptor {
                     // TODO: Only enable this on the desktop backend
                     // required_features: wgpu::Features::POLYGON_MODE_LINE,
-                    required_features: wgpu::Features::default(),
+                    required_features: wgpu::Features::default()
+                        | (adapter.features() & GpuProfiler::ALL_WGPU_TIMER_FEATURES),
                     required_limits: wgpu::Limits::default(),
                     label: None,
                 },
@@ -637,6 +692,32 @@ impl WgpuContext {
         };
         surface.configure(&device, &config);
 
+        let gpu_profiler_settings = GpuProfilerSettings {
+            enable_timer_queries: profiler_settings.gpu,
+            ..GpuProfilerSettings::default()
+        };
+
+        #[cfg(feature = "tracy")]
+        let profiler = GpuProfiler::new_with_tracy_client(
+            gpu_profiler_settings.clone(),
+            adapter.get_info().backend,
+            &device,
+            &queue,
+        )
+        .unwrap_or_else(|e| match e {
+            wgpu_profiler::CreationError::TracyClientNotRunning
+            | wgpu_profiler::CreationError::TracyGpuContextCreationError(_) => {
+                warn!("Failed to connect to Tracy. Continuing without Tracy integration.");
+                GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler")
+            }
+            _ => {
+                panic!("Failed to create profiler: {}", e);
+            }
+        });
+
+        #[cfg(not(feature = "tracy"))]
+        let profiler = GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler");
+
         window.request_redraw();
 
         Ok(WgpuContext {
@@ -646,6 +727,7 @@ impl WgpuContext {
             device,
             queue,
             config,
+            profiler,
             window,
             size,
         })

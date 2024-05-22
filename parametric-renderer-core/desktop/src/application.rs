@@ -1,6 +1,6 @@
 use glamour::{Angle, Point3};
 use pollster::FutureExt;
-use renderer_core::application::CpuApplication;
+use renderer_core::application::{CpuApplication, ProfilerSettings};
 use tracing::{error, info, warn};
 use winit::{application::ApplicationHandler, window::Window};
 use winit_input_helper::{WinitInputApp, WinitInputHelper, WinitInputUpdate};
@@ -34,6 +34,7 @@ impl Application {
         let cache_file = CacheFile::from_file(Application::CACHE_FILE).unwrap_or_default();
 
         let mut app = CpuApplication::new()?;
+        app.set_profiling(ProfilerSettings { gpu: true });
 
         if let Some(CachedCamera::FirstPerson {
             position,
@@ -122,6 +123,31 @@ impl WinitInputUpdate for Application {
             event_loop.exit();
             return;
         }
+        // Press space to print profiling data
+        if input.key_pressed_logical(Key::Named(NamedKey::Space)) {
+            match self.app.get_profiling_data() {
+                Some(data) => {
+                    let file_name = format!(
+                        "profile-{}.json",
+                        // use the current time as a unique-enugh identifier
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis()
+                    );
+                    wgpu_profiler::chrometrace::write_chrometrace(
+                        &std::path::Path::new(&file_name),
+                        &data,
+                    )
+                    .unwrap();
+                    info!("Profiling data written to {file_name}");
+                }
+                None => {
+                    warn!("Profiling data not available");
+                }
+            }
+        }
+
         self.app.delta_time = input.delta_time().unwrap_or_default().as_secs_f32();
         if let Some((width, height)) = input.resolution() {
             self.resize(winit::dpi::PhysicalSize { width, height });
