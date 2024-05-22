@@ -76,6 +76,7 @@ watch(
   },
   {
     deep: true,
+    immediate: true,
   }
 );
 const filteredData = computed(() => {
