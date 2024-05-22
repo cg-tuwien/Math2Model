@@ -453,7 +453,6 @@ fn vs_main(
     return out;
 }
 
-// TODO: Include gltf-sample-viewer license
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let v = normalize(camera.world_position.xyz - in.world_position);
