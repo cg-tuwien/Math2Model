@@ -38,6 +38,7 @@ import {
 } from "vue";
 import ComputePatches from "../../parametric-renderer-core/shaders/ComputePatches.wgsl?raw";
 import CopyPatches from "../../parametric-renderer-core/shaders/CopyPatches.wgsl?raw";
+import PbrShader from "../../parametric-renderer-core/shaders/Shader.wgsl?raw";
 
 const props = defineProps<{
   scene: BabylonBaseScene;
@@ -92,6 +93,48 @@ function concatArrayBuffers(views: ArrayBufferView[]) {
   }
 
   return buf;
+}
+
+function replaceAutogen(shader: string, innerCode: string | null) {
+  const autogenRegex = /\/\/ AUTOGEN[^]+?\/\/ END OF AUTOGEN/g;
+
+  if (innerCode === null || innerCode === "") {
+    innerCode = `
+fn evaluateImage(input2: vec2f) -> vec3f {
+  return vec3f(input2, 0.0);
+}
+}
+`;
+  }
+
+  return shader.replaceAll(autogenRegex, (v) => {
+    if (/fn\s+evaluateImage/.test(v)) {
+      return innerCode;
+    } else {
+      return v;
+    }
+  });
+}
+function assembleShaders(innerCode: string): {
+  vertexShader: string;
+  fragmentShader: string;
+} {
+  const shader = replaceAutogen(PbrShader, innerCode);
+  const vertexRegex = /\/\/\/ VERTEX[^]+?\/\/\/ END VERTEX/g;
+  const fragmentRegex = /\/\/\/ FRAGMENT[^]+?\/\/\/ END FRAGMENT/g;
+
+  return {
+    vertexShader: shader
+      .replace(fragmentRegex, "")
+      .replace("fn vs_main", "fn main"),
+    fragmentShader: shader
+      .replace(vertexRegex, "")
+      .replace("fn fs_main", "fn main"),
+  };
+}
+
+function assembleComputeShader(innerCode: string | null) {
+  return replaceAutogen(ComputePatches, innerCode);
 }
 
 class SmartStorageBuffer {
@@ -173,46 +216,91 @@ watchEffect(() => {
 
 const shaderMaterial = babylonEffectRef<ShaderMaterial | null>(() => {
   // This is neccessary to make it fully reactive (otherwise it would not update when the file changes)
-  const vertexSourceId = props.files.fileNames.value.get(
-    props.model.code.vertexFile
-  );
+  const vertexSourceId = props.files.fileNames.value.get(props.model.code);
   if (vertexSourceId === undefined) {
     return null;
   }
-  const vertexSource = props.files.readFile(props.model.code.vertexFile);
+  const vertexSource = props.files.readFile(props.model.code);
   if (vertexSource === null) {
     return null;
   }
-  const fragmentSourceId = props.files.fileNames.value.get(
-    props.model.code.fragmentFile
-  );
-  if (fragmentSourceId === undefined) {
-    return null;
-  }
-  const fragmentSource = props.files.readFile(props.model.code.fragmentFile);
-  if (fragmentSource === null) {
-    return null;
-  }
+
+  const shaders = assembleShaders(vertexSource);
   const material = new ShaderMaterial(
     "custom",
     props.scene,
     {
-      vertexSource: assembleFullVertexShader(vertexSource),
-      fragmentSource: fragmentSource,
+      vertexSource: shaders.vertexShader,
+      fragmentSource: shaders.fragmentShader,
     },
     {
-      attributes: ["uv", "position", "normal"],
+      attributes: ["uv", "position", "normal", "camera", "model"],
       uniformBuffers: ["Scene", "Mesh", "instances"],
       shaderLanguage: ShaderLanguage.WGSL,
-      storageBuffers: ["renderBuffer"],
+      storageBuffers: ["lights", "render_buffer"],
     }
   );
   material.backFaceCulling = false;
   // material.wireframe = true;
   return material;
 });
+const materialUbo = babylonEffectRef<UniformBuffer>(() => {
+  const buffer = new UniformBuffer(props.scene.engine);
+  buffer.addColor4(
+    "color_roughness",
+    {
+      r: 0,
+      g: 0,
+      b: 0,
+    },
+    0
+  );
+  buffer.addColor4(
+    "emissive_metallic",
+    {
+      r: 0,
+      g: 0,
+      b: 0,
+    },
+    0
+  );
+  return buffer;
+});
 watchEffect(() => {
-  shaderMaterial.value?.setUniformBuffer("globalUBO", props.scene.globalUBO);
+  shaderMaterial.value?.setUniformBuffer("global_ubo", props.scene.globalUBO);
+});
+watchEffect(() => {
+  shaderMaterial.value?.setUniformBuffer("material", materialUbo.value);
+});
+// TODO:
+/*
+@group(0) @binding(0) var<uniform> camera: Camera;
+@group(0) @binding(1) var<storage, read> lights: Lights;
+@group(0) @binding(2) var<uniform> model: Model;
+@group(0) @binding(4) var<uniform> material: Material;
+  */
+
+watchEffect(() => {
+  materialUbo.value.updateColor4(
+    "color_roughness",
+    {
+      r: props.model.material.color.x,
+      g: props.model.material.color.y,
+      b: props.model.material.color.z,
+    },
+    props.model.material.roughness
+  );
+});
+watchEffect(() => {
+  materialUbo.value.updateColor4(
+    "emissive_metallic",
+    {
+      r: props.model.material.emissive.x,
+      g: props.model.material.emissive.y,
+      b: props.model.material.emissive.z,
+    },
+    props.model.material.metallic
+  );
 });
 watchEffect(() => {
   mesh.value.material = shaderMaterial.value;
@@ -359,13 +447,11 @@ onUnmounted(() => {
 
 const computePatchesShader = shallowEffectRef<[ComputeShader, ComputeShader]>(
   () => {
-    const vertexSourceId = props.files.fileNames.value.get(
-      props.model.code.vertexFile
-    );
+    const vertexSourceId = props.files.fileNames.value.get(props.model.code);
     const vertexSource =
       vertexSourceId === undefined
         ? null
-        : props.files.readFile(props.model.code.vertexFile);
+        : props.files.readFile(props.model.code);
 
     const computeSource = assembleComputeShader(vertexSource);
     // Apparently the compute shader cannot be disposed of.
@@ -481,7 +567,7 @@ watchEffect(() => {
 
 watchEffect(() => {
   shaderMaterial.value?.setStorageBuffer(
-    "renderBuffer",
+    "render_buffer",
     renderBuffer.value.buffer
   );
 });
@@ -565,85 +651,6 @@ function babylonEffectRef<T extends HasDispose | null>(
     ref.value?.dispose();
   });
   return ref;
-}
-
-function assembleFullVertexShader(innerCode: string) {
-  return `
-#include<sceneUboDeclaration>
-#include<meshUboDeclaration>
-
-attribute position : vec3<f32>;
-attribute uv: vec2<f32>;
-attribute normal : vec3<f32>;
-
-varying vUV : vec2<f32>;
-varying vNormal : vec3<f32>;
-
-struct GlobalUBO {
-  iTime: f32,
-  iTimeDelta: f32,
-  iFrame: f32,
-};
-
-struct Patch {
-  min: vec2<f32>,
-  max: vec2<f32>,
-};
-
-struct RenderBufferRead {
-  patches_length: u32, // Same size as atomic<u32>
-  patches_capacity: u32,
-  patches: array<Patch>,
-};
-
-var<uniform> globalUBO: GlobalUBO;
-var<storage, read> renderBuffer: RenderBufferRead;
-
-${innerCode}
-
-@vertex
-fn main(input: VertexInputs) -> FragmentInputs {
-  let quad = renderBuffer.patches[input.instanceIndex];
-
-  var uv = vec2<f32>(quad.min.x, quad.min.y);
-  if (input.vertexIndex == 0) {
-      uv = vec2<f32>(quad.min.x, quad.min.y);
-  } else if (input.vertexIndex == 1) {
-      uv = vec2<f32>(quad.max.x, quad.min.y);
-  } else if (input.vertexIndex == 2) {
-      uv = vec2<f32>(quad.max.x, quad.max.y);
-  } else if (input.vertexIndex == 3) {
-      uv = vec2<f32>(quad.min.x, quad.max.y);
-  }
-
-  vertexInputs.uv = uv;
-
-  ${
-    innerCode !== ""
-      ? "let pos = evaluateImage(vertexInputs.uv);"
-      : "let pos = vec3f(vertexInputs.uv, 0.0);"
-  }
-  vertexOutputs.position = scene.projection * scene.view * mesh.world * vec4f(pos,1.);
-  vertexOutputs.vUV = vertexInputs.uv;
-  vertexOutputs.vNormal = vertexInputs.normal;
-}`;
-}
-
-function assembleComputeShader(innerCode: string | null) {
-  const computeSource = ComputePatches;
-  const autogenRegex = /\/\/ AUTOGEN[^]+?\/\/ END OF AUTOGEN/g;
-
-  if (innerCode === null || innerCode === "") {
-    return computeSource;
-  }
-
-  return computeSource.replaceAll(autogenRegex, (v) => {
-    if (/fn\s+evaluateImage/.test(v)) {
-      return innerCode;
-    } else {
-      return v;
-    }
-  });
 }
 
 function toVector3(v: ReadonlyVector3) {

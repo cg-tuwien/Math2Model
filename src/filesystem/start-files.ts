@@ -40,20 +40,10 @@ export function getOrCreateScene(files: ReactiveFiles, scenePath: FilePath) {
  */
 function createDefaults(files: ReactiveFiles, scenePath: FilePath) {
   const defaultParametricShader = {
-    name: makeFilePath("my-shader.vert.wgsl"),
+    name: makeFilePath("my-shader.wgsl"),
     value: () => HeartSphere,
   };
-  const defaultFragmentShader = {
-    name: makeFilePath("my-shader.frag.wgsl"),
-    value: () => `
-    varying vNormal : vec3<f32>;
-    varying vUV : vec2<f32>;
-    @fragment
-    fn main(input : FragmentInputs) -> FragmentOutputs {
-        fragmentOutputs.color = vec4<f32>(input.vUV,1.0, 1.0);
-    }
-`,
-  };
+
   const defaultScene = {
     name: scenePath,
     value: () => {
@@ -64,11 +54,16 @@ function createDefaults(files: ReactiveFiles, scenePath: FilePath) {
             type: "model",
             id: crypto.randomUUID(),
             name: "Heart Sphere",
-            fragmentShader: defaultFragmentShader.name,
             parametricShader: defaultParametricShader.name,
             position: [0, 0, 0],
             rotation: ReadonlyEulerAngles.identity.serialize(),
             scale: 1,
+            material: {
+              color: [1, 0, 0],
+              roughness: 0.5,
+              metallic: 0.5,
+              emissive: [0, 0, 0],
+            },
           },
         ],
       };
@@ -91,11 +86,6 @@ function createDefaults(files: ReactiveFiles, scenePath: FilePath) {
     files,
     defaultParametricShader.name,
     defaultParametricShader.value
-  );
-  readOrCreateFile(
-    files,
-    defaultFragmentShader.name,
-    defaultFragmentShader.value
   );
   return { sceneData };
 }

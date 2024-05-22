@@ -1,5 +1,5 @@
 //#include "./Common.wgsl"
-// AUTOGEN d1af44c46a1cbb7b88eb3a40a108148e105bbe3d63aab3143845fbb6b5bb0256
+// AUTOGEN 3981bafad9591a71e64476011502e8895e11e31084dccd1f27a08f4fa5fc2983
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
@@ -30,6 +30,11 @@ struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/stru
   z: u32,
 } 
 fn ceil_div(a: u32, b: u32) -> u32 { return (a + b - 1u) / b; }
+struct GlobalUBO {
+  iTime: f32,
+  iTimeDelta: f32,
+  iFrame: f32,
+};
 // END OF AUTOGEN
 
 alias Vec3Padded = vec4<f32>;
@@ -80,6 +85,7 @@ struct Material {
 @group(0) @binding(2) var<uniform> model: Model;
 @group(0) @binding(3) var<storage, read> render_buffer: RenderBufferRead;
 @group(0) @binding(4) var<uniform> material: Material;
+@group(0) @binding(5) var<uniform> global_ubo: GlobalUBO;
 
 //#include "./HeartSphere.wgsl"
 // AUTOGEN e752278f38b5cff0b524b4eac45aa8fe29236e32e79fa3d6bca5a871d21478e8
@@ -424,6 +430,8 @@ struct VertexOutput {
     @location(2) texture_coords: vec2<f32>,
 }
 
+// This comment is needed for Babylon.js fuckery.
+/// VERTEX
 @vertex
 fn vs_main(
     in: VertexInput,
@@ -452,7 +460,9 @@ fn vs_main(
     out.world_normal = (model.model_similarity * vec4<f32>(normal, 0.0)).xyz; // Only uniform scaling
     return out;
 }
+/// END VERTEX
 
+/// FRAGMENT
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let v = normalize(camera.world_position.xyz - in.world_position);
@@ -511,7 +521,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     return vec4<f32>(color, 1.0);
 }
-
+/// END FRAGMENT
  
 
  

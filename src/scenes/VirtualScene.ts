@@ -60,26 +60,51 @@ export class ReadonlyQuaternion {
   }
 }
 
+export interface MaterialParameter {
+  color: ReadonlyVector3;
+  roughness: number;
+  metallic: number;
+  emissive: ReadonlyVector3;
+}
+
 export interface VirtualModelState {
   id: string;
   name: string;
-  code: ShaderCodeRef;
+  code: FilePath;
   position: ReadonlyVector3;
   rotation: ReadonlyEulerAngles;
   scale: number;
+  material: MaterialParameter;
 }
 
 export interface VirtualModelUpdate {
   name?: string;
-  code?: ShaderCodeRef;
-  position?: ReadonlyVector3;
-  rotation?: ReadonlyEulerAngles;
+  code?: FilePath;
+  position?: {
+    x?: number;
+    y?: number;
+    z?: number;
+  };
+  rotation?: {
+    x?: number;
+    y?: number;
+    z?: number;
+  };
   scale?: number;
-}
-
-export interface ShaderCodeRef {
-  readonly vertexFile: FilePath;
-  readonly fragmentFile: FilePath;
+  material?: {
+    color?: {
+      x: number;
+      y: number;
+      z: number;
+    };
+    roughness?: number;
+    metallic?: number;
+    emissive?: {
+      x: number;
+      y: number;
+      z: number;
+    };
+  };
 }
 
 export interface VirtualSceneState {
@@ -92,7 +117,7 @@ export class VirtualScene {
   public readonly parametricShaders = computed(() => {
     const shaders = new Set<FilePath>();
     for (const model of this.state.value.models) {
-      shaders.add(model.code.vertexFile);
+      shaders.add(model.code);
     }
     return shaders;
   });
@@ -140,13 +165,43 @@ export class VirtualScene {
         model.code = update.code;
       }
       if (update.position !== undefined) {
-        model.position = update.position;
+        model.position = new ReadonlyVector3(
+          update.position.x ?? model.position.x,
+          update.position.y ?? model.position.y,
+          update.position.z ?? model.position.z
+        );
       }
       if (update.rotation !== undefined) {
-        model.rotation = update.rotation;
+        model.rotation = new ReadonlyEulerAngles(
+          update.rotation.x ?? model.rotation.x,
+          update.rotation.y ?? model.rotation.y,
+          update.rotation.z ?? model.rotation.z
+        );
       }
       if (update.scale !== undefined) {
         model.scale = update.scale;
+      }
+      if (update.material !== undefined) {
+        if (update.material.color !== undefined) {
+          model.material.color = new ReadonlyVector3(
+            update.material.color.x,
+            update.material.color.y,
+            update.material.color.z
+          );
+        }
+        if (update.material.roughness !== undefined) {
+          model.material.roughness = update.material.roughness;
+        }
+        if (update.material.metallic !== undefined) {
+          model.material.metallic = update.material.metallic;
+        }
+        if (update.material.emissive !== undefined) {
+          model.material.emissive = new ReadonlyVector3(
+            update.material.emissive.x,
+            update.material.emissive.y,
+            update.material.emissive.z
+          );
+        }
       }
     }
   }
@@ -169,11 +224,16 @@ function serializeModel(model: VirtualModelState): SerializedModel {
     type: "model",
     id: model.id,
     name: model.name,
-    parametricShader: model.code.vertexFile,
-    fragmentShader: model.code.fragmentFile,
+    parametricShader: model.code,
     position: model.position.serialize(),
     rotation: model.rotation.serialize(),
     scale: model.scale,
+    material: {
+      color: model.material.color.serialize(),
+      roughness: model.material.roughness,
+      metallic: model.material.metallic,
+      emissive: model.material.emissive.serialize(),
+    },
   };
 }
 
@@ -182,12 +242,15 @@ function deserializeModel(data: SerializedModel): VirtualModelState {
   return {
     id: data.id,
     name: data.name,
-    code: {
-      vertexFile: makeFilePath(data.parametricShader),
-      fragmentFile: makeFilePath(data.fragmentShader),
-    },
+    code: makeFilePath(data.parametricShader),
     position: ReadonlyVector3.fromSerialized(data.position),
     rotation: ReadonlyEulerAngles.fromSerialized(data.rotation),
     scale: data.scale,
+    material: {
+      color: ReadonlyVector3.fromSerialized(data.material.color),
+      roughness: data.material.roughness,
+      metallic: data.material.metallic,
+      emissive: ReadonlyVector3.fromSerialized(data.material.emissive),
+    },
   };
 }

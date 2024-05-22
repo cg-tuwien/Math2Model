@@ -1,22 +1,16 @@
 <script setup lang="ts">
 import {
-  ReadonlyEulerAngles,
-  ReadonlyVector3,
   type VirtualModelState,
   type VirtualModelUpdate,
 } from "@/scenes/VirtualScene";
 import { computed, h, ref, watchEffect, type DeepReadonly } from "vue";
 import { NButton, NInput, type TreeOption } from "naive-ui";
-import AngleInput from "@/components/input/AngleInput.vue";
 import NumberInput from "@/components/input/NumberInput.vue";
+import VectorInput from "@/components/input/VectorInput.vue";
+import EulerInput from "@/components/input/EulerInput.vue";
 import { showError } from "@/notification";
-import {
-  commonWriteableModelState,
-  toWriteableModelState,
-  type WriteableModelState,
-} from "@/sceneview/writeablemodelstate";
+import { commonModelState } from "@/sceneview/writeablemodelstate";
 import { type FilePath, makeFilePath } from "@/filesystem/reactive-files";
-import { assertUnreachable } from "@stefnotch/typestef/assert";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 
 const emit = defineEmits({
@@ -36,12 +30,12 @@ const emit = defineEmits({
 
 const props = defineProps<{
   models: DeepReadonly<VirtualModelState>[];
-  shaders: DeepReadonly<SelectMixedOption>[];
+  shaders: SelectMixedOption[];
 }>();
 
 const pattern = ref("");
 const selectedKeys = ref<string[]>(
-  props.models.length > 0 ? [props.models[0].id] : [],
+  props.models.length > 0 ? [props.models[0].id] : []
 );
 const checkedKeys = ref<string[]>([]);
 const data = computed(() =>
@@ -49,11 +43,11 @@ const data = computed(() =>
     (model): TreeOption => ({
       label: model.name,
       key: model.id,
-    }),
-  ),
+    })
+  )
 );
 
-let currentModel = ref<WriteableModelState | null>(null);
+let currentModel = ref<DeepReadonly<VirtualModelState> | null>(null);
 let toAddModel = ref<[string, FilePath] | null>(null);
 let customShader = ref<string | null>(null);
 
@@ -64,16 +58,18 @@ watchEffect(() => {
   } else if (keys.length == 1) {
     const model = props.models.find((model) => model.id === keys[0]);
     if (model) {
-      currentModel.value = toWriteableModelState(model);
-      emit("select", model.code.vertexFile);
+      currentModel.value = model;
+      emit("select", model.code);
     }
   } else if (keys.length > 1) {
     const models: VirtualModelState[] = [];
     for (let key of keys) {
       const model = props.models.find((model) => model.id == key);
-      if (model) models.push(model);
+      if (model) {
+        models.push(model);
+      }
     }
-    currentModel.value = commonWriteableModelState(models);
+    currentModel.value = commonModelState(models);
   }
 });
 
@@ -81,53 +77,13 @@ function renderLabel({ option }: { option: TreeOption }) {
   return h("span", option.label);
 }
 
-function change(key: keyof WriteableModelState) {
-  const model = currentModel.value;
-  if (!model) return;
+function change(value: VirtualModelUpdate) {
   let keys = selectedKeys.value;
   if (selectedKeys.value.length === 0) {
     console.warn("No model selected");
     return;
   }
-
-  //const degX = new Angle(euler.x).degrees();
-  //const degY = new Angle(euler.y).degrees();
-  //const degZ = new Angle(euler.z).degrees();
-  //console.log(degX, degY, degZ);
-
-  if (key === "name") {
-    emit("update", keys, {
-      name: model.name ?? "",
-    });
-  } else if (key === "code") {
-    emit("update", keys, {
-      code: model.code ?? "",
-    });
-  } else if (key === "posX" || key === "posY" || key === "posZ") {
-    emit("update", keys, {
-      position: new ReadonlyVector3(
-        model.posX ?? 0,
-        model.posY ?? 0,
-        model.posZ ?? 0,
-      ),
-    });
-  } else if (key === "rotX" || key === "rotY" || key === "rotZ") {
-    emit("update", keys, {
-      rotation: new ReadonlyEulerAngles(
-        model.rotX ?? 0,
-        model.rotY ?? 0,
-        model.rotZ ?? 0,
-      ),
-    });
-  } else if (key === "scale") {
-    emit("update", keys, {
-      scale: model.scale ?? 0,
-    });
-  } else if (key === "id") {
-    showError("Cannot change id", new Error("Cannot change id"));
-  } else {
-    assertUnreachable(key);
-  }
+  emit("update", keys, value);
 }
 
 function startAddModel() {
@@ -153,7 +109,7 @@ function addModel() {
     return;
   }
 
-  if (toAddModel.value[1] == "NEW...") {
+  if (toAddModel.value[1] == undefined) {
     if (!customShader) {
       showError("Invalid State!", null);
       return;
@@ -161,11 +117,11 @@ function addModel() {
     if (customShader.value === null) {
       showError(
         "Please enter a name for the new shader or select an existing shader.",
-        null,
+        null
       );
       return;
     }
-    toAddModel.value[1] = makeFilePath(customShader.value + ".vert.wgsl");
+    toAddModel.value[1] = makeFilePath(customShader.value + ".wgsl");
   }
 
   emit("addModel", toAddModel.value[0], toAddModel.value[1]);
@@ -209,54 +165,119 @@ function removeModel() {
       <n-h3 class="underline">Inspector</n-h3>
       <n-text>Name</n-text>
       <n-input
-        v-model:value="currentModel.name"
+        :value="currentModel.name"
         type="text"
         clearable
-        v-on:input="change('name')"
+        @input="
+          (name) =>
+            change({
+              name,
+            })
+        "
       ></n-input>
       <br /><br />
       <n-flex justify="space-between">
         <div>
-          <n-text>Position x</n-text>
-          <NumberInput
-            v-model="currentModel.posX"
-            @update:modelValue="change('posX')"
-          ></NumberInput>
-          <n-text>Position y</n-text>
-          <NumberInput
-            v-model="currentModel.posY"
-            @update:modelValue="change('posY')"
-          ></NumberInput>
-          <n-text>Position z</n-text>
-          <NumberInput
-            v-model="currentModel.posZ"
-            @update:modelValue="change('posZ')"
-            :show-button="false"
-          ></NumberInput>
+          <n-text>Position</n-text>
+          <VectorInput
+            :modelValue="[
+              currentModel.position.x,
+              currentModel.position.y,
+              currentModel.position.z,
+            ]"
+            @update:modelValue="
+              (position) =>
+                change({
+                  position: { x: position[0], y: position[1], z: position[2] },
+                })
+            "
+          ></VectorInput>
         </div>
         <div>
-          <n-text>Rotation x</n-text>
-          <AngleInput
-            v-model="currentModel.rotX"
-            @update:modelValue="change('rotX')"
-          ></AngleInput>
-          <n-text>Rotation y</n-text>
-          <AngleInput
-            v-model="currentModel.rotY"
-            @update:modelValue="change('rotY')"
-          ></AngleInput>
-          <n-text>Rotation z</n-text>
-          <AngleInput
-            v-model="currentModel.rotZ"
-            @update:modelValue="change('rotZ')"
-          ></AngleInput>
+          <n-text>Rotation</n-text>
+          <EulerInput
+            :modelValue="[
+              currentModel.rotation.x,
+              currentModel.rotation.y,
+              currentModel.rotation.z,
+            ]"
+            @update:modelValue="
+              (rotation) =>
+                change({
+                  rotation: {
+                    x: rotation[0],
+                    y: rotation[1],
+                    z: rotation[2],
+                  },
+                })
+            "
+          ></EulerInput>
         </div>
         <div>
           <n-text>Scale</n-text>
           <NumberInput
-            v-model="currentModel.scale"
-            @update:modelValue="change('scale')"
+            :modelValue="currentModel.scale"
+            @update:modelValue="(scale) => change({ scale })"
           ></NumberInput>
+        </div>
+        <div>
+          <n-text>Material</n-text>
+          <n-text>Color</n-text>
+          <VectorInput
+            :modelValue="[
+              currentModel.material.color.x,
+              currentModel.material.color.y,
+              currentModel.material.color.z,
+            ]"
+            @update:modelValue="
+              (color) =>
+                change({
+                  material: {
+                    color: { x: color[0], y: color[1], z: color[2] },
+                  },
+                })
+            "
+          ></VectorInput>
+          <n-text>Roughness</n-text>
+          <NumberInput
+            :modelValue="currentModel.material.roughness"
+            @update:modelValue="
+              (roughness) =>
+                change({
+                  material: { roughness },
+                })
+            "
+          ></NumberInput>
+          <n-text>Metallic</n-text>
+          <NumberInput
+            :modelValue="currentModel.material.metallic"
+            @update:modelValue="
+              (metallic) =>
+                change({
+                  material: { metallic },
+                })
+            "
+          ></NumberInput>
+          <n-text>Emissive</n-text>
+          <VectorInput
+            :modelValue="[
+              currentModel.material.emissive.x,
+              currentModel.material.emissive.y,
+              currentModel.material.emissive.z,
+            ]"
+            @update:modelValue="
+              (emissive) =>
+                change({
+                  material: {
+                    emissive: {
+                      x: emissive[0],
+                      y: emissive[1],
+                      z: emissive[2],
+                    },
+                  },
+                })
+            "
+          ></VectorInput>
         </div>
       </n-flex>
     </div>
