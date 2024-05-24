@@ -2,10 +2,13 @@ use glam::Quat;
 use glamour::Point3;
 use winit_input_helper::WinitInputHelper;
 
-use super::{
-    camera::CursorCapture, freecam_controller::FreecamController,
-    orbitcam_controller::OrbitcamController,
-};
+use super::{freecam_controller::FreecamController, orbitcam_controller::OrbitcamController};
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum CursorCapture {
+    Free,
+    LockedAndHidden,
+}
 
 pub trait IsCameraController {
     fn position(&self) -> Point3;

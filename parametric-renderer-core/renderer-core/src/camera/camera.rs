@@ -13,11 +13,6 @@ pub struct Camera {
     proj: Matrix4<f32>,
 }
 
-pub enum CursorCapture {
-    Free,
-    LockedAndHidden,
-}
-
 impl Camera {
     pub fn new(aspect_ratio: f32, settings: CameraSettings) -> Self {
         let position = Point3::ZERO;

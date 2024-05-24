@@ -3,14 +3,15 @@ use std::sync::Arc;
 use glamour::{Matrix4, Point3, ToRaw, Vector2, Vector4};
 use tracing::info;
 use wgpu_profiler::{GpuProfiler, GpuProfilerSettings};
-use winit::window::Window;
+use winit::{dpi::PhysicalPosition, window::Window};
 use winit_input_helper::WinitInputHelper;
 
 use crate::{
     buffer::TypedBuffer,
     camera::{
         camera_controller::{
-            CameraController, ChosenKind, GeneralController, GeneralControllerSettings,
+            CameraController, ChosenKind, CursorCapture, GeneralController,
+            GeneralControllerSettings,
         },
         camera_settings::CameraSettings,
         Camera,
@@ -101,6 +102,9 @@ impl CpuApplication {
 
     pub fn update(&mut self, inputs: &WinitInputHelper) {
         let cursor_capture = self.camera_controller.update(inputs, self.delta_time);
+        if let Some(gpu) = &mut self.gpu {
+            gpu.update_cursor_capture(cursor_capture, inputs);
+        }
         self.camera.update_camera(&self.camera_controller);
     }
 
@@ -151,6 +155,47 @@ pub struct GpuApplication {
     indirect_compute_buffer: [TypedBuffer<compute_patches::DispatchIndirectArgs>; 2],
     indirect_draw_buffer: TypedBuffer<copy_patches::DrawIndexedIndirectArgs>,
     mesh: Mesh,
+    cursor_capture: WindowCursorCapture,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum WindowCursorCapture {
+    Free,
+    LockedAndHidden(PhysicalPosition<f64>),
+}
+
+impl GpuApplication {
+    pub fn update_cursor_capture(
+        &mut self,
+        cursor_capture: CursorCapture,
+        inputs: &WinitInputHelper,
+    ) {
+        let window = &self.context.window;
+        match (self.cursor_capture, cursor_capture) {
+            (WindowCursorCapture::LockedAndHidden(position), CursorCapture::Free) => {
+                window
+                    .set_cursor_grab(winit::window::CursorGrabMode::None)
+                    .unwrap();
+                window.set_cursor_visible(true);
+                window.set_cursor_position(position).unwrap();
+                self.cursor_capture = WindowCursorCapture::Free;
+            }
+            (WindowCursorCapture::Free, CursorCapture::Free) => {}
+            (WindowCursorCapture::LockedAndHidden(_), CursorCapture::LockedAndHidden) => {}
+            (WindowCursorCapture::Free, CursorCapture::LockedAndHidden) => {
+                let cursor_position = inputs.cursor().unwrap_or_else(|| (0.0, 0.0));
+                window
+                    .set_cursor_grab(winit::window::CursorGrabMode::Confined)
+                    .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))
+                    .unwrap();
+                window.set_cursor_visible(false);
+                self.cursor_capture = WindowCursorCapture::LockedAndHidden(PhysicalPosition::new(
+                    cursor_position.0 as f64,
+                    cursor_position.1 as f64,
+                ));
+            }
+        }
+    }
 }
 
 impl GpuApplication {
@@ -439,6 +484,7 @@ impl GpuApplication {
             light_buffer,
             model_buffer,
             mesh,
+            cursor_capture: WindowCursorCapture::Free,
         })
     }
 

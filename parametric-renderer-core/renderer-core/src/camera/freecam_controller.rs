@@ -4,8 +4,9 @@ use winit::{event::MouseButton, keyboard::KeyCode};
 use winit_input_helper::WinitInputHelper;
 
 use super::{
-    camera::CursorCapture,
-    camera_controller::{GeneralController, GeneralControllerSettings, IsCameraController},
+    camera_controller::{
+        CursorCapture, GeneralController, GeneralControllerSettings, IsCameraController,
+    },
     Camera,
 };
 
@@ -81,7 +82,7 @@ impl FreecamController {
     ) {
         let horizontal_movement = (direction * Vector3::new(1.0, 0.0, 1.0)).normalize_or_zero();
         let vertical_movement = Camera::up() * direction.y;
-        let horizontal_movement = Quat::from_rotation_y(-self.yaw.radians) * horizontal_movement;
+        let horizontal_movement = Quat::from_rotation_y(self.yaw.radians) * horizontal_movement;
 
         self.position += horizontal_movement * settings.fly_speed * delta_time;
         self.position += vertical_movement * settings.fly_speed * delta_time;

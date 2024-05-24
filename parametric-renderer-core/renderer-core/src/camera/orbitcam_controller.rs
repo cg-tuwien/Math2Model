@@ -1,11 +1,12 @@
 use glam::Quat;
-use glamour::{Angle, Point3, ToRaw, Vector2, Vector3};
+use glamour::{Angle, Point3, Vector2, Vector3};
 use winit::event::MouseButton;
 use winit_input_helper::WinitInputHelper;
 
 use super::{
-    camera::CursorCapture,
-    camera_controller::{GeneralController, GeneralControllerSettings, IsCameraController},
+    camera_controller::{
+        CursorCapture, GeneralController, GeneralControllerSettings, IsCameraController,
+    },
     Camera,
 };
 

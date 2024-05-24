@@ -141,8 +141,8 @@ impl WinitInputUpdate for Application {
             event_loop.exit();
             return;
         }
-        // Press space to print profiling data
-        if input.key_pressed_logical(Key::Named(NamedKey::Space)) {
+        // Press P to print profiling data
+        if input.key_pressed(winit::keyboard::KeyCode::KeyP) {
             match self.app.get_profiling_data() {
                 Some(data) => {
                     let file_name = format!(
