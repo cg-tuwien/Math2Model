@@ -204,7 +204,7 @@ impl GpuApplication {
         let render_bind_group_0 = shader::bind_groups::BindGroup0::from_bindings(
             &device,
             shader::bind_groups::BindGroupLayout0 {
-                camera: camera_buffer.as_entire_buffer_binding(),
+                camera_data: camera_buffer.as_entire_buffer_binding(),
                 lights: light_buffer.as_entire_buffer_binding(),
                 model: model_buffer.as_entire_buffer_binding(),
                 render_buffer: render_buffer.as_entire_buffer_binding(),

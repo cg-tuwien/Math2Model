@@ -80,7 +80,7 @@ struct Material {
     emissive_metallic: vec4<f32>,
 }
 
-@group(0) @binding(0) var<uniform> camera: Camera;
+@group(0) @binding(0) var<uniform> camera_data: Camera;
 @group(0) @binding(1) var<storage, read> lights: Lights;
 @group(0) @binding(2) var<uniform> model: Model;
 @group(0) @binding(3) var<storage, read> render_buffer: RenderBufferRead;
@@ -453,7 +453,7 @@ fn vs_main(
     let world_pos = model.model_similarity * vec4<f32>(pos, 1.0);
 
     var out: VertexOutput;
-    out.clip_position = camera.projection * camera.view * world_pos;
+    out.clip_position = camera_data.projection * camera_data.view * world_pos;
     out.world_position = world_pos.xyz;
     out.texture_coords = uv;
     let normal = vec3<f32>(0.0, -1.0, 0.0); // TODO: We'll compute this later
@@ -465,7 +465,7 @@ fn vs_main(
 /// FRAGMENT
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let v = normalize(camera.world_position.xyz - in.world_position);
+    let v = normalize(camera_data.world_position.xyz - in.world_position);
     // let n = normalize(in.world_normal);
     let n = normalize(-cross(dpdxFine(in.world_position), dpdyFine(in.world_position)));
 

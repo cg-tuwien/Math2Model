@@ -78,7 +78,6 @@ const WORKGROUP_SIZE = 64u;
 // assume a single work group
 @compute @workgroup_size(WORKGROUP_SIZE, 1, 1)
 fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
-  // TODO: Pls benchmark this compared to the previous one
   let patch_index = global_id.x;
   var final_patches_length = 0u;
   if (patch_index < patches_from_buffer.patches_length) {

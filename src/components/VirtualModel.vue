@@ -29,6 +29,7 @@ import {
 } from "@babylonjs/core";
 import { assert } from "@stefnotch/typestef/assert";
 import {
+  computed,
   onUnmounted,
   shallowRef,
   watch,
@@ -39,25 +40,19 @@ import {
 import ComputePatches from "../../parametric-renderer-core/shaders/ComputePatches.wgsl?raw";
 import CopyPatches from "../../parametric-renderer-core/shaders/CopyPatches.wgsl?raw";
 import PbrShader from "../../parametric-renderer-core/shaders/Shader.wgsl?raw";
+import {
+  SmartStorageBuffer,
+  concatArrayBuffers,
+  shallowEffectRef,
+  useUniformBuffer,
+} from "@/engine/babylon-helpers";
 
 const props = defineProps<{
   scene: BabylonBaseScene;
   files: ReadonlyFiles & HasReactiveFiles;
   model: DeepReadonly<VirtualModelState>;
 }>();
-
-const dummyValue = Symbol("dummyValue");
-function shallowEffectRef<T>(
-  effect: (oldValue: NoInfer<T> | null) => T
-): ShallowRef<T> {
-  const ref = shallowRef<T>(dummyValue as any);
-  watchEffect(() => {
-    const oldValue = ref.value;
-    ref.value = effect(oldValue === dummyValue ? null : oldValue);
-  });
-  assert(ref.value !== dummyValue);
-  return ref;
-}
+const engineRef = computed(() => props.scene.engine);
 
 const onRenderCallbacks: (() => void)[] = [];
 function onRender(callback: () => void) {
@@ -78,22 +73,6 @@ const renderObserver = shallowEffectRef<{ dispose: () => void }>((oldValue) => {
 onUnmounted(() => {
   renderObserver.value.dispose();
 });
-
-// From https://stackoverflow.com/a/70005195/3492994
-function concatArrayBuffers(views: ArrayBufferView[]) {
-  let length = 0;
-  for (const v of views) length += v.byteLength;
-
-  let buf = new Uint8Array(length);
-  let offset = 0;
-  for (const v of views) {
-    const uint8view = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
-    buf.set(uint8view, offset);
-    offset += uint8view.byteLength;
-  }
-
-  return buf;
-}
 
 function replaceAutogen(shader: string, innerCode: string | null) {
   const autogenRegex = /\/\/ AUTOGEN[^]+?\/\/ END OF AUTOGEN/g;
@@ -135,54 +114,6 @@ function assembleShaders(innerCode: string): {
 
 function assembleComputeShader(innerCode: string | null) {
   return replaceAutogen(ComputePatches, innerCode);
-}
-
-class SmartStorageBuffer {
-  buffer: StorageBuffer;
-  initialBuffer: StorageBuffer;
-  initialByteSize: number;
-  constructor(
-    engine: WebGPUEngine,
-    initialData: {
-      buffers: ArrayBufferView[];
-      runtimeArray: number;
-    },
-    creationFlags: number,
-    label: string
-  ) {
-    const data = concatArrayBuffers(initialData.buffers);
-
-    this.initialByteSize = data.byteLength;
-    this.buffer = new StorageBuffer(
-      engine,
-      data.byteLength + initialData.runtimeArray,
-      creationFlags | Constants.BUFFER_CREATIONFLAG_WRITE,
-      label
-    );
-    this.buffer.update(data);
-    this.initialBuffer = new StorageBuffer(
-      engine,
-      data.byteLength,
-      Constants.BUFFER_CREATIONFLAG_READ | Constants.BUFFER_CREATIONFLAG_WRITE,
-      label
-    );
-    this.initialBuffer.update(data);
-  }
-
-  reset(engine: WebGPUEngine) {
-    engine._renderEncoder.copyBufferToBuffer(
-      this.initialBuffer.getBuffer().underlyingResource,
-      0,
-      this.buffer.getBuffer().underlyingResource,
-      0,
-      this.initialByteSize
-    );
-  }
-
-  dispose() {
-    this.buffer.dispose();
-    this.initialBuffer.dispose();
-  }
 }
 
 // TODO: Introduce a shader caching in the layer above
@@ -234,8 +165,8 @@ const shaderMaterial = babylonEffectRef<ShaderMaterial | null>(() => {
       fragmentSource: shaders.fragmentShader,
     },
     {
-      attributes: ["uv", "position", "normal", "camera", "model"],
-      uniformBuffers: ["Scene", "Mesh", "instances"],
+      attributes: ["uv", "position", "normal"],
+      uniformBuffers: ["Scene", "Mesh", "instances", "camera_data"],
       shaderLanguage: ShaderLanguage.WGSL,
       storageBuffers: ["lights", "render_buffer"],
     }
@@ -244,64 +175,123 @@ const shaderMaterial = babylonEffectRef<ShaderMaterial | null>(() => {
   // material.wireframe = true;
   return material;
 });
-const materialUbo = babylonEffectRef<UniformBuffer>(() => {
-  const buffer = new UniformBuffer(props.scene.engine);
-  buffer.addColor4(
-    "color_roughness",
-    {
-      r: 0,
-      g: 0,
-      b: 0,
-    },
-    0
-  );
-  buffer.addColor4(
-    "emissive_metallic",
-    {
-      r: 0,
-      g: 0,
-      b: 0,
-    },
-    0
-  );
-  return buffer;
-});
 watchEffect(() => {
   shaderMaterial.value?.setUniformBuffer("global_ubo", props.scene.globalUBO);
 });
-watchEffect(() => {
-  shaderMaterial.value?.setUniformBuffer("material", materialUbo.value);
-});
-// TODO:
-/*
-@group(0) @binding(0) var<uniform> camera: Camera;
-@group(0) @binding(1) var<storage, read> lights: Lights;
-@group(0) @binding(2) var<uniform> model: Model;
-@group(0) @binding(4) var<uniform> material: Material;
-  */
 
-watchEffect(() => {
-  materialUbo.value.updateColor4(
-    "color_roughness",
-    {
-      r: props.model.material.color.x,
-      g: props.model.material.color.y,
-      b: props.model.material.color.z,
+const cameraUbo = useUniformBuffer(engineRef, onRender, [
+  {
+    name: "world_position",
+    type: "vec4",
+    getValue: () => {
+      const pos = props.scene.camera.position;
+      return [pos.x, pos.y, pos.z, 0.0];
     },
-    props.model.material.roughness
+  },
+  {
+    name: "view",
+    type: "mat4",
+    getValue: () => props.scene.camera.getViewMatrix(),
+  },
+  {
+    name: "projection",
+    type: "mat4",
+    getValue: () => props.scene.camera.getProjectionMatrix(),
+  },
+]);
+watchEffect(() => {
+  shaderMaterial.value?.setUniformBuffer("camera_data", cameraUbo.buffer.value);
+});
+onUnmounted(() => {
+  cameraUbo[Symbol.dispose]();
+});
+
+const lightsStorageBuffer = babylonEffectRef<SmartStorageBuffer>(() => {
+  const maxLightCount = 10;
+  const floatByteSize = 4;
+  const vec4ByteSize = floatByteSize * 4;
+  const lightByteSize = 2 * vec4ByteSize;
+  return new SmartStorageBuffer(
+    props.scene.engine,
+    {
+      buffers: [
+        new Float32Array([
+          0.01,
+          0.01,
+          0.01,
+          0, // ambient
+        ]),
+        new Uint32Array([
+          1, // points_length
+        ]),
+        // Point lights
+        new Uint32Array([
+          0.0,
+          10.0,
+          2.0,
+          30.0, //position_range
+          1.0,
+          1.0,
+          1.0,
+          1.0, //color_intensity
+        ]),
+      ],
+      runtimeArray: maxLightCount * lightByteSize,
+    },
+    Constants.BUFFER_CREATIONFLAG_READWRITE,
+    "Lights Buffer"
   );
 });
 watchEffect(() => {
-  materialUbo.value.updateColor4(
-    "emissive_metallic",
-    {
-      r: props.model.material.emissive.x,
-      g: props.model.material.emissive.y,
-      b: props.model.material.emissive.z,
-    },
-    props.model.material.metallic
+  shaderMaterial.value?.setStorageBuffer(
+    "lights",
+    lightsStorageBuffer.value.buffer
   );
 });
+
+const modelUbo = useUniformBuffer(engineRef, onRender, [
+  {
+    name: "model_similarity",
+    type: "mat4",
+    getValue: () => mesh.value.getWorldMatrix(),
+  },
+]);
+watchEffect(() => {
+  shaderMaterial.value?.setUniformBuffer("model", modelUbo.buffer.value);
+});
+onUnmounted(() => {
+  modelUbo[Symbol.dispose]();
+});
+
+const materialUbo = useUniformBuffer(engineRef, onRender, [
+  {
+    name: "color_roughness",
+    type: "vec4",
+    getValue: () => [
+      props.model.material.color.x,
+      props.model.material.color.y,
+      props.model.material.color.z,
+      props.model.material.roughness,
+    ],
+  },
+  {
+    name: "emissive_metallic",
+    type: "vec4",
+    getValue: () => [
+      props.model.material.emissive.x,
+      props.model.material.emissive.y,
+      props.model.material.emissive.z,
+      props.model.material.metallic,
+    ],
+  },
+]);
+watchEffect(() => {
+  shaderMaterial.value?.setUniformBuffer("material", materialUbo.buffer.value);
+});
+onUnmounted(() => {
+  materialUbo[Symbol.dispose]();
+});
+
 watchEffect(() => {
   mesh.value.material = shaderMaterial.value;
 });
@@ -325,17 +315,16 @@ const renderBuffer = babylonEffectRef<SmartStorageBuffer>(() => {
   );
 });
 
-const patchesInputBuffer = babylonEffectRef<UniformBuffer>(() => {
-  const buffer = new UniformBuffer(props.scene.engine);
-  buffer.addMatrix("model_view_projection", Matrix.Identity());
-  return buffer;
-});
-onRender(() => {
-  patchesInputBuffer.value.updateMatrix(
-    "model_view_projection",
-    mesh.value.getWorldMatrix().multiply(props.scene.getTransformMatrix())
-  );
-  patchesInputBuffer.value.update();
+const patchesInputBuffer = useUniformBuffer(engineRef, onRender, [
+  {
+    name: "model_view_projection",
+    type: "mat4",
+    getValue: () =>
+      mesh.value.getWorldMatrix().multiply(props.scene.getTransformMatrix()),
+  },
+]);
+onUnmounted(() => {
+  patchesInputBuffer[Symbol.dispose]();
 });
 
 const patchesBufferReset = babylonEffectRef<StorageBuffer>(() => {
@@ -493,11 +482,11 @@ const computePatchesShader = shallowEffectRef<[ComputeShader, ComputeShader]>(
 watchEffect(() => {
   computePatchesShader.value[0].setUniformBuffer(
     "input_buffer",
-    patchesInputBuffer.value
+    patchesInputBuffer.buffer.value
   );
   computePatchesShader.value[1].setUniformBuffer(
     "input_buffer",
-    patchesInputBuffer.value
+    patchesInputBuffer.buffer.value
   );
   computePatchesShader.value[0].setStorageBuffer(
     "render_buffer",

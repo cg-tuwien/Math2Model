@@ -72,13 +72,6 @@ onUnmounted(() => {
   baseScene.value[Symbol.dispose]();
 });
 
-// TODO: Gizmo
-// Including
-// - GPU picking
-// - Dragging and then updating the filesystem (aka serialize the scene)
-// Excluding
-// - Switching to the shader. Instead we should have a scene tree/property editor, where the user can click on the referenced shaders to edit them.
-
 // Attach the canvas to the DOM
 watchEffect(() => {
   canvasContainer.value?.appendChild(props.canvas);

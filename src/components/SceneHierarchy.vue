@@ -3,8 +3,8 @@ import {
   type VirtualModelState,
   type VirtualModelUpdate,
 } from "@/scenes/VirtualScene";
-import { computed, h, ref, watchEffect, type DeepReadonly } from "vue";
-import { NButton, NInput, type TreeOption } from "naive-ui";
+import { computed, h, ref, watch, watchEffect, type DeepReadonly } from "vue";
+import { NButton, NInput } from "naive-ui";
 import NumberInput from "@/components/input/NumberInput.vue";
 import VectorInput from "@/components/input/VectorInput.vue";
 import EulerInput from "@/components/input/EulerInput.vue";
@@ -12,6 +12,14 @@ import { showError } from "@/notification";
 import { commonModelState } from "@/sceneview/writeablemodelstate";
 import { type FilePath, makeFilePath } from "@/filesystem/reactive-files";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
+import {
+  NodeTreeHelper,
+  makeSelectionGeneration,
+  type NodePath,
+  type SelectionGeneration,
+  type TreeNode,
+  type TreeSelection,
+} from "./node-tree/NodeTreeHelper";
 
 const emit = defineEmits({
   update(ids: string[], update: VirtualModelUpdate) {
@@ -34,19 +42,53 @@ const props = defineProps<{
 }>();
 
 const pattern = ref("");
-const selectedKeys = ref<string[]>(
-  props.models.length > 0 ? [props.models[0].id] : []
-);
-const checkedKeys = ref<string[]>([]);
-const data = computed(() =>
-  props.models.map(
-    (model): TreeOption => ({
+function matchesPattern(node: TreeNode): { start: number; end: number } | null {
+  if (pattern.value === "") {
+    return { start: 0, end: node.label.length };
+  }
+  const start = node.label.indexOf(pattern.value);
+  if (start === -1) {
+    return null;
+  }
+  return { start, end: start + pattern.value.length };
+}
+const data = ref<TreeNode>({
+  key: "root",
+  label: "Root",
+  children: [],
+});
+watchEffect(() => {
+  data.value.children = props.models.map(
+    (model): TreeNode => ({
       label: model.name,
       key: model.id,
     })
-  )
-);
-
+  );
+});
+const filteredData = computed(() => {
+  if (pattern.value === "") {
+    return data.value;
+  }
+  const filteredData = { ...data.value };
+  filteredData.children = (data.value.children ?? []).flatMap((node) =>
+    NodeTreeHelper.filterNodes(node, (v) => matchesPattern(v) !== null)
+  );
+  return filteredData;
+});
+const treeSelection = ref<TreeSelection>({
+  base: [],
+  generation: makeSelectionGeneration(0),
+});
+const selectedKeys = computed(() => {
+  const selected: string[] = [];
+  const generation = treeSelection.value.generation;
+  for (const [node, _] of NodeTreeHelper.visibleNodesIter(filteredData.value)) {
+    if (NodeTreeHelper.isSelected(node, generation)) {
+      selected.push(node.key);
+    }
+  }
+  return selected;
+});
 let currentModel = ref<DeepReadonly<VirtualModelState> | null>(null);
 let toAddModel = ref<[string, FilePath] | null>(null);
 let customShader = ref<string | null>(null);
@@ -73,7 +115,7 @@ watchEffect(() => {
   }
 });
 
-function renderLabel({ option }: { option: TreeOption }) {
+function renderLabel({ option }: { option: TreeNode }) {
   return h("span", option.label);
 }
 
@@ -135,7 +177,19 @@ function removeModel() {
     return;
   }
   emit("removeModel", selectedKeys.value);
-  selectedKeys.value = [];
+}
+
+function onNodeExpand(path: NodePath, value: boolean) {
+  let node = NodeTreeHelper.getNode(data.value, path);
+  if (node !== null) {
+    node.isExpanded = value;
+  }
+}
+function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
+  let node = NodeTreeHelper.getNode(data.value, path);
+  if (node !== null) {
+    node.isSelected = value;
+  }
 }
 </script>
 <template>
@@ -146,19 +200,16 @@ function removeModel() {
         <n-button @click="startAddModel()"> Add </n-button>
         <n-button @click="removeModel()"> Delete </n-button>
       </n-flex>
-      <n-tree
-        block-line
-        cascade
-        expand-on-click
-        show-line
-        multiple
-        :show-irrelevant-nodes="false"
-        v-model:selected-keys="selectedKeys"
-        :pattern="pattern"
-        :data="data"
-        :checked-keys="checkedKeys"
-        :render-label="renderLabel"
-      />
+      <NodeTree
+        :root="filteredData"
+        v-model:selection="treeSelection"
+        @setExpanded="onNodeExpand"
+        @setIsSelected="onNodeSelect"
+      >
+        <template #node="node">
+          <renderLabel :option="node" />
+        </template>
+      </NodeTree>
     </n-flex>
     <n-divider></n-divider>
     <div v-if="currentModel && !toAddModel" class="mr-1 ml-1">
