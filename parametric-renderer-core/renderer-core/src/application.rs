@@ -8,7 +8,13 @@ use winit_input_helper::WinitInputHelper;
 
 use crate::{
     buffer::TypedBuffer,
-    camera::{camera_settings::CameraSettings, freecam_controller::FreecamController, Camera},
+    camera::{
+        camera_controller::{
+            CameraController, ChosenKind, GeneralController, GeneralControllerSettings,
+        },
+        camera_settings::CameraSettings,
+        Camera,
+    },
     mesh::Mesh,
     shaders::{compute_patches, copy_patches, shader},
     texture::Texture,
@@ -22,7 +28,7 @@ pub struct ProfilerSettings {
 pub struct CpuApplication {
     pub gpu: Option<GpuApplication>,
     camera: Camera,
-    pub freecam_controller: FreecamController,
+    pub camera_controller: CameraController,
     pub delta_time: f32,
     profiler_settings: ProfilerSettings,
 }
@@ -30,13 +36,24 @@ pub struct CpuApplication {
 impl CpuApplication {
     pub fn new() -> anyhow::Result<Self> {
         let camera = Camera::new(1.0, CameraSettings::default());
-        let mut freecam_controller = FreecamController::new(5.0, 0.01);
-        freecam_controller.position = Point3::new(0.0, 0.0, 4.0);
+        let camera_controller = CameraController::new(
+            GeneralController {
+                position: Point3::new(0.0, 0.0, 4.0),
+                orientation: glam::Quat::IDENTITY,
+                distance_to_center: 4.0,
+            },
+            GeneralControllerSettings {
+                fly_speed: 5.0,
+                pan_speed: 1.0,
+                rotation_sensitivity: 0.01,
+            },
+            ChosenKind::Freecam,
+        );
 
         Ok(Self {
             gpu: None,
             camera,
-            freecam_controller,
+            camera_controller,
             delta_time: 0.0,
             profiler_settings: ProfilerSettings::default(),
         })
@@ -83,8 +100,8 @@ impl CpuApplication {
     }
 
     pub fn update(&mut self, inputs: &WinitInputHelper) {
-        self.freecam_controller.update(inputs, self.delta_time);
-        self.camera.update_camera(&self.freecam_controller);
+        let cursor_capture = self.camera_controller.update(inputs, self.delta_time);
+        self.camera.update_camera(&self.camera_controller);
     }
 
     fn render_data(&self) -> RenderData<'_> {

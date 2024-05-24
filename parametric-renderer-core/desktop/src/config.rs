@@ -34,12 +34,16 @@ pub struct CacheFile {
 }
 
 #[derive(DeJson, SerJson, Debug, Clone)]
-pub enum CachedCamera {
-    FirstPerson {
-        position: [f32; 3],
-        pitch: f32,
-        yaw: f32,
-    },
+pub struct CachedCamera {
+    pub position: [f32; 3],
+    pub orientation: [f32; 4],
+    pub distance_to_center: f32,
+    pub chosen: CachedChosenController,
+}
+#[derive(DeJson, SerJson, Debug, Clone)]
+pub enum CachedChosenController {
+    Orbitcam,
+    Freecam,
 }
 
 impl CacheFile {

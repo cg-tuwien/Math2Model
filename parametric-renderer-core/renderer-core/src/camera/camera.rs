@@ -1,7 +1,7 @@
 use glam::Quat;
 use glamour::{Matrix4, Point3, Vector3};
 
-use super::{camera_controller::CameraController, camera_settings::CameraSettings};
+use super::{camera_controller::IsCameraController, camera_settings::CameraSettings};
 
 #[derive(Debug, Clone)]
 pub struct Camera {
@@ -11,6 +11,11 @@ pub struct Camera {
 
     view: Matrix4<f32>,
     proj: Matrix4<f32>,
+}
+
+pub enum CursorCapture {
+    Free,
+    LockedAndHidden,
 }
 
 impl Camera {
@@ -41,7 +46,7 @@ impl Camera {
         self.proj
     }
 
-    pub fn update_camera(&mut self, controller: &impl CameraController) {
+    pub fn update_camera(&mut self, controller: &impl IsCameraController) {
         self.position = controller.position();
         self.orientation = controller.orientation();
 

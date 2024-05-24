@@ -14,7 +14,7 @@ thiserror = "1.0.60"
 glam = { version = "0.27", features = ["bytemuck"] }
 glamour = "0.11.1"
 encase = { version = "0.8", features = ["glam"] }
-bytemuck = { version = "1.15.0", features = ["derive"] }
+bytemuck = { version = "1.16.0", features = ["derive"] }
 winit_input_helper = "0.16"
 nanoserde = "0.1.37"
 

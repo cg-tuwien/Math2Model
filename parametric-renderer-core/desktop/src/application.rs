@@ -1,11 +1,14 @@
 use glamour::{Angle, Point3};
 use pollster::FutureExt;
-use renderer_core::application::{CpuApplication, ProfilerSettings};
+use renderer_core::{
+    application::{CpuApplication, ProfilerSettings},
+    camera::camera_controller::{self, CameraController, IsCameraController},
+};
 use tracing::{error, info, warn};
 use winit::{application::ApplicationHandler, window::Window};
 use winit_input_helper::{WinitInputApp, WinitInputHelper, WinitInputUpdate};
 
-use crate::config::{CacheFile, CachedCamera, ConfigFile};
+use crate::config::{CacheFile, CachedCamera, CachedChosenController, ConfigFile};
 
 pub struct Application {
     app: CpuApplication,
@@ -15,10 +18,15 @@ pub struct Application {
 
 impl Drop for Application {
     fn drop(&mut self) {
-        self.cache_file.camera = Some(CachedCamera::FirstPerson {
-            position: self.app.freecam_controller.position.to_array(),
-            pitch: self.app.freecam_controller.pitch.radians,
-            yaw: self.app.freecam_controller.yaw.radians,
+        let controller = self.app.camera_controller.get_general_controller();
+        self.cache_file.camera = Some(CachedCamera {
+            position: controller.position.to_array(),
+            orientation: controller.orientation.to_array(),
+            distance_to_center: controller.distance_to_center,
+            chosen: match self.app.camera_controller.get_chosen_kind() {
+                camera_controller::ChosenKind::Orbitcam => CachedChosenController::Orbitcam,
+                camera_controller::ChosenKind::Freecam => CachedChosenController::Freecam,
+            },
         });
         self.cache_file
             .save_to_file(Application::CACHE_FILE)
@@ -36,15 +44,25 @@ impl Application {
         let mut app = CpuApplication::new()?;
         app.set_profiling(ProfilerSettings { gpu: true });
 
-        if let Some(CachedCamera::FirstPerson {
+        if let Some(CachedCamera {
             position,
-            pitch,
-            yaw,
-        }) = cache_file.camera
+            orientation,
+            distance_to_center,
+            chosen,
+        }) = cache_file.camera.clone()
         {
-            app.freecam_controller.position = Point3::from(position);
-            app.freecam_controller.pitch = Angle::from(pitch);
-            app.freecam_controller.yaw = Angle::from(yaw);
+            app.camera_controller = CameraController::new(
+                camera_controller::GeneralController {
+                    position: Point3::from(position),
+                    orientation: glam::Quat::from_array(orientation),
+                    distance_to_center,
+                },
+                app.camera_controller.settings,
+                match chosen {
+                    CachedChosenController::Orbitcam => camera_controller::ChosenKind::Orbitcam,
+                    CachedChosenController::Freecam => camera_controller::ChosenKind::Freecam,
+                },
+            );
         }
 
         Ok(Self {

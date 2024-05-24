@@ -5,7 +5,7 @@ edition = "2021"
 build = "build.rs"
 
 [dependencies]
-anyhow = "1.0.83"
+anyhow = "1.0.86"
 bytemuck = { workspace = true }
 encase = { workspace = true }
 glam = { workspace = true }

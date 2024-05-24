@@ -3,39 +3,65 @@ use glamour::{Angle, Point3, Vector2, Vector3};
 use winit::{event::MouseButton, keyboard::KeyCode};
 use winit_input_helper::WinitInputHelper;
 
-use super::{camera_controller::CameraController, Camera};
+use super::{
+    camera::CursorCapture,
+    camera_controller::{GeneralController, GeneralControllerSettings, IsCameraController},
+    Camera,
+};
 
 pub struct FreecamController {
     pub position: Point3,
     pub pitch: Angle,
     pub yaw: Angle,
-    pub speed: f32,
-    pub sensitivity: f32,
 }
 
 impl FreecamController {
-    pub fn new(speed: f32, sensitivity: f32) -> Self {
+    pub fn new(controller: GeneralController) -> Self {
+        let (pitch, yaw, _) = controller.orientation.to_euler(glam::EulerRot::XYZ);
+
         Self {
-            position: Point3::ZERO,
-            pitch: Angle::default(),
-            yaw: Angle::default(),
-            speed,
-            sensitivity,
+            position: controller.position,
+            pitch: Angle::from(pitch),
+            yaw: Angle::from(yaw),
         }
     }
-    pub fn update(&mut self, input: &WinitInputHelper, delta_time: f32) {
+    pub fn update(
+        &mut self,
+        input: &WinitInputHelper,
+        delta_time: f32,
+        settings: &GeneralControllerSettings,
+    ) -> CursorCapture {
+        let mut cursor_capture = CursorCapture::Free;
         if input.mouse_held(MouseButton::Right) {
-            self.update_orientation(Vector2::from(input.mouse_diff()));
+            self.update_orientation(Vector2::from(input.mouse_diff()), settings);
+            cursor_capture = CursorCapture::LockedAndHidden;
         }
 
-        self.update_position(input_to_direction(input), delta_time);
+        self.update_position(input_to_direction(input), delta_time, settings);
+        if input.mouse_held(MouseButton::Middle) {
+            self.update_pan_position(Vector2::from(input.mouse_diff()), delta_time, settings);
+            cursor_capture = CursorCapture::LockedAndHidden;
+        }
+        cursor_capture
     }
 
-    fn update_orientation(&mut self, mouse_delta: Vector2) {
+    fn update_orientation(&mut self, mouse_delta: Vector2, settings: &GeneralControllerSettings) {
         self.set_pitch_yaw(
-            self.pitch + Angle::new(mouse_delta.y * self.sensitivity),
-            self.yaw + Angle::new(mouse_delta.x * self.sensitivity),
+            self.pitch - Angle::new(mouse_delta.y * settings.rotation_sensitivity),
+            self.yaw - Angle::new(mouse_delta.x * settings.rotation_sensitivity),
         );
+    }
+
+    fn update_pan_position(
+        &mut self,
+        direction: Vector2,
+        delta_time: f32,
+        settings: &GeneralControllerSettings,
+    ) {
+        let horizontal_movement = self.orientation() * (Camera::right() * direction.x * 1.0);
+        let vertical_movement = self.orientation() * (Camera::up() * direction.y * -1.0);
+        self.position += horizontal_movement * settings.pan_speed * delta_time;
+        self.position += vertical_movement * settings.pan_speed * delta_time;
     }
 
     fn set_pitch_yaw(&mut self, new_pitch: Angle, new_yaw: Angle) {
@@ -47,31 +73,33 @@ impl FreecamController {
         self.yaw = Angle::new(new_yaw.radians.rem_euclid(TWO_PI));
     }
 
-    fn update_position(&mut self, direction: Vector3, delta_time: f32) {
+    fn update_position(
+        &mut self,
+        direction: Vector3,
+        delta_time: f32,
+        settings: &GeneralControllerSettings,
+    ) {
         let horizontal_movement = (direction * Vector3::new(1.0, 0.0, 1.0)).normalize_or_zero();
         let vertical_movement = Camera::up() * direction.y;
-        let horizontal_movement = self.get_yaw_rotation() * horizontal_movement;
+        let horizontal_movement = Quat::from_rotation_y(-self.yaw.radians) * horizontal_movement;
 
-        self.position += horizontal_movement * self.speed * delta_time;
-        self.position += vertical_movement * self.speed * delta_time;
-    }
-
-    fn get_yaw_rotation(&self) -> Quat {
-        Quat::from_rotation_y(-self.yaw.radians)
-    }
-
-    fn get_pitch_rotation(&self) -> Quat {
-        Quat::from_rotation_x(-self.pitch.radians)
+        self.position += horizontal_movement * settings.fly_speed * delta_time;
+        self.position += vertical_movement * settings.fly_speed * delta_time;
     }
 }
 
-impl CameraController for FreecamController {
+impl IsCameraController for FreecamController {
     fn position(&self) -> Point3 {
         self.position
     }
 
     fn orientation(&self) -> Quat {
-        self.get_yaw_rotation() * self.get_pitch_rotation()
+        Quat::from_euler(
+            glam::EulerRot::XYZ,
+            self.pitch.radians,
+            self.yaw.radians,
+            0.0,
+        )
     }
 }
 
