@@ -28,6 +28,16 @@ impl Transform {
     }
 }
 
+impl Default for Transform {
+    fn default() -> Self {
+        Self {
+            position: Point3::new(0.0, 0.0, 0.0),
+            rotation: glam::Quat::IDENTITY,
+            scale: 1.0,
+        }
+    }
+}
+
 pub struct Mesh {
     pub transform: Transform,
     pub vertex_buffer: wgpu::Buffer,
@@ -36,34 +46,73 @@ pub struct Mesh {
 }
 impl Mesh {
     pub fn new_quad(device: &wgpu::Device) -> Self {
-        let transform = Transform {
-            position: Point3::new(0.0, 0.0, 0.0),
-            rotation: glam::Quat::IDENTITY,
-            scale: 1.0,
-        };
         let vertex_buffer_contents = QUAD_VERTICES
             .iter()
             .map(|&position| shader::VertexInput { position })
             .collect::<Vec<_>>();
 
+        Mesh::with_contents(device, &vertex_buffer_contents, &QUAD_INDICES)
+    }
+
+    fn with_contents(
+        device: &wgpu::Device,
+        vertex_buffer_contents: &[shader::VertexInput],
+        index_buffer_contents: &[u16],
+    ) -> Self {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertex_buffer_contents),
+            contents: bytemuck::cast_slice(vertex_buffer_contents),
             usage: wgpu::BufferUsages::VERTEX,
         });
 
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(&QUAD_INDICES),
+            contents: bytemuck::cast_slice(index_buffer_contents),
             usage: wgpu::BufferUsages::INDEX,
         });
 
         Self {
-            transform,
+            transform: Default::default(),
             vertex_buffer,
             index_buffer,
-            num_indices: QUAD_INDICES.len() as u32,
+            num_indices: index_buffer_contents.len() as u32,
         }
+    }
+
+    /// Create a new tesselated quad mesh
+    /// split_count: number of splits to make in the quad. 0 is a single quad, 1 is 4 quads, 2 is 16 quads, etc.
+    pub fn new_tesselated_quad(device: &wgpu::Device, split_count: u32) -> Self {
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+
+        let quad_count_one_side = 1 << split_count;
+
+        for i in 0..=quad_count_one_side {
+            for j in 0..=quad_count_one_side {
+                let position = Vec3::new(i as f32, j as f32, 0.0) / (quad_count_one_side as f32);
+                vertices.push(shader::VertexInput { position });
+            }
+        }
+
+        let quads_per_row = quad_count_one_side + 1;
+        for i in 0..quad_count_one_side {
+            for j in 0..quad_count_one_side {
+                let i0 = i * quads_per_row + j;
+                let i1 = i0 + 1;
+                let i2 = i0 + quads_per_row;
+                let i3 = i2 + 1;
+
+                indices.push(i0 as u16);
+                indices.push(i1 as u16);
+                indices.push(i2 as u16);
+
+                indices.push(i2 as u16);
+                indices.push(i1 as u16);
+                indices.push(i3 as u16);
+            }
+        }
+
+        Mesh::with_contents(device, &vertices, &indices)
     }
 
     pub fn get_model_matrix(&self) -> Matrix4<f32> {

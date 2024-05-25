@@ -18,7 +18,7 @@ struct RenderBuffer {
   patches: array<Patch>,
 };
 struct RenderBufferRead {
-  patches_length: u32, // Same size as atomic<u32>
+  _patches_length: u32, // Not to be used, CopyPatches will never write to this
   patches_capacity: u32,
   patches: array<Patch>,
 };
@@ -26,5 +26,8 @@ struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/stru
   x: atomic<u32>,
   y: u32,
   z: u32,
-} 
+};
 fn ceil_div(a: u32, b: u32) -> u32 { return (a + b - 1u) / b; }
+fn assert(condition: bool) {
+  // TODO: Implement this
+}

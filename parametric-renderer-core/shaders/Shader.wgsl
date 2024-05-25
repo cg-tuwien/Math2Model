@@ -1,5 +1,5 @@
-//#include "./Common.wgsl"
-// AUTOGEN d1af44c46a1cbb7b88eb3a40a108148e105bbe3d63aab3143845fbb6b5bb0256
+////#include "./Common.wgsl"
+//// AUTOGEN 1c0b2e57e3dd026763bb346cee213a10f0c740a7aa85a23af4416803018482e7
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
@@ -20,7 +20,7 @@ struct RenderBuffer {
   patches: array<Patch>,
 };
 struct RenderBufferRead {
-  patches_length: u32, // Same size as atomic<u32>
+  _patches_length: u32, // Not to be used, CopyPatches will never write to this
   patches_capacity: u32,
   patches: array<Patch>,
 };
@@ -28,9 +28,43 @@ struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/stru
   x: atomic<u32>,
   y: u32,
   z: u32,
-} 
+};
 fn ceil_div(a: u32, b: u32) -> u32 { return (a + b - 1u) / b; }
-// END OF AUTOGEN
+fn assert(condition: bool) {
+  // TODO: Implement this
+}
+//// END OF AUTOGEN
+
+////#include "./EvaluateImage.wgsl"
+//// AUTOGEN 8960c43e220676f35c377822f4f6c2d82fd28b95f1106cfe67927c591c81d815
+struct Time {
+  elapsed: f32,
+  delta: f32,
+  frame: u32,
+};
+struct Screen {
+  resolution: vec2<f32>,
+  inv_resolution: vec2<f32>,
+};
+struct Mouse {
+  pos: vec2<f32>,
+  prev_pos: vec2<f32>,
+  buttons: u32,
+};
+fn mouse_held(button: u32) -> bool {
+  return (mouse.buttons & button) != 0u;
+}
+// Group 0 is for constants that change once per frame at most
+@group(0) @binding(0) var<uniform> time : Time;
+@group(0) @binding(1) var<uniform> screen : Screen;
+@group(0) @binding(2) var<uniform> mouse : Mouse;
+
+fn evaluateImage(input2: vec2f) -> vec3f {
+    return vec3f(input2, 0.0);
+}
+//// END OF AUTOGEN
+
+
 
 alias Vec3Padded = vec4<f32>;
 
@@ -75,33 +109,13 @@ struct Material {
     emissive_metallic: vec4<f32>,
 }
 
-@group(0) @binding(0) var<uniform> camera: Camera;
-@group(0) @binding(1) var<storage, read> lights: Lights;
-@group(0) @binding(2) var<uniform> model: Model;
-@group(0) @binding(3) var<storage, read> render_buffer: RenderBufferRead;
-@group(0) @binding(4) var<uniform> material: Material;
+@group(0) @binding(3) var<uniform> camera: Camera;
+@group(1) @binding(0) var<storage, read> lights: Lights;
+@group(1) @binding(1) var<uniform> model: Model;
+@group(1) @binding(2) var<storage, read> render_buffer: RenderBufferRead;
+@group(1) @binding(3) var<uniform> material: Material;
 
-//#include "./HeartSphere.wgsl"
-// AUTOGEN e752278f38b5cff0b524b4eac45aa8fe29236e32e79fa3d6bca5a871d21478e8
-fn evaluateImage(input2: vec2f) -> vec3f {
-    let pos = vec3(input2.x, 0.0, 2. * input2.y) * 3.14159265359;
 
-    let x = sin(pos.x) * cos(pos.z);
-    let y = sin(pos.x) * sin(pos.z);
-    let z = cos(pos.x);
-
-    let x2 = sin(pos.x) * (15. * sin(pos.z) - 4. * sin(3. * pos.z));
-    let y2 = 8. * cos(pos.x);
-    let z2 = sin(pos.x) * (15. * cos(pos.z) - 5. * cos(2. * pos.z) - 2. * cos(3. * pos.z) - cos(2. * pos.z));
-
-    let sphere = vec3(x, y, z) * 3.0;
-    let heart = vec3(x2, y2, z2) * 0.2;
-
-    let p = vec3(mix(sphere, heart, 0.) * 1.);
-
-    return p;
-}
-// END OF AUTOGEN
 
 
 /**
