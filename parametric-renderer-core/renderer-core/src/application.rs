@@ -322,44 +322,6 @@ impl GpuApplication {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        [
-            TypedBuffer::new_storage_with_runtime_array(
-                &device,
-                "Render Buffer 2",
-                &render_buffer_initial,
-                max_patch_count as u64,
-                wgpu::BufferUsages::COPY_DST,
-            )?,
-            TypedBuffer::new_storage_with_runtime_array(
-                &device,
-                "Render Buffer 4",
-                &render_buffer_initial,
-                max_patch_count as u64,
-                wgpu::BufferUsages::COPY_DST,
-            )?,
-            TypedBuffer::new_storage_with_runtime_array(
-                &device,
-                "Render Buffer 8",
-                &render_buffer_initial,
-                max_patch_count as u64,
-                wgpu::BufferUsages::COPY_DST,
-            )?,
-            TypedBuffer::new_storage_with_runtime_array(
-                &device,
-                "Render Buffer 16",
-                &render_buffer_initial,
-                max_patch_count as u64,
-                wgpu::BufferUsages::COPY_DST,
-            )?,
-            TypedBuffer::new_storage_with_runtime_array(
-                &device,
-                "Render Buffer 32",
-                &render_buffer_initial,
-                max_patch_count as u64,
-                wgpu::BufferUsages::COPY_DST,
-            )?,
-        ];
-
         let material_buffer = TypedBuffer::new_uniform(
             &device,
             "Material Buffer",
