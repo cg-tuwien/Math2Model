@@ -156,7 +156,8 @@ pub struct GpuApplication {
     render_bind_group_0: shader::bind_groups::BindGroup0,
     render_bind_group_1: Vec<shader::bind_groups::BindGroup1>,
     compute_patches_pipeline: wgpu::ComputePipeline,
-    compute_patches_input_buffer: TypedBuffer<compute_patches::InputBuffer>,
+    /// The second one is for "force_render"
+    compute_patches_input_buffer: [TypedBuffer<compute_patches::InputBuffer>; 2],
     compute_patches_bind_group_0: compute_patches::bind_groups::BindGroup0,
     compute_patches_bind_group_1: compute_patches::bind_groups::BindGroup1,
     compute_patches_bind_group_2: [compute_patches::bind_groups::BindGroup2; 2],
@@ -171,7 +172,7 @@ pub struct GpuApplication {
     indirect_compute_buffer: [TypedBuffer<compute_patches::DispatchIndirectArgs>; 2],
     indirect_draw_buffers: TypedBuffer<copy_patches::DrawIndexedBuffers>,
     meshes: Vec<Mesh>,
-    threshold_factor: f32, // TODO: Make this smaller
+    threshold_factor: f32, // TODO: Make this adjustable
     cursor_capture: WindowCursorCapture,
 }
 
@@ -384,7 +385,7 @@ impl GpuApplication {
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: None,
                 // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
-                polygon_mode: wgpu::PolygonMode::Fill, // Wireframe mode can be toggled here
+                polygon_mode: wgpu::PolygonMode::Fill, // Wireframe mode can be toggled here on the desktop backend
                 // Requires Features::DEPTH_CLIP_CONTROL
                 unclipped_depth: false,
                 // Requires Features::CONSERVATIVE_RASTERIZATION
@@ -410,17 +411,29 @@ impl GpuApplication {
                 compilation_options: Default::default(),
             });
 
-        let threshold_factor = 10.0;
-        let compute_patches_input_buffer = TypedBuffer::new_uniform(
-            &device,
-            "Compute Patches Input Buffer",
-            &compute_patches::InputBuffer {
-                model_view_projection: meshes[0].get_model_view_projection(&camera).to_raw(),
-                threshold_factor,
-                force_render: 0,
-            },
-            wgpu::BufferUsages::COPY_DST,
-        )?;
+        let threshold_factor = 1.0;
+        let compute_patches_input_buffer = [
+            TypedBuffer::new_uniform(
+                &device,
+                "Compute Patches Input Buffer",
+                &compute_patches::InputBuffer {
+                    model_view_projection: meshes[0].get_model_view_projection(&camera).to_raw(),
+                    threshold_factor,
+                    force_render: 0,
+                },
+                wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
+            )?,
+            TypedBuffer::new_uniform(
+                &device,
+                "Compute Patches Input Buffer Force Render",
+                &compute_patches::InputBuffer {
+                    model_view_projection: meshes[0].get_model_view_projection(&camera).to_raw(),
+                    threshold_factor,
+                    force_render: 1,
+                },
+                wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
+            )?,
+        ];
         let patches_buffer_starting_patch = compute_patches::Patches {
             patches_length: 1,
             patches_capacity: max_patch_count,
@@ -503,7 +516,7 @@ impl GpuApplication {
         let compute_patches_bind_group_1 = compute_patches::bind_groups::BindGroup1::from_bindings(
             &device,
             compute_patches::bind_groups::BindGroupLayout1 {
-                input_buffer: compute_patches_input_buffer.as_entire_buffer_binding(),
+                input_buffer: compute_patches_input_buffer[0].as_entire_buffer_binding(),
                 render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
                 render_buffer_4: render_buffer[1].as_entire_buffer_binding(),
                 render_buffer_8: render_buffer[2].as_entire_buffer_binding(),
@@ -675,18 +688,22 @@ impl GpuApplication {
                 },
             )
             .unwrap();
-        self.compute_patches_input_buffer
-            .update(
-                queue,
-                &compute_patches::InputBuffer {
-                    model_view_projection: self.meshes[0]
-                        .get_model_view_projection(&render_data.camera)
-                        .to_raw(),
-                    threshold_factor: self.threshold_factor,
-                    force_render: 0,
-                },
-            )
-            .unwrap();
+        {
+            let mut data = compute_patches::InputBuffer {
+                model_view_projection: self.meshes[0]
+                    .get_model_view_projection(&render_data.camera)
+                    .to_raw(),
+                threshold_factor: self.threshold_factor,
+                force_render: 0,
+            };
+            self.compute_patches_input_buffer[0]
+                .update(queue, &data)
+                .unwrap();
+            data.force_render = 1;
+            self.compute_patches_input_buffer[1]
+                .update(queue, &data)
+                .unwrap();
+        }
 
         self.indirect_compute_buffer[0]
             .update(queue, &self.indirect_compute_buffer_initial)
@@ -719,7 +736,9 @@ impl GpuApplication {
             0,
             self.patches_buffer_starting_patch.buffer().size(),
         );
-        for i in 0..4 {
+        let number_of_rounds = 4;
+        for i in 0..number_of_rounds {
+            let is_last_round = i == number_of_rounds - 1;
             {
                 commands.copy_buffer_to_buffer(
                     self.patches_buffer_reset.buffer(),
@@ -750,6 +769,17 @@ impl GpuApplication {
                     0,
                     self.patches_buffer_reset.buffer().size(),
                 );
+                if is_last_round {
+                    // Set the "force_render" flag to 1
+                    commands.copy_buffer_to_buffer(
+                        self.compute_patches_input_buffer[1].buffer(),
+                        0,
+                        self.compute_patches_input_buffer[0].buffer(),
+                        0,
+                        self.compute_patches_input_buffer[0].buffer().size(),
+                    );
+                }
+
                 let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor {
                     label: Some(&format!("Compute Patches To-From {i}")),
                     timestamp_writes: None,
@@ -898,10 +928,9 @@ impl WgpuContext {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    // TODO: Only enable this on the desktop backend
-                    // required_features: wgpu::Features::POLYGON_MODE_LINE,
                     required_features: wgpu::Features::default()
-                        | (adapter.features() & GpuProfiler::ALL_WGPU_TIMER_FEATURES),
+                        | (adapter.features() & GpuProfiler::ALL_WGPU_TIMER_FEATURES)
+                        | (adapter.features() & wgpu::Features::POLYGON_MODE_LINE),
                     required_limits: wgpu::Limits::default(),
                     label: None,
                 },
