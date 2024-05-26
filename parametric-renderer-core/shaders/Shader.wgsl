@@ -461,8 +461,8 @@ fn vs_main(
     in: VertexInput,
 ) -> VertexOutput {
     let quad = render_buffer.patches[in.instance_index];
-
-    let pos = evaluateImage(in.uv);
+    let quad_point = mix(quad.min, quad.max, in.uv);
+    let pos = evaluateImage(quad_point);
     let world_pos = model.model_similarity * vec4<f32>(pos, 1.0);
 
     var out: VertexOutput;
