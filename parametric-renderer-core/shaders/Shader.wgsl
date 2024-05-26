@@ -36,7 +36,7 @@ fn assert(condition: bool) {
 //// END OF AUTOGEN
 
 ////#include "./EvaluateImage.wgsl"
-//// AUTOGEN 5c96c767e58e8a0d69302800f14e610883ff8290edc5dff49f75eb2e27bfc160
+//// AUTOGEN d91526df6038377127de8b8bb9d882abebe0d00d89faf2181496731a64549d40
 struct Time {
   elapsed: f32,
   delta: f32,
@@ -58,8 +58,26 @@ fn mouse_held(button: u32) -> bool {
 @group(0) @binding(1) var<uniform> screen : Screen;
 @group(0) @binding(2) var<uniform> mouse : Mouse;
 
-fn evaluateImage(input2: vec2f) -> vec3f {
+/*fn evaluateImage(input2: vec2f) -> vec3f {
     return vec3f(input2, 0.0);
+}*/
+fn evaluateImage(input2: vec2f) -> vec3f {
+    let pos = vec3(input2.x, 0.0, 2. * input2.y) * 3.14159265359;
+
+    let x = sin(pos.x) * cos(pos.z);
+    let y = sin(pos.x) * sin(pos.z);
+    let z = cos(pos.x);
+
+    let x2 = sin(pos.x) * (15. * sin(pos.z) - 4. * sin(3. * pos.z));
+    let y2 = 8. * cos(pos.x);
+    let z2 = sin(pos.x) * (15. * cos(pos.z) - 5. * cos(2. * pos.z) - 2. * cos(3. * pos.z) - cos(2. * pos.z));
+
+    let sphere = vec3(x, y, z) * 3.0;
+    let heart = vec3(x2, y2, z2) * 0.2;
+
+    let p = vec3(mix(sphere, heart, 0.9) * 1.);
+
+    return p;
 }
 //// END OF AUTOGEN
 
@@ -91,6 +109,7 @@ struct Lights {
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
+    @location(1) uv: vec2<f32>,
     @builtin(instance_index) instance_index: u32,
     @builtin(vertex_index) vertex_index: u32,
 }
@@ -443,24 +462,13 @@ fn vs_main(
 ) -> VertexOutput {
     let quad = render_buffer.patches[in.instance_index];
 
-    var uv = vec2<f32>(quad.min.x, quad.min.y);
-    if (in.vertex_index == 0) {
-        uv = vec2<f32>(quad.min.x, quad.min.y);
-    } else if (in.vertex_index == 1) {
-        uv = vec2<f32>(quad.max.x, quad.min.y);
-    } else if (in.vertex_index == 2) {
-        uv = vec2<f32>(quad.max.x, quad.max.y);
-    } else if (in.vertex_index == 3) {
-        uv = vec2<f32>(quad.min.x, quad.max.y);
-    }
-
-    let pos = evaluateImage(uv);
+    let pos = evaluateImage(in.uv);
     let world_pos = model.model_similarity * vec4<f32>(pos, 1.0);
 
     var out: VertexOutput;
     out.clip_position = camera.projection * camera.view * world_pos;
     out.world_position = world_pos.xyz;
-    out.texture_coords = uv;
+    out.texture_coords = in.uv;
     let normal = vec3<f32>(0.0, -1.0, 0.0); // TODO: We'll compute this later
     out.world_normal = (model.model_similarity * vec4<f32>(normal, 0.0)).xyz; // Only uniform scaling
     return out;

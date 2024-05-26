@@ -1,16 +1,8 @@
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 use glamour::{Matrix4, Point3, Vector3};
 use wgpu::util::DeviceExt;
 
 use crate::shaders::shader;
-
-pub const QUAD_VERTICES: [Vec3; 4] = [
-    Vec3::new(-0.5, -0.5, 0.0),
-    Vec3::new(0.5, -0.5, 0.0),
-    Vec3::new(0.5, 0.5, 0.0),
-    Vec3::new(-0.5, 0.5, 0.0),
-];
-pub const QUAD_INDICES: [u16; 6] = [0, 1, 2, 2, 3, 0];
 
 pub struct Transform {
     pub position: Point3,
@@ -45,15 +37,6 @@ pub struct Mesh {
     pub num_indices: u32,
 }
 impl Mesh {
-    pub fn new_quad(device: &wgpu::Device) -> Self {
-        let vertex_buffer_contents = QUAD_VERTICES
-            .iter()
-            .map(|&position| shader::VertexInput { position })
-            .collect::<Vec<_>>();
-
-        Mesh::with_contents(device, &vertex_buffer_contents, &QUAD_INDICES)
-    }
-
     fn with_contents(
         device: &wgpu::Device,
         vertex_buffer_contents: &[shader::VertexInput],
@@ -89,7 +72,8 @@ impl Mesh {
         for i in 0..=quad_count_one_side {
             for j in 0..=quad_count_one_side {
                 let position = Vec3::new(i as f32, j as f32, 0.0) / (quad_count_one_side as f32);
-                vertices.push(shader::VertexInput { position });
+                let uv = Vec2::new(i as f32, j as f32) / (quad_count_one_side as f32);
+                vertices.push(shader::VertexInput { position, uv });
             }
         }
 
