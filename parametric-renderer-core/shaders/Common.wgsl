@@ -18,7 +18,7 @@ struct RenderBuffer {
   patches: array<Patch>,
 };
 struct RenderBufferRead {
-  _patches_length: u32, // Not to be used, CopyPatches will never write to this
+  patches_length: u32,
   patches_capacity: u32,
   patches: array<Patch>,
 };

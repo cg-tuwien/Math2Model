@@ -1,6 +1,6 @@
 #[allow(dead_code)]
 pub mod shader {
-    include!(concat!(env!("OUT_DIR"), "/shader.rs"));
+    include!(concat!(env!("OUT_DIR"), "/Shader.rs"));
 }
 
 #[allow(dead_code)]

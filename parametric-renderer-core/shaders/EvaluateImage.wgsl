@@ -4,12 +4,11 @@ struct Time {
   frame: u32,
 };
 struct Screen {
-  resolution: vec2<f32>,
+  resolution: vec2<u32>,
   inv_resolution: vec2<f32>,
 };
 struct Mouse {
   pos: vec2<f32>,
-  prev_pos: vec2<f32>,
   buttons: u32,
 };
 fn mouse_held(button: u32) -> bool {

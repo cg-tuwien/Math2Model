@@ -1,5 +1,5 @@
 ////#include "./Common.wgsl"
-//// AUTOGEN 1c0b2e57e3dd026763bb346cee213a10f0c740a7aa85a23af4416803018482e7
+//// AUTOGEN 32cdfe4ef9c02e259d48c302aae42e898b22c7302626909847da08fae73f6cac
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
@@ -20,7 +20,7 @@ struct RenderBuffer {
   patches: array<Patch>,
 };
 struct RenderBufferRead {
-  _patches_length: u32, // Not to be used, CopyPatches will never write to this
+  patches_length: u32,
   patches_capacity: u32,
   patches: array<Patch>,
 };
@@ -44,34 +44,31 @@ struct DrawIndexedIndirectArgs  {
   first_instance: u32,
 };
 
-@group(0) @binding(0) var<storage, read_write> indirect_draw_buffer : DrawIndexedIndirectArgs;
-@group(0) @binding(1) var<storage, read> patches_from_buffer : PatchesRead;
-@group(0) @binding(2) var<storage, read_write> render_buffer : RenderBuffer;
+struct DrawIndexedBuffers {
+  indirect_draw_2: DrawIndexedIndirectArgs,
+  indirect_draw_4: DrawIndexedIndirectArgs,
+  indirect_draw_8: DrawIndexedIndirectArgs,
+  indirect_draw_16: DrawIndexedIndirectArgs,
+  indirect_draw_32: DrawIndexedIndirectArgs,
+};
 
+@group(0) @binding(0) var<storage, read> render_buffer_2 : RenderBufferRead;
+@group(0) @binding(1) var<storage, read_write> indirect_draw_2: DrawIndexedIndirectArgs;
+@group(0) @binding(2) var<storage, read> render_buffer_4 : RenderBufferRead;
+@group(0) @binding(3) var<storage, read_write> indirect_draw_4: DrawIndexedIndirectArgs;
+@group(0) @binding(4) var<storage, read> render_buffer_8 : RenderBufferRead;
+@group(0) @binding(5) var<storage, read_write> indirect_draw_8: DrawIndexedIndirectArgs;
+@group(0) @binding(6) var<storage, read> render_buffer_16 : RenderBufferRead;
+@group(0) @binding(7) var<storage, read_write> indirect_draw_16: DrawIndexedIndirectArgs;
+@group(0) @binding(8) var<storage, read> render_buffer_32 : RenderBufferRead;
+@group(0) @binding(9) var<storage, read_write> indirect_draw_32: DrawIndexedIndirectArgs;
+
+/// Copies the render buffer sizes to indirect draws
 @compute @workgroup_size(1, 1, 1)
 fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
-  let render_buffer_start = atomicLoad(&render_buffer.patches_length);
-  let patch_index = global_id.x;
-  let write_index = render_buffer_start + patch_index;
-
-  // TODO: Frustum culling
-
-  if (patch_index < patches_from_buffer.patches_length 
-      && write_index < render_buffer.patches_capacity) {
-    // Notice how we know where to put everything, so no need for synchronization with atomics
-    render_buffer.patches[write_index] = patches_from_buffer.patches[patch_index];
-  }
-
-  if(global_id.x == 0u && global_id.y == 0u && global_id.z == 0u) {
-    var final_patches_length = render_buffer_start + patches_from_buffer.patches_length;
-
-    if(final_patches_length > render_buffer.patches_capacity) {
-      final_patches_length = render_buffer.patches_capacity;
-      // TODO: write to an atomic when we run out of space
-    }
-
-    // The vertex shader will never read render_buffer.patches_length. It's not allowed to.
-    // So we don't need to update render_buffer.patches_length. Not that we could, thanks to storageBarriers being useless.
-    indirect_draw_buffer.instance_count = final_patches_length;
-  }
+  indirect_draw_2.instance_count = render_buffer_2.patches_length;
+  indirect_draw_4.instance_count = render_buffer_4.patches_length;
+  indirect_draw_8.instance_count = render_buffer_8.patches_length;
+  indirect_draw_16.instance_count = render_buffer_16.patches_length;
+  indirect_draw_32.instance_count = render_buffer_32.patches_length;
 }

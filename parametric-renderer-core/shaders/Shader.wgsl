@@ -1,5 +1,5 @@
 ////#include "./Common.wgsl"
-//// AUTOGEN 1c0b2e57e3dd026763bb346cee213a10f0c740a7aa85a23af4416803018482e7
+//// AUTOGEN 32cdfe4ef9c02e259d48c302aae42e898b22c7302626909847da08fae73f6cac
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
@@ -20,7 +20,7 @@ struct RenderBuffer {
   patches: array<Patch>,
 };
 struct RenderBufferRead {
-  _patches_length: u32, // Not to be used, CopyPatches will never write to this
+  patches_length: u32,
   patches_capacity: u32,
   patches: array<Patch>,
 };
@@ -36,19 +36,18 @@ fn assert(condition: bool) {
 //// END OF AUTOGEN
 
 ////#include "./EvaluateImage.wgsl"
-//// AUTOGEN 8960c43e220676f35c377822f4f6c2d82fd28b95f1106cfe67927c591c81d815
+//// AUTOGEN 5c96c767e58e8a0d69302800f14e610883ff8290edc5dff49f75eb2e27bfc160
 struct Time {
   elapsed: f32,
   delta: f32,
   frame: u32,
 };
 struct Screen {
-  resolution: vec2<f32>,
+  resolution: vec2<u32>,
   inv_resolution: vec2<f32>,
 };
 struct Mouse {
   pos: vec2<f32>,
-  prev_pos: vec2<f32>,
   buttons: u32,
 };
 fn mouse_held(button: u32) -> bool {

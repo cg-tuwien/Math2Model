@@ -1,8 +1,8 @@
-use glamour::{Angle, Point3};
+use glamour::Point3;
 use pollster::FutureExt;
 use renderer_core::{
     application::{CpuApplication, ProfilerSettings},
-    camera::camera_controller::{self, CameraController, IsCameraController},
+    camera::camera_controller::{self, CameraController},
 };
 use tracing::{error, info, warn};
 use winit::{application::ApplicationHandler, window::Window};
