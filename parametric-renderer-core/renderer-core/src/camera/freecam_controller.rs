@@ -18,7 +18,7 @@ pub struct FreecamController {
 
 impl FreecamController {
     pub fn new(controller: GeneralController) -> Self {
-        let (pitch, yaw, _) = controller.orientation.to_euler(glam::EulerRot::XYZ);
+        let (yaw, pitch, _) = controller.orientation.to_euler(glam::EulerRot::YXZ);
 
         Self {
             position: controller.position,
@@ -96,9 +96,9 @@ impl IsCameraController for FreecamController {
 
     fn orientation(&self) -> Quat {
         Quat::from_euler(
-            glam::EulerRot::XYZ,
-            self.pitch.radians,
+            glam::EulerRot::YXZ,
             self.yaw.radians,
+            self.pitch.radians,
             0.0,
         )
     }
