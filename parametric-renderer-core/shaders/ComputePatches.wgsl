@@ -120,6 +120,7 @@ var<workgroup> v_samples: array<array<vec2Screen, U_X>, U_Y>;
 const U_LENGTHS_X = U_X - 1; // Last sample per row doesn't have a next sample
 var<workgroup> u_lengths: array<array<f32, U_LENGTHS_X>, U_Y>;
 var<workgroup> v_lengths: array<array<f32, U_LENGTHS_X>, U_Y>;
+var <workgroup> frustum_sides: array<u32, 25>;
 
 /// Split the patch and write it to the output buffers
 fn split_patch(quad: Patch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>, force_render: bool) {
@@ -251,6 +252,19 @@ fn split_patch(quad: Patch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>
   }
 }
 
+/// Gets a bitflag for the frustum sides of a point in clip space. 6 bits are used, 1 for each side.
+/// Based on the equations in https://carmencincotti.com/2022-05-02/homogeneous-coordinates-clip-space-ndc/#clip-space
+fn get_frustum_side(point_clip_space: vec4f) -> u32 {
+  return u32(
+    u32(point_clip_space.x < -point_clip_space.w) << 5u |
+    u32(point_clip_space.x > point_clip_space.w) << 4u |
+    u32(point_clip_space.y < -point_clip_space.w) << 3u |
+    u32(point_clip_space.y > point_clip_space.w) << 2u |
+    u32(point_clip_space.z < -point_clip_space.w) << 1u |
+    u32(point_clip_space.z > point_clip_space.w) << 0u
+  );
+}
+
 // assume a single work group
 @compute @workgroup_size(WORKGROUP_SIZE, 1, 1)
 fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>, 
@@ -260,6 +274,31 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
   assert(patch_index < patches_from_buffer.patches_length); // We dispatch one per patch, so this is always true.
   let quad = patches_from_buffer.patches[patch_index];
   let quad_size = quad.max - quad.min;
+
+  // Culling is done by checking if all samples are outside of exactly one of the frustum planes :)
+  // 5*5 = 25 extra samples for frustum culling
+  let extra_sample_index = vec2<u32>(sample_index % 5u, sample_index / 5u);
+  let extra_sample_location = quad.min + vec2(
+    (quad_size.x / 5.0) * f32(extra_sample_index.x),
+    (quad_size.y / 5.0) * f32(extra_sample_index.y)
+  );
+  if (sample_index < 25) {
+    let extra_sample = evaluateImage(extra_sample_location);
+    let extra_clip_space = input_buffer.model_view_projection * vec4f(extra_sample.xyz, 1.0);
+    frustum_sides[sample_index] = get_frustum_side(extra_clip_space);
+  }
+  workgroupBarrier(); // wait for frustum_sides
+  // Now parallel combine the frustum sides
+  for (var i: u32 = 16u; i > 0u; i >>= 1u) {
+    if (sample_index < i && sample_index + i < 25u) {
+      frustum_sides[sample_index] &= frustum_sides[sample_index + i];
+    }
+    workgroupBarrier();
+  }
+  // frustum_sides[0] now contains the combined frustum sides for the entire patch
+  if (frustum_sides[0] != 0u) {
+    return; // Skip the entire patch
+  }
 
   let u_v_sample_index = vec2<u32>(sample_index % U_X, sample_index / U_X);
   
@@ -314,19 +353,6 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
     split_patch(quad, u_length, v_length, input_buffer.force_render != 0u);
   }
 
-  // TODO: Update the copy patches and the indirect dispatch buffer, now that we're computing only one patch per workgroup.
-  
-  // TODO: Frustum culling
-  // Culling is done by checking if all samples are outside of exactly one of the frustum planes :)
-  // 5*5 = 25 extra samples for frustum culling
-  /*let extra_sample_index = vec2<u32>(sample_index % 5u, sample_index / 5u);
-  let extra_sample_location = quad.min + vec2(
-    (quad_size.x / 5.0) * f32(u_v_sample_index.x),
-    (quad_size.y / 5.0) * f32(u_v_sample_index.y)
-  );
-  if (sample_index < 25) {
-    let extra_sample = evaluateImage(extra_sample_location);
-  }*/
 
   // Warning regarding storage barrier:
   // https://stackoverflow.com/questions/72035548/what-does-storagebarrier-in-webgpu-actually-do
