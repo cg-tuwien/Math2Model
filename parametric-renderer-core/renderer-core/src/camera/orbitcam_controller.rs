@@ -22,7 +22,8 @@ impl OrbitcamController {
         let center = controller.position
             + controller.orientation * (Camera::forward() * controller.distance_to_center);
 
-        let (pitch, yaw, _) = controller.orientation.to_euler(glam::EulerRot::XYZ);
+        let (yaw, pitch, _) = controller.orientation.to_euler(glam::EulerRot::YXZ);
+
 
         Self {
             center,
@@ -86,9 +87,9 @@ impl IsCameraController for OrbitcamController {
 
     fn orientation(&self) -> Quat {
         Quat::from_euler(
-            glam::EulerRot::XYZ,
-            self.pitch.radians,
+            glam::EulerRot::YXZ,
             self.yaw.radians,
+            self.pitch.radians,
             0.0,
         )
     }

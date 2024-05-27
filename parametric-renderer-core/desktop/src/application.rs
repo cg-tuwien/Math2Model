@@ -99,7 +99,7 @@ pub async fn run() -> anyhow::Result<()> {
 
 impl ApplicationHandler<()> for Application {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let _ = self.create_surface(
+        self.create_surface(
             event_loop
                 .create_window(Window::default_attributes())
                 .unwrap(),
@@ -115,10 +115,7 @@ impl ApplicationHandler<()> for Application {
         match &event {
             winit::event::WindowEvent::RedrawRequested => {
                 // Shouldn't need anything here
-                match self.app.gpu {
-                    Some(ref mut gpu) => gpu.request_redraw(),
-                    None => {}
-                }
+                if let Some(ref mut gpu) = self.app.gpu { gpu.request_redraw() }
             }
             _ => {}
         }
@@ -154,7 +151,7 @@ impl WinitInputUpdate for Application {
                             .as_millis()
                     );
                     wgpu_profiler::chrometrace::write_chrometrace(
-                        &std::path::Path::new(&file_name),
+                        std::path::Path::new(&file_name),
                         &data,
                     )
                     .unwrap();

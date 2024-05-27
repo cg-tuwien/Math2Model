@@ -32,6 +32,9 @@ impl Application {
                 }
             };
 
+            // TODO: Fix this
+            // warning: this `MutexGuard` is held across an `await` point
+            // https://docs.rs/async-lock/latest/async_lock/
             app.create_surface(window).await.unwrap();
         };
         wasm_bindgen_futures::spawn_local(task);
@@ -85,7 +88,7 @@ impl ApplicationHandler<()> for Application {
             use winit::platform::web::WindowAttributesExtWebSys;
             window_attributes.with_canvas(Some(self._canvas.clone()))
         };
-        let _ = self.create_surface(event_loop.create_window(window_attributes).unwrap());
+        self.create_surface(event_loop.create_window(window_attributes).unwrap());
     }
 
     fn window_event(

@@ -201,7 +201,7 @@ impl GpuApplication {
             (WindowCursorCapture::Free, CursorCapture::Free) => {}
             (WindowCursorCapture::LockedAndHidden(_), CursorCapture::LockedAndHidden) => {}
             (WindowCursorCapture::Free, CursorCapture::LockedAndHidden) => {
-                let cursor_position = inputs.cursor().unwrap_or_else(|| (0.0, 0.0));
+                let cursor_position = inputs.cursor().unwrap_or((0.0, 0.0));
                 window
                     .set_cursor_grab(winit::window::CursorGrabMode::Confined)
                     .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))
@@ -233,7 +233,7 @@ impl GpuApplication {
         let meshes = [0, 1, 3, 7, 15]
             .iter()
             .map(|&size| {
-                let mut mesh = Mesh::new_tesselated_quad(&device, size);
+                let mut mesh = Mesh::new_tesselated_quad(device, size);
                 mesh.transform.position = Point3::new(0.0, 1.0, 0.0);
                 mesh
             })
@@ -241,7 +241,7 @@ impl GpuApplication {
         assert!(meshes.len() == patch_sizes().len());
 
         let time_buffer = TypedBuffer::new_uniform(
-            &device,
+            device,
             "Time Buffer",
             &shader::Time {
                 elapsed: 0.0,
@@ -252,7 +252,7 @@ impl GpuApplication {
         )?;
         let window_pixel_size = context.window.inner_size();
         let screen_buffer = TypedBuffer::new_uniform(
-            &device,
+            device,
             "Screen Buffer",
             &shader::Screen {
                 resolution: Vector2::<u32>::new(window_pixel_size.width, window_pixel_size.height)
@@ -266,7 +266,7 @@ impl GpuApplication {
             wgpu::BufferUsages::COPY_DST,
         )?;
         let mouse_buffer = TypedBuffer::new_uniform(
-            &device,
+            device,
             "Mouse Buffer",
             &shader::Mouse {
                 pos: Vector2::<f32>::ZERO.to_raw(),
@@ -276,14 +276,14 @@ impl GpuApplication {
         )?;
 
         let camera_buffer = TypedBuffer::new_uniform(
-            &device,
+            device,
             "Camera Buffer",
             &camera.to_shader(),
             wgpu::BufferUsages::COPY_DST,
         )?;
 
         let light_buffer = TypedBuffer::new_storage(
-            &device,
+            device,
             "Light Buffer",
             &shader::Lights {
                 ambient: Vector4::<f32>::new(0.1, 0.1, 0.1, 0.0).to_raw(),
@@ -297,7 +297,7 @@ impl GpuApplication {
         )?;
 
         let model_buffer = TypedBuffer::new_uniform(
-            &device,
+            device,
             "Model Buffer",
             &shader::Model {
                 model_similarity: meshes[0].get_model_matrix().to_raw(),
@@ -314,7 +314,7 @@ impl GpuApplication {
             .iter()
             .map(|size| {
                 TypedBuffer::new_storage_with_runtime_array(
-                    &device,
+                    device,
                     &format!("Render Buffer {}", size),
                     &render_buffer_initial,
                     max_patch_count as u64,
@@ -324,7 +324,7 @@ impl GpuApplication {
             .collect::<Result<Vec<_>, _>>()?;
 
         let material_buffer = TypedBuffer::new_uniform(
-            &device,
+            device,
             "Material Buffer",
             &shader::Material {
                 color_roughness: Vector4::<f32>::new(0.6, 1.0, 1.0, 0.7).to_raw(),
@@ -334,7 +334,7 @@ impl GpuApplication {
         )?;
 
         let render_bind_group_0 = shader::bind_groups::BindGroup0::from_bindings(
-            &device,
+            device,
             shader::bind_groups::BindGroupLayout0 {
                 camera: camera_buffer.as_entire_buffer_binding(),
                 time: time_buffer.as_entire_buffer_binding(),
@@ -346,7 +346,7 @@ impl GpuApplication {
             .iter()
             .map(|v| {
                 shader::bind_groups::BindGroup1::from_bindings(
-                    &device,
+                    device,
                     shader::bind_groups::BindGroupLayout1 {
                         lights: light_buffer.as_entire_buffer_binding(),
                         model: model_buffer.as_entire_buffer_binding(),
@@ -358,10 +358,10 @@ impl GpuApplication {
             .collect();
 
         let depth_texture =
-            Texture::create_depth_texture(&device, &context.config, "Depth Texture");
+            Texture::create_depth_texture(device, &context.config, "Depth Texture");
 
-        let shader = shader::create_shader_module(&device);
-        let render_pipeline_layout = shader::create_pipeline_layout(&device);
+        let shader = shader::create_shader_module(device);
+        let render_pipeline_layout = shader::create_pipeline_layout(device);
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),
             layout: Some(&render_pipeline_layout),
@@ -405,8 +405,8 @@ impl GpuApplication {
         let compute_patches_pipeline =
             device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
                 label: Some("Compute Patches Pipeline"),
-                layout: Some(&compute_patches::create_pipeline_layout(&device)),
-                module: &compute_patches::create_shader_module(&device),
+                layout: Some(&compute_patches::create_pipeline_layout(device)),
+                module: &compute_patches::create_shader_module(device),
                 entry_point: compute_patches::ENTRY_MAIN,
                 compilation_options: Default::default(),
             });
@@ -414,20 +414,20 @@ impl GpuApplication {
         let threshold_factor = 1.0;
         let compute_patches_input_buffer = [
             TypedBuffer::new_uniform(
-                &device,
+                device,
                 "Compute Patches Input Buffer",
                 &compute_patches::InputBuffer {
-                    model_view_projection: meshes[0].get_model_view_projection(&camera).to_raw(),
+                    model_view_projection: meshes[0].get_model_view_projection(camera).to_raw(),
                     threshold_factor,
                     force_render: 0,
                 },
                 wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
             )?,
             TypedBuffer::new_uniform(
-                &device,
+                device,
                 "Compute Patches Input Buffer Force Render",
                 &compute_patches::InputBuffer {
-                    model_view_projection: meshes[0].get_model_view_projection(&camera).to_raw(),
+                    model_view_projection: meshes[0].get_model_view_projection(camera).to_raw(),
                     threshold_factor,
                     force_render: 1,
                 },
@@ -450,7 +450,7 @@ impl GpuApplication {
 
         let patches_buffer = [
             TypedBuffer::new_storage_with_runtime_array(
-                &device,
+                device,
                 "Patches Buffer 0",
                 &patches_buffer_starting_patch,
                 max_patch_count as u64,
@@ -459,7 +459,7 @@ impl GpuApplication {
                     | wgpu::BufferUsages::COPY_DST,
             )?,
             TypedBuffer::new_storage_with_runtime_array(
-                &device,
+                device,
                 "Patches Buffer 1",
                 &patches_buffer_reset,
                 max_patch_count as u64,
@@ -469,14 +469,14 @@ impl GpuApplication {
             )?,
         ];
         let patches_buffer_starting_patch = TypedBuffer::new_storage_with_runtime_array(
-            &device,
+            device,
             "Patches Buffer Starting Patch",
             &patches_buffer_starting_patch,
             1,
             wgpu::BufferUsages::COPY_SRC,
         )?;
         let patches_buffer_reset = TypedBuffer::new_storage_with_runtime_array(
-            &device,
+            device,
             "Patches Buffer Reset",
             &patches_buffer_reset,
             1,
@@ -487,7 +487,7 @@ impl GpuApplication {
             compute_patches::DispatchIndirectArgs { x: 1, y: 1, z: 1 };
         let indirect_compute_buffer = [
             TypedBuffer::new_storage(
-                &device,
+                device,
                 "Indirect Compute Dispatch Buffer 0",
                 &indirect_compute_buffer_initial,
                 wgpu::BufferUsages::INDIRECT
@@ -495,7 +495,7 @@ impl GpuApplication {
                     | wgpu::BufferUsages::COPY_DST,
             )?,
             TypedBuffer::new_storage(
-                &device,
+                device,
                 "Indirect Compute Dispatch Buffer 1",
                 &indirect_compute_buffer_initial,
                 wgpu::BufferUsages::INDIRECT
@@ -505,7 +505,7 @@ impl GpuApplication {
         ];
 
         let compute_patches_bind_group_0 = compute_patches::bind_groups::BindGroup0::from_bindings(
-            &device,
+            device,
             compute_patches::bind_groups::BindGroupLayout0 {
                 mouse: mouse_buffer.as_entire_buffer_binding(),
                 screen: screen_buffer.as_entire_buffer_binding(),
@@ -514,7 +514,7 @@ impl GpuApplication {
         );
 
         let compute_patches_bind_group_1 = compute_patches::bind_groups::BindGroup1::from_bindings(
-            &device,
+            device,
             compute_patches::bind_groups::BindGroupLayout1 {
                 input_buffer: compute_patches_input_buffer[0].as_entire_buffer_binding(),
                 render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
@@ -526,7 +526,7 @@ impl GpuApplication {
         );
         let compute_patches_bind_group_2 = [
             compute_patches::bind_groups::BindGroup2::from_bindings(
-                &device,
+                device,
                 compute_patches::bind_groups::BindGroupLayout2 {
                     patches_from_buffer: patches_buffer[0].as_entire_buffer_binding(),
                     patches_to_buffer: patches_buffer[1].as_entire_buffer_binding(),
@@ -534,7 +534,7 @@ impl GpuApplication {
                 },
             ),
             compute_patches::bind_groups::BindGroup2::from_bindings(
-                &device,
+                device,
                 compute_patches::bind_groups::BindGroupLayout2 {
                     patches_from_buffer: patches_buffer[1].as_entire_buffer_binding(), // Swap the order :)
                     patches_to_buffer: patches_buffer[0].as_entire_buffer_binding(),
@@ -557,8 +557,8 @@ impl GpuApplication {
             .collect::<Vec<_>>();
 
         let indirect_draw_buffers = TypedBuffer::new_storage(
-            &device,
-            &"Indirect Draw Buffers",
+            device,
+            "Indirect Draw Buffers",
             &copy_patches::DrawIndexedBuffers {
                 indirect_draw_2: indirect_draw_data[0],
                 indirect_draw_4: indirect_draw_data[1],
@@ -574,13 +574,13 @@ impl GpuApplication {
         let copy_patches_pipeline =
             device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
                 label: Some("Copy Patches Pipeline"),
-                layout: Some(&copy_patches::create_pipeline_layout(&device)),
-                module: &copy_patches::create_shader_module(&device),
+                layout: Some(&copy_patches::create_pipeline_layout(device)),
+                module: &copy_patches::create_shader_module(device),
                 entry_point: "main",
                 compilation_options: Default::default(),
             });
         let copy_patches_bind_group_0 = copy_patches::bind_groups::BindGroup0::from_bindings(
-            &device,
+            device,
             copy_patches::bind_groups::BindGroupLayout0 {
                 render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
                 render_buffer_4: render_buffer[1].as_entire_buffer_binding(),
@@ -647,7 +647,6 @@ impl GpuApplication {
         }
     }
 
-    #[must_use]
     pub fn render(&mut self, render_data: RenderData) -> Result<(), wgpu::SurfaceError> {
         let surface = &self.context.surface;
         let queue = &self.context.queue;
@@ -682,7 +681,7 @@ impl GpuApplication {
             .unwrap();
         self.model_buffer
             .update(
-                &queue,
+                queue,
                 &shader::Model {
                     model_similarity: self.meshes[0].get_model_matrix().to_raw(),
                 },
@@ -691,7 +690,7 @@ impl GpuApplication {
         {
             let mut data = compute_patches::InputBuffer {
                 model_view_projection: self.meshes[0]
-                    .get_model_view_projection(&render_data.camera)
+                    .get_model_view_projection(render_data.camera)
                     .to_raw(),
                 threshold_factor: self.threshold_factor,
                 force_render: 0,
@@ -854,7 +853,7 @@ impl GpuApplication {
                 .zip(self.meshes.iter())
                 .zip(indirect_draw_offsets)
             {
-                shader::set_bind_groups(&mut render_pass, &self.render_bind_group_0, &bind_group_1);
+                shader::set_bind_groups(&mut render_pass, &self.render_bind_group_0, bind_group_1);
                 render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 render_pass
                     .set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
