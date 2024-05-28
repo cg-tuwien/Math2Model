@@ -1,7 +1,24 @@
 use glam::Quat;
-use glamour::{Matrix4, Point3, Vector3};
+use glamour::{Angle, Matrix4, Point3, Vector3};
 
-use super::{camera_controller::IsCameraController, camera_settings::CameraSettings};
+use super::camera_controller::IsCameraController;
+
+#[derive(Debug, Clone)]
+pub struct CameraSettings {
+    pub z_near: f32,
+    pub z_far: f32,
+    pub fov: Angle,
+}
+
+impl Default for CameraSettings {
+    fn default() -> Self {
+        Self {
+            z_near: 0.1,
+            z_far: 100.0,
+            fov: Angle::from_degrees(60.0),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Camera {

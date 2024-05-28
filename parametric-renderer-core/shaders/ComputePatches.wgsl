@@ -334,12 +334,12 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
 /// Based on the equations in https://carmencincotti.com/2022-05-02/homogeneous-coordinates-clip-space-ndc/#clip-space
 fn get_frustum_side(point_clip_space: vec4f) -> u32 {
   return u32(
-    u32(point_clip_space.x < -point_clip_space.w) << 5u |
-    u32(point_clip_space.x > point_clip_space.w) << 4u |
-    u32(point_clip_space.y < -point_clip_space.w) << 3u |
-    u32(point_clip_space.y > point_clip_space.w) << 2u |
-    u32(point_clip_space.z < -point_clip_space.w) << 1u |
-    u32(point_clip_space.z > point_clip_space.w) << 0u
+    (u32(point_clip_space.x < -point_clip_space.w) << 5u) |
+    (u32(point_clip_space.x >  point_clip_space.w) << 4u) |
+    (u32(point_clip_space.y < -point_clip_space.w) << 3u) |
+    (u32(point_clip_space.y >  point_clip_space.w) << 2u) |
+    (u32(point_clip_space.z < -point_clip_space.w) << 1u) |
+    (u32(point_clip_space.z >  point_clip_space.w) << 0u)
   );
 }
 
@@ -375,7 +375,7 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
     workgroupBarrier();
   }
   // frustum_sides[0] now contains the combined frustum sides for the entire patch
-  if (frustum_sides[0] != 0u) {
+  if (workgroupUniformLoad(&frustum_sides[0]) != 0u) {
     return; // Skip the entire patch
   }
 

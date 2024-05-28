@@ -1,6 +1,5 @@
-mod camera;
+mod camera_and_settings;
 pub mod camera_controller;
-pub mod camera_settings;
 pub mod freecam_controller;
 pub mod orbitcam_controller;
-pub use camera::Camera;
+pub use camera_and_settings::{Camera, CameraSettings};
