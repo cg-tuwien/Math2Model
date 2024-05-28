@@ -357,8 +357,7 @@ impl GpuApplication {
             })
             .collect();
 
-        let depth_texture =
-            Texture::create_depth_texture(device, &context.config, "Depth Texture");
+        let depth_texture = Texture::create_depth_texture(device, &context.config, "Depth Texture");
 
         let shader = shader::create_shader_module(device);
         let render_pipeline_layout = shader::create_pipeline_layout(device);
@@ -437,9 +436,10 @@ impl GpuApplication {
         let patches_buffer_starting_patch = compute_patches::Patches {
             patches_length: 1,
             patches_capacity: max_patch_count,
-            patches: vec![compute_patches::Patch {
-                min: Vector2::<f32>::ZERO.to_raw(),
-                max: Vector2::<f32>::ONE.to_raw(),
+            patches: vec![compute_patches::EncodedPatch {
+                // Just the leading 1 bit
+                u: 1,
+                v: 1,
             }],
         };
         let patches_buffer_reset = compute_patches::Patches {

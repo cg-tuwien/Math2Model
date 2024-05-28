@@ -1,5 +1,9 @@
 ////#include "./Common.wgsl"
-//// AUTOGEN 32cdfe4ef9c02e259d48c302aae42e898b22c7302626909847da08fae73f6cac
+//// AUTOGEN 1634e55ec963b66572fb8830615806e05fa4dd9650c05428c184c35a566d3331
+struct EncodedPatch {
+  u: u32,
+  v: u32,
+};
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
@@ -7,22 +11,22 @@ struct Patch {
 struct Patches {
   patches_length: atomic<u32>,
   patches_capacity: u32,
-  patches : array<Patch>,
+  patches : array<EncodedPatch>,
 };
 struct PatchesRead { // Is currently needed, see https://github.com/gpuweb/gpuweb/discussions/4438
   patches_length: u32, // Same size and alignment as atomic<u32>. Should be legal, right?
   patches_capacity: u32,
-  patches : array<Patch>,
+  patches : array<EncodedPatch>,
 };
 struct RenderBuffer {
   patches_length: atomic<u32>,
   patches_capacity: u32,
-  patches: array<Patch>,
+  patches: array<EncodedPatch>,
 };
 struct RenderBufferRead {
   patches_length: u32,
   patches_capacity: u32,
-  patches: array<Patch>,
+  patches: array<EncodedPatch>,
 };
 struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/struct.DispatchIndirectArgs.html
   x: atomic<u32>,
@@ -30,6 +34,82 @@ struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/stru
   z: u32,
 };
 fn ceil_div(a: u32, b: u32) -> u32 { return (a + b - 1u) / b; }
+// Inspired from https://onrendering.com/data/papers/isubd/isubd.pdf
+fn patch_u_child(u: u32, child_bit: u32) -> u32 {
+  return (u << 1) | (child_bit & 1);
+}
+fn patch_top_child(encoded: EncodedPatch) -> EncodedPatch {
+  return EncodedPatch(
+    encoded.u,
+    patch_u_child(encoded.v, 0u)
+  );
+}
+fn patch_bottom_child(encoded: EncodedPatch) -> EncodedPatch {
+  return EncodedPatch(
+    encoded.u,
+    patch_u_child(encoded.v, 1u),
+  );
+}
+fn patch_left_child(encoded: EncodedPatch) -> EncodedPatch {
+  return EncodedPatch(
+    patch_u_child(encoded.u, 0u),
+    encoded.v,
+  );
+}
+fn patch_right_child(encoded: EncodedPatch) -> EncodedPatch {
+  return EncodedPatch(
+    patch_u_child(encoded.u, 1u),
+    encoded.v,
+  );
+}
+fn patch_top_left_child(encoded: EncodedPatch) -> EncodedPatch {
+  return patch_top_child(patch_left_child(encoded));
+}
+fn patch_top_right_child(encoded: EncodedPatch) -> EncodedPatch {
+  return patch_top_child(patch_right_child(encoded));
+}
+fn patch_bottom_left_child(encoded: EncodedPatch) -> EncodedPatch {
+  return patch_bottom_child(patch_left_child(encoded));
+}
+fn patch_bottom_right_child(encoded: EncodedPatch) -> EncodedPatch {
+  return patch_bottom_child(patch_right_child(encoded));
+}
+fn patch_decode(encoded: EncodedPatch) -> Patch {
+  // First we go to the implicit 1u
+  let leading_zeroes_u = countLeadingZeros(encoded.u);
+  let u_bits = extractBits(encoded.u, 0u, 31u - leading_zeroes_u);
+  let u_max_bits = u_bits + 1u; // The end position of the patch
+  let leading_zeroes_v = countLeadingZeros(encoded.v);
+  let v_bits = extractBits(encoded.v, 0u, 31u - leading_zeroes_v);
+  let v_max_bits = v_bits + 1u;
+
+  // And every bit after that describes if we go left or right
+  // Conveniently, this is already what binary numbers do.
+  // 0b0.1 == 0.5
+  // 0b0.01 == 0.25
+  // 0b0.11 == 0.75
+  // And that directly corresponds to how floats work: mantissa * 2^exponent
+  // So we can just convert the bits to a float
+  // let u = f32(u_bits) * pow(2.0, -1.0 * f32(31 - leading_zeroes_u));
+  // And that's equivalent to the size of a patch, see formula below
+  let min_value = vec2f(
+    f32(u_bits) / f32(1u << (31u - leading_zeroes_u)),
+    f32(v_bits) / f32(1u << (31u - leading_zeroes_v))
+  );
+  let max_value = vec2f(
+    f32(u_max_bits) / f32(1u << (31u - leading_zeroes_u)),
+    f32(v_max_bits) / f32(1u << (31u - leading_zeroes_v))
+  );
+  
+  // The size of the patch is 1 / 2^(31 - leading_zeroes)
+  // let u_size = 1.0 / f32(2 << (31 - leading_zeroes_u));
+  // let v_size = 1.0 / f32(2 << (31 - leading_zeroes_v));
+  // But we care about this_patch.max == next_patch.min, 
+  // so we need to do the floating point calculations more carefully
+  
+  return Patch(min_value, max_value);
+}
+
 fn assert(condition: bool) {
   // TODO: Implement this
 }
@@ -123,7 +203,7 @@ var<workgroup> v_lengths: array<array<f32, U_LENGTHS_X>, U_Y>;
 var <workgroup> frustum_sides: array<u32, 25>;
 
 /// Split the patch and write it to the output buffers
-fn split_patch(quad: Patch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>, force_render: bool) {
+fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>, force_render: bool) {
   // We use threshold_32, because after that, we don't need to split anymore.
   // Instead, we need to compute the correct render buffer to write to.
   let threshold_32 = (32.0 * screen.inv_resolution) * input_buffer.threshold_factor;
@@ -133,17 +213,15 @@ fn split_patch(quad: Patch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>
   let split_left = v_length[0] > threshold_32.y || v_length[1] > threshold_32.y;
   let split_right = v_length[2] > threshold_32.y || v_length[3] > threshold_32.y;
 
-  let patch_center = mix(quad.min, quad.max, 0.5);
+  let patch_top = patch_top_child(quad_encoded);
+  let patch_bottom = patch_bottom_child(quad_encoded);
+  let patch_left = patch_left_child(quad_encoded);
+  let patch_right = patch_right_child(quad_encoded);
 
-  let patch_top = Patch(quad.min, vec2(quad.max.x, patch_center.y));
-  let patch_bottom = Patch(vec2(quad.min.x, patch_center.y), quad.max);
-  let patch_left = Patch(quad.min, vec2(patch_center.x, quad.max.y));
-  let patch_right = Patch(vec2(patch_center.x, quad.min.y), quad.max);
-
-  let patch_top_left = Patch(quad.min, patch_center);
-  let patch_top_right = Patch(vec2(patch_center.x, quad.min.y), vec2(quad.max.x, patch_center.y));
-  let patch_bottom_right = Patch(patch_center, quad.max);
-  let patch_bottom_left = Patch(vec2(quad.min.x, patch_center.y), vec2(patch_center.x, quad.max.y));
+  let patch_top_left = patch_top_left_child(quad_encoded);
+  let patch_top_right = patch_top_right_child(quad_encoded);
+  let patch_bottom_right = patch_bottom_right_child(quad_encoded);
+  let patch_bottom_left = patch_bottom_left_child(quad_encoded);
 
   // TODO: @Stefan: Add D:/master/optimal-splits.xopp with the list
   let splits_bitflags = (u32(split_top) << 3) | (u32(split_bottom) << 2) | (u32(split_left) << 1) | u32(split_right);
@@ -160,27 +238,27 @@ fn split_patch(quad: Patch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>
     if (max_u_length > threshold_16.x || max_v_length > threshold_16.y) {
       let write_index = atomicAdd(&render_buffer_32.patches_length, 1u);
       if (write_index < render_buffer_32.patches_capacity) {
-        render_buffer_32.patches[write_index] = quad;
+        render_buffer_32.patches[write_index] = quad_encoded;
       }
     } else if (max_u_length > threshold_8.x || max_v_length > threshold_8.y) {
       let write_index = atomicAdd(&render_buffer_16.patches_length, 1u);
       if (write_index < render_buffer_16.patches_capacity) {
-        render_buffer_16.patches[write_index] = quad;
+        render_buffer_16.patches[write_index] = quad_encoded;
       }
     } else if (max_u_length > threshold_4.x || max_v_length > threshold_4.y) {
       let write_index = atomicAdd(&render_buffer_8.patches_length, 1u);
       if (write_index < render_buffer_8.patches_capacity) {
-        render_buffer_8.patches[write_index] = quad;
+        render_buffer_8.patches[write_index] = quad_encoded;
       }
     } else if (max_u_length > threshold_2.x || max_v_length > threshold_2.y) {
       let write_index = atomicAdd(&render_buffer_4.patches_length, 1u);
       if (write_index < render_buffer_4.patches_capacity) {
-        render_buffer_4.patches[write_index] = quad;
+        render_buffer_4.patches[write_index] = quad_encoded;
       }
     } else {
       let write_index = atomicAdd(&render_buffer_2.patches_length, 1u);
       if (write_index < render_buffer_2.patches_capacity) {
-        render_buffer_2.patches[write_index] = quad;
+        render_buffer_2.patches[write_index] = quad_encoded;
       }
     }
   } else if (splits_bitflags == 8 || splits_bitflags == 4 || splits_bitflags == 12) {
@@ -272,7 +350,8 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
   let patch_index: u32 = workgroup_id.x;
   let sample_index: u32 = local_invocation_id.x; // From 0 to 31 (WORKGROUP_SIZE - 1)
   assert(patch_index < patches_from_buffer.patches_length); // We dispatch one per patch, so this is always true.
-  let quad = patches_from_buffer.patches[patch_index];
+  let quad_encoded = patches_from_buffer.patches[patch_index];
+  let quad = patch_decode(patches_from_buffer.patches[patch_index]);
   let quad_size = quad.max - quad.min;
 
   // Culling is done by checking if all samples are outside of exactly one of the frustum planes :)
@@ -350,7 +429,7 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
   );
 
   if(sample_index == 0) {
-    split_patch(quad, u_length, v_length, input_buffer.force_render != 0u);
+    split_patch(quad_encoded, quad, u_length, v_length, input_buffer.force_render != 0u);
   }
 
 
