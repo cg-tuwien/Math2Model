@@ -79,7 +79,7 @@ impl CpuApplication {
         }
     }
 
-    pub async fn create_surface(&mut self, window: Window) -> anyhow::Result<()> {
+    pub async fn create_surface(&mut self, window: Arc<Window>) -> anyhow::Result<()> {
         if self.gpu.is_some() {
             return Ok(());
         }
@@ -234,7 +234,7 @@ fn patch_sizes() -> [u32; 5] {
 
 impl GpuApplication {
     pub async fn new(
-        window: Window,
+        window: Arc<Window>,
         camera: &Camera,
         profiler_settings: &ProfilerSettings,
     ) -> anyhow::Result<Self> {
@@ -633,7 +633,8 @@ impl GpuApplication {
         &mut self,
         new_size: winit::dpi::PhysicalSize<u32>,
     ) -> Option<winit::dpi::PhysicalSize<u32>> {
-        if new_size.width > 0 && new_size.height > 0 && new_size != self.context.size {
+        let new_size = new_size.max(winit::dpi::PhysicalSize::new(1, 1));
+        if new_size != self.context.size {
             self.context.size = new_size;
             self.context.config.width = new_size.width;
             self.context.config.height = new_size.height;

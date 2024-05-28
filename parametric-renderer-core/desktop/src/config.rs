@@ -4,31 +4,6 @@ use nanoserde::{DeJson, DeJsonErr, SerJson};
 use thiserror::Error;
 
 #[derive(DeJson, SerJson, Debug, Clone)]
-pub struct ConfigFile {}
-
-impl ConfigFile {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    pub fn from_file(path: impl AsRef<Path>) -> Result<Self, LoadConfigError> {
-        let content = std::fs::read_to_string(path)?;
-        Ok(DeJson::deserialize_json(&content)?)
-    }
-
-    pub fn save_to_file(&self, path: impl AsRef<Path>) -> Result<(), std::io::Error> {
-        let content = SerJson::serialize_json(self);
-        std::fs::write(path, content)
-    }
-}
-
-impl Default for ConfigFile {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[derive(DeJson, SerJson, Debug, Clone)]
 pub struct CacheFile {
     pub camera: Option<CachedCamera>,
 }

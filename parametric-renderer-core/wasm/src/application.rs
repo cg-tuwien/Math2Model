@@ -7,6 +7,7 @@ use winit::{application::ApplicationHandler, window::Window};
 use winit_input_helper::{WinitInputApp, WinitInputHelper, WinitInputUpdate};
 
 pub struct Application {
+    window: Option<Arc<Window>>,
     app: Arc<Mutex<CpuApplication>>,
     /** For wasm32 */
     _canvas: HtmlCanvasElement,
@@ -16,12 +17,13 @@ impl Application {
     pub fn new(canvas: HtmlCanvasElement) -> anyhow::Result<Self> {
         let app = CpuApplication::new()?;
         Ok(Self {
+            window: None,
             app: Arc::new(Mutex::new(app)),
             _canvas: canvas,
         })
     }
 
-    fn create_surface(&mut self, window: Window) {
+    fn create_surface(&mut self, window: Arc<Window>) {
         let app_mutex = self.app.clone();
         let task = async move {
             let mut app = match app_mutex.try_lock() {
@@ -74,7 +76,6 @@ impl Application {
 
 pub async fn run(canvas: HtmlCanvasElement) -> anyhow::Result<()> {
     let event_loop = winit::event_loop::EventLoop::new()?;
-    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
     let application = Application::new(canvas)?;
     event_loop.run_app(&mut WinitInputApp::new(application))?;
     Ok(())
@@ -82,13 +83,21 @@ pub async fn run(canvas: HtmlCanvasElement) -> anyhow::Result<()> {
 
 impl ApplicationHandler<()> for Application {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        if let Some(window) = &self.window {
+            window.request_redraw();
+            return;
+        }
+
         let window_attributes = Window::default_attributes();
         #[cfg(target_arch = "wasm32")]
         let window_attributes = {
             use winit::platform::web::WindowAttributesExtWebSys;
             window_attributes.with_canvas(Some(self._canvas.clone()))
         };
-        self.create_surface(event_loop.create_window(window_attributes).unwrap());
+
+        let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
+        self.window = Some(window.clone());
+        self.create_surface(window);
     }
 
     fn window_event(
@@ -99,7 +108,6 @@ impl ApplicationHandler<()> for Application {
     ) {
         match &event {
             winit::event::WindowEvent::RedrawRequested => {
-                // Shouldn't need anything here
                 let mut app = match self.app.try_lock() {
                     Ok(app) => app,
                     Err(_) => {
@@ -145,7 +153,7 @@ impl WinitInputUpdate for Application {
         self.update(input);
         match self.render() {
             Ok(_) => (),
-            Err(wgpu::SurfaceError::Lost) => {
+            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 let mut app = match self.app.try_lock() {
                     Ok(app) => app,
                     Err(_) => {

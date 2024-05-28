@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use glamour::Point3;
 use pollster::FutureExt;
 use renderer_core::{
@@ -8,11 +10,11 @@ use tracing::{error, info, warn};
 use winit::{application::ApplicationHandler, window::Window};
 use winit_input_helper::{WinitInputApp, WinitInputHelper, WinitInputUpdate};
 
-use crate::config::{CacheFile, CachedCamera, CachedChosenController, ConfigFile};
+use crate::config::{CacheFile, CachedCamera, CachedChosenController};
 
 pub struct Application {
     app: CpuApplication,
-    config_file: ConfigFile,
+    window: Option<Arc<Window>>,
     cache_file: CacheFile,
 }
 
@@ -35,10 +37,8 @@ impl Drop for Application {
 }
 
 impl Application {
-    const CONFIG_FILE: &'static str = "config.json";
     const CACHE_FILE: &'static str = "cache.json";
     pub fn new() -> anyhow::Result<Self> {
-        let config_file = ConfigFile::from_file(Application::CONFIG_FILE).unwrap_or_default();
         let cache_file = CacheFile::from_file(Application::CACHE_FILE).unwrap_or_default();
 
         let mut app = CpuApplication::new()?;
@@ -66,13 +66,13 @@ impl Application {
         }
 
         Ok(Self {
+            window: None,
             app,
-            config_file,
             cache_file,
         })
     }
 
-    fn create_surface(&mut self, window: Window) {
+    fn create_surface(&mut self, window: Arc<Window>) {
         self.app.create_surface(window).block_on().unwrap();
     }
 
@@ -91,7 +91,6 @@ impl Application {
 
 pub async fn run() -> anyhow::Result<()> {
     let event_loop = winit::event_loop::EventLoop::new()?;
-    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
     let application = Application::new()?;
     event_loop.run_app(&mut WinitInputApp::new(application))?;
     Ok(())
@@ -99,11 +98,18 @@ pub async fn run() -> anyhow::Result<()> {
 
 impl ApplicationHandler<()> for Application {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        self.create_surface(
+        if let Some(window) = &self.window {
+            window.request_redraw();
+            return;
+        }
+
+        let window = Arc::new(
             event_loop
                 .create_window(Window::default_attributes())
                 .unwrap(),
         );
+        self.window = Some(window.clone());
+        self.create_surface(window);
     }
 
     fn window_event(
@@ -114,8 +120,10 @@ impl ApplicationHandler<()> for Application {
     ) {
         match &event {
             winit::event::WindowEvent::RedrawRequested => {
-                // Shouldn't need anything here
-                if let Some(ref mut gpu) = self.app.gpu { gpu.request_redraw() }
+                if let Some(window) = &self.window {
+                    window.request_redraw();
+                    return;
+                }
             }
             _ => {}
         }
@@ -129,7 +137,6 @@ impl WinitInputUpdate for Application {
         input: &WinitInputHelper,
     ) {
         use winit::keyboard::{Key, NamedKey};
-
         if input.key_released_logical(Key::Named(NamedKey::Escape))
             || input.close_requested()
             || input.destroyed()
@@ -170,7 +177,8 @@ impl WinitInputUpdate for Application {
         self.update(input);
         match self.render() {
             Ok(_) => (),
-            Err(wgpu::SurfaceError::Lost) => {
+            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                // TODO: Window closing and opening is borked
                 if let Some(gpu) = &mut self.app.gpu {
                     let _ = gpu.resize(gpu.size());
                 }

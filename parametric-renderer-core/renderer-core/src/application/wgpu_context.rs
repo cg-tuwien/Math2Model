@@ -20,9 +20,11 @@ pub struct WgpuContext {
 }
 
 impl WgpuContext {
-    pub async fn new(window: Window, profiler_settings: &ProfilerSettings) -> anyhow::Result<Self> {
-        let window = Arc::new(window);
-        let size = window.inner_size().min(winit::dpi::PhysicalSize::new(1, 1));
+    pub async fn new(
+        window: Arc<Window>,
+        profiler_settings: &ProfilerSettings,
+    ) -> anyhow::Result<Self> {
+        let size = window.inner_size().max(winit::dpi::PhysicalSize::new(1, 1));
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             ..Default::default()
