@@ -13,7 +13,7 @@ export class BabylonEngine implements Engine {
   private constructor(private engine: WebGPUEngine) {}
   static async createEngine(canvasElement: HTMLCanvasElement) {
     // GDPR compliance https://forum.babylonjs.com/t/offer-alternative-to-babylon-js-cdn/48982
-    Tools.ScriptBaseUrl = "/babylon";
+    Tools.ScriptBaseUrl = import.meta.env.BASE_URL + "babylon";
 
     const engine = new WebGPUEngine(canvasElement, {});
     engine.compatibilityMode = false;
