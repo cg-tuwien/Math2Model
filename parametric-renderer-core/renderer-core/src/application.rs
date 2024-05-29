@@ -1,11 +1,12 @@
+mod scene;
 mod wgpu_context;
 
 use std::sync::Arc;
 
 use glamour::{Matrix4, Point3, ToRaw, Vector2, Vector4};
-use tracing::info;
+use scene::SceneData;
 use wgpu_context::WgpuContext;
-use wgpu_profiler::{GpuProfiler, GpuProfilerSettings};
+use wgpu_profiler::GpuProfilerSettings;
 use winit::{dpi::PhysicalPosition, window::Window};
 use winit_input_helper::WinitInputHelper;
 
@@ -19,7 +20,10 @@ use crate::{
         Camera, CameraSettings,
     },
     mesh::Mesh,
-    shaders::{compute_patches, copy_patches, shader},
+    shaders::{
+        compute_patches::{self},
+        copy_patches, shader,
+    },
     texture::Texture,
 };
 
@@ -28,17 +32,59 @@ pub struct ProfilerSettings {
     pub gpu: bool,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct Seconds(f32);
+
+struct FrameTime {
+    frame: u64,
+    delta: Seconds,
+    elapsed: Seconds,
+}
+
+struct FrameCounter {
+    frame: u64,
+    first_render_instant: Option<std::time::Instant>,
+    render_instant: Option<std::time::Instant>,
+}
+impl FrameCounter {
+    pub fn new() -> Self {
+        Self {
+            frame: 0,
+            first_render_instant: None,
+            render_instant: None,
+        }
+    }
+
+    pub fn new_frame(&mut self) -> FrameTime {
+        let frame = self.frame;
+        let now = std::time::Instant::now();
+        let first_render_instant = *self.first_render_instant.get_or_insert(now);
+        let previous_render_instant = *self.render_instant.get_or_insert(now);
+        let delta = Seconds((now - previous_render_instant).as_secs_f32());
+        let elapsed = Seconds((now - first_render_instant).as_secs_f32());
+        self.render_instant = Some(now);
+        self.frame += 1;
+        FrameTime {
+            frame,
+            delta,
+            elapsed,
+        }
+    }
+}
+
 pub struct CpuApplication {
     pub gpu: Option<GpuApplication>,
-    camera: Camera,
     pub camera_controller: CameraController,
-    pub delta_time: f32,
+    frame_counter: FrameCounter,
+    camera: Camera,
+    mouse: Vector2<f32>,
+    mouse_held: bool,
     profiler_settings: ProfilerSettings,
 }
 
 impl CpuApplication {
     pub fn new() -> anyhow::Result<Self> {
-        let camera = Camera::new(1.0, CameraSettings::default());
+        let camera = Camera::new(Vector2::new(1, 1), CameraSettings::default());
         let camera_controller = CameraController::new(
             GeneralController {
                 position: Point3::new(0.0, 0.0, 4.0),
@@ -57,7 +103,9 @@ impl CpuApplication {
             gpu: None,
             camera,
             camera_controller,
-            delta_time: 0.0,
+            frame_counter: FrameCounter::new(),
+            mouse: Vector2::ZERO,
+            mouse_held: false,
             profiler_settings: ProfilerSettings::default(),
         })
     }
@@ -85,7 +133,7 @@ impl CpuApplication {
         }
         let size = window.inner_size();
         self.camera
-            .update_aspect_ratio(size.width as f32 / size.height as f32);
+            .update_size(Vector2::new(size.width, size.height));
         let gpu = GpuApplication::new(window, &self.camera, &self.profiler_settings).await?;
         self.gpu = Some(gpu);
         self.set_profiling(self.profiler_settings.clone());
@@ -97,38 +145,46 @@ impl CpuApplication {
             let new_size = gpu.resize(new_size);
             if let Some(new_size) = new_size {
                 self.camera
-                    .update_aspect_ratio(new_size.width as f32 / new_size.height as f32);
+                    .update_size(Vector2::new(new_size.width, new_size.height));
             }
         }
     }
 
     pub fn update(&mut self, inputs: &WinitInputHelper) {
-        let cursor_capture = self.camera_controller.update(inputs, self.delta_time);
+        let cursor_capture = self.camera_controller.update(
+            inputs,
+            inputs.delta_time().unwrap_or_default().as_secs_f32(),
+        );
         if let Some(gpu) = &mut self.gpu {
             gpu.update_cursor_capture(cursor_capture, inputs);
         }
         self.camera.update_camera(&self.camera_controller);
+        if let Some(mouse) = inputs.cursor() {
+            self.mouse = mouse.into();
+        }
+        self.mouse_held = inputs.mouse_held(winit::event::MouseButton::Left);
     }
 
-    fn render_data(&self) -> RenderData<'_> {
+    fn render_data(&self, frame_time: &FrameTime) -> RenderData<'_> {
         RenderData {
             camera: &self.camera,
             // TODO: Set the data correctly
             time_data: shader::Time {
-                elapsed: 0.0,
-                delta: 1000.0 / 60.0,
-                frame: 0,
+                elapsed: frame_time.elapsed.0,
+                delta: frame_time.delta.0,
+                frame: frame_time.frame as u32,
             },
             mouse_data: shader::Mouse {
-                pos: Vector2::<f32>::ZERO.to_raw(),
-                buttons: 0,
+                pos: self.mouse.to_raw(),
+                buttons: if self.mouse_held { 1 } else { 0 },
             },
         }
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
+        let frame_time = self.frame_counter.new_frame();
         if let Some(mut gpu) = self.gpu.take() {
-            gpu.render(self.render_data())?;
+            gpu.render(self.render_data(&frame_time))?;
             self.gpu = Some(gpu);
         }
         Ok(())
@@ -164,11 +220,7 @@ struct CopyPatchesStep {
 pub struct GpuApplication {
     context: WgpuContext,
     depth_texture: Texture,
-    time_buffer: TypedBuffer<shader::Time>,
-    screen_buffer: TypedBuffer<shader::Screen>,
-    mouse_buffer: TypedBuffer<shader::Mouse>,
-    camera_buffer: TypedBuffer<shader::Camera>,
-    light_buffer: TypedBuffer<shader::Lights>,
+    scene_data: SceneData,
     model_buffer: TypedBuffer<shader::Model>,
     compute_patches: ComputePatchesStep,
     copy_patches: CopyPatchesStep,
@@ -241,6 +293,8 @@ impl GpuApplication {
         let context = WgpuContext::new(window, profiler_settings).await?;
         let device = &context.device;
 
+        let scene_data = SceneData::new(device, camera)?;
+
         // Some arbitrary splits (size/2 - 1 == one quad per four pixels)
         let meshes = [0, 1, 3, 7, 15]
             .iter()
@@ -251,62 +305,6 @@ impl GpuApplication {
             })
             .collect::<Vec<_>>();
         assert!(meshes.len() == patch_sizes().len());
-
-        let time_buffer = TypedBuffer::new_uniform(
-            device,
-            "Time Buffer",
-            &shader::Time {
-                elapsed: 0.0,
-                delta: 1000.0 / 60.0,
-                frame: 0,
-            },
-            wgpu::BufferUsages::COPY_DST,
-        )?;
-        let window_pixel_size = context.window.inner_size();
-        let screen_buffer = TypedBuffer::new_uniform(
-            device,
-            "Screen Buffer",
-            &shader::Screen {
-                resolution: Vector2::<u32>::new(window_pixel_size.width, window_pixel_size.height)
-                    .to_raw(),
-                inv_resolution: Vector2::<f32>::new(
-                    1.0 / (window_pixel_size.width as f32),
-                    1.0 / (window_pixel_size.height as f32),
-                )
-                .to_raw(),
-            },
-            wgpu::BufferUsages::COPY_DST,
-        )?;
-        let mouse_buffer = TypedBuffer::new_uniform(
-            device,
-            "Mouse Buffer",
-            &shader::Mouse {
-                pos: Vector2::<f32>::ZERO.to_raw(),
-                buttons: 0,
-            },
-            wgpu::BufferUsages::COPY_DST,
-        )?;
-
-        let camera_buffer = TypedBuffer::new_uniform(
-            device,
-            "Camera Buffer",
-            &camera.to_shader(),
-            wgpu::BufferUsages::COPY_DST,
-        )?;
-
-        let light_buffer = TypedBuffer::new_storage(
-            device,
-            "Light Buffer",
-            &shader::Lights {
-                ambient: Vector4::<f32>::new(0.1, 0.1, 0.1, 0.0).to_raw(),
-                points_length: 1,
-                points: vec![shader::PointLight {
-                    position_range: Vector4::<f32>::new(0.0, 4.0, 2.0, 40.0).to_raw(),
-                    color_intensity: Vector4::<f32>::new(1.0, 1.0, 1.0, 3.0).to_raw(),
-                }],
-            },
-            wgpu::BufferUsages::COPY_DST,
-        )?;
 
         let model_buffer = TypedBuffer::new_uniform(
             device,
@@ -391,22 +389,13 @@ impl GpuApplication {
                 multisample: Default::default(),
                 multiview: None,
             }),
-            bind_group_0: shader::bind_groups::BindGroup0::from_bindings(
-                device,
-                shader::bind_groups::BindGroupLayout0 {
-                    camera: camera_buffer.as_entire_buffer_binding(),
-                    time: time_buffer.as_entire_buffer_binding(),
-                    screen: screen_buffer.as_entire_buffer_binding(),
-                    mouse: mouse_buffer.as_entire_buffer_binding(),
-                },
-            ),
+            bind_group_0: scene_data.as_bind_group_0(device),
             bind_group_1: render_buffer
                 .iter()
                 .map(|v| {
                     shader::bind_groups::BindGroup1::from_bindings(
                         device,
                         shader::bind_groups::BindGroupLayout1 {
-                            lights: light_buffer.as_entire_buffer_binding(),
                             model: model_buffer.as_entire_buffer_binding(),
                             render_buffer: v.as_entire_buffer_binding(),
                             material: material_buffer.as_entire_buffer_binding(),
@@ -544,9 +533,9 @@ impl GpuApplication {
             bind_group_0: compute_patches::bind_groups::BindGroup0::from_bindings(
                 device,
                 compute_patches::bind_groups::BindGroupLayout0 {
-                    mouse: mouse_buffer.as_entire_buffer_binding(),
-                    screen: screen_buffer.as_entire_buffer_binding(),
-                    time: time_buffer.as_entire_buffer_binding(),
+                    mouse: scene_data.mouse_buffer.as_entire_buffer_binding(),
+                    screen: scene_data.screen_buffer.as_entire_buffer_binding(),
+                    time: scene_data.time_buffer.as_entire_buffer_binding(),
                 },
             ),
             bind_group_1: compute_patches::bind_groups::BindGroup1::from_bindings(
@@ -616,11 +605,7 @@ impl GpuApplication {
             render_buffer,
             indirect_draw_buffers,
             depth_texture,
-            time_buffer,
-            screen_buffer,
-            mouse_buffer,
-            camera_buffer,
-            light_buffer,
+            scene_data,
             model_buffer,
             meshes,
             threshold_factor,
@@ -661,30 +646,7 @@ impl GpuApplication {
             ..Default::default()
         });
 
-        self.time_buffer
-            .update(queue, &render_data.time_data)
-            .unwrap();
-        let screen_size = self.context.size;
-        self.screen_buffer
-            .update(
-                queue,
-                &shader::Screen {
-                    resolution: Vector2::<u32>::new(screen_size.width, screen_size.height).to_raw(),
-                    inv_resolution: Vector2::<f32>::new(
-                        1.0 / (screen_size.width as f32),
-                        1.0 / (screen_size.height as f32),
-                    )
-                    .to_raw(),
-                },
-            )
-            .unwrap();
-        self.mouse_buffer
-            .update(queue, &render_data.mouse_data)
-            .unwrap();
-
-        self.camera_buffer
-            .update(queue, &render_data.camera.to_shader())
-            .unwrap();
+        self.scene_data.update(&render_data, queue);
         self.model_buffer
             .update(
                 queue,
@@ -900,16 +862,6 @@ pub struct RenderData<'a> {
     camera: &'a Camera,
     time_data: shader::Time,
     mouse_data: shader::Mouse,
-}
-
-impl Camera {
-    pub fn to_shader(&self) -> shader::Camera {
-        shader::Camera {
-            view: self.view_matrix().to_raw(),
-            projection: self.projection_matrix().to_raw(),
-            world_position: self.position.to_raw().extend(1.0),
-        }
-    }
 }
 
 impl Mesh {

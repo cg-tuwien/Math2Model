@@ -138,15 +138,6 @@ impl WinitInputUpdate for Application {
             return;
         }
 
-        {
-            let mut app = match self.app.try_lock() {
-                Ok(app) => app,
-                Err(_) => {
-                    return;
-                }
-            };
-            app.delta_time = input.delta_time().unwrap_or_default().as_secs_f32();
-        }
         if let Some((width, height)) = input.resolution() {
             self.resize(winit::dpi::PhysicalSize { width, height });
         }

@@ -170,7 +170,6 @@ impl WinitInputUpdate for Application {
             }
         }
 
-        self.app.delta_time = input.delta_time().unwrap_or_default().as_secs_f32();
         if let Some((width, height)) = input.resolution() {
             self.resize(winit::dpi::PhysicalSize { width, height });
         }
