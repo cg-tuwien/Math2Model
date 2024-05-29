@@ -9,9 +9,11 @@
     "dev": "vite --open",
     "dev-bun": "bunx --bun vite --open",
     "build": "run-p type-check \"build-only {@}\" --",
+    "build-release": "run-p type-check \"build-only-release {@}\" --",
     "preview": "vite preview",
     "test:unit": "vitest",
     "build-only": "vite build",
+    "build-only-release": "vite build --base=/math2model/",
     "type-check": "vue-tsc --build --force"
   },
   "dependencies": {

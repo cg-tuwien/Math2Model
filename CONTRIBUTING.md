@@ -26,6 +26,11 @@ Remember to use a browser that supports WebGPU.
 npm run build
 ```
 
+Different base URL:
+```sh
+npm run build-release
+```
+
 ### Run Unit Tests with [Vitest](https://vitest.dev/)
 
 ```sh
