@@ -17,7 +17,6 @@ tracing-subscriber = { version = "0.3.18" }
 wgpu = { workspace = true }
 wgpu-profiler = "0.17.0"
 winit = { workspace = true }
-winit_input_helper = { workspace = true }
 
 [features]
 default = []

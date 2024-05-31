@@ -1,10 +1,12 @@
 use std::sync::{Arc, Mutex};
 
-use renderer_core::application::CpuApplication;
+use renderer_core::{
+    application::CpuApplication,
+    input::{InputHandler, WindowInputs, WinitAppHelper},
+};
 use tracing::{error, info, warn};
 use web_sys::HtmlCanvasElement;
-use winit::{application::ApplicationHandler, window::Window};
-use winit_input_helper::{WinitInputApp, WinitInputHelper, WinitInputUpdate};
+use winit::{application::ApplicationHandler, dpi::PhysicalSize, window::Window};
 
 pub struct Application {
     window: Option<Arc<Window>>,
@@ -53,7 +55,7 @@ impl Application {
         app.resize(new_size);
     }
 
-    pub fn update(&mut self, inputs: &WinitInputHelper) {
+    pub fn update(&mut self, inputs: &WindowInputs) {
         let mut app = match self.app.try_lock() {
             Ok(app) => app,
             Err(_) => {
@@ -77,7 +79,7 @@ impl Application {
 pub async fn run(canvas: HtmlCanvasElement) -> anyhow::Result<()> {
     let event_loop = winit::event_loop::EventLoop::new()?;
     let application = Application::new(canvas)?;
-    event_loop.run_app(&mut WinitInputApp::new(application))?;
+    event_loop.run_app(&mut WinitAppHelper::new(application))?;
     Ok(())
 }
 
@@ -125,23 +127,19 @@ impl ApplicationHandler<()> for Application {
     }
 }
 
-impl WinitInputUpdate for Application {
-    fn update(
-        &mut self,
-        event_loop: &winit::event_loop::ActiveEventLoop,
-        input: &WinitInputHelper,
-    ) {
+impl InputHandler for Application {
+    fn update(&mut self, event_loop: &winit::event_loop::ActiveEventLoop, input: WindowInputs<'_>) {
         // Don't react to "esc"
-        if input.close_requested() || input.destroyed() {
+        if input.close_requested {
             info!("Stopping the application.");
             event_loop.exit();
             return;
         }
 
-        if let Some((width, height)) = input.resolution() {
+        if let Some(PhysicalSize { width, height }) = input.new_size {
             self.resize(winit::dpi::PhysicalSize { width, height });
         }
-        self.update(input);
+        self.update(&input);
         match self.render() {
             Ok(_) => (),
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {

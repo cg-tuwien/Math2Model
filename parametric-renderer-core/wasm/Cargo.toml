@@ -21,4 +21,3 @@ wasm-bindgen-futures = "0.4.42"
 web-sys = { version = "0.3.69", features = ["HtmlCanvasElement"] }
 wgpu = { workspace = true }
 winit = { workspace = true }
-winit_input_helper = { workspace = true }

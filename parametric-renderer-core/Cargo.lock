@@ -477,7 +477,6 @@ dependencies = [
  "wgpu",
  "wgpu-profiler",
  "winit",
- "winit_input_helper",
 ]
 
 [[package]]
@@ -1456,7 +1455,6 @@ dependencies = [
  "wgpu-profiler",
  "wgsl_to_wgpu",
  "winit",
- "winit_input_helper",
 ]
 
 [[package]]
@@ -2124,7 +2122,6 @@ dependencies = [
  "web-sys",
  "wgpu",
  "winit",
- "winit_input_helper",
 ]
 
 [[package]]
@@ -2593,15 +2590,6 @@ dependencies = [
  "x11-dl",
  "x11rb",
  "xkbcommon-dl",
-]
-
-[[package]]
-name = "winit_input_helper"
-version = "0.16.0"
-source = "git+https://github.com/stefnotch/winit_input_helper#6e76a79d01ce836c01b9cdeaa98846a6f0955dc4"
-dependencies = [
- "web-time",
- "winit",
 ]
 
 [[package]]

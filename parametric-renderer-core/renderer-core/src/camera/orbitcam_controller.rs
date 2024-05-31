@@ -1,7 +1,8 @@
 use glam::Quat;
 use glamour::{Angle, Point3, Vector2, Vector3};
 use winit::event::MouseButton;
-use winit_input_helper::WinitInputHelper;
+
+use crate::input::WindowInputs;
 
 use super::{
     camera_controller::{
@@ -24,7 +25,6 @@ impl OrbitcamController {
 
         let (yaw, pitch, _) = controller.orientation.to_euler(glam::EulerRot::YXZ);
 
-
         Self {
             center,
             pitch: Angle::from(pitch),
@@ -34,20 +34,24 @@ impl OrbitcamController {
     }
     pub fn update(
         &mut self,
-        input: &WinitInputHelper,
+        input: &WindowInputs,
         delta_time: f32,
         settings: &GeneralControllerSettings,
     ) -> CursorCapture {
         let mut cursor_capture = CursorCapture::Free;
-        if input.mouse_held(MouseButton::Right) {
-            self.update_orientation(Vector2::from(input.mouse_diff()), settings);
+        let mouse_delta = Vector2::new(input.mouse.delta.0 as f32, input.mouse.delta.1 as f32);
+        if input.mouse.pressed(MouseButton::Right) {
+            self.update_orientation(mouse_delta, settings);
             cursor_capture = CursorCapture::LockedAndHidden;
         }
 
-        if input.mouse_held(MouseButton::Middle) {
-            self.update_pan_position(Vector2::from(input.mouse_diff()), delta_time, settings);
+        if input.mouse.pressed(MouseButton::Middle) {
+            self.update_pan_position(mouse_delta, delta_time, settings);
             cursor_capture = CursorCapture::LockedAndHidden;
         }
+
+        // TODO: Scroll zoom
+
         cursor_capture
     }
 

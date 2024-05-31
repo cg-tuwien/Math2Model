@@ -14,7 +14,6 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 wgpu = { workspace = true }
 winit = { workspace = true }
-winit_input_helper = { workspace = true }
 wgpu-profiler = "0.17.0"
 
 [build-dependencies]

@@ -8,7 +8,6 @@ use scene::SceneData;
 use wgpu_context::WgpuContext;
 use wgpu_profiler::GpuProfilerSettings;
 use winit::{dpi::PhysicalPosition, window::Window};
-use winit_input_helper::WinitInputHelper;
 
 use crate::{
     buffer::TypedBuffer,
@@ -19,11 +18,9 @@ use crate::{
         },
         Camera, CameraSettings,
     },
+    input::WindowInputs,
     mesh::Mesh,
-    shaders::{
-        compute_patches::{self},
-        copy_patches, shader,
-    },
+    shaders::{compute_patches, copy_patches, shader},
     texture::Texture,
 };
 
@@ -75,6 +72,7 @@ impl FrameCounter {
 pub struct CpuApplication {
     pub gpu: Option<GpuApplication>,
     pub camera_controller: CameraController,
+    last_update_instant: Option<std::time::Instant>,
     frame_counter: FrameCounter,
     camera: Camera,
     mouse: Vector2<f32>,
@@ -103,6 +101,7 @@ impl CpuApplication {
             gpu: None,
             camera,
             camera_controller,
+            last_update_instant: None,
             frame_counter: FrameCounter::new(),
             mouse: Vector2::ZERO,
             mouse_held: false,
@@ -150,19 +149,22 @@ impl CpuApplication {
         }
     }
 
-    pub fn update(&mut self, inputs: &WinitInputHelper) {
-        let cursor_capture = self.camera_controller.update(
-            inputs,
-            inputs.delta_time().unwrap_or_default().as_secs_f32(),
-        );
-        if let Some(gpu) = &mut self.gpu {
-            gpu.update_cursor_capture(cursor_capture, inputs);
+    pub fn update(&mut self, inputs: &WindowInputs) {
+        if let Some(last_update_instant) = self.last_update_instant {
+            let now = std::time::Instant::now();
+            let delta = Seconds((now - last_update_instant).as_secs_f32());
+            let cursor_capture = self.camera_controller.update(inputs, delta.0);
+            self.last_update_instant = Some(now);
+            if let Some(gpu) = &mut self.gpu {
+                gpu.update_cursor_capture(cursor_capture, inputs);
+            }
         }
         self.camera.update_camera(&self.camera_controller);
-        if let Some(mouse) = inputs.cursor() {
-            self.mouse = mouse.into();
-        }
-        self.mouse_held = inputs.mouse_held(winit::event::MouseButton::Left);
+        self.mouse = Vector2::new(
+            inputs.mouse.position.x as f32,
+            inputs.mouse.position.y as f32,
+        );
+        self.mouse_held = inputs.mouse.pressed(winit::event::MouseButton::Left);
     }
 
     fn render_data(&self, frame_time: &FrameTime) -> RenderData<'_> {
@@ -247,11 +249,7 @@ enum WindowCursorCapture {
 }
 
 impl GpuApplication {
-    pub fn update_cursor_capture(
-        &mut self,
-        cursor_capture: CursorCapture,
-        inputs: &WinitInputHelper,
-    ) {
+    pub fn update_cursor_capture(&mut self, cursor_capture: CursorCapture, inputs: &WindowInputs) {
         let window = &self.context.window;
         match (self.cursor_capture, cursor_capture) {
             (WindowCursorCapture::LockedAndHidden(position), CursorCapture::Free) => {
@@ -265,16 +263,13 @@ impl GpuApplication {
             (WindowCursorCapture::Free, CursorCapture::Free) => {}
             (WindowCursorCapture::LockedAndHidden(_), CursorCapture::LockedAndHidden) => {}
             (WindowCursorCapture::Free, CursorCapture::LockedAndHidden) => {
-                let cursor_position = inputs.cursor().unwrap_or((0.0, 0.0));
+                let cursor_position = inputs.mouse.position;
                 window
                     .set_cursor_grab(winit::window::CursorGrabMode::Confined)
                     .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))
                     .unwrap();
                 window.set_cursor_visible(false);
-                self.cursor_capture = WindowCursorCapture::LockedAndHidden(PhysicalPosition::new(
-                    cursor_position.0 as f64,
-                    cursor_position.1 as f64,
-                ));
+                self.cursor_capture = WindowCursorCapture::LockedAndHidden(cursor_position);
             }
         }
     }

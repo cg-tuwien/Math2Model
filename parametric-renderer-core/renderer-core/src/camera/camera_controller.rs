@@ -1,6 +1,7 @@
 use glam::Quat;
 use glamour::Point3;
-use winit_input_helper::WinitInputHelper;
+
+use crate::input::WindowInputs;
 
 use super::{freecam_controller::FreecamController, orbitcam_controller::OrbitcamController};
 
@@ -35,7 +36,7 @@ impl ChosenController {
 
     fn update(
         &mut self,
-        input: &WinitInputHelper,
+        input: &WindowInputs,
         delta_time: f32,
         settings: &GeneralControllerSettings,
     ) -> CursorCapture {
@@ -105,7 +106,7 @@ impl CameraController {
         }
     }
 
-    pub fn update(&mut self, input: &WinitInputHelper, delta_time: f32) -> CursorCapture {
+    pub fn update(&mut self, input: &WindowInputs, delta_time: f32) -> CursorCapture {
         self.chosen.update(input, delta_time, &self.settings)
     }
 }

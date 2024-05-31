@@ -15,9 +15,5 @@ glam = { version = "0.27", features = ["bytemuck"] }
 glamour = "0.11.1"
 encase = { version = "0.8", features = ["glam"] }
 bytemuck = { version = "1.16.0", features = ["derive"] }
-winit_input_helper = "0.16"
 nanoserde = "0.1.37"
 
-[patch.crates-io]
-# TODO: Remove this patch once my PRs are merged, or the issue is fixed in the original crate
-winit_input_helper = { git = "https://github.com/stefnotch/winit_input_helper" }
