@@ -309,7 +309,7 @@ impl GpuApplication {
             },
             wgpu::BufferUsages::COPY_DST,
         )?;
-        let max_patch_count = 10_000;
+        let max_patch_count = 10_0000;
         let render_buffer_initial = compute_patches::RenderBuffer {
             patches_length: 0,
             patches_capacity: max_patch_count,
