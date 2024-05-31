@@ -20,7 +20,7 @@ pub struct WindowMouseInputs<'a> {
     pub position_delta: (f64, f64),
     /// Raw, unfiltered mouse motion
     pub motion: (f64, f64),
-    pub scroll_delta: MouseScrollDelta,
+    pub scroll_delta: PhysicalPosition<f64>,
     pub inputs: Vec<MouseInput>,
     pub held: &'a HashSet<MouseButton>,
 }
@@ -116,7 +116,7 @@ pub struct WindowInputCollector {
     start_cursor_position: PhysicalPosition<f64>,
     end_cursor_position: PhysicalPosition<f64>,
     mouse_motion: (f64, f64),
-    scroll_delta: MouseScrollDelta,
+    scroll_delta: PhysicalPosition<f64>,
     mouse_inputs: Vec<MouseInput>,
     mouse_held: HashSet<MouseButton>,
     key_inputs: Vec<KeyEvent>,
@@ -139,10 +139,10 @@ pub struct MouseInput {
 impl WindowInputCollector {
     pub fn new() -> Self {
         Self {
-            start_cursor_position: PhysicalPosition::new(0.0, 0.0),
-            end_cursor_position: PhysicalPosition::new(0.0, 0.0),
+            start_cursor_position: Default::default(),
+            end_cursor_position: Default::default(),
             mouse_motion: (0.0, 0.0),
-            scroll_delta: MouseScrollDelta::LineDelta(0.0, 0.0),
+            scroll_delta: Default::default(),
             mouse_inputs: Vec::new(),
             mouse_held: HashSet::new(),
             key_inputs: Vec::new(),
@@ -174,7 +174,18 @@ impl WindowInputCollector {
                 }
             }
             winit::event::WindowEvent::MouseWheel { delta, .. } => {
-                self.scroll_delta = *delta;
+                // Taken from winit_input_helper, which took it from somewhere else.
+                const PIXELS_PER_LINE: f64 = 38.0;
+                match delta {
+                    MouseScrollDelta::LineDelta(x, y) => {
+                        self.scroll_delta.x += (*x as f64) * PIXELS_PER_LINE;
+                        self.scroll_delta.y += (*y as f64) * PIXELS_PER_LINE;
+                    }
+                    MouseScrollDelta::PixelDelta(delta) => {
+                        self.scroll_delta.x += delta.x;
+                        self.scroll_delta.y += delta.y;
+                    }
+                }
             }
             winit::event::WindowEvent::KeyboardInput { event, .. } => {
                 self.key_inputs.push(event.clone());
@@ -205,7 +216,8 @@ impl WindowInputCollector {
     pub fn handle_device_event(&mut self, event: &winit::event::DeviceEvent) {
         match event {
             winit::event::DeviceEvent::MouseMotion { delta } => {
-                self.mouse_motion = *delta;
+                self.mouse_motion.0 += delta.0;
+                self.mouse_motion.1 += delta.1;
             }
             _ => {}
         }
@@ -236,7 +248,7 @@ impl WindowInputCollector {
         };
 
         self.start_cursor_position = self.end_cursor_position;
-        self.scroll_delta = MouseScrollDelta::LineDelta(0.0, 0.0);
+        self.scroll_delta = Default::default();
         self.mouse_motion = (0.0, 0.0);
         self.mouse_inputs.clear();
         self.key_inputs.clear();
