@@ -34,7 +34,7 @@ impl FreecamController {
         settings: &GeneralControllerSettings,
     ) -> CursorCapture {
         let mut cursor_capture = CursorCapture::Free;
-        let mouse_delta = Vector2::new(input.mouse.delta.0 as f32, input.mouse.delta.1 as f32);
+        let mouse_delta = Vector2::new(input.mouse.motion.0 as f32, input.mouse.motion.1 as f32);
         if input.mouse.pressed(MouseButton::Right) {
             self.update_orientation(mouse_delta, settings);
             cursor_capture = CursorCapture::LockedAndHidden;

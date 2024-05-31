@@ -17,7 +17,7 @@ pub struct WindowInputs<'a> {
 pub struct WindowMouseInputs<'a> {
     pub position: PhysicalPosition<f64>,
     /// With mouse acceleration
-    pub delta: (f64, f64),
+    pub position_delta: (f64, f64),
     /// Raw, unfiltered mouse motion
     pub motion: (f64, f64),
     pub scroll_delta: MouseScrollDelta,
@@ -219,7 +219,7 @@ impl WindowInputCollector {
         let inputs = WindowInputs {
             mouse: WindowMouseInputs {
                 position: self.end_cursor_position,
-                delta: cursor_delta,
+                position_delta: cursor_delta,
                 motion: self.mouse_motion,
                 scroll_delta: self.scroll_delta,
                 inputs: self.mouse_inputs.clone(),
