@@ -150,15 +150,15 @@ impl CpuApplication {
     }
 
     pub fn update(&mut self, inputs: &WindowInputs) {
+        let now = std::time::Instant::now();
         if let Some(last_update_instant) = self.last_update_instant {
-            let now = std::time::Instant::now();
             let delta = Seconds((now - last_update_instant).as_secs_f32());
             let cursor_capture = self.camera_controller.update(inputs, delta.0);
-            self.last_update_instant = Some(now);
             if let Some(gpu) = &mut self.gpu {
                 gpu.update_cursor_capture(cursor_capture, inputs);
             }
         }
+        self.last_update_instant = Some(now);
         self.camera.update_camera(&self.camera_controller);
         self.mouse = Vector2::new(
             inputs.mouse.position.x as f32,
