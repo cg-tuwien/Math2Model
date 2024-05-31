@@ -358,8 +358,9 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
   // 5*5 = 25 extra samples for frustum culling
   let extra_sample_index = vec2<u32>(sample_index % 5u, sample_index / 5u);
   let extra_sample_location = quad.min + vec2(
-    (quad_size.x / 5.0) * f32(extra_sample_index.x),
-    (quad_size.y / 5.0) * f32(extra_sample_index.y)
+    // Divide by 4.0 because we have 5 samples, but we want to go from 0 to 1
+    (quad_size.x / 4.0) * f32(extra_sample_index.x),
+    (quad_size.y / 4.0) * f32(extra_sample_index.y)
   );
   if (sample_index < 25) {
     let extra_sample = evaluateImage(extra_sample_location);
