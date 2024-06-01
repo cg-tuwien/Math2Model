@@ -219,6 +219,11 @@ struct CopyPatchesStep {
     bind_group_0: copy_patches::bind_groups::BindGroup0,
 }
 
+struct BufferWithReset<Buffer, Reset> {
+    buffer: Buffer,
+    reset: Reset,
+}
+
 pub struct GpuApplication {
     context: WgpuContext,
     depth_texture: Texture,
@@ -230,12 +235,19 @@ pub struct GpuApplication {
     /// The second one is for "force_render"
     compute_patches_input_buffer: [TypedBuffer<compute_patches::InputBuffer>; 2],
     patches_buffer_starting_patch: TypedBuffer<compute_patches::Patches>,
-    patches_buffer_reset: TypedBuffer<compute_patches::Patches>,
-    patches_buffer: [TypedBuffer<compute_patches::Patches>; 2],
-    render_buffer_initial: compute_patches::RenderBuffer,
-    render_buffer: Vec<TypedBuffer<compute_patches::RenderBuffer>>,
-    indirect_compute_buffer_initial: compute_patches::DispatchIndirectArgs,
-    indirect_compute_buffer: [TypedBuffer<compute_patches::DispatchIndirectArgs>; 2],
+    patches_buffer: BufferWithReset<
+        [TypedBuffer<compute_patches::Patches>; 2],
+        TypedBuffer<compute_patches::Patches>,
+    >,
+    render_buffer: BufferWithReset<
+        Vec<TypedBuffer<compute_patches::RenderBuffer>>,
+        compute_patches::RenderBuffer,
+    >,
+    indirect_compute_buffer: BufferWithReset<
+        [TypedBuffer<compute_patches::DispatchIndirectArgs>; 2],
+        TypedBuffer<compute_patches::DispatchIndirectArgs>,
+    >,
+    indirect_compute_buffer_starting_patch: TypedBuffer<compute_patches::DispatchIndirectArgs>,
     indirect_draw_buffers: TypedBuffer<copy_patches::DrawIndexedBuffers>,
     meshes: Vec<Mesh>,
     threshold_factor: f32, // TODO: Make this adjustable
@@ -315,18 +327,21 @@ impl GpuApplication {
             patches_capacity: max_patch_count,
             patches: vec![],
         };
-        let render_buffer = patch_sizes()
-            .iter()
-            .map(|size| {
-                TypedBuffer::new_storage_with_runtime_array(
-                    device,
-                    &format!("Render Buffer {}", size),
-                    &render_buffer_initial,
-                    max_patch_count as u64,
-                    wgpu::BufferUsages::COPY_DST,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let render_buffer = BufferWithReset {
+            buffer: patch_sizes()
+                .iter()
+                .map(|size| {
+                    TypedBuffer::new_storage_with_runtime_array(
+                        device,
+                        &format!("Render Buffer {}", size),
+                        &render_buffer_initial,
+                        max_patch_count as u64,
+                        wgpu::BufferUsages::COPY_DST,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+            reset: render_buffer_initial,
+        };
 
         let material_buffer = TypedBuffer::new_uniform(
             device,
@@ -386,6 +401,7 @@ impl GpuApplication {
             }),
             bind_group_0: scene_data.as_bind_group_0(device),
             bind_group_1: render_buffer
+                .buffer
                 .iter()
                 .map(|v| {
                     shader::bind_groups::BindGroup1::from_bindings(
@@ -423,68 +439,83 @@ impl GpuApplication {
                 wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
             )?,
         ];
-        let patches_buffer_starting_patch = compute_patches::Patches {
-            patches_length: 1,
-            patches_capacity: max_patch_count,
-            patches: vec![compute_patches::EncodedPatch {
-                // Just the leading 1 bit
-                u: 1,
-                v: 1,
-            }],
-        };
+
         let patches_buffer_reset = compute_patches::Patches {
             patches_length: 0,
             patches_capacity: max_patch_count,
             patches: vec![],
         };
-
-        let patches_buffer = [
-            TypedBuffer::new_storage_with_runtime_array(
+        let patches_buffer = BufferWithReset {
+            buffer: [
+                TypedBuffer::new_storage_with_runtime_array(
+                    device,
+                    "Patches Buffer 0",
+                    &patches_buffer_reset,
+                    max_patch_count as u64,
+                    wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+                )?,
+                TypedBuffer::new_storage_with_runtime_array(
+                    device,
+                    "Patches Buffer 1",
+                    &patches_buffer_reset,
+                    max_patch_count as u64,
+                    wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+                )?,
+            ],
+            reset: TypedBuffer::new_storage_with_runtime_array(
                 device,
-                "Patches Buffer 0",
-                &patches_buffer_starting_patch,
-                max_patch_count as u64,
-                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
-            )?,
-            TypedBuffer::new_storage_with_runtime_array(
-                device,
-                "Patches Buffer 1",
+                "Patches Buffer Reset",
                 &patches_buffer_reset,
-                max_patch_count as u64,
-                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+                1,
+                wgpu::BufferUsages::COPY_SRC,
             )?,
-        ];
+        };
         let patches_buffer_starting_patch = TypedBuffer::new_storage_with_runtime_array(
             device,
             "Patches Buffer Starting Patch",
-            &patches_buffer_starting_patch,
-            1,
-            wgpu::BufferUsages::COPY_SRC,
-        )?;
-        let patches_buffer_reset = TypedBuffer::new_storage_with_runtime_array(
-            device,
-            "Patches Buffer Reset",
-            &patches_buffer_reset,
+            &compute_patches::Patches {
+                patches_length: 1,
+                patches_capacity: max_patch_count,
+                patches: vec![compute_patches::EncodedPatch {
+                    // Just the leading 1 bit
+                    u: 1,
+                    v: 1,
+                }],
+            },
             1,
             wgpu::BufferUsages::COPY_SRC,
         )?;
 
-        let indirect_compute_buffer_initial =
-            compute_patches::DispatchIndirectArgs { x: 1, y: 1, z: 1 };
-        let indirect_compute_buffer = [
-            TypedBuffer::new_storage(
+        let indirect_compute_buffer_reset =
+            compute_patches::DispatchIndirectArgs { x: 0, y: 1, z: 1 };
+        let indirect_compute_buffer = BufferWithReset {
+            buffer: [
+                TypedBuffer::new_storage(
+                    device,
+                    "Indirect Compute Dispatch Buffer 0",
+                    &indirect_compute_buffer_reset,
+                    wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
+                )?,
+                TypedBuffer::new_storage(
+                    device,
+                    "Indirect Compute Dispatch Buffer 1",
+                    &indirect_compute_buffer_reset,
+                    wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
+                )?,
+            ],
+            reset: TypedBuffer::new_storage(
                 device,
-                "Indirect Compute Dispatch Buffer 0",
-                &indirect_compute_buffer_initial,
-                wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
+                "Indirect Compute Dispatch Buffer Reset",
+                &indirect_compute_buffer_reset,
+                wgpu::BufferUsages::COPY_SRC,
             )?,
-            TypedBuffer::new_storage(
-                device,
-                "Indirect Compute Dispatch Buffer 1",
-                &indirect_compute_buffer_initial,
-                wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
-            )?,
-        ];
+        };
+        let indirect_compute_buffer_starting_patch = TypedBuffer::new_storage(
+            device,
+            "Indirect Compute Dispatch Buffer Starting Patch",
+            &compute_patches::DispatchIndirectArgs { x: 1, y: 1, z: 1 },
+            wgpu::BufferUsages::COPY_SRC,
+        )?;
 
         let indirect_draw_data = meshes
             .iter()
@@ -537,28 +568,28 @@ impl GpuApplication {
                 device,
                 compute_patches::bind_groups::BindGroupLayout1 {
                     input_buffer: compute_patches_input_buffer[0].as_entire_buffer_binding(),
-                    render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
-                    render_buffer_4: render_buffer[1].as_entire_buffer_binding(),
-                    render_buffer_8: render_buffer[2].as_entire_buffer_binding(),
-                    render_buffer_16: render_buffer[3].as_entire_buffer_binding(),
-                    render_buffer_32: render_buffer[4].as_entire_buffer_binding(),
+                    render_buffer_2: render_buffer.buffer[0].as_entire_buffer_binding(),
+                    render_buffer_4: render_buffer.buffer[1].as_entire_buffer_binding(),
+                    render_buffer_8: render_buffer.buffer[2].as_entire_buffer_binding(),
+                    render_buffer_16: render_buffer.buffer[3].as_entire_buffer_binding(),
+                    render_buffer_32: render_buffer.buffer[4].as_entire_buffer_binding(),
                 },
             ),
             bind_group_2: [
                 compute_patches::bind_groups::BindGroup2::from_bindings(
                     device,
                     compute_patches::bind_groups::BindGroupLayout2 {
-                        patches_from_buffer: patches_buffer[0].as_entire_buffer_binding(),
-                        patches_to_buffer: patches_buffer[1].as_entire_buffer_binding(),
-                        dispatch_next: indirect_compute_buffer[1].as_entire_buffer_binding(),
+                        patches_from_buffer: patches_buffer.buffer[0].as_entire_buffer_binding(),
+                        patches_to_buffer: patches_buffer.buffer[1].as_entire_buffer_binding(),
+                        dispatch_next: indirect_compute_buffer.buffer[1].as_entire_buffer_binding(),
                     },
                 ),
                 compute_patches::bind_groups::BindGroup2::from_bindings(
                     device,
                     compute_patches::bind_groups::BindGroupLayout2 {
-                        patches_from_buffer: patches_buffer[1].as_entire_buffer_binding(), // Swap the order :)
-                        patches_to_buffer: patches_buffer[0].as_entire_buffer_binding(),
-                        dispatch_next: indirect_compute_buffer[0].as_entire_buffer_binding(),
+                        patches_from_buffer: patches_buffer.buffer[1].as_entire_buffer_binding(), // Swap the order :)
+                        patches_to_buffer: patches_buffer.buffer[0].as_entire_buffer_binding(),
+                        dispatch_next: indirect_compute_buffer.buffer[0].as_entire_buffer_binding(),
                     },
                 ),
             ],
@@ -575,11 +606,11 @@ impl GpuApplication {
             bind_group_0: copy_patches::bind_groups::BindGroup0::from_bindings(
                 device,
                 copy_patches::bind_groups::BindGroupLayout0 {
-                    render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
-                    render_buffer_4: render_buffer[1].as_entire_buffer_binding(),
-                    render_buffer_8: render_buffer[2].as_entire_buffer_binding(),
-                    render_buffer_16: render_buffer[3].as_entire_buffer_binding(),
-                    render_buffer_32: render_buffer[4].as_entire_buffer_binding(),
+                    render_buffer_2: render_buffer.buffer[0].as_entire_buffer_binding(),
+                    render_buffer_4: render_buffer.buffer[1].as_entire_buffer_binding(),
+                    render_buffer_8: render_buffer.buffer[2].as_entire_buffer_binding(),
+                    render_buffer_16: render_buffer.buffer[3].as_entire_buffer_binding(),
+                    render_buffer_32: render_buffer.buffer[4].as_entire_buffer_binding(),
                     indirect_draw: indirect_draw_buffers.as_entire_buffer_binding(),
                 },
             ),
@@ -587,16 +618,14 @@ impl GpuApplication {
 
         Ok(Self {
             context,
-            indirect_compute_buffer_initial,
+            indirect_compute_buffer_starting_patch,
             indirect_compute_buffer,
             compute_patches_input_buffer,
             render_step: render,
             compute_patches,
             copy_patches,
             patches_buffer_starting_patch,
-            patches_buffer_reset,
             patches_buffer,
-            render_buffer_initial,
             render_buffer,
             indirect_draw_buffers,
             depth_texture,
@@ -641,7 +670,7 @@ impl GpuApplication {
             ..Default::default()
         });
 
-        self.scene_data.update(&render_data, queue);
+        self.scene_data.write_buffers(&render_data, queue);
         self.model_buffer
             .write_buffer(
                 queue,
@@ -666,16 +695,9 @@ impl GpuApplication {
                 .write_buffer(queue, &data)
                 .unwrap();
         }
-
-        self.indirect_compute_buffer[0]
-            .write_buffer(queue, &self.indirect_compute_buffer_initial)
-            .unwrap();
-        self.indirect_compute_buffer[1]
-            .write_buffer(queue, &self.indirect_compute_buffer_initial)
-            .unwrap();
-        for render_buffer in self.render_buffer.iter() {
+        for render_buffer in self.render_buffer.buffer.iter() {
             render_buffer
-                .write_buffer(queue, &self.render_buffer_initial)
+                .write_buffer(queue, &self.render_buffer.reset)
                 .unwrap();
         }
 
@@ -691,24 +713,20 @@ impl GpuApplication {
                 .profiler
                 .scope("Render", &mut command_encoder, &self.context.device);
 
-        commands.copy_buffer_to_buffer(
-            self.patches_buffer_starting_patch.buffer(),
-            0,
-            self.patches_buffer[0].buffer(),
-            0,
-            self.patches_buffer_starting_patch.buffer().size(),
-        );
-        let number_of_rounds = 4;
-        for i in 0..number_of_rounds {
-            let is_last_round = i == number_of_rounds - 1;
+        self.patches_buffer.buffer[0]
+            .copy_all_from(&self.patches_buffer_starting_patch, &mut commands);
+        self.indirect_compute_buffer.buffer[0]
+            .copy_all_from(&self.indirect_compute_buffer_starting_patch, &mut commands);
+        // Each round, we do a ping-pong and pong-ping
+        // 2*4 rounds is enough to subdivide a 4k screen into 16x16 pixel patches
+        let double_number_of_rounds = 4;
+        for i in 0..double_number_of_rounds {
+            let is_last_round = i == double_number_of_rounds - 1;
             {
-                commands.copy_buffer_to_buffer(
-                    self.patches_buffer_reset.buffer(),
-                    0,
-                    self.patches_buffer[1].buffer(),
-                    0,
-                    self.patches_buffer_reset.buffer().size(),
-                );
+                self.patches_buffer.buffer[1]
+                    .copy_all_from(&self.patches_buffer.reset, &mut commands);
+                self.indirect_compute_buffer.buffer[1]
+                    .copy_all_from(&self.indirect_compute_buffer.reset, &mut commands);
                 let mut compute_pass = commands.scoped_compute_pass(
                     format!("Compute Patches From-To {i}"),
                     &self.context.device,
@@ -721,25 +739,17 @@ impl GpuApplication {
                     &self.compute_patches.bind_group_2[0],
                 );
                 compute_pass
-                    .dispatch_workgroups_indirect(self.indirect_compute_buffer[0].buffer(), 0);
+                    .dispatch_workgroups_indirect(&self.indirect_compute_buffer.buffer[0], 0);
             }
             {
-                commands.copy_buffer_to_buffer(
-                    self.patches_buffer_reset.buffer(),
-                    0,
-                    self.patches_buffer[0].buffer(),
-                    0,
-                    self.patches_buffer_reset.buffer().size(),
-                );
+                self.patches_buffer.buffer[0]
+                    .copy_all_from(&self.patches_buffer.reset, &mut commands);
+                self.indirect_compute_buffer.buffer[0]
+                    .copy_all_from(&self.indirect_compute_buffer.reset, &mut commands);
                 if is_last_round {
                     // Set the "force_render" flag to 1
-                    commands.copy_buffer_to_buffer(
-                        self.compute_patches_input_buffer[1].buffer(),
-                        0,
-                        self.compute_patches_input_buffer[0].buffer(),
-                        0,
-                        self.compute_patches_input_buffer[0].buffer().size(),
-                    );
+                    self.compute_patches_input_buffer[0]
+                        .copy_all_from(&self.compute_patches_input_buffer[1], &mut commands);
                 }
 
                 let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -754,16 +764,16 @@ impl GpuApplication {
                     &self.compute_patches.bind_group_2[1],
                 );
                 compute_pass
-                    .dispatch_workgroups_indirect(self.indirect_compute_buffer[1].buffer(), 0);
+                    .dispatch_workgroups_indirect(&self.indirect_compute_buffer.buffer[1], 0);
             }
         }
 
         {
             let mut compute_pass =
-                commands.scoped_compute_pass("Copy Patches Pass", &self.context.device);
+                commands.scoped_compute_pass("Copy Patch Sizes Pass", &self.context.device);
             compute_pass.set_pipeline(&self.copy_patches.pipeline);
             copy_patches::set_bind_groups(&mut compute_pass, &self.copy_patches.bind_group_0);
-            compute_pass.dispatch_workgroups_indirect(self.indirect_compute_buffer[0].buffer(), 0);
+            compute_pass.dispatch_workgroups(1, 1, 1);
         }
 
         {
@@ -825,8 +835,7 @@ impl GpuApplication {
                 render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 render_pass
                     .set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-                render_pass
-                    .draw_indexed_indirect(self.indirect_draw_buffers.buffer(), buffer_offset)
+                render_pass.draw_indexed_indirect(&self.indirect_draw_buffers, buffer_offset)
             }
         }
 

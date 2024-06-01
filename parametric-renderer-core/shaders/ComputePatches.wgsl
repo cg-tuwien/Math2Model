@@ -200,7 +200,7 @@ var<workgroup> v_samples: array<array<vec2Screen, U_X>, U_Y>;
 const U_LENGTHS_X = U_X - 1; // Last sample per row doesn't have a next sample
 var<workgroup> u_lengths: array<array<f32, U_LENGTHS_X>, U_Y>;
 var<workgroup> v_lengths: array<array<f32, U_LENGTHS_X>, U_Y>;
-var <workgroup> frustum_sides: array<u32, 25>;
+var<workgroup> frustum_sides: array<u32, 25>;
 
 /// Split the patch and write it to the output buffers
 fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>, force_render: bool) {
@@ -223,10 +223,15 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
   let patch_bottom_right = patch_bottom_right_child(quad_encoded);
   let patch_bottom_left = patch_bottom_left_child(quad_encoded);
 
-  // TODO: @Stefan: Add D:/master/optimal-splits.xopp with the list
   let splits_bitflags = (u32(split_top) << 3) | (u32(split_bottom) << 2) | (u32(split_left) << 1) | u32(split_right);
-  if (splits_bitflags == 0 || force_render) {
-    // 0000 => render it (only case where we don't split further)
+  if (splits_bitflags == 0u || force_render) {
+    /* No splits, render the patch
+    +---+---+
+    |       |
+    +       +
+    |       |
+    +---+---+
+    */
     let max_u_length = max(max(u_length[0], u_length[1]), max(u_length[2], u_length[3]));
     let max_v_length = max(max(v_length[0], v_length[1]), max(v_length[2], v_length[3]));
 
@@ -261,16 +266,30 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
         render_buffer_2.patches[write_index] = quad_encoded;
       }
     }
-  } else if (splits_bitflags == 8 || splits_bitflags == 4 || splits_bitflags == 12) {
-    // 1000, 0100, 1100 => Split along the U axis
+  } else if (splits_bitflags == 8u || splits_bitflags == 4u || splits_bitflags == 12u) {
+    /* Split top or split bottom or split top-bottom
+    => Split along the U axis
+    +---+---+    +---+---+   +---+---+
+    |   |   |    |       |   |   |   |
+    +       +    +       +   +   |   +
+    |       |    |   |   |   |   |   |
+    +---+---+    +---+---+   +---+---+
+    */
     let write_index = atomicAdd(&patches_to_buffer.patches_length, 2u);
     if write_index + 2 < patches_to_buffer.patches_capacity {
       atomicAdd(&dispatch_next.x, 2u);
       patches_to_buffer.patches[write_index + 0] = patch_left;
       patches_to_buffer.patches[write_index + 1] = patch_right;
     }
-  } else if (splits_bitflags == 2 || splits_bitflags == 1 || splits_bitflags == 3) {
-    // 0010, 0001, 0011 => Split along the V axis
+  } else if (splits_bitflags == 2u || splits_bitflags == 1u || splits_bitflags == 3u) {
+    /* Split left or split right or split left-right
+    => Split along the V axis
+    +---+---+    +---+---+   +---+---+
+    |       |    |       |   |       |
+    +---    +    +    ---+   +-------+
+    |       |    |       |   |       |
+    +---+---+    +---+---+   +---+---+
+    */
     let write_index = atomicAdd(&patches_to_buffer.patches_length, 2u);
     if write_index + 2 < patches_to_buffer.patches_capacity {
       atomicAdd(&dispatch_next.x, 2u);
@@ -278,8 +297,15 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
       patches_to_buffer.patches[write_index + 1] = patch_bottom;
     }
   } else if(splits_bitflags == 14 || splits_bitflags == 10) {
-    // 1110 => T-split
-    // 1010 => Ambiguous T-split (1110 or 1011)
+    /* Split top-bottom-left or split top-left
+    => T-split
+    => Ambiguous T-split (1110 or 1011)
+    +---+---+    +---+---+
+    |   |   |    |   |   |
+    +---+   +    +---+   +
+    |   |   |    |       |
+    +---+---+    +---+---+
+    */
     let write_index = atomicAdd(&patches_to_buffer.patches_length, 3u);
     if write_index + 3 < patches_to_buffer.patches_capacity {
       atomicAdd(&dispatch_next.x, 3u);
@@ -288,8 +314,15 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
       patches_to_buffer.patches[write_index + 2] = patch_bottom_left;
     }
   } else if(splits_bitflags == 13 || splits_bitflags == 5) {
-    // 1101 => T-split
-    // 0101 => Ambiguous T-split (1101 or 0111)
+    /* Split top-bottom-right or split bottom-right
+    => T-split
+    => Ambiguous T-split (1101 or 0111)
+    +---+---+    +---+---+
+    |   |   |    |       |
+    +   +---+    +   +---+
+    |   |   |    |   |   |
+    +---+---+    +---+---+
+    */
     let write_index = atomicAdd(&patches_to_buffer.patches_length, 3u);
     if write_index + 3 < patches_to_buffer.patches_capacity {
       atomicAdd(&dispatch_next.x, 3u);
@@ -298,8 +331,15 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
       patches_to_buffer.patches[write_index + 2] = patch_bottom_right;
     }
   } else if(splits_bitflags == 11 || splits_bitflags == 9) {
-    // 1011 => T-split
-    // 1001 => Ambiguous T-split (1101 or 1011)
+    /* Split top-left-right or split top-right
+    => T-split
+    => Ambiguous T-split (1101 or 1011)
+    +---+---+    +---+---+
+    |   |   |    |   |   |
+    +---+---+    +   +---+
+    |       |    |       |
+    +---+---+    +---+---+
+    */
     let write_index = atomicAdd(&patches_to_buffer.patches_length, 3u);
     if write_index + 3 < patches_to_buffer.patches_capacity {
       atomicAdd(&dispatch_next.x, 3u);
@@ -308,8 +348,15 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
       patches_to_buffer.patches[write_index + 2] = patch_bottom;
     }
   } else if(splits_bitflags == 7 || splits_bitflags == 6) {
-    // 0111 => T-split
-    // 0110 => Ambiguous T-split (1110 or 0111)
+    /* Split bottom-left-right or split bottom-left
+    => T-split
+    => Ambiguous T-split (1110 or 0111)
+    +---+---+    +---+---+
+    |       |    |       |
+    +---+---+    +---+   +
+    |   |   |    |   |   |
+    +---+---+    +---+---+
+    */
     let write_index = atomicAdd(&patches_to_buffer.patches_length, 3u);
     if write_index + 3 < patches_to_buffer.patches_capacity {
       atomicAdd(&dispatch_next.x, 3u);
@@ -318,7 +365,14 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
       patches_to_buffer.patches[write_index + 2] = patch_bottom_right;
     }
   } else if(splits_bitflags == 15) {
-    // 1111 => Full split
+    /*
+    Split all 4 ways
+    +---+---+
+    |   |   |
+    +---+---+
+    |   |   |
+    +---+---+
+    */
     let write_index = atomicAdd(&patches_to_buffer.patches_length, 4u);
     if write_index + 4 < patches_to_buffer.patches_capacity {
       atomicAdd(&dispatch_next.x, 4u);
