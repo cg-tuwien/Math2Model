@@ -643,7 +643,7 @@ impl GpuApplication {
 
         self.scene_data.update(&render_data, queue);
         self.model_buffer
-            .update(
+            .write_buffer(
                 queue,
                 &shader::Model {
                     model_similarity: self.meshes[0].get_model_matrix().to_raw(),
@@ -659,23 +659,23 @@ impl GpuApplication {
                 force_render: 0,
             };
             self.compute_patches_input_buffer[0]
-                .update(queue, &data)
+                .write_buffer(queue, &data)
                 .unwrap();
             data.force_render = 1;
             self.compute_patches_input_buffer[1]
-                .update(queue, &data)
+                .write_buffer(queue, &data)
                 .unwrap();
         }
 
         self.indirect_compute_buffer[0]
-            .update(queue, &self.indirect_compute_buffer_initial)
+            .write_buffer(queue, &self.indirect_compute_buffer_initial)
             .unwrap();
         self.indirect_compute_buffer[1]
-            .update(queue, &self.indirect_compute_buffer_initial)
+            .write_buffer(queue, &self.indirect_compute_buffer_initial)
             .unwrap();
         for render_buffer in self.render_buffer.iter() {
             render_buffer
-                .update(queue, &self.render_buffer_initial)
+                .write_buffer(queue, &self.render_buffer_initial)
                 .unwrap();
         }
 

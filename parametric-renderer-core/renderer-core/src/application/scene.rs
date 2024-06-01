@@ -85,11 +85,11 @@ impl SceneData {
 
     pub fn update(&mut self, render_data: &RenderData, queue: &wgpu::Queue) {
         self.time_buffer
-            .update(queue, &render_data.time_data)
+            .write_buffer(queue, &render_data.time_data)
             .unwrap();
         let size = render_data.camera.size();
         self.screen_buffer
-            .update(
+            .write_buffer(
                 queue,
                 &shader::Screen {
                     resolution: size.to_raw(),
@@ -102,10 +102,10 @@ impl SceneData {
             )
             .unwrap();
         self.mouse_buffer
-            .update(queue, &render_data.mouse_data)
+            .write_buffer(queue, &render_data.mouse_data)
             .unwrap();
         self.camera_buffer
-            .update(queue, &render_data.camera.to_shader())
+            .write_buffer(queue, &render_data.camera.to_shader())
             .unwrap();
     }
 }

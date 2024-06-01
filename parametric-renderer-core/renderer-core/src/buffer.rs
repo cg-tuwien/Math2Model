@@ -105,7 +105,7 @@ where
         })
     }
 
-    pub fn update(&self, queue: &wgpu::Queue, data: &T) -> Result<(), encase::internal::Error>
+    pub fn write_buffer(&self, queue: &wgpu::Queue, data: &T) -> Result<(), encase::internal::Error>
     where
         T: encase::ShaderType + encase::internal::WriteInto,
     {
