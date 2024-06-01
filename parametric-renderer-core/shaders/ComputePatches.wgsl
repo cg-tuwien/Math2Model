@@ -384,7 +384,8 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
   
   // 4*8 = 32 U samples
   let u_sample_location = quad.min + vec2(
-    (quad_size.x / f32(U_X)) * f32(u_v_sample_index.x),
+    // 8 samples divide a quad into 7 parts
+    (quad_size.x / f32(U_X - 1)) * f32(u_v_sample_index.x),
     (quad_size.y / f32(U_Y) / 2.0) // top offset
     + (quad_size.y / f32(U_Y)) * f32(u_v_sample_index.y)
   );
@@ -397,7 +398,7 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
   let v_sample_location = quad.min + vec2(
     (quad_size.x / f32(U_Y) / 2.0) // left offset
     + (quad_size.x / f32(U_Y)) * f32(u_v_sample_index.y),
-    (quad_size.y / f32(U_X)) * f32(u_v_sample_index.x),
+    (quad_size.y / f32(U_X - 1)) * f32(u_v_sample_index.x),
   );
   let v_sample = evaluateImage(v_sample_location);
   let v_clip_space = input_buffer.model_view_projection * vec4f(v_sample.xyz, 1.0);
