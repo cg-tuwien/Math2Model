@@ -37,28 +37,16 @@ fn patch_u_child(u: u32, child_bit: u32) -> u32 {
   return (u << 1) | (child_bit & 1);
 }
 fn patch_top_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(
-    encoded.u,
-    patch_u_child(encoded.v, 0u)
-  );
+  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 0u));
 }
 fn patch_bottom_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(
-    encoded.u,
-    patch_u_child(encoded.v, 1u),
-  );
+  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 1u));
 }
 fn patch_left_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(
-    patch_u_child(encoded.u, 0u),
-    encoded.v,
-  );
+  return EncodedPatch(patch_u_child(encoded.u, 0u), encoded.v);
 }
 fn patch_right_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(
-    patch_u_child(encoded.u, 1u),
-    encoded.v,
-  );
+  return EncodedPatch(patch_u_child(encoded.u, 1u), encoded.v);
 }
 fn patch_top_left_child(encoded: EncodedPatch) -> EncodedPatch {
   return patch_top_child(patch_left_child(encoded));
