@@ -158,7 +158,7 @@ const shaderMaterial = babylonEffectRef<ShaderMaterial | null>(() => {
 
   const shaders = assembleShaders(vertexSource);
   const material = new ShaderMaterial(
-    "custom",
+    "Custom_PBR_Shader",
     props.scene,
     {
       vertexSource: shaders.vertexShader,
@@ -166,7 +166,7 @@ const shaderMaterial = babylonEffectRef<ShaderMaterial | null>(() => {
     },
     {
       attributes: ["uv", "position", "normal"],
-      uniformBuffers: ["Scene", "Mesh", "instances", "camera_data"],
+      uniformBuffers: ["Scene", "Mesh", "instances", "pbr_camera_data","model","pbr_material","global_ubo"],
       shaderLanguage: ShaderLanguage.WGSL,
       storageBuffers: ["lights", "render_buffer"],
     }
@@ -191,16 +191,25 @@ const cameraUbo = useUniformBuffer(engineRef, onRender, [
   {
     name: "view",
     type: "mat4",
-    getValue: () => props.scene.camera.getViewMatrix(),
+    getValue: () =>
+    {
+      return props.scene.camera.getViewMatrix();
+    }
   },
   {
     name: "projection",
     type: "mat4",
-    getValue: () => props.scene.camera.getProjectionMatrix(),
+    getValue: () =>
+    {
+
+      console.log("Projection MATRIX:");
+      console.log(Array.from(props.scene.camera.getProjectionMatrix()._m));
+      return props.scene.camera.getProjectionMatrix();
+    }
   },
 ]);
 watchEffect(() => {
-  shaderMaterial.value?.setUniformBuffer("camera_data", cameraUbo.buffer.value);
+  shaderMaterial.value?.setUniformBuffer("pbr_camera_data", cameraUbo.buffer.value);
 });
 onUnmounted(() => {
   cameraUbo[Symbol.dispose]();
@@ -253,10 +262,14 @@ const modelUbo = useUniformBuffer(engineRef, onRender, [
   {
     name: "model_similarity",
     type: "mat4",
-    getValue: () => mesh.value.getWorldMatrix(),
+    getValue: () =>
+    {
+      return mesh.value.getWorldMatrix();
+    },
   },
 ]);
 watchEffect(() => {
+
   shaderMaterial.value?.setUniformBuffer("model", modelUbo.buffer.value);
 });
 onUnmounted(() => {
@@ -286,7 +299,7 @@ const materialUbo = useUniformBuffer(engineRef, onRender, [
   },
 ]);
 watchEffect(() => {
-  shaderMaterial.value?.setUniformBuffer("material", materialUbo.buffer.value);
+  shaderMaterial.value?.setUniformBuffer("pbr_material", materialUbo.buffer.value);
 });
 onUnmounted(() => {
   materialUbo[Symbol.dispose]();
@@ -621,10 +634,10 @@ onRender(() => {
     }
   }
 
+
   copyPatchesShader.value.dispatchIndirect(
     indirectComputeBuffer.value[0].buffer
   );
-
   // And Babylon.js will submit the commands
 });
 

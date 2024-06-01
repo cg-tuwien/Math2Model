@@ -71,21 +71,21 @@ struct Model {
     model_similarity: mat4x4<f32>,
 }
 
-struct Material {
-    // color.rgb is the color of the material
-    // color.a is the roughness of the material
+struct PBRMaterial {
+    // color.rgb is the color of the pbrmaterial
+    // color.a is the roughness of the pbrmaterial
     color_roughness: vec4<f32>,
-    // emissive_metallic.rgb is the emissive color of the material
-    // emissive_metallic.a is the metallicness of the material
+    // emissive_metallic.rgb is the emissive color of the pbrmaterial
+    // emissive_metallic.a is the metallicness of the pbrmaterial
     emissive_metallic: vec4<f32>,
 }
 
-@group(0) @binding(0) var<uniform> camera_data: Camera;
-@group(0) @binding(1) var<storage, read> lights: Lights;
-@group(0) @binding(2) var<uniform> model: Model;
-@group(0) @binding(3) var<storage, read> render_buffer: RenderBufferRead;
-@group(0) @binding(4) var<uniform> material: Material;
-@group(0) @binding(5) var<uniform> global_ubo: GlobalUBO;
+var<uniform> pbr_camera_data: Camera;
+var<storage, read> lights: Lights;
+var<uniform> model: Model;
+var<storage, read> render_buffer: RenderBufferRead;
+var<uniform> pbr_material: PBRMaterial;
+var<uniform> global_ubo: GlobalUBO;
 
 //#include "./HeartSphere.wgsl"
 // AUTOGEN e752278f38b5cff0b524b4eac45aa8fe29236e32e79fa3d6bca5a871d21478e8
@@ -432,61 +432,99 @@ struct VertexOutput {
 
 // This comment is needed for Babylon.js fuckery.
 /// VERTEX
+varying vNormalW : vec3<f32>;
 @vertex
 fn vs_main(
-    in: VertexInput,
-) -> VertexOutput {
-    let quad = render_buffer.patches[in.instance_index];
+    input: VertexInputs,
+) -> FragmentInputs {
+    let quad = render_buffer.patches[vertexInputs.instanceIndex];
 
     var uv = vec2<f32>(quad.min.x, quad.min.y);
-    if (in.vertex_index == 0) {
+    if (vertexInputs.vertexIndex == 0) {
         uv = vec2<f32>(quad.min.x, quad.min.y);
-    } else if (in.vertex_index == 1) {
+    } else if (vertexInputs.vertexIndex == 1) {
         uv = vec2<f32>(quad.max.x, quad.min.y);
-    } else if (in.vertex_index == 2) {
+    } else if (vertexInputs.vertexIndex == 2) {
         uv = vec2<f32>(quad.max.x, quad.max.y);
-    } else if (in.vertex_index == 3) {
+    } else if (vertexInputs.vertexIndex == 3) {
         uv = vec2<f32>(quad.min.x, quad.max.y);
     }
 
     let pos = evaluateImage(uv);
-    let world_pos = model.model_similarity * vec4<f32>(pos, 1.0);
+    let model_similarity_standin = mat4x4(1,0,0,0,
+                                          0,1,0,0,
+                                          0,0,1,0,
+                                          0,0,0,1);
+    let view_standin = mat4x4(
+                                 -0.11061684787273407,-0.7722444534301758,-0.6256216764450073,0,
+                                 0,0.6294847130775452,-0.7770128846168518,0,
+                                 0.9938631057739258,-0.08595070987939835,-0.06963161379098892,0,
+                                 -1.1923125982284546,-2.367401123046875,8.103739738464355,1
+                             );
+    let proj_standin = mat4x4(
+                           1.4610854387283325,
+                           0,
+                           0,
+                           0,
+                           0,
+                           2.365222454071045,
+                           0,
+                           0,
+                           0,
+                           0,
+                           1.0000100135803223,
+                           1,
+                           0,
+                           0,
+                           -0.01000010035932064,
+                           0
+                       );
+    let world_pos = model_similarity_standin * vec4<f32>(pos, 1.0);
+
 
     var out: VertexOutput;
-    out.clip_position = camera_data.projection * camera_data.view * world_pos;
+    out.clip_position = proj_standin * view_standin * world_pos;
     out.world_position = world_pos.xyz;
     out.texture_coords = uv;
     let normal = vec3<f32>(0.0, -1.0, 0.0); // TODO: We'll compute this later
-    out.world_normal = (model.model_similarity * vec4<f32>(normal, 0.0)).xyz; // Only uniform scaling
-    return out;
+    out.world_normal = (model_similarity_standin * vec4<f32>(normal, 0.0)).xyz; // Only uniform scaling
+
+
+    //  We could add an output like this with
+    //    varying vPositionW : vec3<f32>;
+    //vertexOutputs.vPositionW = world_pos.xyzw;
+
+    vertexOutputs.position = out.clip_position;
+    vertexOutputs.vNormalW = out.world_normal;
+    //vertexOutputs.vUV = uv;
 }
 /// END VERTEX
 
 /// FRAGMENT
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    let v = normalize(camera_data.world_position.xyz - in.world_position);
-    // let n = normalize(in.world_normal);
-    let n = normalize(-cross(dpdxFine(in.world_position), dpdyFine(in.world_position)));
+fn fs_main(input: FragmentInputs) -> FragmentOutputs {
+    let v = normalize(pbr_camera_data.world_position - fragmentInputs.position).xyz;
+    // let n = normalize(input.world_normal);
+    let n = normalize(-cross(dpdxFine(fragmentInputs.position.xyz), dpdyFine(fragmentInputs.position.xyz)));
 
     var materialInfo = MaterialInfo(
-        material.color_roughness.rgb,
+        pbr_material.color_roughness.rgb,
         vec3f(0.04),
         vec3f(1.0),
         vec3f(0.0),
         1.0,
         1.0
     );
-    materialInfo = getMetallicRoughnessInfo(materialInfo, material.emissive_metallic.a, material.color_roughness.a);
+    materialInfo = getMetallicRoughnessInfo(materialInfo, pbr_material.emissive_metallic.a, pbr_material.color_roughness.a);
 
     var f_diffuse = vec3f(0.0);
     var f_specular = vec3f(0.0);
     for (var i: u32 = 0u; i < lights.points_length; i += 1u) {
         let light = lights.points[i];
-        let pointToLight = light.position_range.xyz - in.world_position;
-        let l = normalize(pointToLight); // Direction from surface point to light
+        let pointToLight = light.position_range - fragmentInputs.position;
+        let l = normalize(pointToLight.xyz); // Direction from surface point to light
         let h = normalize(l + v);        // Direction of the vector between l and v, called halfway vector
-        let intensity: vec3f = getLighIntensity(light, pointToLight);
+        let intensity: vec3f = getLighIntensity(light, pointToLight.xyz);
         let NdotL = clamped_dot(n, l);
         if(NdotL > 0.0) {
             let NdotV = clamped_dot(n, v);
@@ -517,9 +555,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let color = f_diffuse * 2.0 
         + f_specular * 2.0 
         + ambient 
-        + material.emissive_metallic.rgb;
-
-    return vec4<f32>(color, 1.0);
+        + pbr_material.emissive_metallic.rgb;
+      fragmentOutputs.color = vec4<f32>(color, 1.0);
+      fragmentOutputs.fragDepth = fragmentInputs.position.z;
+    //return vec4<f32>(color, 1.0);
 }
 /// END FRAGMENT
  
