@@ -2,20 +2,29 @@ use glam::Quat;
 use glamour::{Angle, Point3, Vector2, Vector3};
 use winit::event::MouseButton;
 
-use crate::input::WindowInputs;
+use crate::{application::CursorCapture, input::WindowInputs};
 
 use super::{
-    camera_controller::{
-        CursorCapture, GeneralController, GeneralControllerSettings, IsCameraController,
-    },
+    camera_controller::{GeneralController, GeneralControllerSettings, IsCameraController},
     Camera,
 };
+
+struct LogarithmicDistance(f32);
+impl LogarithmicDistance {
+    fn new(distance: f32) -> Self {
+        Self(distance.ln())
+    }
+
+    fn distance(&self) -> f32 {
+        self.0.exp()
+    }
+}
 
 pub struct OrbitcamController {
     pub center: Point3,
     pub pitch: Angle,
     pub yaw: Angle,
-    pub distance: f32,
+    logarithmic_distance: LogarithmicDistance,
 }
 
 impl OrbitcamController {
@@ -29,7 +38,7 @@ impl OrbitcamController {
             center,
             pitch: Angle::from(pitch),
             yaw: Angle::from(yaw),
-            distance: controller.distance_to_center,
+            logarithmic_distance: LogarithmicDistance::new(controller.distance_to_center),
         }
     }
     pub fn update(
@@ -50,7 +59,8 @@ impl OrbitcamController {
             cursor_capture = CursorCapture::LockedAndHidden;
         }
 
-        // TODO: Scroll zoom
+        self.logarithmic_distance.0 +=
+            (input.mouse.scroll_delta.y as f32) * settings.fly_speed * delta_time;
 
         cursor_capture
     }
@@ -86,7 +96,8 @@ impl OrbitcamController {
 
 impl IsCameraController for OrbitcamController {
     fn position(&self) -> Point3 {
-        self.center + self.orientation() * Vector3::new(0.0, 0.0, self.distance)
+        self.center
+            + self.orientation() * Vector3::new(0.0, 0.0, self.logarithmic_distance.distance())
     }
 
     fn orientation(&self) -> Quat {
@@ -96,5 +107,13 @@ impl IsCameraController for OrbitcamController {
             self.pitch.radians,
             0.0,
         )
+    }
+
+    fn general_controller(&self) -> GeneralController {
+        GeneralController {
+            position: self.position(),
+            orientation: self.orientation(),
+            distance_to_center: self.logarithmic_distance.distance(),
+        }
     }
 }

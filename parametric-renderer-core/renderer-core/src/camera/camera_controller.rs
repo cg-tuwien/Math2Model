@@ -1,19 +1,14 @@
 use glam::Quat;
 use glamour::Point3;
 
-use crate::input::WindowInputs;
+use crate::{application::CursorCapture, input::WindowInputs};
 
 use super::{freecam_controller::FreecamController, orbitcam_controller::OrbitcamController};
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum CursorCapture {
-    Free,
-    LockedAndHidden,
-}
 
 pub trait IsCameraController {
     fn position(&self) -> Point3;
     fn orientation(&self) -> Quat;
+    fn general_controller(&self) -> GeneralController;
 }
 
 pub enum ChosenKind {
@@ -65,9 +60,6 @@ pub struct CameraController {
     chosen: ChosenController,
 }
 
-// Magic number.
-const FREECAM_DISTANCE_TO_CENTER: f32 = 15.;
-
 impl CameraController {
     pub fn new(
         controller: GeneralController,
@@ -79,24 +71,7 @@ impl CameraController {
     }
 
     pub fn switch_to(&mut self, chosen_kind: ChosenKind) {
-        self.chosen = ChosenController::new(self.get_general_controller(), chosen_kind);
-    }
-
-    pub fn get_general_controller(&self) -> GeneralController {
-        let position = self.position();
-        let orientation = self.orientation();
-        match &self.chosen {
-            ChosenController::Orbitcam(orbitcam) => GeneralController {
-                position,
-                orientation,
-                distance_to_center: orbitcam.distance,
-            },
-            ChosenController::Freecam(_freecam) => GeneralController {
-                position,
-                orientation,
-                distance_to_center: FREECAM_DISTANCE_TO_CENTER,
-            },
-        }
+        self.chosen = ChosenController::new(self.general_controller(), chosen_kind);
     }
 
     pub fn get_chosen_kind(&self) -> ChosenKind {
@@ -123,6 +98,13 @@ impl IsCameraController for CameraController {
         match &self.chosen {
             ChosenController::Orbitcam(v) => v.orientation(),
             ChosenController::Freecam(v) => v.orientation(),
+        }
+    }
+
+    fn general_controller(&self) -> GeneralController {
+        match &self.chosen {
+            ChosenController::Orbitcam(v) => v.general_controller(),
+            ChosenController::Freecam(v) => v.general_controller(),
         }
     }
 }

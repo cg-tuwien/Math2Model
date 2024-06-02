@@ -2,12 +2,10 @@ use glam::Quat;
 use glamour::{Angle, Point3, Vector2, Vector3};
 use winit::{event::MouseButton, keyboard::KeyCode};
 
-use crate::input::WindowInputs;
+use crate::{application::CursorCapture, input::WindowInputs};
 
 use super::{
-    camera_controller::{
-        CursorCapture, GeneralController, GeneralControllerSettings, IsCameraController,
-    },
+    camera_controller::{GeneralController, GeneralControllerSettings, IsCameraController},
     Camera,
 };
 
@@ -91,6 +89,9 @@ impl FreecamController {
     }
 }
 
+// Magic number.
+const FREECAM_DISTANCE_TO_CENTER: f32 = 15.;
+
 impl IsCameraController for FreecamController {
     fn position(&self) -> Point3 {
         self.position
@@ -103,6 +104,14 @@ impl IsCameraController for FreecamController {
             self.pitch.radians,
             0.0,
         )
+    }
+
+    fn general_controller(&self) -> GeneralController {
+        GeneralController {
+            position: self.position(),
+            orientation: self.orientation(),
+            distance_to_center: FREECAM_DISTANCE_TO_CENTER,
+        }
     }
 }
 

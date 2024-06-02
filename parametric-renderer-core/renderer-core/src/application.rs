@@ -1,8 +1,10 @@
+mod frame_counter;
 mod scene;
 mod wgpu_context;
 
 use std::sync::Arc;
 
+use frame_counter::{FrameCounter, FrameTime, Seconds};
 use glamour::{Matrix4, Point3, ToRaw, Vector2, Vector4};
 use scene::SceneData;
 use wgpu_context::WgpuContext;
@@ -13,8 +15,7 @@ use crate::{
     buffer::TypedBuffer,
     camera::{
         camera_controller::{
-            CameraController, ChosenKind, CursorCapture, GeneralController,
-            GeneralControllerSettings,
+            CameraController, ChosenKind, GeneralController, GeneralControllerSettings,
         },
         Camera, CameraSettings,
     },
@@ -27,46 +28,6 @@ use crate::{
 #[derive(Debug, Clone, Default)]
 pub struct ProfilerSettings {
     pub gpu: bool,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct Seconds(f32);
-
-struct FrameTime {
-    frame: u64,
-    delta: Seconds,
-    elapsed: Seconds,
-}
-
-struct FrameCounter {
-    frame: u64,
-    first_render_instant: Option<std::time::Instant>,
-    render_instant: Option<std::time::Instant>,
-}
-impl FrameCounter {
-    pub fn new() -> Self {
-        Self {
-            frame: 0,
-            first_render_instant: None,
-            render_instant: None,
-        }
-    }
-
-    pub fn new_frame(&mut self) -> FrameTime {
-        let frame = self.frame;
-        let now = std::time::Instant::now();
-        let first_render_instant = *self.first_render_instant.get_or_insert(now);
-        let previous_render_instant = *self.render_instant.get_or_insert(now);
-        let delta = Seconds((now - previous_render_instant).as_secs_f32());
-        let elapsed = Seconds((now - first_render_instant).as_secs_f32());
-        self.render_instant = Some(now);
-        self.frame += 1;
-        FrameTime {
-            frame,
-            delta,
-            elapsed,
-        }
-    }
 }
 
 pub struct CpuApplication {
@@ -170,7 +131,6 @@ impl CpuApplication {
     fn render_data(&self, frame_time: &FrameTime) -> RenderData<'_> {
         RenderData {
             camera: &self.camera,
-            // TODO: Set the data correctly
             time_data: shader::Time {
                 elapsed: frame_time.elapsed.0,
                 delta: frame_time.delta.0,
@@ -252,6 +212,12 @@ pub struct GpuApplication {
     meshes: Vec<Mesh>,
     threshold_factor: f32, // TODO: Make this adjustable
     cursor_capture: WindowCursorCapture,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum CursorCapture {
+    Free,
+    LockedAndHidden,
 }
 
 #[derive(Debug, Clone, Copy)]
