@@ -4,7 +4,7 @@ use glamour::Point3;
 use pollster::FutureExt;
 use renderer_core::{
     application::{CpuApplication, ProfilerSettings},
-    camera::camera_controller::{self, CameraController},
+    camera::camera_controller::{self, CameraController, IsCameraController},
     input::{InputHandler, WindowInputs, WinitAppHelper},
 };
 use tracing::{error, info, warn};
@@ -20,7 +20,7 @@ pub struct Application {
 
 impl Drop for Application {
     fn drop(&mut self) {
-        let controller = self.app.camera_controller.get_general_controller();
+        let controller = self.app.camera_controller.general_controller();
         self.cache_file.camera = Some(CachedCamera {
             position: controller.position.to_array(),
             orientation: controller.orientation.to_array(),
