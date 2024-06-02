@@ -169,7 +169,8 @@ struct RenderStep {
     bind_group_1: Vec<shader::bind_groups::BindGroup1>,
 }
 struct ComputePatchesStep {
-    pipeline: wgpu::ComputePipeline,
+    /// The second one is for "force_render"
+    pipeline: [wgpu::ComputePipeline; 2],
     bind_group_0: compute_patches::bind_groups::BindGroup0,
     bind_group_1: compute_patches::bind_groups::BindGroup1,
     bind_group_2: [compute_patches::bind_groups::BindGroup2; 2],
@@ -192,8 +193,7 @@ pub struct GpuApplication {
     compute_patches: ComputePatchesStep,
     copy_patches: CopyPatchesStep,
     render_step: RenderStep,
-    /// The second one is for "force_render"
-    compute_patches_input_buffer: [TypedBuffer<compute_patches::InputBuffer>; 2],
+    compute_patches_input_buffer: TypedBuffer<compute_patches::InputBuffer>,
     patches_buffer_starting_patch: TypedBuffer<compute_patches::Patches>,
     patches_buffer: BufferWithReset<
         [TypedBuffer<compute_patches::Patches>; 2],
@@ -383,28 +383,15 @@ impl GpuApplication {
         };
 
         let threshold_factor = 1.0;
-        let compute_patches_input_buffer = [
-            TypedBuffer::new_uniform(
-                device,
-                "Compute Patches Input Buffer",
-                &compute_patches::InputBuffer {
-                    model_view_projection: meshes[0].get_model_view_projection(camera).to_raw(),
-                    threshold_factor,
-                    force_render: 0,
-                },
-                wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
-            )?,
-            TypedBuffer::new_uniform(
-                device,
-                "Compute Patches Input Buffer Force Render",
-                &compute_patches::InputBuffer {
-                    model_view_projection: meshes[0].get_model_view_projection(camera).to_raw(),
-                    threshold_factor,
-                    force_render: 1,
-                },
-                wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
-            )?,
-        ];
+        let compute_patches_input_buffer = TypedBuffer::new_uniform(
+            device,
+            "Compute Patches Input Buffer",
+            &compute_patches::InputBuffer {
+                model_view_projection: meshes[0].get_model_view_projection(camera).to_raw(),
+                threshold_factor,
+            },
+            wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
+        )?;
 
         let patches_buffer_reset = compute_patches::Patches {
             patches_length: 0,
@@ -510,18 +497,38 @@ impl GpuApplication {
         )?;
 
         let compute_patches = ComputePatchesStep {
-            pipeline: device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                label: Some("Compute Patches"),
-                layout: Some(&compute_patches::create_pipeline_layout(device)),
-                module: &device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                    label: None,
-                    source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(
-                        compute_patches::SOURCE,
-                    )),
+            pipeline: [
+                device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                    label: Some("Compute Patches"),
+                    layout: Some(&compute_patches::create_pipeline_layout(device)),
+                    module: &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                        label: None,
+                        source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(
+                            compute_patches::SOURCE,
+                        )),
+                    }),
+                    entry_point: compute_patches::ENTRY_MAIN,
+                    compilation_options: Default::default(),
                 }),
-                entry_point: compute_patches::ENTRY_MAIN,
-                compilation_options: Default::default(),
-            }),
+                device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                    label: Some("Compute Patches Force Render"),
+                    layout: Some(&compute_patches::create_pipeline_layout(device)),
+                    module: &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                        label: None,
+                        source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(
+                            compute_patches::SOURCE,
+                        )),
+                    }),
+                    entry_point: compute_patches::ENTRY_MAIN,
+                    compilation_options: wgpu::PipelineCompilationOptions {
+                        constants: &compute_patches::OverrideConstants {
+                            force_render: Some(true),
+                        }
+                        .constants(),
+                        ..Default::default()
+                    },
+                }),
+            ],
             bind_group_0: compute_patches::bind_groups::BindGroup0::from_bindings(
                 device,
                 compute_patches::bind_groups::BindGroupLayout0 {
@@ -533,7 +540,7 @@ impl GpuApplication {
             bind_group_1: compute_patches::bind_groups::BindGroup1::from_bindings(
                 device,
                 compute_patches::bind_groups::BindGroupLayout1 {
-                    input_buffer: compute_patches_input_buffer[0].as_entire_buffer_binding(),
+                    input_buffer: compute_patches_input_buffer.as_entire_buffer_binding(),
                     render_buffer_2: render_buffer.buffer[0].as_entire_buffer_binding(),
                     render_buffer_4: render_buffer.buffer[1].as_entire_buffer_binding(),
                     render_buffer_8: render_buffer.buffer[2].as_entire_buffer_binding(),
@@ -645,22 +652,18 @@ impl GpuApplication {
                 },
             )
             .unwrap();
-        {
-            let mut data = compute_patches::InputBuffer {
-                model_view_projection: self.meshes[0]
-                    .get_model_view_projection(render_data.camera)
-                    .to_raw(),
-                threshold_factor: self.threshold_factor,
-                force_render: 0,
-            };
-            self.compute_patches_input_buffer[0]
-                .write_buffer(queue, &data)
-                .unwrap();
-            data.force_render = 1;
-            self.compute_patches_input_buffer[1]
-                .write_buffer(queue, &data)
-                .unwrap();
-        }
+        self.compute_patches_input_buffer
+            .write_buffer(
+                queue,
+                &compute_patches::InputBuffer {
+                    model_view_projection: self.meshes[0]
+                        .get_model_view_projection(render_data.camera)
+                        .to_raw(),
+                    threshold_factor: self.threshold_factor,
+                },
+            )
+            .unwrap();
+
         for render_buffer in self.render_buffer.buffer.iter() {
             render_buffer
                 .write_buffer(queue, &self.render_buffer.reset)
@@ -697,7 +700,7 @@ impl GpuApplication {
                     format!("Compute Patches From-To {i}"),
                     &self.context.device,
                 );
-                compute_pass.set_pipeline(&self.compute_patches.pipeline);
+                compute_pass.set_pipeline(&self.compute_patches.pipeline[0]);
                 compute_patches::set_bind_groups(
                     &mut compute_pass,
                     &self.compute_patches.bind_group_0,
@@ -712,17 +715,16 @@ impl GpuApplication {
                     .copy_all_from(&self.patches_buffer.reset, &mut commands);
                 self.indirect_compute_buffer.buffer[0]
                     .copy_all_from(&self.indirect_compute_buffer.reset, &mut commands);
-                if is_last_round {
-                    // Set the "force_render" flag to 1
-                    self.compute_patches_input_buffer[0]
-                        .copy_all_from(&self.compute_patches_input_buffer[1], &mut commands);
-                }
 
                 let mut compute_pass = commands.begin_compute_pass(&wgpu::ComputePassDescriptor {
                     label: Some(&format!("Compute Patches To-From {i}")),
                     timestamp_writes: None,
                 });
-                compute_pass.set_pipeline(&self.compute_patches.pipeline);
+                if is_last_round {
+                    compute_pass.set_pipeline(&self.compute_patches.pipeline[1]);
+                } else {
+                    compute_pass.set_pipeline(&self.compute_patches.pipeline[0]);
+                }
                 compute_patches::set_bind_groups(
                     &mut compute_pass,
                     &self.compute_patches.bind_group_0,

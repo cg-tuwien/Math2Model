@@ -149,9 +149,10 @@ fn evaluateImage(input2: vec2f) -> vec3f {
 
 struct InputBuffer {
     threshold_factor: f32,
-    force_render: u32, // TODO: Test with pipeline overridable constant
     model_view_projection: mat4x4<f32>,
 };
+
+override force_render: bool = false;
 
 // Group 1 is for things that change once per model
 // TODO: Read back the patches_length on the CPU to know when we're going out of bounds
@@ -188,7 +189,7 @@ var<workgroup> v_lengths: array<array<f32, U_LENGTHS_X>, U_Y>;
 var<workgroup> frustum_sides: array<u32, 25>;
 
 /// Split the patch and write it to the output buffers
-fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>, force_render: bool) {
+fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>) {
   // We use threshold_32, because after that, we don't need to split anymore.
   // Instead, we need to compute the correct render buffer to write to.
   let threshold_32 = (32.0 * screen.inv_resolution) * input_buffer.threshold_factor;
@@ -470,7 +471,7 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
   );
 
   if(sample_index == 0) {
-    split_patch(quad_encoded, quad, u_length, v_length, input_buffer.force_render != 0u);
+    split_patch(quad_encoded, quad, u_length, v_length);
   }
 
 
