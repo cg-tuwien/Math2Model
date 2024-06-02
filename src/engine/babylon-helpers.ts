@@ -133,20 +133,24 @@ export function useUniformBuffer(
     if (entry.type === "float") {
       onRender(() => {
         buffer.value.updateFloat(entry.name, entry.getValue());
+        buffer.value.update();
       });
     } else if (entry.type === "vec2") {
       onRender(() => {
         const [x, y] = entry.getValue();
         buffer.value.updateFloat2(entry.name, x, y);
+        buffer.value.update();
       });
     } else if (entry.type === "vec4") {
       onRender(() => {
         const [x, y, z, w] = entry.getValue();
         buffer.value.updateFloat4(entry.name, x, y, z, w);
+        buffer.value.update();
       });
     } else if (entry.type === "mat4") {
       onRender(() => {
         buffer.value.updateMatrix(entry.name, entry.getValue());
+        buffer.value.update();
       });
     }
   }

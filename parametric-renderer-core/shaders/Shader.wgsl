@@ -433,61 +433,26 @@ struct VertexOutput {
 // This comment is needed for Babylon.js fuckery.
 /// VERTEX
 varying vNormalW : vec3<f32>;
+varying vUV : vec2<f32>;
+attribute uv: vec2<f32>;
 @vertex
 fn vs_main(
     input: VertexInputs,
 ) -> FragmentInputs {
     let quad = render_buffer.patches[vertexInputs.instanceIndex];
 
-    var uv = vec2<f32>(quad.min.x, quad.min.y);
-    if (vertexInputs.vertexIndex == 0) {
-        uv = vec2<f32>(quad.min.x, quad.min.y);
-    } else if (vertexInputs.vertexIndex == 1) {
-        uv = vec2<f32>(quad.max.x, quad.min.y);
-    } else if (vertexInputs.vertexIndex == 2) {
-        uv = vec2<f32>(quad.max.x, quad.max.y);
-    } else if (vertexInputs.vertexIndex == 3) {
-        uv = vec2<f32>(quad.min.x, quad.max.y);
-    }
-
-    let pos = evaluateImage(uv);
-    let model_similarity_standin = mat4x4(1,0,0,0,
-                                          0,1,0,0,
-                                          0,0,1,0,
-                                          0,0,0,1);
-    let view_standin = mat4x4(
-                                 -0.11061684787273407,-0.7722444534301758,-0.6256216764450073,0,
-                                 0,0.6294847130775452,-0.7770128846168518,0,
-                                 0.9938631057739258,-0.08595070987939835,-0.06963161379098892,0,
-                                 -1.1923125982284546,-2.367401123046875,8.103739738464355,1
-                             );
-    let proj_standin = mat4x4(
-                           1.4610854387283325,
-                           0,
-                           0,
-                           0,
-                           0,
-                           2.365222454071045,
-                           0,
-                           0,
-                           0,
-                           0,
-                           1.0000100135803223,
-                           1,
-                           0,
-                           0,
-                           -0.01000010035932064,
-                           0
-                       );
-    let world_pos = model_similarity_standin * vec4<f32>(pos, 1.0);
+    let quad_point = mix(quad.min, quad.max, vertexInputs.uv);
+    let pos = evaluateImage(quad_point);
+    
+    let world_pos = model.model_similarity * vec4<f32>(pos, 1.0);
 
 
     var out: VertexOutput;
-    out.clip_position = proj_standin * view_standin * world_pos;
+    out.clip_position = pbr_camera_data.projection * pbr_camera_data.view * world_pos;
     out.world_position = world_pos.xyz;
-    out.texture_coords = uv;
+    out.texture_coords = vertexInputs.uv;
     let normal = vec3<f32>(0.0, -1.0, 0.0); // TODO: We'll compute this later
-    out.world_normal = (model_similarity_standin * vec4<f32>(normal, 0.0)).xyz; // Only uniform scaling
+    out.world_normal = (model.model_similarity * vec4<f32>(normal, 0.0)).xyz; // Only uniform scaling
 
 
     //  We could add an output like this with
@@ -496,7 +461,7 @@ fn vs_main(
 
     vertexOutputs.position = out.clip_position;
     vertexOutputs.vNormalW = out.world_normal;
-    //vertexOutputs.vUV = uv;
+    vertexOutputs.vUV = vertexInputs.uv;
 }
 /// END VERTEX
 

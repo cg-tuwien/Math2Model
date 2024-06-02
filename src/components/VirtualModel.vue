@@ -166,7 +166,15 @@ const shaderMaterial = babylonEffectRef<ShaderMaterial | null>(() => {
     },
     {
       attributes: ["uv", "position", "normal"],
-      uniformBuffers: ["Scene", "Mesh", "instances", "pbr_camera_data","model","pbr_material","global_ubo"],
+      uniformBuffers: [
+        "Scene",
+        "Mesh",
+        "instances",
+        "pbr_camera_data",
+        "model",
+        "pbr_material",
+        "global_ubo",
+      ],
       shaderLanguage: ShaderLanguage.WGSL,
       storageBuffers: ["lights", "render_buffer"],
     }
@@ -191,25 +199,19 @@ const cameraUbo = useUniformBuffer(engineRef, onRender, [
   {
     name: "view",
     type: "mat4",
-    getValue: () =>
-    {
-      return props.scene.camera.getViewMatrix();
-    }
+    getValue: () => props.scene.camera.getViewMatrix(),
   },
   {
     name: "projection",
     type: "mat4",
-    getValue: () =>
-    {
-
-      console.log("Projection MATRIX:");
-      console.log(Array.from(props.scene.camera.getProjectionMatrix()._m));
-      return props.scene.camera.getProjectionMatrix();
-    }
+    getValue: () => props.scene.camera.getProjectionMatrix(),
   },
 ]);
 watchEffect(() => {
-  shaderMaterial.value?.setUniformBuffer("pbr_camera_data", cameraUbo.buffer.value);
+  shaderMaterial.value?.setUniformBuffer(
+    "pbr_camera_data",
+    cameraUbo.buffer.value
+  );
 });
 onUnmounted(() => {
   cameraUbo[Symbol.dispose]();
@@ -262,14 +264,12 @@ const modelUbo = useUniformBuffer(engineRef, onRender, [
   {
     name: "model_similarity",
     type: "mat4",
-    getValue: () =>
-    {
+    getValue: () => {
       return mesh.value.getWorldMatrix();
     },
   },
 ]);
 watchEffect(() => {
-
   shaderMaterial.value?.setUniformBuffer("model", modelUbo.buffer.value);
 });
 onUnmounted(() => {
@@ -299,7 +299,10 @@ const materialUbo = useUniformBuffer(engineRef, onRender, [
   },
 ]);
 watchEffect(() => {
-  shaderMaterial.value?.setUniformBuffer("pbr_material", materialUbo.buffer.value);
+  shaderMaterial.value?.setUniformBuffer(
+    "pbr_material",
+    materialUbo.buffer.value
+  );
 });
 onUnmounted(() => {
   materialUbo[Symbol.dispose]();
@@ -633,7 +636,6 @@ onRender(() => {
       lastIndirectDrawBuffer = indirectDrawBuffer;
     }
   }
-
 
   copyPatchesShader.value.dispatchIndirect(
     indirectComputeBuffer.value[0].buffer
