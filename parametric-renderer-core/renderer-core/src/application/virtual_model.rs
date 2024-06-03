@@ -1,5 +1,7 @@
 // This is the simplest design, where each virtual model has its own set of resources.
 
+use std::borrow::Borrow;
+
 use glamour::{Matrix4, ToRaw, Vector3, Vector4};
 
 use crate::{
@@ -414,15 +416,14 @@ fn create_compute_patches_pipeline(
     evaluate_image_code: Option<&str>,
 ) -> [wgpu::ComputePipeline; 2] {
     let label = label.as_deref().unwrap_or_default();
+    let source = replace_evaluate_image_code(compute_patches::SOURCE, evaluate_image_code);
     [
         device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some(&format!("Compute Patches {}", label)),
             layout: Some(&compute_patches::create_pipeline_layout(device)),
             module: &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: None,
-                source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(
-                    compute_patches::SOURCE,
-                )),
+                source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(source.as_ref())),
             }),
             entry_point: compute_patches::ENTRY_MAIN,
             compilation_options: Default::default(),
@@ -432,10 +433,7 @@ fn create_compute_patches_pipeline(
             layout: Some(&compute_patches::create_pipeline_layout(device)),
             module: &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: None,
-                source: wgpu::ShaderSource::Wgsl(replace_evaluate_image_code(
-                    compute_patches::SOURCE,
-                    evaluate_image_code,
-                )),
+                source: wgpu::ShaderSource::Wgsl(source),
             }),
             entry_point: compute_patches::ENTRY_MAIN,
             compilation_options: wgpu::PipelineCompilationOptions {
@@ -455,8 +453,8 @@ fn replace_evaluate_image_code<'a>(
 ) -> std::borrow::Cow<'a, str> {
     // TODO: use wgsl-parser instead of this
     if let Some(evaluate_image_code) = evaluate_image_code {
-        let start = source.find("//// START evaluateImage").unwrap_or_default();
-        let end = source.find("//// END evaluateImage").unwrap_or_default();
+        let start = source.find("//// START evaluateImage").unwrap();
+        let end = source.find("//// END evaluateImage").unwrap();
 
         let mut result = String::with_capacity(
             &source[..start].len() + evaluate_image_code.len() + &source[end..].len(),
