@@ -3,7 +3,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-// TODO: Rewrite this in JS, using the https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/digest
 use sha2::{Digest, Sha256};
 
 const AUTOGEN_PREFIX: &str = "// AUTOGEN";

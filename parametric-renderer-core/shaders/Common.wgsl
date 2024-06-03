@@ -28,3 +28,8 @@ struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/stru
   z: u32,
 } 
 fn ceil_div(a: u32, b: u32) -> u32 { return (a + b - 1u) / b; }
+struct GlobalUBO {
+  iTime: f32,
+  iTimeDelta: f32,
+  iFrame: f32,
+};

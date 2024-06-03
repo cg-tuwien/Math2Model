@@ -29,6 +29,7 @@ import {
 } from "@babylonjs/core";
 import { assert } from "@stefnotch/typestef/assert";
 import {
+  computed,
   onUnmounted,
   shallowRef,
   watch,
@@ -38,25 +39,20 @@ import {
 } from "vue";
 import ComputePatches from "../../parametric-renderer-core/shaders/ComputePatches.wgsl?raw";
 import CopyPatches from "../../parametric-renderer-core/shaders/CopyPatches.wgsl?raw";
+import PbrShader from "../../parametric-renderer-core/shaders/Shader.wgsl?raw";
+import {
+  SmartStorageBuffer,
+  concatArrayBuffers,
+  shallowEffectRef,
+  useUniformBuffer,
+} from "@/engine/babylon-helpers";
 
 const props = defineProps<{
   scene: BabylonBaseScene;
   files: ReadonlyFiles & HasReactiveFiles;
   model: DeepReadonly<VirtualModelState>;
 }>();
-
-const dummyValue = Symbol("dummyValue");
-function shallowEffectRef<T>(
-  effect: (oldValue: NoInfer<T> | null) => T
-): ShallowRef<T> {
-  const ref = shallowRef<T>(dummyValue as any);
-  watchEffect(() => {
-    const oldValue = ref.value;
-    ref.value = effect(oldValue === dummyValue ? null : oldValue);
-  });
-  assert(ref.value !== dummyValue);
-  return ref;
-}
+const engineRef = computed(() => props.scene.engine);
 
 const onRenderCallbacks: (() => void)[] = [];
 function onRender(callback: () => void) {
@@ -78,68 +74,46 @@ onUnmounted(() => {
   renderObserver.value.dispose();
 });
 
-// From https://stackoverflow.com/a/70005195/3492994
-function concatArrayBuffers(views: ArrayBufferView[]) {
-  let length = 0;
-  for (const v of views) length += v.byteLength;
+function replaceAutogen(shader: string, innerCode: string | null) {
+  const autogenRegex = /\/\/ AUTOGEN[^]+?\/\/ END OF AUTOGEN/g;
 
-  let buf = new Uint8Array(length);
-  let offset = 0;
-  for (const v of views) {
-    const uint8view = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
-    buf.set(uint8view, offset);
-    offset += uint8view.byteLength;
+  if (innerCode === null || innerCode === "") {
+    innerCode = `
+fn evaluateImage(input2: vec2f) -> vec3f {
+  return vec3f(input2, 0.0);
+}
+}
+`;
   }
 
-  return buf;
+  return shader.replaceAll(autogenRegex, (v) => {
+    if (/fn\s+evaluateImage/.test(v)) {
+      return innerCode;
+    } else {
+      return v;
+    }
+  });
+}
+function assembleShaders(innerCode: string): {
+  vertexShader: string;
+  fragmentShader: string;
+} {
+  const shader = replaceAutogen(PbrShader, innerCode);
+  const vertexRegex = /\/\/\/ VERTEX[^]+?\/\/\/ END VERTEX/g;
+  const fragmentRegex = /\/\/\/ FRAGMENT[^]+?\/\/\/ END FRAGMENT/g;
+
+  return {
+    vertexShader: shader
+      .replace(fragmentRegex, "")
+      .replace("fn vs_main", "fn main"),
+    fragmentShader: shader
+      .replace(vertexRegex, "")
+      .replace("fn fs_main", "fn main"),
+  };
 }
 
-class SmartStorageBuffer {
-  buffer: StorageBuffer;
-  initialBuffer: StorageBuffer;
-  initialByteSize: number;
-  constructor(
-    engine: WebGPUEngine,
-    initialData: {
-      buffers: ArrayBufferView[];
-      runtimeArray: number;
-    },
-    creationFlags: number,
-    label: string
-  ) {
-    const data = concatArrayBuffers(initialData.buffers);
-
-    this.initialByteSize = data.byteLength;
-    this.buffer = new StorageBuffer(
-      engine,
-      data.byteLength + initialData.runtimeArray,
-      creationFlags | Constants.BUFFER_CREATIONFLAG_WRITE,
-      label
-    );
-    this.buffer.update(data);
-    this.initialBuffer = new StorageBuffer(
-      engine,
-      data.byteLength,
-      Constants.BUFFER_CREATIONFLAG_READ | Constants.BUFFER_CREATIONFLAG_WRITE,
-      label
-    );
-    this.initialBuffer.update(data);
-  }
-
-  reset(engine: WebGPUEngine) {
-    engine._renderEncoder.copyBufferToBuffer(
-      this.initialBuffer.getBuffer().underlyingResource,
-      0,
-      this.buffer.getBuffer().underlyingResource,
-      0,
-      this.initialByteSize
-    );
-  }
-
-  dispose() {
-    this.buffer.dispose();
-    this.initialBuffer.dispose();
-  }
+function assembleComputeShader(innerCode: string | null) {
+  return replaceAutogen(ComputePatches, innerCode);
 }
 
 // TODO: Introduce a shader caching in the layer above
@@ -173,38 +147,36 @@ watchEffect(() => {
 
 const shaderMaterial = babylonEffectRef<ShaderMaterial | null>(() => {
   // This is neccessary to make it fully reactive (otherwise it would not update when the file changes)
-  const vertexSourceId = props.files.fileNames.value.get(
-    props.model.code.vertexFile
-  );
+  const vertexSourceId = props.files.fileNames.value.get(props.model.code);
   if (vertexSourceId === undefined) {
     return null;
   }
-  const vertexSource = props.files.readFile(props.model.code.vertexFile);
+  const vertexSource = props.files.readFile(props.model.code);
   if (vertexSource === null) {
     return null;
   }
-  const fragmentSourceId = props.files.fileNames.value.get(
-    props.model.code.fragmentFile
-  );
-  if (fragmentSourceId === undefined) {
-    return null;
-  }
-  const fragmentSource = props.files.readFile(props.model.code.fragmentFile);
-  if (fragmentSource === null) {
-    return null;
-  }
+
+  const shaders = assembleShaders(vertexSource);
   const material = new ShaderMaterial(
-    "custom",
+    "Custom_PBR_Shader",
     props.scene,
     {
-      vertexSource: assembleFullVertexShader(vertexSource),
-      fragmentSource: fragmentSource,
+      vertexSource: shaders.vertexShader,
+      fragmentSource: shaders.fragmentShader,
     },
     {
       attributes: ["uv", "position", "normal"],
-      uniformBuffers: ["Scene", "Mesh", "instances"],
+      uniformBuffers: [
+        "Scene",
+        "Mesh",
+        "instances",
+        "pbr_camera_data",
+        "model",
+        "pbr_material",
+        "global_ubo",
+      ],
       shaderLanguage: ShaderLanguage.WGSL,
-      storageBuffers: ["renderBuffer"],
+      storageBuffers: ["lights", "render_buffer"],
     }
   );
   material.backFaceCulling = false;
@@ -212,8 +184,130 @@ const shaderMaterial = babylonEffectRef<ShaderMaterial | null>(() => {
   return material;
 });
 watchEffect(() => {
-  shaderMaterial.value?.setUniformBuffer("globalUBO", props.scene.globalUBO);
+  shaderMaterial.value?.setUniformBuffer("global_ubo", props.scene.globalUBO);
 });
+
+const cameraUbo = useUniformBuffer(engineRef, onRender, [
+  {
+    name: "world_position",
+    type: "vec4",
+    getValue: () => {
+      const pos = props.scene.camera.position;
+      return [pos.x, pos.y, pos.z, 0.0];
+    },
+  },
+  {
+    name: "view",
+    type: "mat4",
+    getValue: () => props.scene.camera.getViewMatrix(),
+  },
+  {
+    name: "projection",
+    type: "mat4",
+    getValue: () => props.scene.camera.getProjectionMatrix(),
+  },
+]);
+watchEffect(() => {
+  shaderMaterial.value?.setUniformBuffer(
+    "pbr_camera_data",
+    cameraUbo.buffer.value
+  );
+});
+onUnmounted(() => {
+  cameraUbo[Symbol.dispose]();
+});
+
+const lightsStorageBuffer = babylonEffectRef<SmartStorageBuffer>(() => {
+  const maxLightCount = 10;
+  const floatByteSize = 4;
+  const vec4ByteSize = floatByteSize * 4;
+  const lightByteSize = 2 * vec4ByteSize;
+  return new SmartStorageBuffer(
+    props.scene.engine,
+    {
+      buffers: [
+        new Float32Array([
+          0.01,
+          0.01,
+          0.01,
+          0, // ambient
+        ]),
+        new Uint32Array([
+          1, // points_length
+        ]),
+        // Point lights
+        new Uint32Array([
+          0.0,
+          10.0,
+          2.0,
+          30.0, //position_range
+          1.0,
+          1.0,
+          1.0,
+          1.0, //color_intensity
+        ]),
+      ],
+      runtimeArray: maxLightCount * lightByteSize,
+    },
+    Constants.BUFFER_CREATIONFLAG_READWRITE,
+    "Lights Buffer"
+  );
+});
+watchEffect(() => {
+  shaderMaterial.value?.setStorageBuffer(
+    "lights",
+    lightsStorageBuffer.value.buffer
+  );
+});
+
+const modelUbo = useUniformBuffer(engineRef, onRender, [
+  {
+    name: "model_similarity",
+    type: "mat4",
+    getValue: () => {
+      return mesh.value.getWorldMatrix();
+    },
+  },
+]);
+watchEffect(() => {
+  shaderMaterial.value?.setUniformBuffer("model", modelUbo.buffer.value);
+});
+onUnmounted(() => {
+  modelUbo[Symbol.dispose]();
+});
+
+const materialUbo = useUniformBuffer(engineRef, onRender, [
+  {
+    name: "color_roughness",
+    type: "vec4",
+    getValue: () => [
+      props.model.material.color.x,
+      props.model.material.color.y,
+      props.model.material.color.z,
+      props.model.material.roughness,
+    ],
+  },
+  {
+    name: "emissive_metallic",
+    type: "vec4",
+    getValue: () => [
+      props.model.material.emissive.x,
+      props.model.material.emissive.y,
+      props.model.material.emissive.z,
+      props.model.material.metallic,
+    ],
+  },
+]);
+watchEffect(() => {
+  shaderMaterial.value?.setUniformBuffer(
+    "pbr_material",
+    materialUbo.buffer.value
+  );
+});
+onUnmounted(() => {
+  materialUbo[Symbol.dispose]();
+});
+
 watchEffect(() => {
   mesh.value.material = shaderMaterial.value;
 });
@@ -237,17 +331,16 @@ const renderBuffer = babylonEffectRef<SmartStorageBuffer>(() => {
   );
 });
 
-const patchesInputBuffer = babylonEffectRef<UniformBuffer>(() => {
-  const buffer = new UniformBuffer(props.scene.engine);
-  buffer.addMatrix("model_view_projection", Matrix.Identity());
-  return buffer;
-});
-onRender(() => {
-  patchesInputBuffer.value.updateMatrix(
-    "model_view_projection",
-    mesh.value.getWorldMatrix().multiply(props.scene.getTransformMatrix())
-  );
-  patchesInputBuffer.value.update();
+const patchesInputBuffer = useUniformBuffer(engineRef, onRender, [
+  {
+    name: "model_view_projection",
+    type: "mat4",
+    getValue: () =>
+      mesh.value.getWorldMatrix().multiply(props.scene.getTransformMatrix()),
+  },
+]);
+onUnmounted(() => {
+  patchesInputBuffer[Symbol.dispose]();
 });
 
 const patchesBufferReset = babylonEffectRef<StorageBuffer>(() => {
@@ -359,13 +452,11 @@ onUnmounted(() => {
 
 const computePatchesShader = shallowEffectRef<[ComputeShader, ComputeShader]>(
   () => {
-    const vertexSourceId = props.files.fileNames.value.get(
-      props.model.code.vertexFile
-    );
+    const vertexSourceId = props.files.fileNames.value.get(props.model.code);
     const vertexSource =
       vertexSourceId === undefined
         ? null
-        : props.files.readFile(props.model.code.vertexFile);
+        : props.files.readFile(props.model.code);
 
     const computeSource = assembleComputeShader(vertexSource);
     // Apparently the compute shader cannot be disposed of.
@@ -407,11 +498,11 @@ const computePatchesShader = shallowEffectRef<[ComputeShader, ComputeShader]>(
 watchEffect(() => {
   computePatchesShader.value[0].setUniformBuffer(
     "input_buffer",
-    patchesInputBuffer.value
+    patchesInputBuffer.buffer.value
   );
   computePatchesShader.value[1].setUniformBuffer(
     "input_buffer",
-    patchesInputBuffer.value
+    patchesInputBuffer.buffer.value
   );
   computePatchesShader.value[0].setStorageBuffer(
     "render_buffer",
@@ -481,7 +572,7 @@ watchEffect(() => {
 
 watchEffect(() => {
   shaderMaterial.value?.setStorageBuffer(
-    "renderBuffer",
+    "render_buffer",
     renderBuffer.value.buffer
   );
 });
@@ -549,7 +640,6 @@ onRender(() => {
   copyPatchesShader.value.dispatchIndirect(
     indirectComputeBuffer.value[0].buffer
   );
-
   // And Babylon.js will submit the commands
 });
 
@@ -565,85 +655,6 @@ function babylonEffectRef<T extends HasDispose | null>(
     ref.value?.dispose();
   });
   return ref;
-}
-
-function assembleFullVertexShader(innerCode: string) {
-  return `
-#include<sceneUboDeclaration>
-#include<meshUboDeclaration>
-
-attribute position : vec3<f32>;
-attribute uv: vec2<f32>;
-attribute normal : vec3<f32>;
-
-varying vUV : vec2<f32>;
-varying vNormal : vec3<f32>;
-
-struct GlobalUBO {
-  iTime: f32,
-  iTimeDelta: f32,
-  iFrame: f32,
-};
-
-struct Patch {
-  min: vec2<f32>,
-  max: vec2<f32>,
-};
-
-struct RenderBufferRead {
-  patches_length: u32, // Same size as atomic<u32>
-  patches_capacity: u32,
-  patches: array<Patch>,
-};
-
-var<uniform> globalUBO: GlobalUBO;
-var<storage, read> renderBuffer: RenderBufferRead;
-
-${innerCode}
-
-@vertex
-fn main(input: VertexInputs) -> FragmentInputs {
-  let quad = renderBuffer.patches[input.instanceIndex];
-
-  var uv = vec2<f32>(quad.min.x, quad.min.y);
-  if (input.vertexIndex == 0) {
-      uv = vec2<f32>(quad.min.x, quad.min.y);
-  } else if (input.vertexIndex == 1) {
-      uv = vec2<f32>(quad.max.x, quad.min.y);
-  } else if (input.vertexIndex == 2) {
-      uv = vec2<f32>(quad.max.x, quad.max.y);
-  } else if (input.vertexIndex == 3) {
-      uv = vec2<f32>(quad.min.x, quad.max.y);
-  }
-
-  vertexInputs.uv = uv;
-
-  ${
-    innerCode !== ""
-      ? "let pos = evaluateImage(vertexInputs.uv);"
-      : "let pos = vec3f(vertexInputs.uv, 0.0);"
-  }
-  vertexOutputs.position = scene.projection * scene.view * mesh.world * vec4f(pos,1.);
-  vertexOutputs.vUV = vertexInputs.uv;
-  vertexOutputs.vNormal = vertexInputs.normal;
-}`;
-}
-
-function assembleComputeShader(innerCode: string | null) {
-  const computeSource = ComputePatches;
-  const autogenRegex = /\/\/ AUTOGEN[^]+?\/\/ END OF AUTOGEN/g;
-
-  if (innerCode === null || innerCode === "") {
-    return computeSource;
-  }
-
-  return computeSource.replaceAll(autogenRegex, (v) => {
-    if (/fn\s+evaluateImage/.test(v)) {
-      return innerCode;
-    } else {
-      return v;
-    }
-  });
 }
 
 function toVector3(v: ReadonlyVector3) {

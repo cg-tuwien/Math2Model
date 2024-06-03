@@ -1,5 +1,5 @@
 //#include "./Common.wgsl"
-// AUTOGEN d1af44c46a1cbb7b88eb3a40a108148e105bbe3d63aab3143845fbb6b5bb0256
+// AUTOGEN 3981bafad9591a71e64476011502e8895e11e31084dccd1f27a08f4fa5fc2983
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
@@ -30,6 +30,11 @@ struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/stru
   z: u32,
 } 
 fn ceil_div(a: u32, b: u32) -> u32 { return (a + b - 1u) / b; }
+struct GlobalUBO {
+  iTime: f32,
+  iTimeDelta: f32,
+  iFrame: f32,
+};
 // END OF AUTOGEN
 
 struct InputBuffer {
@@ -73,7 +78,6 @@ const WORKGROUP_SIZE = 64u;
 // assume a single work group
 @compute @workgroup_size(WORKGROUP_SIZE, 1, 1)
 fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {
-  // TODO: Pls benchmark this compared to the previous one
   let patch_index = global_id.x;
   var final_patches_length = 0u;
   if (patch_index < patches_from_buffer.patches_length) {

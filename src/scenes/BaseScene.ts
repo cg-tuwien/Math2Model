@@ -84,6 +84,7 @@ export class BabylonBaseScene extends Scene implements BaseScene {
     this._camera = camera;
 
     this.globalUBO = new UniformBuffer(engine);
+    // Warning: This order has to match the shader order
     this.globalUBO.addUniform("iTime", 1);
     this.globalUBO.addUniform("iTimeDelta", 1);
     this.globalUBO.addUniform("iFrame", 1);
