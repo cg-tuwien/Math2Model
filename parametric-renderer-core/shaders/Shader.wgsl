@@ -55,9 +55,9 @@ struct PointLight {
 }
 
 struct Lights {
-    ambient: Vec3Padded,
+    ambient: vec4f,
     // TODO: Directional light
-    points_length: u32,
+    points_length: vec4<u32>,
     points: array<PointLight>,
 }
 
@@ -434,6 +434,7 @@ struct VertexOutput {
 /// VERTEX
 varying vNormalW : vec3<f32>;
 varying vUV : vec2<f32>;
+varying vWorldPos: vec4<f32>;
 attribute uv: vec2<f32>;
 @vertex
 fn vs_main(
@@ -462,6 +463,7 @@ fn vs_main(
     vertexOutputs.position = out.clip_position;
     vertexOutputs.vNormalW = out.world_normal;
     vertexOutputs.vUV = vertexInputs.uv;
+    vertexOutputs.vWorldPos = world_pos;
 }
 /// END VERTEX
 
@@ -470,7 +472,11 @@ fn vs_main(
 fn fs_main(input: FragmentInputs) -> FragmentOutputs {
     let v = normalize(pbr_camera_data.world_position - fragmentInputs.position).xyz;
     // let n = normalize(input.world_normal);
-    let n = normalize(-cross(dpdxFine(fragmentInputs.position.xyz), dpdyFine(fragmentInputs.position.xyz)));
+
+    let ddx = dpdxFine(fragmentInputs.vWorldPos.xyz);
+    let ddy = dpdyFine(fragmentInputs.vWorldPos.xyz);
+
+    let n = normalize(-cross(ddx, ddy));
 
     var materialInfo = MaterialInfo(
         pbr_material.color_roughness.rgb,
@@ -484,9 +490,14 @@ fn fs_main(input: FragmentInputs) -> FragmentOutputs {
 
     var f_diffuse = vec3f(0.0);
     var f_specular = vec3f(0.0);
-    for (var i: u32 = 0u; i < lights.points_length; i += 1u) {
+
+    var pointLength = lights.points_length.x;
+    // var nLights = lights.points;
+    var ambientLight = lights.ambient;
+
+    for (var i: u32 = 0u; i < pointLength; i += 1u) {
         let light = lights.points[i];
-        let pointToLight = light.position_range - fragmentInputs.position;
+        let pointToLight = light.position_range - fragmentInputs.vWorldPos;
         let l = normalize(pointToLight.xyz); // Direction from surface point to light
         let h = normalize(l + v);        // Direction of the vector between l and v, called halfway vector
         let intensity: vec3f = getLighIntensity(light, pointToLight.xyz);
@@ -517,12 +528,12 @@ fn fs_main(input: FragmentInputs) -> FragmentOutputs {
 
     let ambient: vec3f = lights.ambient.rgb * materialInfo.baseColor;
 
-    let color = f_diffuse * 2.0 
-        + f_specular * 2.0 
-        + ambient 
+    let color = f_diffuse * 2.0
+        + f_specular * 2.0
+        + ambient
         + pbr_material.emissive_metallic.rgb;
-      fragmentOutputs.color = vec4<f32>(color, 1.0);
-      fragmentOutputs.fragDepth = fragmentInputs.position.z;
+    fragmentOutputs.color = vec4<f32>(color, 1.0);
+    fragmentOutputs.fragDepth = fragmentInputs.position.z;
     //return vec4<f32>(color, 1.0);
 }
 /// END FRAGMENT
