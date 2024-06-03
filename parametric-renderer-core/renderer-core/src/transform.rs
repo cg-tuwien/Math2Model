@@ -1,5 +1,6 @@
 use glamour::{Matrix4, Point3, Vector3};
 
+#[derive(Debug, Clone)]
 pub struct Transform {
     pub position: Point3,
     pub rotation: glam::Quat,

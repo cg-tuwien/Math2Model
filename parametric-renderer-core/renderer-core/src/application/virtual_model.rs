@@ -223,7 +223,7 @@ impl RenderStep {
         let material_buffer = TypedBuffer::new_uniform(
             &context.device,
             "Material Buffer",
-            &MaterialInfo::default().to_shader(),
+            &MaterialInfo::missing().to_shader(),
             wgpu::BufferUsages::COPY_DST,
         )?;
 
@@ -262,6 +262,7 @@ pub struct VirtualModel {
     pub material_info: MaterialInfo,
 }
 
+#[derive(Debug, Clone)]
 pub struct MaterialInfo {
     pub color: Vector3<f32>,
     pub emissive: Vector3<f32>,
@@ -287,13 +288,22 @@ impl MaterialInfo {
             .to_raw(),
         }
     }
-}
-impl Default for MaterialInfo {
-    fn default() -> Self {
+
+    fn missing() -> Self {
         Self {
             color: Vector3::new(1.0, 0.0, 1.0),
             emissive: Vector3::new(1.0, 0.0, 1.0),
             roughness: 0.7,
+            metallic: 0.0,
+        }
+    }
+}
+impl Default for MaterialInfo {
+    fn default() -> Self {
+        Self {
+            color: Vector3::new(0.0, 0.0, 0.0),
+            emissive: Vector3::new(0.0, 0.0, 0.0),
+            roughness: 0.0,
             metallic: 0.0,
         }
     }

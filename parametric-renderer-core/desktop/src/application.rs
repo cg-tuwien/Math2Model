@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
-use glamour::Point3;
+use glamour::{Point3, Vector3};
 use pollster::FutureExt;
 use renderer_core::{
-    application::{CpuApplication, ProfilerSettings},
+    application::{CpuApplication, MaterialInfo, ModelInfo, ProfilerSettings},
     camera::camera_controller::{self, CameraController, IsCameraController},
     input::{InputHandler, WindowInputs, WinitAppHelper},
+    transform::Transform,
 };
 use tracing::{error, info, warn};
 use winit::{application::ApplicationHandler, dpi::PhysicalSize, window::Window};
@@ -38,11 +39,26 @@ impl Drop for Application {
 
 impl Application {
     const CACHE_FILE: &'static str = "cache.json";
+    const DEFAULT_SHADER_CODE: &'static str = include_str!("../../shaders/HeartSphere.wgsl");
     pub fn new() -> anyhow::Result<Self> {
         let cache_file = CacheFile::from_file(Application::CACHE_FILE).unwrap_or_default();
 
         let mut app = CpuApplication::new()?;
         app.set_profiling(ProfilerSettings { gpu: true });
+        app.update_models(vec![ModelInfo {
+            label: "Default Model".to_owned(),
+            transform: Transform {
+                position: Point3::new(0.0, 1.0, 0.0),
+                ..Default::default()
+            },
+            material_info: MaterialInfo {
+                color: Vector3::new(0.6, 1.0, 1.0),
+                emissive: Vector3::new(0.0, 0.0, 0.0),
+                roughness: 0.7,
+                metallic: 0.1,
+            },
+            evaluate_image_code: Application::DEFAULT_SHADER_CODE.to_owned(),
+        }]);
 
         if let Some(CachedCamera {
             position,

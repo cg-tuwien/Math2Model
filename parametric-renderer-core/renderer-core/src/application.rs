@@ -6,9 +6,10 @@ mod wgpu_context;
 use std::sync::Arc;
 
 use frame_counter::{FrameCounter, FrameTime, Seconds};
-use glamour::{Point3, ToRaw, Vector2, Vector3};
+use glamour::{Point3, ToRaw, Vector2};
 use scene::SceneData;
-use virtual_model::{MaterialInfo, VirtualModel};
+pub use virtual_model::MaterialInfo;
+use virtual_model::VirtualModel;
 use wgpu_context::WgpuContext;
 use wgpu_profiler::GpuProfilerSettings;
 use winit::{dpi::PhysicalPosition, window::Window};
@@ -25,6 +26,7 @@ use crate::{
     mesh::Mesh,
     shaders::{compute_patches, copy_patches, shader},
     texture::Texture,
+    transform::Transform,
 };
 
 #[derive(Debug, Clone, Default)]
@@ -32,9 +34,17 @@ pub struct ProfilerSettings {
     pub gpu: bool,
 }
 
+pub struct ModelInfo {
+    pub label: String,
+    pub transform: Transform,
+    pub material_info: MaterialInfo,
+    pub evaluate_image_code: String,
+}
+
 pub struct CpuApplication {
     pub gpu: Option<GpuApplication>,
     pub camera_controller: CameraController,
+    models: Vec<ModelInfo>,
     last_update_instant: Option<std::time::Instant>,
     frame_counter: FrameCounter,
     camera: Camera,
@@ -64,6 +74,7 @@ impl CpuApplication {
             gpu: None,
             camera,
             camera_controller,
+            models: vec![],
             last_update_instant: None,
             frame_counter: FrameCounter::new(),
             mouse: Vector2::ZERO,
@@ -96,7 +107,8 @@ impl CpuApplication {
         let size = window.inner_size();
         self.camera
             .update_size(Vector2::new(size.width, size.height));
-        let gpu = GpuApplication::new(window, &self.camera, &self.profiler_settings).await?;
+        let gpu = GpuApplication::new(window, &self.camera, &self.models, &self.profiler_settings)
+            .await?;
         self.gpu = Some(gpu);
         self.set_profiling(self.profiler_settings.clone());
         Ok(())
@@ -109,6 +121,19 @@ impl CpuApplication {
                 self.camera
                     .update_size(Vector2::new(new_size.width, new_size.height));
             }
+        }
+    }
+
+    pub fn update_models(&mut self, models: Vec<ModelInfo>) {
+        self.models = models;
+        if let Some(gpu) = &mut self.gpu {
+            update_virtual_models(
+                &mut gpu.virtual_models,
+                &self.models,
+                &gpu.context,
+                &gpu.meshes,
+            )
+            .unwrap();
         }
     }
 
@@ -194,12 +219,13 @@ pub struct GpuApplication {
 }
 
 const PATCH_SIZES: [u32; 5] = [2, 4, 8, 16, 32];
-const MAX_PATCH_COUNT: u32 = 10_0000;
+const MAX_PATCH_COUNT: u32 = 100_000;
 
 impl GpuApplication {
     pub async fn new(
         window: Arc<Window>,
         camera: &Camera,
+        models: &[ModelInfo],
         profiler_settings: &ProfilerSettings,
     ) -> anyhow::Result<Self> {
         let context = WgpuContext::new(window, profiler_settings).await?;
@@ -214,21 +240,8 @@ impl GpuApplication {
             .collect::<Vec<_>>();
         assert!(meshes.len() == PATCH_SIZES.len());
 
-        let mut virtual_models = vec![VirtualModel::new(
-            Some("Default Model".to_owned()),
-            &context,
-            &meshes,
-        )?];
-
-        for model in virtual_models.iter_mut() {
-            model.transform.position = Point3::new(0.0, 1.0, 0.0);
-            model.material_info = MaterialInfo {
-                color: Vector3::new(0.6, 1.0, 1.0),
-                emissive: Vector3::new(0.0, 0.0, 0.0),
-                roughness: 0.7,
-                metallic: 0.1,
-            };
-        }
+        let mut virtual_models = vec![];
+        update_virtual_models(&mut virtual_models, models, &context, &meshes)?;
 
         let max_patch_count = MAX_PATCH_COUNT;
         let render_buffer_initial = compute_patches::RenderBuffer {
@@ -568,6 +581,25 @@ impl GpuApplication {
     }
 }
 
+fn update_virtual_models(
+    virtual_models: &mut Vec<VirtualModel>,
+    models: &[ModelInfo],
+    context: &WgpuContext,
+    meshes: &[Mesh],
+) -> anyhow::Result<()> {
+    // Throwing away and recreating all models is a bit wasteful, but it's fine for now
+    *virtual_models = models
+        .iter()
+        .map(|model| -> Result<VirtualModel, anyhow::Error> {
+            let mut virtual_model = VirtualModel::new(Some(model.label.clone()), context, meshes)?;
+            virtual_model.transform = model.transform.clone();
+            virtual_model.material_info = model.material_info.clone();
+            virtual_model.update_code(context, Some(model.evaluate_image_code.as_str()));
+            Ok(virtual_model)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(())
+}
 pub struct RenderData<'a> {
     camera: &'a Camera,
     time_data: shader::Time,
