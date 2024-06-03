@@ -1,7 +1,9 @@
 use std::sync::{Arc, Mutex};
 
+use glamour::Point3;
 use renderer_core::{
     application::{CpuApplication, GpuApplication, ModelInfo},
+    camera::camera_controller::{self, CameraController},
     input::{InputHandler, WindowInputs, WinitAppHelper},
 };
 use serde::{Deserialize, Serialize};
@@ -23,8 +25,16 @@ impl Application {
 
     pub fn new(canvas: HtmlCanvasElement) -> anyhow::Result<Self> {
         let mut app = CpuApplication::new()?;
-        app.camera_controller
-            .switch_to(renderer_core::camera::camera_controller::ChosenKind::Orbitcam);
+        app.camera_controller = CameraController::new(
+            camera_controller::GeneralController {
+                position: Point3::new(0.0, 0.0, 4.0),
+                orientation: glam::Quat::IDENTITY,
+                distance_to_center: 4.0,
+            },
+            app.camera_controller.settings,
+            camera_controller::ChosenKind::Orbitcam,
+        );
+
         app.update_models(vec![ModelInfo {
             label: "Default Model".to_owned(),
             transform: renderer_core::transform::Transform {

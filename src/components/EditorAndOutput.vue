@@ -118,7 +118,7 @@ try {
             scale: v.scale,
           },
           material_info: {
-            color: [1, 0.5, 0.2],
+            color: [0.1, 0.5, 0.2],
             emissive: [0, 0, 0],
             roughness: 0.5,
             metallic: 0.5,
