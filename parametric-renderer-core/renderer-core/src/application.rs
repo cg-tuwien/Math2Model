@@ -10,6 +10,7 @@ use glamour::{Point3, ToRaw, Vector2};
 use scene::SceneData;
 pub use virtual_model::MaterialInfo;
 use virtual_model::VirtualModel;
+use web_time::Instant;
 use wgpu_context::WgpuContext;
 use wgpu_profiler::GpuProfilerSettings;
 use winit::{dpi::PhysicalPosition, window::Window};
@@ -34,6 +35,7 @@ pub struct ProfilerSettings {
     pub gpu: bool,
 }
 
+#[derive(Debug, Clone)]
 pub struct ModelInfo {
     pub label: String,
     pub transform: Transform,
@@ -45,7 +47,7 @@ pub struct CpuApplication {
     pub gpu: Option<GpuApplication>,
     pub camera_controller: CameraController,
     models: Vec<ModelInfo>,
-    last_update_instant: Option<std::time::Instant>,
+    last_update_instant: Option<Instant>,
     frame_counter: FrameCounter,
     camera: Camera,
     mouse: Vector2<f32>,
@@ -104,14 +106,31 @@ impl CpuApplication {
         if self.gpu.is_some() {
             return Ok(());
         }
+        let gpu = self.start_create_gpu(window).create_surface().await?;
+        self.set_gpu(gpu);
+        Ok(())
+    }
+
+    pub fn start_create_gpu(&mut self, window: Arc<Window>) -> GpuApplicationBuilder {
         let size = window.inner_size();
         self.camera
             .update_size(Vector2::new(size.width, size.height));
-        let gpu = GpuApplication::new(window, &self.camera, &self.models, &self.profiler_settings)
-            .await?;
-        self.gpu = Some(gpu);
+
+        GpuApplicationBuilder {
+            camera: self.camera.clone(),
+            models: self.models.clone(),
+            profiler_settings: self.profiler_settings.clone(),
+            window,
+        }
+    }
+
+    pub fn set_gpu(&mut self, gpu_application: GpuApplication) {
+        let size = gpu_application.size();
+        self.gpu = Some(gpu_application);
         self.set_profiling(self.profiler_settings.clone());
-        Ok(())
+        self.resize(size);
+        let models = std::mem::take(&mut self.models);
+        self.update_models(models);
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -138,7 +157,7 @@ impl CpuApplication {
     }
 
     pub fn update(&mut self, inputs: &WindowInputs) {
-        let now = std::time::Instant::now();
+        let now = Instant::now();
         if let Some(last_update_instant) = self.last_update_instant {
             let delta = Seconds((now - last_update_instant).as_secs_f32());
             let cursor_capture = self.camera_controller.update(inputs, delta.0);
@@ -198,6 +217,25 @@ struct ComputePatchesStep {
 }
 struct CopyPatchesStep {
     pipeline: wgpu::ComputePipeline,
+}
+
+pub struct GpuApplicationBuilder {
+    pub camera: Camera,
+    pub models: Vec<ModelInfo>,
+    pub profiler_settings: ProfilerSettings,
+    pub window: Arc<Window>,
+}
+
+impl GpuApplicationBuilder {
+    pub async fn create_surface(self) -> anyhow::Result<GpuApplication> {
+        GpuApplication::new(
+            self.window,
+            &self.camera,
+            &self.models,
+            &self.profiler_settings,
+        )
+        .await
+    }
 }
 
 pub struct GpuApplication {
@@ -622,7 +660,7 @@ impl GpuApplication {
                     .set_cursor_grab(winit::window::CursorGrabMode::None)
                     .unwrap();
                 window.set_cursor_visible(true);
-                window.set_cursor_position(position).unwrap();
+                let _ = window.set_cursor_position(position);
                 self.cursor_capture = WindowCursorCapture::Free;
             }
             (WindowCursorCapture::Free, CursorCapture::Free) => {}

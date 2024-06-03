@@ -57,7 +57,7 @@ watch(
     } catch (e) {
       console.log("Could not deserialize scene file.");
     }
-  },
+  }
 );
 if (sceneFile !== null) {
   scene.api.value.fromSerialized(sceneFile);
@@ -82,18 +82,21 @@ watchEffect(() => {
   canvasContainer.value?.appendChild(props.canvas);
 });
 
-let stopRenderLoop = props.engine.startRenderLoop(renderLoop);
 function renderLoop() {
   baseScene.value.update();
   baseScene.value.render();
 }
-onUnmounted(() => {
-  stopRenderLoop.stop();
-});
-
+try {
+  let stopRenderLoop = props.engine.startRenderLoop(renderLoop, scene.state);
+  onUnmounted(() => {
+    stopRenderLoop.stop();
+  });
+} catch (e) {
+  showError("Could not start render loop", e);
+}
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
   const keyedCode = ref<KeyedCode | null>(
-    startFile !== null ? readFile(startFile) : null,
+    startFile !== null ? readFile(startFile) : null
   );
 
   function readFile(name: FilePath): KeyedCode | null {
@@ -197,7 +200,7 @@ function updateScene() {
   if (sceneContent === null) {
     showError(
       "Could not serialize scene",
-      new Error("Could not serialize scene"),
+      new Error("Could not serialize scene")
     );
   } else {
     props.files.writeFile(scenePath, sceneContent);
@@ -213,7 +216,7 @@ function addModel(name: string, shaderName: FilePath) {
   if (shaderName) {
     const vertexSource = shaderName;
     const fragmentSource = makeFilePath(
-      shaderName.replaceAll(".vert.wgsl", ".frag.wgsl"),
+      shaderName.replaceAll(".vert.wgsl", ".frag.wgsl")
     );
 
     if (!props.files.hasFile(vertexSource)) {
@@ -229,7 +232,7 @@ function addModel(name: string, shaderName: FilePath) {
     fn main(input : FragmentInputs) -> FragmentOutputs {
         fragmentOutputs.color = vec4<f32>(input.vUV,1.0, 1.0);
     }
-`,
+`
       );
     }
 
@@ -319,7 +322,7 @@ function removeModel(ids: string[]) {
                         .valueOf()
                         .substring(
                           0,
-                          fileName.valueOf().length - '.vert.wgsl'.length,
+                          fileName.valueOf().length - '.vert.wgsl'.length
                         ),
                       value: fileName,
                     };

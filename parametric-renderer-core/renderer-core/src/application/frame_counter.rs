@@ -1,3 +1,5 @@
+use web_time::Instant;
+
 #[derive(Debug, Clone, Copy)]
 pub struct Seconds(pub f32);
 
@@ -9,8 +11,8 @@ pub struct FrameTime {
 
 pub struct FrameCounter {
     pub frame: u64,
-    pub first_render_instant: Option<std::time::Instant>,
-    pub render_instant: Option<std::time::Instant>,
+    pub first_render_instant: Option<Instant>,
+    pub render_instant: Option<Instant>,
 }
 impl FrameCounter {
     pub fn new() -> Self {
@@ -23,7 +25,7 @@ impl FrameCounter {
 
     pub fn new_frame(&mut self) -> FrameTime {
         let frame = self.frame;
-        let now = std::time::Instant::now();
+        let now = Instant::now();
         let first_render_instant = *self.first_render_instant.get_or_insert(now);
         let previous_render_instant = *self.render_instant.get_or_insert(now);
         let delta = Seconds((now - previous_render_instant).as_secs_f32());

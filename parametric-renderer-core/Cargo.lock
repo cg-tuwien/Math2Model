@@ -448,7 +448,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b28bfe653d79bd16c77f659305b195b82bb5ce0c0eb2a4846b82ddbd77586813"
 dependencies = [
  "bitflags 2.5.0",
- "libloading 0.7.4",
+ "libloading 0.8.3",
  "winapi",
 ]
 
@@ -1451,6 +1451,7 @@ dependencies = [
  "glamour",
  "thiserror",
  "tracing",
+ "web-time",
  "wgpu",
  "wgpu-profiler",
  "wgsl_to_wgpu",
@@ -1523,6 +1524,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "226b61a0d411b2ba5ff6d7f73a476ac4f8bb900373459cd00fab8512828ba395"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde-wasm-bindgen"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3b4c031cd0d9014307d82b8abf653c0290fbdaeb4c02d00c63cf52f728628bf"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -2113,6 +2125,8 @@ dependencies = [
  "glam",
  "glamour",
  "renderer-core",
+ "serde",
+ "serde-wasm-bindgen",
  "time",
  "tracing",
  "tracing-subscriber",
@@ -2221,7 +2235,7 @@ dependencies = [
  "js-sys",
  "khronos-egl",
  "libc",
- "libloading 0.7.4",
+ "libloading 0.8.3",
  "log",
  "metal",
  "naga",

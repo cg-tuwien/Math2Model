@@ -1,7 +1,5 @@
 // This is the simplest design, where each virtual model has its own set of resources.
 
-use std::borrow::Borrow;
-
 use glamour::{Matrix4, ToRaw, Vector3, Vector4};
 
 use crate::{
