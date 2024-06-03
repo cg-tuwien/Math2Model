@@ -17,7 +17,20 @@
       ],
       "scale": 5.300000000000001,
       "parametricShader": "my-shader.vert.wgsl",
-      "fragmentShader": "my-shader.frag.wgsl"
+      "material": {
+        "color": [
+          1,
+          0,
+          0
+        ],
+        "roughness": 0.5,
+        "metallic": 0.5,
+        "emissive": [
+          0,
+          0,
+          0
+        ]
+      }
     },
     {
       "type": "model",
@@ -35,7 +48,20 @@
       ],
       "scale": 5,
       "parametricShader": "spherehog-shader.vert.wgsl",
-      "fragmentShader": "spherehog-shader.frag.wgsl"
+      "material": {
+        "color": [
+          1,
+          0,
+          0
+        ],
+        "roughness": 0.5,
+        "metallic": 0.5,
+        "emissive": [
+          0,
+          0,
+          0
+        ]
+      }
     },
     {
       "type": "model",
@@ -53,7 +79,20 @@
       ],
       "scale": 2,
       "parametricShader": "seashell-shader.vert.wgsl",
-      "fragmentShader": "seashell-shader.frag.wgsl"
+      "material": {
+        "color": [
+          1,
+          0,
+          0
+        ],
+        "roughness": 0.5,
+        "metallic": 0.5,
+        "emissive": [
+          0,
+          0,
+          0
+        ]
+      }
     },
     {
       "type": "model",
@@ -71,7 +110,20 @@
       ],
       "scale": 1,
       "parametricShader": "palm-tree-shader.vert.wgsl",
-      "fragmentShader": "palm-tree-shader.frag.wgsl"
+      "material": {
+        "color": [
+          1,
+          0,
+          0
+        ],
+        "roughness": 0.5,
+        "metallic": 0.5,
+        "emissive": [
+          0,
+          0,
+          0
+        ]
+      }
     },
     {
       "type": "model",
@@ -89,7 +141,20 @@
       ],
       "scale": 1,
       "parametricShader": "palm-tree-trunk-shader.vert.wgsl",
-      "fragmentShader": "palm-tree-trunk-shader.frag.wgsl"
+      "material": {
+        "color": [
+          1,
+          0,
+          0
+        ],
+        "roughness": 0.5,
+        "metallic": 0.5,
+        "emissive": [
+          0,
+          0,
+          0
+        ]
+      }
     }
   ]
 }
