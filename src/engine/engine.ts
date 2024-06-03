@@ -1,12 +1,6 @@
-import type { VirtualSceneState } from "@/scenes/VirtualScene";
-import type { ComputedRef } from "vue";
-
 export interface Engine {
   createBaseScene(): BaseScene;
-  startRenderLoop(
-    value: () => void,
-    scene: ComputedRef<VirtualSceneState>
-  ): {
+  startRenderLoop(value: () => void): {
     stop: () => void;
   };
 }
@@ -16,4 +10,5 @@ export interface BaseScene {
   [Symbol.dispose](): void;
 
   asBabylon(): any | null;
+  asWgpu(): any | null;
 }

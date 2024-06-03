@@ -115,6 +115,10 @@ export class BabylonBaseScene extends Scene implements BaseScene {
     globalThis.addEventListener("beforeunload", () => writeCache());
   }
 
+  asWgpu() {
+    return null;
+  }
+
   update() {
     this._currentTime = performance.now();
     this._frame++;

@@ -60,7 +60,7 @@ impl OrbitcamController {
         }
 
         self.logarithmic_distance.0 +=
-            (input.mouse.scroll_delta.y as f32) * settings.fly_speed * delta_time;
+            -1.0 * (input.mouse.scroll_delta.y as f32) * 0.1 * delta_time;
 
         cursor_capture
     }

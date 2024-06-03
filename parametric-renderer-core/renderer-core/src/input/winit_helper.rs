@@ -56,7 +56,7 @@ where
         let window_helper = self
             .windows
             .entry(window_id)
-            .or_insert_with(|| WindowInputCollector::new());
+            .or_insert_with(WindowInputCollector::new);
         window_helper.handle_window_event(&event);
         if matches!(event, WindowEvent::RedrawRequested) {
             let update = window_helper.step();

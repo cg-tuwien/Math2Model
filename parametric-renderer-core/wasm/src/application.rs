@@ -19,8 +19,26 @@ pub struct Application {
 }
 
 impl Application {
+    const DEFAULT_SHADER_CODE: &'static str = include_str!("../../shaders/HeartSphere.wgsl");
+
     pub fn new(canvas: HtmlCanvasElement) -> anyhow::Result<Self> {
-        let app = CpuApplication::new()?;
+        let mut app = CpuApplication::new()?;
+        app.camera_controller
+            .switch_to(renderer_core::camera::camera_controller::ChosenKind::Orbitcam);
+        app.update_models(vec![ModelInfo {
+            label: "Default Model".to_owned(),
+            transform: renderer_core::transform::Transform {
+                position: glamour::Point3::new(0.0, 1.0, 0.0),
+                ..Default::default()
+            },
+            material_info: renderer_core::application::MaterialInfo {
+                color: glamour::Vector3::new(0.6, 1.0, 1.0),
+                emissive: glamour::Vector3::new(0.0, 0.0, 0.0),
+                roughness: 0.7,
+                metallic: 0.1,
+            },
+            evaluate_image_code: Application::DEFAULT_SHADER_CODE.to_owned(),
+        }]);
         Ok(Self {
             window: None,
             app,
@@ -202,6 +220,7 @@ impl InputHandler for Application {
         match self.render() {
             Ok(_) => (),
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                warn!("Lost or outdated surface");
                 if let Some(gpu) = &mut self.app.gpu {
                     let _ = gpu.resize(gpu.size());
                 }

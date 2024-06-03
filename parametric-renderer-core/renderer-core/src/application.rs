@@ -118,14 +118,13 @@ impl CpuApplication {
 
         GpuApplicationBuilder {
             camera: self.camera.clone(),
-            models: self.models.clone(),
             profiler_settings: self.profiler_settings.clone(),
             window,
         }
     }
 
     pub fn set_gpu(&mut self, gpu_application: GpuApplication) {
-        let size = gpu_application.size();
+        let size = gpu_application.context.window.inner_size();
         self.gpu = Some(gpu_application);
         self.set_profiling(self.profiler_settings.clone());
         self.resize(size);
@@ -192,10 +191,12 @@ impl CpuApplication {
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let frame_time = self.frame_counter.new_frame();
         if let Some(mut gpu) = self.gpu.take() {
-            gpu.render(self.render_data(&frame_time))?;
+            let result = gpu.render(self.render_data(&frame_time));
             self.gpu = Some(gpu);
+            result
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
     pub fn get_profiling_data(&mut self) -> Option<Vec<wgpu_profiler::GpuTimerQueryResult>> {
@@ -221,20 +222,13 @@ struct CopyPatchesStep {
 
 pub struct GpuApplicationBuilder {
     pub camera: Camera,
-    pub models: Vec<ModelInfo>,
     pub profiler_settings: ProfilerSettings,
     pub window: Arc<Window>,
 }
 
 impl GpuApplicationBuilder {
     pub async fn create_surface(self) -> anyhow::Result<GpuApplication> {
-        GpuApplication::new(
-            self.window,
-            &self.camera,
-            &self.models,
-            &self.profiler_settings,
-        )
-        .await
+        GpuApplication::new(self.window, &self.camera, &self.profiler_settings).await
     }
 }
 
@@ -261,7 +255,6 @@ impl GpuApplication {
     pub async fn new(
         window: Arc<Window>,
         camera: &Camera,
-        models: &[ModelInfo],
         profiler_settings: &ProfilerSettings,
     ) -> anyhow::Result<Self> {
         let context = WgpuContext::new(window, profiler_settings).await?;
@@ -276,8 +269,7 @@ impl GpuApplication {
             .collect::<Vec<_>>();
         assert!(meshes.len() == PATCH_SIZES.len());
 
-        let mut virtual_models = vec![];
-        update_virtual_models(&mut virtual_models, models, &context, &meshes)?;
+        let virtual_models = vec![];
 
         let render_buffer_reset = compute_patches::RenderBuffer {
             patches_length: 0,
@@ -532,7 +524,7 @@ impl GpuApplication {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
+                            r: 0.1, // render_data.time_data.elapsed.sin().abs() as f64
                             g: 0.2,
                             b: 0.3,
                             a: 1.0,
@@ -624,10 +616,14 @@ fn update_virtual_models(
     *virtual_models = models
         .iter()
         .map(|model| -> Result<VirtualModel, anyhow::Error> {
-            let mut virtual_model = VirtualModel::new(Some(model.label.clone()), context, meshes)?;
+            let mut virtual_model = VirtualModel::new(
+                Some(model.label.clone()),
+                context,
+                meshes,
+                Some(model.evaluate_image_code.as_str()),
+            )?;
             virtual_model.transform = model.transform.clone();
             virtual_model.material_info = model.material_info.clone();
-            virtual_model.update_code(context, Some(model.evaluate_image_code.as_str()));
             Ok(virtual_model)
         })
         .collect::<Result<Vec<_>, _>>()?;

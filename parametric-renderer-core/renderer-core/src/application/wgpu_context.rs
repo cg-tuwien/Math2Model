@@ -59,7 +59,7 @@ impl WgpuContext {
         let surface_caps = surface.get_capabilities(&adapter);
         let surface_format = surface_caps
             .formats
-            .get(0)
+            .first()
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("No sRGB format surface found"))?;
         let view_format = if surface_format.is_srgb() {
@@ -71,6 +71,7 @@ impl WgpuContext {
         let config = wgpu::SurfaceConfiguration {
             format: surface_format,
             view_formats: vec![view_format],
+            present_mode: wgpu::PresentMode::AutoVsync,
             ..surface
                 .get_default_config(&adapter, size.width, size.height)
                 .ok_or_else(|| anyhow::anyhow!("No default surface config found"))?

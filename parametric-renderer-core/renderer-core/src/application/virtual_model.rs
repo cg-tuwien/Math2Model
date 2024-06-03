@@ -26,9 +26,13 @@ pub struct ComputePatchesStep {
 }
 
 impl ComputePatchesStep {
-    pub fn new(label: Option<&str>, device: &wgpu::Device) -> anyhow::Result<Self> {
-        let pipeline = create_compute_patches_pipeline(label, device, None);
-        let label = label.as_deref().unwrap_or_default();
+    pub fn new(
+        label: Option<&str>,
+        device: &wgpu::Device,
+        user_code: Option<&str>,
+    ) -> anyhow::Result<Self> {
+        let pipeline = create_compute_patches_pipeline(label, device, user_code);
+        let label = label.unwrap_or_default();
         let input_buffer = TypedBuffer::new_uniform(
             device,
             &format!("Input Buffer {}", label),
@@ -149,7 +153,7 @@ impl CopyPatchesStep {
         compute_patches: &ComputePatchesStep,
         meshes: &[crate::mesh::Mesh],
     ) -> anyhow::Result<Self> {
-        let label = label.as_deref().unwrap_or_default();
+        let label = label.unwrap_or_default();
 
         let indirect_draw_data = meshes
             .iter()
@@ -207,10 +211,11 @@ impl RenderStep {
         label: Option<&str>,
         context: &WgpuContext,
         compute_patches: &ComputePatchesStep,
+        user_code: Option<&str>,
     ) -> anyhow::Result<Self> {
-        let pipeline = create_render_pipeline(label, context, None);
+        let pipeline = create_render_pipeline(label, context, user_code);
 
-        let label = label.as_deref().unwrap_or_default();
+        let label = label.unwrap_or_default();
         let model_buffer = TypedBuffer::new_uniform(
             &context.device,
             &format!("Model Buffer {}", label),
@@ -314,15 +319,18 @@ impl VirtualModel {
         label: Option<String>,
         context: &WgpuContext,
         meshes: &[Mesh],
+        user_code: Option<&str>,
     ) -> anyhow::Result<Self> {
-        let compute_patches_step = ComputePatchesStep::new(label.as_deref(), &context.device)?;
+        let compute_patches_step =
+            ComputePatchesStep::new(label.as_deref(), &context.device, user_code)?;
         let copy_patches_step = CopyPatchesStep::new(
             label.as_deref(),
             &context.device,
             &compute_patches_step,
             meshes,
         )?;
-        let render_step = RenderStep::new(label.as_deref(), context, &compute_patches_step)?;
+        let render_step =
+            RenderStep::new(label.as_deref(), context, &compute_patches_step, user_code)?;
 
         Ok(Self {
             label,
@@ -342,14 +350,11 @@ impl VirtualModel {
         camera.projection_matrix() * camera.view_matrix() * self.transform.to_matrix()
     }
 
-    pub fn update_code(&mut self, context: &WgpuContext, evaluate_image_code: Option<&str>) {
-        self.compute_patches.pipeline = create_compute_patches_pipeline(
-            self.label.as_deref(),
-            &context.device,
-            evaluate_image_code,
-        );
+    pub fn update_code(&mut self, context: &WgpuContext, user_code: Option<&str>) {
+        self.compute_patches.pipeline =
+            create_compute_patches_pipeline(self.label.as_deref(), &context.device, user_code);
         self.render_step.pipeline =
-            create_render_pipeline(self.label.as_deref(), context, evaluate_image_code);
+            create_render_pipeline(self.label.as_deref(), context, user_code);
     }
 }
 
@@ -358,7 +363,7 @@ fn create_render_pipeline(
     context: &WgpuContext,
     evaluate_image_code: Option<&str>,
 ) -> wgpu::RenderPipeline {
-    let label = label.as_deref().unwrap_or_default();
+    let label = label.unwrap_or_default();
     let device = &context.device;
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some(&format!("Render Shader {}", label)),
@@ -413,8 +418,10 @@ fn create_compute_patches_pipeline(
     device: &wgpu::Device,
     evaluate_image_code: Option<&str>,
 ) -> [wgpu::ComputePipeline; 2] {
-    let label = label.as_deref().unwrap_or_default();
+    let label = label.unwrap_or_default();
     let source = replace_evaluate_image_code(compute_patches::SOURCE, evaluate_image_code);
+    let source_final =
+        replace_evaluate_image_code(compute_patches::SOURCE_FINAL, evaluate_image_code);
     [
         device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some(&format!("Compute Patches {}", label)),
@@ -431,7 +438,7 @@ fn create_compute_patches_pipeline(
             layout: Some(&compute_patches::create_pipeline_layout(device)),
             module: &device.create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: None,
-                source: wgpu::ShaderSource::Wgsl(source),
+                source: wgpu::ShaderSource::Wgsl(source_final),
             }),
             entry_point: compute_patches::ENTRY_MAIN,
             compilation_options: wgpu::PipelineCompilationOptions {
@@ -455,10 +462,10 @@ fn replace_evaluate_image_code<'a>(
         let end = source.find("//// END evaluateImage").unwrap();
 
         let mut result = String::with_capacity(
-            &source[..start].len() + evaluate_image_code.len() + &source[end..].len(),
+            source[..start].len() + evaluate_image_code.len() + source[end..].len(),
         );
         result.push_str(&source[..start]);
-        result.push_str(&evaluate_image_code);
+        result.push_str(evaluate_image_code);
         result.push_str(&source[end..]);
         std::borrow::Cow::Owned(result)
     } else {
