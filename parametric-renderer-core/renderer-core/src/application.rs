@@ -208,10 +208,8 @@ pub struct GpuApplication {
     compute_patches: ComputePatchesStep,
     copy_patches: CopyPatchesStep,
     render_step: RenderStep,
-    patches_buffer_starting_patch: compute_patches::Patches,
     patches_buffer_reset: TypedBuffer<compute_patches::Patches>,
     render_buffer_reset: compute_patches::RenderBuffer,
-    indirect_compute_buffer_starting_patch: compute_patches::DispatchIndirectArgs,
     indirect_compute_buffer_reset: TypedBuffer<compute_patches::DispatchIndirectArgs>,
     meshes: Vec<Mesh>,
     threshold_factor: f32, // TODO: Make this adjustable
@@ -243,13 +241,11 @@ impl GpuApplication {
         let mut virtual_models = vec![];
         update_virtual_models(&mut virtual_models, models, &context, &meshes)?;
 
-        let max_patch_count = MAX_PATCH_COUNT;
-        let render_buffer_initial = compute_patches::RenderBuffer {
+        let render_buffer_reset = compute_patches::RenderBuffer {
             patches_length: 0,
-            patches_capacity: max_patch_count,
+            patches_capacity: MAX_PATCH_COUNT,
             patches: vec![],
         };
-        let render_buffer_reset = render_buffer_initial;
 
         let depth_texture = Texture::create_depth_texture(device, &context.config, "Depth Texture");
 
@@ -264,22 +260,12 @@ impl GpuApplication {
             "Patches Buffer Reset",
             &compute_patches::Patches {
                 patches_length: 0,
-                patches_capacity: max_patch_count,
+                patches_capacity: MAX_PATCH_COUNT,
                 patches: vec![],
             },
             1,
             wgpu::BufferUsages::COPY_SRC,
         )?;
-
-        let patches_buffer_starting_patch = compute_patches::Patches {
-            patches_length: 1,
-            patches_capacity: max_patch_count,
-            patches: vec![compute_patches::EncodedPatch {
-                // Just the leading 1 bit
-                u: 1,
-                v: 1,
-            }],
-        };
 
         let indirect_compute_buffer_reset = TypedBuffer::new_storage(
             device,
@@ -287,8 +273,6 @@ impl GpuApplication {
             &compute_patches::DispatchIndirectArgs { x: 0, y: 1, z: 1 },
             wgpu::BufferUsages::COPY_SRC,
         )?;
-        let indirect_compute_buffer_starting_patch =
-            compute_patches::DispatchIndirectArgs { x: 1, y: 1, z: 1 };
 
         let compute_patches = ComputePatchesStep {
             bind_group_0: compute_patches::bind_groups::BindGroup0::from_bindings(
@@ -313,12 +297,10 @@ impl GpuApplication {
 
         Ok(Self {
             context,
-            indirect_compute_buffer_starting_patch,
             indirect_compute_buffer_reset,
             render_step,
             compute_patches,
             copy_patches,
-            patches_buffer_starting_patch,
             patches_buffer_reset,
             render_buffer_reset,
             depth_texture,
@@ -381,10 +363,24 @@ impl GpuApplication {
                 )
                 .unwrap();
             model.compute_patches.patches_buffer[0]
-                .write_buffer(queue, &self.patches_buffer_starting_patch)
+                .write_buffer(
+                    queue,
+                    &compute_patches::Patches {
+                        patches_length: 1,
+                        patches_capacity: MAX_PATCH_COUNT,
+                        patches: vec![compute_patches::EncodedPatch {
+                            // Just the leading 1 bit
+                            u: 1,
+                            v: 1,
+                        }],
+                    },
+                )
                 .unwrap();
             model.compute_patches.indirect_compute_buffer[0]
-                .write_buffer(queue, &self.indirect_compute_buffer_starting_patch)
+                .write_buffer(
+                    queue,
+                    &compute_patches::DispatchIndirectArgs { x: 1, y: 1, z: 1 },
+                )
                 .unwrap();
 
             for render_buffer in model.compute_patches.render_buffer.iter() {
@@ -457,11 +453,10 @@ impl GpuApplication {
                     model.compute_patches.indirect_compute_buffer[0]
                         .copy_all_from(&self.indirect_compute_buffer_reset, &mut commands);
 
-                    let mut compute_pass =
-                        commands.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                            label: Some(&format!("Compute Patches To-From {i}")),
-                            timestamp_writes: None,
-                        });
+                    let mut compute_pass = commands.scoped_compute_pass(
+                        format!("Compute Patches To-From {i}"),
+                        &self.context.device,
+                    );
                     if is_last_round {
                         compute_pass.set_pipeline(&model.compute_patches.pipeline[1]);
                     } else {
