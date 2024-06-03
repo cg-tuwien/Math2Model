@@ -1,37 +1,9 @@
 use glam::{Vec2, Vec3};
-use glamour::{Matrix4, Point3, Vector3};
 use wgpu::util::DeviceExt;
 
 use crate::shaders::shader;
 
-pub struct Transform {
-    pub position: Point3,
-    pub rotation: glam::Quat,
-    pub scale: f32,
-}
-
-impl Transform {
-    pub fn to_matrix(&self) -> Matrix4<f32> {
-        Matrix4::from_scale_rotation_translation(
-            Vector3::new(self.scale, self.scale, self.scale),
-            self.rotation,
-            self.position.to_vector(),
-        )
-    }
-}
-
-impl Default for Transform {
-    fn default() -> Self {
-        Self {
-            position: Point3::new(0.0, 0.0, 0.0),
-            rotation: glam::Quat::IDENTITY,
-            scale: 1.0,
-        }
-    }
-}
-
 pub struct Mesh {
-    pub transform: Transform,
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub num_indices: u32,
@@ -55,7 +27,6 @@ impl Mesh {
         });
 
         Self {
-            transform: Default::default(),
             vertex_buffer,
             index_buffer,
             num_indices: index_buffer_contents.len() as u32,
@@ -96,9 +67,5 @@ impl Mesh {
         }
 
         Mesh::with_contents(device, &vertices, &indices)
-    }
-
-    pub fn get_model_matrix(&self) -> Matrix4<f32> {
-        self.transform.to_matrix()
     }
 }
