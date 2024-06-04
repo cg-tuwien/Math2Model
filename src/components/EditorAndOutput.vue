@@ -77,14 +77,55 @@ watchEffect(() => {
   canvasContainer.value?.appendChild(props.canvas);
 });
 
-let stopRenderLoop = props.engine.startRenderLoop(renderLoop);
 function renderLoop() {
   baseScene.value.update();
   baseScene.value.render();
 }
-onUnmounted(() => {
-  stopRenderLoop.stop();
-});
+try {
+  let stopRenderLoop = props.engine.startRenderLoop(renderLoop);
+  onUnmounted(() => {
+    stopRenderLoop.stop();
+  });
+} catch (e) {
+  showError("Could not start render loop", e);
+}
+{
+  let wgpuScene = baseScene.value.asWgpu();
+  if (wgpuScene !== null) {
+    watchEffect(() => {
+      let models = scene.state.value.models.map((v) => {
+        let code = `fn evaluateImage(input2: vec2f) -> vec3f { return vec3(input2, 0.0); }`;
+        const vertexSourceId = props.files.fileNames.value.get(
+          v.code.vertexFile
+        );
+        if (vertexSourceId !== undefined) {
+          const vertexSource = props.files.readFile(v.code.vertexFile);
+          if (vertexSource !== null) {
+            code = vertexSource;
+          }
+        }
+
+        let model = {
+          label: v.name,
+          transform: {
+            position: [v.position.x, v.position.y, v.position.z],
+            rotation: [v.rotation.x, v.rotation.y, v.rotation.z],
+            scale: v.scale,
+          },
+          material_info: {
+            color: [0.1, 0.5, 0.2],
+            emissive: [0, 0, 0],
+            roughness: 0.5,
+            metallic: 0.5,
+          },
+          evaluate_image_code: code,
+        };
+        return model;
+      });
+      wgpuScene.updateModels(models);
+    });
+  }
+}
 
 const shadersDropdown = computed<SelectMixedOption[]>(() => {
   return [...props.files.fileNames.value.keys()]

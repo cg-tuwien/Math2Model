@@ -1,20 +1,30 @@
 use glam::Quat;
 use glamour::{Angle, Point3, Vector2, Vector3};
 use winit::event::MouseButton;
-use winit_input_helper::WinitInputHelper;
+
+use crate::{application::CursorCapture, input::WindowInputs};
 
 use super::{
-    camera_controller::{
-        CursorCapture, GeneralController, GeneralControllerSettings, IsCameraController,
-    },
+    camera_controller::{GeneralController, GeneralControllerSettings, IsCameraController},
     Camera,
 };
+
+struct LogarithmicDistance(f32);
+impl LogarithmicDistance {
+    fn new(distance: f32) -> Self {
+        Self(distance.ln())
+    }
+
+    fn distance(&self) -> f32 {
+        self.0.exp()
+    }
+}
 
 pub struct OrbitcamController {
     pub center: Point3,
     pub pitch: Angle,
     pub yaw: Angle,
-    pub distance: f32,
+    logarithmic_distance: LogarithmicDistance,
 }
 
 impl OrbitcamController {
@@ -22,31 +32,36 @@ impl OrbitcamController {
         let center = controller.position
             + controller.orientation * (Camera::forward() * controller.distance_to_center);
 
-        let (pitch, yaw, _) = controller.orientation.to_euler(glam::EulerRot::XYZ);
+        let (yaw, pitch, _) = controller.orientation.to_euler(glam::EulerRot::YXZ);
 
         Self {
             center,
             pitch: Angle::from(pitch),
             yaw: Angle::from(yaw),
-            distance: controller.distance_to_center,
+            logarithmic_distance: LogarithmicDistance::new(controller.distance_to_center),
         }
     }
     pub fn update(
         &mut self,
-        input: &WinitInputHelper,
+        input: &WindowInputs,
         delta_time: f32,
         settings: &GeneralControllerSettings,
     ) -> CursorCapture {
         let mut cursor_capture = CursorCapture::Free;
-        if input.mouse_held(MouseButton::Right) {
-            self.update_orientation(Vector2::from(input.mouse_diff()), settings);
+        let mouse_delta = Vector2::new(input.mouse.motion.0 as f32, input.mouse.motion.1 as f32);
+        if input.mouse.pressed(MouseButton::Right) {
+            self.update_orientation(mouse_delta, settings);
             cursor_capture = CursorCapture::LockedAndHidden;
         }
 
-        if input.mouse_held(MouseButton::Middle) {
-            self.update_pan_position(Vector2::from(input.mouse_diff()), delta_time, settings);
+        if input.mouse.pressed(MouseButton::Middle) {
+            self.update_pan_position(mouse_delta, delta_time, settings);
             cursor_capture = CursorCapture::LockedAndHidden;
         }
+
+        self.logarithmic_distance.0 +=
+            -1.0 * (input.mouse.scroll_delta.y as f32) * 0.1 * delta_time;
+
         cursor_capture
     }
 
@@ -81,15 +96,24 @@ impl OrbitcamController {
 
 impl IsCameraController for OrbitcamController {
     fn position(&self) -> Point3 {
-        self.center + self.orientation() * Vector3::new(0.0, 0.0, self.distance)
+        self.center
+            + self.orientation() * Vector3::new(0.0, 0.0, self.logarithmic_distance.distance())
     }
 
     fn orientation(&self) -> Quat {
         Quat::from_euler(
-            glam::EulerRot::XYZ,
-            self.pitch.radians,
+            glam::EulerRot::YXZ,
             self.yaw.radians,
+            self.pitch.radians,
             0.0,
         )
+    }
+
+    fn general_controller(&self) -> GeneralController {
+        GeneralController {
+            position: self.position(),
+            orientation: self.orientation(),
+            distance_to_center: self.logarithmic_distance.distance(),
+        }
     }
 }

@@ -1,12 +1,11 @@
 use glam::Quat;
 use glamour::{Angle, Point3, Vector2, Vector3};
 use winit::{event::MouseButton, keyboard::KeyCode};
-use winit_input_helper::WinitInputHelper;
+
+use crate::{application::CursorCapture, input::WindowInputs};
 
 use super::{
-    camera_controller::{
-        CursorCapture, GeneralController, GeneralControllerSettings, IsCameraController,
-    },
+    camera_controller::{GeneralController, GeneralControllerSettings, IsCameraController},
     Camera,
 };
 
@@ -18,7 +17,7 @@ pub struct FreecamController {
 
 impl FreecamController {
     pub fn new(controller: GeneralController) -> Self {
-        let (pitch, yaw, _) = controller.orientation.to_euler(glam::EulerRot::XYZ);
+        let (yaw, pitch, _) = controller.orientation.to_euler(glam::EulerRot::YXZ);
 
         Self {
             position: controller.position,
@@ -28,19 +27,20 @@ impl FreecamController {
     }
     pub fn update(
         &mut self,
-        input: &WinitInputHelper,
+        input: &WindowInputs,
         delta_time: f32,
         settings: &GeneralControllerSettings,
     ) -> CursorCapture {
         let mut cursor_capture = CursorCapture::Free;
-        if input.mouse_held(MouseButton::Right) {
-            self.update_orientation(Vector2::from(input.mouse_diff()), settings);
+        let mouse_delta = Vector2::new(input.mouse.motion.0 as f32, input.mouse.motion.1 as f32);
+        if input.mouse.pressed(MouseButton::Right) {
+            self.update_orientation(mouse_delta, settings);
             cursor_capture = CursorCapture::LockedAndHidden;
         }
 
         self.update_position(input_to_direction(input), delta_time, settings);
-        if input.mouse_held(MouseButton::Middle) {
-            self.update_pan_position(Vector2::from(input.mouse_diff()), delta_time, settings);
+        if input.mouse.pressed(MouseButton::Middle) {
+            self.update_pan_position(mouse_delta, delta_time, settings);
             cursor_capture = CursorCapture::LockedAndHidden;
         }
         cursor_capture
@@ -89,6 +89,9 @@ impl FreecamController {
     }
 }
 
+// Magic number.
+const FREECAM_DISTANCE_TO_CENTER: f32 = 15.;
+
 impl IsCameraController for FreecamController {
     fn position(&self) -> Point3 {
         self.position
@@ -96,34 +99,44 @@ impl IsCameraController for FreecamController {
 
     fn orientation(&self) -> Quat {
         Quat::from_euler(
-            glam::EulerRot::XYZ,
-            self.pitch.radians,
+            glam::EulerRot::YXZ,
             self.yaw.radians,
+            self.pitch.radians,
             0.0,
         )
     }
+
+    fn general_controller(&self) -> GeneralController {
+        GeneralController {
+            position: self.position(),
+            orientation: self.orientation(),
+            distance_to_center: FREECAM_DISTANCE_TO_CENTER,
+        }
+    }
 }
 
-fn input_to_direction(input: &WinitInputHelper) -> Vector3 {
+fn input_to_direction(input: &WindowInputs) -> Vector3 {
     let mut direction = Vector3::ZERO;
-    if input.key_held(KeyCode::KeyW) {
+    if input.keyboard.pressed_physical(KeyCode::KeyW) {
         direction += Camera::forward();
     }
-    if input.key_held(KeyCode::KeyS) {
+    if input.keyboard.pressed_physical(KeyCode::KeyS) {
         direction -= Camera::forward();
     }
 
-    if input.key_held(KeyCode::KeyD) {
+    if input.keyboard.pressed_physical(KeyCode::KeyD) {
         direction += Camera::right();
     }
-    if input.key_held(KeyCode::KeyA) {
+    if input.keyboard.pressed_physical(KeyCode::KeyA) {
         direction -= Camera::right();
     }
 
-    if input.key_held(KeyCode::Space) {
+    if input.keyboard.pressed_physical(KeyCode::Space) {
         direction += Camera::up();
     }
-    if input.key_held(KeyCode::ShiftLeft) || input.key_held(KeyCode::ShiftRight) {
+    if input.keyboard.pressed_physical(KeyCode::ShiftLeft)
+        || input.keyboard.pressed_physical(KeyCode::ShiftRight)
+    {
         direction -= Camera::up();
     }
     direction

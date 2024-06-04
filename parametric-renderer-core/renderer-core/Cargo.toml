@@ -12,10 +12,11 @@ glam = { workspace = true }
 glamour = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+web-time = "1.1.0"
 wgpu = { workspace = true }
-winit = { workspace = true }
-winit_input_helper = { workspace = true }
 wgpu-profiler = "0.17.0"
+# wgsl-parser = "0.5.0"
+winit = { workspace = true }
 
 [build-dependencies]
 wgsl_to_wgpu = "0.8.0"

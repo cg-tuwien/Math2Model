@@ -10,4 +10,5 @@ export interface BaseScene {
   [Symbol.dispose](): void;
 
   asBabylon(): any | null;
+  asWgpu(): any | null;
 }

@@ -5,10 +5,14 @@ use std::{
 
 use sha2::{Digest, Sha256};
 
-const AUTOGEN_PREFIX: &str = "// AUTOGEN";
-const AUTOGEN_SUFFIX: &str = "// END OF AUTOGEN";
+const AUTOGEN_PREFIX: &str = "//// AUTOGEN";
+const AUTOGEN_SUFFIX: &str = "//// END OF AUTOGEN";
 
 pub fn copy_includes(path: impl AsRef<Path>) -> std::io::Result<()> {
+    println!(
+        "Copying includes in file: {}",
+        path.as_ref().to_string_lossy()
+    );
     let contents = fs::read_to_string(path.as_ref())?;
     let includes = find_includes(path.as_ref().to_owned(), &contents);
 
@@ -126,7 +130,7 @@ fn try_parse_include(
     line: &str,
     line_number: usize,
 ) -> Option<IncludeStatement> {
-    const INCLUDE_PREFIX: &str = "//#include";
+    const INCLUDE_PREFIX: &str = "////#include";
     if !line.starts_with(INCLUDE_PREFIX) {
         return None;
     }

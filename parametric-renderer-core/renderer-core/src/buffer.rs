@@ -105,7 +105,7 @@ where
         })
     }
 
-    pub fn update(&self, queue: &wgpu::Queue, data: &T) -> Result<(), encase::internal::Error>
+    pub fn write_buffer(&self, queue: &wgpu::Queue, data: &T) -> Result<(), encase::internal::Error>
     where
         T: encase::ShaderType + encase::internal::WriteInto,
     {
@@ -118,11 +118,26 @@ where
         Ok(())
     }
 
+    pub fn copy_all_from(&self, other: &Self, commands: &mut wgpu::CommandEncoder) {
+        commands.copy_buffer_to_buffer(&other.buffer, 0, &self.buffer, 0, other.buffer.size());
+    }
+
     pub fn as_entire_buffer_binding(&self) -> wgpu::BufferBinding<'_> {
         self.buffer.as_entire_buffer_binding()
     }
 
     pub fn buffer(&self) -> &wgpu::Buffer {
+        &self.buffer
+    }
+}
+
+impl<T> std::ops::Deref for TypedBuffer<T>
+where
+    T: ?Sized,
+{
+    type Target = wgpu::Buffer;
+
+    fn deref(&self) -> &Self::Target {
         &self.buffer
     }
 }

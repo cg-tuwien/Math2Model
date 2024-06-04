@@ -477,7 +477,6 @@ dependencies = [
  "wgpu",
  "wgpu-profiler",
  "winit",
- "winit_input_helper",
 ]
 
 [[package]]
@@ -1452,11 +1451,11 @@ dependencies = [
  "glamour",
  "thiserror",
  "tracing",
+ "web-time",
  "wgpu",
  "wgpu-profiler",
  "wgsl_to_wgpu",
  "winit",
- "winit_input_helper",
 ]
 
 [[package]]
@@ -1525,6 +1524,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "226b61a0d411b2ba5ff6d7f73a476ac4f8bb900373459cd00fab8512828ba395"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde-wasm-bindgen"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3b4c031cd0d9014307d82b8abf653c0290fbdaeb4c02d00c63cf52f728628bf"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -2115,6 +2125,8 @@ dependencies = [
  "glam",
  "glamour",
  "renderer-core",
+ "serde",
+ "serde-wasm-bindgen",
  "time",
  "tracing",
  "tracing-subscriber",
@@ -2124,7 +2136,6 @@ dependencies = [
  "web-sys",
  "wgpu",
  "winit",
- "winit_input_helper",
 ]
 
 [[package]]
@@ -2593,15 +2604,6 @@ dependencies = [
  "x11-dl",
  "x11rb",
  "xkbcommon-dl",
-]
-
-[[package]]
-name = "winit_input_helper"
-version = "0.16.0"
-source = "git+https://github.com/stefnotch/winit_input_helper#6e76a79d01ce836c01b9cdeaa98846a6f0955dc4"
-dependencies = [
- "web-time",
- "winit",
 ]
 
 [[package]]

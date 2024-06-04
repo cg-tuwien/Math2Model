@@ -1,24 +1,27 @@
-use glamour::{Angle, Point3};
+use std::sync::Arc;
+
+use glamour::{Point3, Vector3};
 use pollster::FutureExt;
 use renderer_core::{
-    application::{CpuApplication, ProfilerSettings},
+    application::{CpuApplication, MaterialInfo, ModelInfo, ProfilerSettings},
     camera::camera_controller::{self, CameraController, IsCameraController},
+    input::{InputHandler, WindowInputs, WinitAppHelper},
+    transform::Transform,
 };
 use tracing::{error, info, warn};
-use winit::{application::ApplicationHandler, window::Window};
-use winit_input_helper::{WinitInputApp, WinitInputHelper, WinitInputUpdate};
+use winit::{application::ApplicationHandler, dpi::PhysicalSize, window::Window};
 
-use crate::config::{CacheFile, CachedCamera, CachedChosenController, ConfigFile};
+use crate::config::{CacheFile, CachedCamera, CachedChosenController};
 
 pub struct Application {
     app: CpuApplication,
-    config_file: ConfigFile,
+    window: Option<Arc<Window>>,
     cache_file: CacheFile,
 }
 
 impl Drop for Application {
     fn drop(&mut self) {
-        let controller = self.app.camera_controller.get_general_controller();
+        let controller = self.app.camera_controller.general_controller();
         self.cache_file.camera = Some(CachedCamera {
             position: controller.position.to_array(),
             orientation: controller.orientation.to_array(),
@@ -35,14 +38,27 @@ impl Drop for Application {
 }
 
 impl Application {
-    const CONFIG_FILE: &'static str = "config.json";
     const CACHE_FILE: &'static str = "cache.json";
+    const DEFAULT_SHADER_CODE: &'static str = include_str!("../../shaders/HeartSphere.wgsl");
     pub fn new() -> anyhow::Result<Self> {
-        let config_file = ConfigFile::from_file(Application::CONFIG_FILE).unwrap_or_default();
         let cache_file = CacheFile::from_file(Application::CACHE_FILE).unwrap_or_default();
 
         let mut app = CpuApplication::new()?;
         app.set_profiling(ProfilerSettings { gpu: true });
+        app.update_models(vec![ModelInfo {
+            label: "Default Model".to_owned(),
+            transform: Transform {
+                position: Point3::new(0.0, 1.0, 0.0),
+                ..Default::default()
+            },
+            material_info: MaterialInfo {
+                color: Vector3::new(0.6, 1.0, 1.0),
+                emissive: Vector3::new(0.0, 0.0, 0.0),
+                roughness: 0.7,
+                metallic: 0.1,
+            },
+            evaluate_image_code: Application::DEFAULT_SHADER_CODE.to_owned(),
+        }]);
 
         if let Some(CachedCamera {
             position,
@@ -66,13 +82,13 @@ impl Application {
         }
 
         Ok(Self {
+            window: None,
             app,
-            config_file,
             cache_file,
         })
     }
 
-    fn create_surface(&mut self, window: Window) {
+    fn create_surface(&mut self, window: Arc<Window>) {
         self.app.create_surface(window).block_on().unwrap();
     }
 
@@ -80,7 +96,7 @@ impl Application {
         self.app.resize(new_size);
     }
 
-    pub fn update(&mut self, inputs: &WinitInputHelper) {
+    pub fn update(&mut self, inputs: &WindowInputs) {
         self.app.update(inputs);
     }
 
@@ -91,19 +107,25 @@ impl Application {
 
 pub async fn run() -> anyhow::Result<()> {
     let event_loop = winit::event_loop::EventLoop::new()?;
-    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
     let application = Application::new()?;
-    event_loop.run_app(&mut WinitInputApp::new(application))?;
+    event_loop.run_app(&mut WinitAppHelper::new(application))?;
     Ok(())
 }
 
 impl ApplicationHandler<()> for Application {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let _ = self.create_surface(
+        if let Some(window) = &self.window {
+            window.request_redraw();
+            return;
+        }
+
+        let window = Arc::new(
             event_loop
                 .create_window(Window::default_attributes())
                 .unwrap(),
         );
+        self.window = Some(window.clone());
+        self.create_surface(window);
     }
 
     fn window_event(
@@ -114,10 +136,9 @@ impl ApplicationHandler<()> for Application {
     ) {
         match &event {
             winit::event::WindowEvent::RedrawRequested => {
-                // Shouldn't need anything here
-                match self.app.gpu {
-                    Some(ref mut gpu) => gpu.request_redraw(),
-                    None => {}
+                if let Some(window) = &self.window {
+                    window.request_redraw();
+                    return;
                 }
             }
             _ => {}
@@ -125,24 +146,23 @@ impl ApplicationHandler<()> for Application {
     }
 }
 
-impl WinitInputUpdate for Application {
-    fn update(
-        &mut self,
-        event_loop: &winit::event_loop::ActiveEventLoop,
-        input: &WinitInputHelper,
-    ) {
+impl InputHandler for Application {
+    fn update(&mut self, event_loop: &winit::event_loop::ActiveEventLoop, input: WindowInputs<'_>) {
         use winit::keyboard::{Key, NamedKey};
-
-        if input.key_released_logical(Key::Named(NamedKey::Escape))
-            || input.close_requested()
-            || input.destroyed()
+        if input
+            .keyboard
+            .just_released_logical(Key::Named(NamedKey::Escape))
+            || input.close_requested
         {
             info!("Stopping the application.");
             event_loop.exit();
             return;
         }
         // Press P to print profiling data
-        if input.key_pressed(winit::keyboard::KeyCode::KeyP) {
+        if input
+            .keyboard
+            .just_pressed_physical(winit::keyboard::KeyCode::KeyP)
+        {
             match self.app.get_profiling_data() {
                 Some(data) => {
                     let file_name = format!(
@@ -154,7 +174,7 @@ impl WinitInputUpdate for Application {
                             .as_millis()
                     );
                     wgpu_profiler::chrometrace::write_chrometrace(
-                        &std::path::Path::new(&file_name),
+                        std::path::Path::new(&file_name),
                         &data,
                     )
                     .unwrap();
@@ -166,14 +186,14 @@ impl WinitInputUpdate for Application {
             }
         }
 
-        self.app.delta_time = input.delta_time().unwrap_or_default().as_secs_f32();
-        if let Some((width, height)) = input.resolution() {
+        if let Some(PhysicalSize { width, height }) = input.new_size {
             self.resize(winit::dpi::PhysicalSize { width, height });
         }
-        self.update(input);
+        self.update(&input);
         match self.render() {
             Ok(_) => (),
-            Err(wgpu::SurfaceError::Lost) => {
+            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                // TODO: Window closing and opening is borked
                 if let Some(gpu) = &mut self.app.gpu {
                     let _ = gpu.resize(gpu.size());
                 }

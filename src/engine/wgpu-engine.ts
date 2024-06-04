@@ -1,4 +1,7 @@
-import init, { init_engine } from "../../parametric-renderer-core/pkg";
+import init, {
+  init_engine,
+  update_models,
+} from "../../parametric-renderer-core/pkg";
 import type { BaseScene, Engine } from "./engine";
 
 await init();
@@ -23,6 +26,11 @@ export class WgpuBaseScene implements BaseScene {
   render(): void {}
   asBabylon() {
     return null;
+  }
+  asWgpu() {
+    return {
+      updateModels: update_models,
+    };
   }
   [Symbol.dispose](): void {}
 }
