@@ -58,10 +58,15 @@ const data = ref<TreeNode>({
   children: [],
 });
 watchEffect(() => {
+  const oldChildrenMap = new Map(
+    data.value.children?.map((node) => [node.key, node])
+  );
   data.value.children = props.models.map(
     (model): TreeNode => ({
       label: model.name,
       key: model.id,
+      isExpanded: oldChildrenMap.get(model.id)?.isExpanded ?? undefined,
+      isSelected: oldChildrenMap.get(model.id)?.isSelected ?? undefined,
     })
   );
 });
