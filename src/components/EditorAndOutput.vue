@@ -111,10 +111,14 @@ try {
             scale: v.scale,
           },
           material_info: {
-            color: [0.1, 0.5, 0.2],
-            emissive: [0, 0, 0],
-            roughness: 0.5,
-            metallic: 0.5,
+            color: [v.material.color.x, v.material.color.y, v.material.color.z],
+            emissive: [
+              v.material.emissive.x,
+              v.material.emissive.y,
+              v.material.emissive.z,
+            ],
+            roughness: v.material.roughness,
+            metallic: v.material.metallic,
           },
           evaluate_image_code: code,
         };
