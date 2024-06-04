@@ -1,0 +1,160 @@
+{
+  "$schema": "http://virtual/scene-schema.json",
+  "models": [
+    {
+      "type": "model",
+      "id": "74278bc2-e0d7-4c1e-9d42-1a7f35aca5d0",
+      "name": "Parametrisches Herz",
+      "position": [
+        5,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 5.300000000000001,
+      "parametricShader": "heart.wgsl",
+      "material": {
+        "color": [
+          1,
+          0,
+          0
+        ],
+        "roughness": 0.5,
+        "metallic": 0.5,
+        "emissive": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "type": "model",
+      "id": "627684bf-d298-4841-b432-f4835e3ce617",
+      "name": "Parametrische Stachelkugel",
+      "position": [
+        -5,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 5,
+      "parametricShader": "spherehog.wgsl",
+      "material": {
+        "color": [
+          0.19999999999999998,
+          0.19999999999999973,
+          0.19999999999999996
+        ],
+        "roughness": 0.5,
+        "metallic": 0.9,
+        "emissive": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "type": "model",
+      "id": "9cacec06-3dd8-48a9-a2cd-67fe3a28b220",
+      "name": "Parametrische Muschel",
+      "position": [
+        5,
+        21.000000000000004,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 2,
+      "parametricShader": "seashell.wgsl",
+      "material": {
+        "color": [
+          0.5000000000000003,
+          0.30000000000000016,
+          0.3
+        ],
+        "roughness": 0.4000000000000001,
+        "metallic": 0,
+        "emissive": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "type": "model",
+      "id": "56c0c0c9-fde6-4ac1-8514-bbe6bb7c6d34",
+      "name": "Parametrische Palmenblätter",
+      "position": [
+        -5,
+        20,
+        0
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "scale": 1,
+      "parametricShader": "palm-tree.wgsl",
+      "material": {
+        "color": [
+          0.10000000000000009,
+          0.7999999999999999,
+          0
+        ],
+        "roughness": 0.9,
+        "metallic": 0,
+        "emissive": [
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "type": "model",
+      "id": "35fa63a2-500f-4c7c-bc95-373833406542",
+      "name": "Parametrischer Palmenstamm",
+      "position": [
+        -5,
+        20,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "parametricShader": "palm-tree-trunk.wgsl",
+      "material": {
+        "color": [
+          0.5,
+          0.20000000000000007,
+          0.19999999999999998
+        ],
+        "roughness": 0.5,
+        "metallic": 0,
+        "emissive": [
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ]
+}
