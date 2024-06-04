@@ -31,7 +31,7 @@ import VirtualModel from "@/components/VirtualModel.vue";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { serializeScene } from "@/filesystem/scene-file";
 import type { Engine } from "@/engine/engine";
-import HeartSphere from "../../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
+import HeartSphere from "@/shaders/HeartSphere.wgsl?raw";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 
 // Unchanging props! No need to watch them.

@@ -10,7 +10,7 @@ import {
   SceneFileSchemaUrl,
   deserializeScene,
 } from "./scene-file";
-import HeartSphere from "../../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
+import HeartSphere from "@/shaders/HeartSphere.wgsl?raw";
 import { assert } from "@stefnotch/typestef/assert";
 import { showError } from "@/notification";
 
