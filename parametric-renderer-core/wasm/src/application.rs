@@ -128,7 +128,7 @@ pub fn update_models(js_models: JsValue) {
                     transform: renderer_core::transform::Transform {
                         position: v.transform.position.into(),
                         rotation: glam::Quat::from_euler(
-                            glam::EulerRot::YXZ,
+                            glam::EulerRot::XYZ,
                             v.transform.rotation[0],
                             v.transform.rotation[1],
                             v.transform.rotation[2],
