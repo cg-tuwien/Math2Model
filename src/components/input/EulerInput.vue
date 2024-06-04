@@ -1,23 +1,22 @@
 <script setup lang="ts">
 import AngleInput from "./AngleInput.vue";
+import type { ObjectUpdate } from "./object-update";
 
 const props = defineProps<{
-  modelValue: [number, number, number];
+  value: [number, number, number];
 }>();
 const emit = defineEmits<{
-  "update:modelValue": [value: [number, number, number]];
+  update: [value: ObjectUpdate<number>];
 }>();
-function updateValue(newValue: number, index: number) {
-  const newValues = props.modelValue.slice() as [number, number, number];
-  newValues[index] = newValue;
-  emit("update:modelValue", newValues);
+function updateValue(newValue: ObjectUpdate<number>, index: number) {
+  emit("update", newValue.addPath(index));
 }
 </script>
 <template>
-  <template v-for="(value, index) in props.modelValue" :key="index">
+  <template v-for="(value, index) in props.value" :key="index">
     <AngleInput
-      :modelValue="value"
-      @update:modelValue="(newValue) => updateValue(newValue, index)"
+      :value="value"
+      @update="(newValue) => updateValue(newValue, index)"
     ></AngleInput>
   </template>
 </template>

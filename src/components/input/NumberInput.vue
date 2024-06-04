@@ -1,26 +1,33 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { ObjectUpdate } from "./object-update";
+import { useThrottleFn } from "@vueuse/core";
 
 const props = defineProps<{
-  modelValue: number;
+  value: number;
+  step?: number;
 }>();
 const emit = defineEmits<{
-  "update:modelValue": [value: number];
+  update: [value: ObjectUpdate<number>];
 }>();
 
-const sliding = ref<null | {
-  x: number;
-  y: number;
-}>(null);
+const speed = computed(() => (props.step ?? 1.0) / 10.0);
+
+const slidingX = ref(0);
+
+const emitSliding = useThrottleFn((value: number) => {
+  emit(
+    "update",
+    ObjectUpdate.sliding<number>([], () => value)
+  );
+}, 150);
 
 function round(value: number, decimals: number) {
   const factor = Math.pow(10, decimals);
   return Math.round(value * factor) / factor;
 }
 
-const showValue = computed(() =>
-  round(props.modelValue + (sliding.value?.x ?? 0), 4)
-);
+const showValue = computed(() => round(props.value + slidingX.value, 4));
 
 async function onPointerDown(event: PointerEvent) {
   const element = event.currentTarget;
@@ -29,10 +36,7 @@ async function onPointerDown(event: PointerEvent) {
     return;
   }
   await element?.requestPointerLock();
-  sliding.value = {
-    x: 0,
-    y: 0,
-  };
+  slidingX.value = 0;
 }
 function onPointerMove(event: PointerEvent) {
   const element = event.currentTarget;
@@ -41,12 +45,9 @@ function onPointerMove(event: PointerEvent) {
     return;
   }
   if (document.pointerLockElement !== element) return;
-  // Maybe this should be screen width dependent? Or screen dpi dependent?
-  const speed = 0.1;
-  sliding.value = {
-    x: (sliding.value?.x ?? 0) + event.movementX * speed,
-    y: (sliding.value?.y ?? 0) + event.movementY * speed,
-  };
+  slidingX.value = slidingX.value + event.movementX * speed.value;
+
+  emitSliding(props.value + slidingX.value);
 }
 function onPointerUp(event: PointerEvent) {
   const element = event.currentTarget;
@@ -55,8 +56,9 @@ function onPointerUp(event: PointerEvent) {
     return;
   }
   document.exitPointerLock();
-  emit("update:modelValue", props.modelValue + (sliding.value?.x ?? 0));
-  sliding.value = null;
+  const newValue = props.value + slidingX.value;
+  emit("update", new ObjectUpdate([], () => newValue));
+  slidingX.value = 0;
 }
 </script>
 <template>
@@ -64,7 +66,9 @@ function onPointerUp(event: PointerEvent) {
     <n-input-number
       type="number"
       :value="showValue"
-      @update:value="($event) => emit('update:modelValue', $event ?? 0)"
+      @update:value="
+        (newValue) => emit('update', new ObjectUpdate([], () => newValue ?? 0))
+      "
       :update-value-on-input="false"
       :show-button="false"
       size="small"

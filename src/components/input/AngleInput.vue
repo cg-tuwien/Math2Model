@@ -1,20 +1,16 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import NumberInput from "./NumberInput.vue";
+import { ObjectUpdate } from "./object-update";
 
 const props = defineProps<{
-  modelValue: number;
+  value: number;
 }>();
 const emit = defineEmits<{
-  "update:modelValue": [value: number];
+  update: [value: ObjectUpdate<number>];
 }>();
 
-const angleInDegrees = computed({
-  get: () => radToDeg(props.modelValue),
-  set: (value: number): void => {
-    emit("update:modelValue", degToRad(value));
-  },
-});
+const angleInDegrees = computed(() => radToDeg(props.value));
 
 function radToDeg(rad: number): number {
   const result = (rad * 180) / Math.PI;
@@ -24,7 +20,22 @@ function radToDeg(rad: number): number {
 function degToRad(deg: number): number {
   return (deg * Math.PI) / 180;
 }
+
+function emitValue(newValue: ObjectUpdate<number>) {
+  emit(
+    "update",
+    new ObjectUpdate<number>(
+      newValue.path,
+      (v) => degToRad(newValue.newValue(v)),
+      newValue.isSliding
+    )
+  );
+}
 </script>
 <template>
-  <NumberInput v-model:modelValue="angleInDegrees"></NumberInput>
+  <NumberInput
+    :value="angleInDegrees"
+    :step="1.0"
+    @update="(newValue) => emitValue(newValue)"
+  ></NumberInput>
 </template>

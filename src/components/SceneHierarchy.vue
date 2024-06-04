@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import {
+  ReadonlyEulerAngles,
+  ReadonlyVector3,
   type VirtualModelState,
-  type VirtualModelUpdate,
 } from "@/scenes/VirtualScene";
 import { computed, h, ref, watch, watchEffect, type DeepReadonly } from "vue";
 import { NButton, NInput } from "naive-ui";
@@ -20,9 +21,10 @@ import {
   type TreeNode,
   type TreeSelection,
 } from "./node-tree/NodeTreeHelper";
+import { ObjectUpdate, type ObjectPathPart } from "./input/object-update";
 
 const emit = defineEmits({
-  update(ids: string[], update: VirtualModelUpdate) {
+  update(ids: string[], update: ObjectUpdate) {
     return true;
   },
   addModel(modelName: string, shaderName: string) {
@@ -124,13 +126,42 @@ function renderLabel({ option }: { option: TreeNode }) {
   return h("span", option.label);
 }
 
-function change(value: VirtualModelUpdate) {
+type VirtualModelPath =
+  | keyof VirtualModelState
+  | [keyof VirtualModelState, ...ObjectPathPart[]];
+function change(path: VirtualModelPath, value: ObjectUpdate) {
   let keys = selectedKeys.value;
   if (selectedKeys.value.length === 0) {
     console.warn("No model selected");
     return;
   }
-  emit("update", keys, value);
+  emit("update", keys, value.addPath(path));
+}
+function vector3Update(
+  value: ObjectUpdate<number>
+): ObjectUpdate<ReadonlyVector3> {
+  return new ObjectUpdate(
+    [],
+    (old: ReadonlyVector3) => {
+      // This simply assumes that our value updates an array of 3 numbers
+      let oldObj = [old.x, old.y, old.z];
+      let newObj = value.applyTo(oldObj);
+      return new ReadonlyVector3(newObj[0], newObj[1], newObj[2]);
+    },
+    value.isSliding
+  );
+}
+function eulerAnglesUpdate(value: ObjectUpdate<number>) {
+  return new ObjectUpdate(
+    [],
+    (old: ReadonlyVector3) => {
+      // This simply assumes that our value updates an array of 3 numbers
+      let oldObj = [old.x, old.y, old.z];
+      let newObj = value.applyTo(oldObj);
+      return new ReadonlyEulerAngles(newObj[0], newObj[1], newObj[2]);
+    },
+    value.isSliding
+  );
 }
 
 function startAddModel() {
@@ -224,115 +255,73 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
         :value="currentModel.name"
         type="text"
         clearable
-        @input="
-          (name) =>
-            change({
-              name,
-            })
-        "
+        @input="(v) => change('name', new ObjectUpdate([], () => v + ''))"
       ></n-input>
       <br /><br />
       <n-flex justify="space-between">
         <div>
           <n-text>Position</n-text>
           <VectorInput
-            :modelValue="[
+            :value="[
               currentModel.position.x,
               currentModel.position.y,
               currentModel.position.z,
             ]"
-            @update:modelValue="
-              (position) =>
-                change({
-                  position: { x: position[0], y: position[1], z: position[2] },
-                })
-            "
+            @update="(v) => change('position', vector3Update(v))"
           ></VectorInput>
         </div>
         <div>
           <n-text>Rotation</n-text>
           <EulerInput
-            :modelValue="[
+            :value="[
               currentModel.rotation.x,
               currentModel.rotation.y,
               currentModel.rotation.z,
             ]"
-            @update:modelValue="
-              (rotation) =>
-                change({
-                  rotation: {
-                    x: rotation[0],
-                    y: rotation[1],
-                    z: rotation[2],
-                  },
-                })
-            "
+            @update="(v) => change('rotation', eulerAnglesUpdate(v))"
           ></EulerInput>
         </div>
         <div>
           <n-text>Scale</n-text>
           <NumberInput
-            :modelValue="currentModel.scale"
-            @update:modelValue="(scale) => change({ scale })"
+            :value="currentModel.scale"
+            :step="0.1"
+            @update="(v) => change('scale', v)"
           ></NumberInput>
         </div>
         <div>
           <n-text>Material</n-text>
           <n-text>Color</n-text>
           <VectorInput
-            :modelValue="[
+            :value="[
               currentModel.material.color.x,
               currentModel.material.color.y,
               currentModel.material.color.z,
             ]"
-            @update:modelValue="
-              (color) =>
-                change({
-                  material: {
-                    color: { x: color[0], y: color[1], z: color[2] },
-                  },
-                })
-            "
+            :step="0.1"
+            @update="(v) => change(['material', 'color'], vector3Update(v))"
           ></VectorInput>
           <n-text>Roughness</n-text>
           <NumberInput
-            :modelValue="currentModel.material.roughness"
-            @update:modelValue="
-              (roughness) =>
-                change({
-                  material: { roughness },
-                })
-            "
+            :value="currentModel.material.roughness"
+            :step="0.1"
+            @update="(v) => change(['material', 'roughness'], v)"
           ></NumberInput>
           <n-text>Metallic</n-text>
           <NumberInput
-            :modelValue="currentModel.material.metallic"
-            @update:modelValue="
-              (metallic) =>
-                change({
-                  material: { metallic },
-                })
-            "
+            :value="currentModel.material.metallic"
+            :step="0.1"
+            @update="(v) => change(['material', 'metallic'], v)"
           ></NumberInput>
           <n-text>Emissive</n-text>
           <VectorInput
-            :modelValue="[
+            :value="[
               currentModel.material.emissive.x,
               currentModel.material.emissive.y,
               currentModel.material.emissive.z,
             ]"
-            @update:modelValue="
-              (emissive) =>
-                change({
-                  material: {
-                    emissive: {
-                      x: emissive[0],
-                      y: emissive[1],
-                      z: emissive[2],
-                    },
-                  },
-                })
-            "
+            :step="0.1"
+            @update="(v) => change(['material', 'emissive'], vector3Update(v))"
           ></VectorInput>
         </div>
       </n-flex>

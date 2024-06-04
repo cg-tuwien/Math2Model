@@ -1,23 +1,24 @@
 <script setup lang="ts">
 import NumberInput from "./NumberInput.vue";
+import type { ObjectUpdate } from "./object-update";
 
 const props = defineProps<{
-  modelValue: number[];
+  value: number[];
+  step?: number;
 }>();
 const emit = defineEmits<{
-  "update:modelValue": [value: number[]];
+  update: [value: ObjectUpdate<number>];
 }>();
-function updateValue(newValue: number, index: number) {
-  const newValues = props.modelValue.slice();
-  newValues[index] = newValue;
-  emit("update:modelValue", newValues);
+function updateValue(newValue: ObjectUpdate<number>, index: number) {
+  emit("update", newValue.addPath(index));
 }
 </script>
 <template>
-  <template v-for="(value, index) in props.modelValue" :key="index">
+  <template v-for="(value, index) in props.value" :key="index">
     <NumberInput
-      :modelValue="value"
-      @update:modelValue="(newValue) => updateValue(newValue, index)"
+      :value="value"
+      :step="props.step"
+      @update="(newValue) => updateValue(newValue, index)"
     ></NumberInput>
   </template>
 </template>

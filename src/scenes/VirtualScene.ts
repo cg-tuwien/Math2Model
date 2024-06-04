@@ -6,6 +6,7 @@ import {
 } from "@/filesystem/scene-file";
 import { makeFilePath, type FilePath } from "@/filesystem/reactive-files";
 import { assert } from "@stefnotch/typestef/assert";
+import type { ObjectUpdate } from "@/components/input/object-update";
 
 export class ReadonlyVector3 {
   constructor(
@@ -77,36 +78,6 @@ export interface VirtualModelState {
   material: MaterialParameter;
 }
 
-export interface VirtualModelUpdate {
-  name?: string;
-  code?: FilePath;
-  position?: {
-    x?: number;
-    y?: number;
-    z?: number;
-  };
-  rotation?: {
-    x?: number;
-    y?: number;
-    z?: number;
-  };
-  scale?: number;
-  material?: {
-    color?: {
-      x: number;
-      y: number;
-      z: number;
-    };
-    roughness?: number;
-    metallic?: number;
-    emissive?: {
-      x: number;
-      y: number;
-      z: number;
-    };
-  };
-}
-
 export interface VirtualSceneState {
   models: VirtualModelState[];
 }
@@ -152,57 +123,13 @@ export class VirtualScene {
     return false;
   }
 
-  updateModels(keys: string[], update: VirtualModelUpdate) {
+  updateModels(keys: string[], update: ObjectUpdate<any>) {
     const keysMap = new Set(keys);
     for (const model of this.state.value.models) {
       if (!keysMap.has(model.id)) {
         continue;
       }
-      if (update.name !== undefined) {
-        model.name = update.name;
-      }
-      if (update.code !== undefined) {
-        model.code = update.code;
-      }
-      if (update.position !== undefined) {
-        model.position = new ReadonlyVector3(
-          update.position.x ?? model.position.x,
-          update.position.y ?? model.position.y,
-          update.position.z ?? model.position.z
-        );
-      }
-      if (update.rotation !== undefined) {
-        model.rotation = new ReadonlyEulerAngles(
-          update.rotation.x ?? model.rotation.x,
-          update.rotation.y ?? model.rotation.y,
-          update.rotation.z ?? model.rotation.z
-        );
-      }
-      if (update.scale !== undefined) {
-        model.scale = update.scale;
-      }
-      if (update.material !== undefined) {
-        if (update.material.color !== undefined) {
-          model.material.color = new ReadonlyVector3(
-            update.material.color.x,
-            update.material.color.y,
-            update.material.color.z
-          );
-        }
-        if (update.material.roughness !== undefined) {
-          model.material.roughness = update.material.roughness;
-        }
-        if (update.material.metallic !== undefined) {
-          model.material.metallic = update.material.metallic;
-        }
-        if (update.material.emissive !== undefined) {
-          model.material.emissive = new ReadonlyVector3(
-            update.material.emissive.x,
-            update.material.emissive.y,
-            update.material.emissive.z
-          );
-        }
-      }
+      update.applyTo(model);
     }
   }
 }

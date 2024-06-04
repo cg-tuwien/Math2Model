@@ -24,7 +24,6 @@ import {
   ReadonlyVector3,
   useVirtualScene,
   type VirtualModelState,
-  type VirtualModelUpdate,
 } from "@/scenes/VirtualScene";
 import { getOrCreateScene } from "@/filesystem/start-files";
 import VirtualModel from "@/components/VirtualModel.vue";
@@ -33,6 +32,7 @@ import { serializeScene } from "@/filesystem/scene-file";
 import type { Engine } from "@/engine/engine";
 import HeartSphere from "@/shaders/HeartSphere.wgsl?raw";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
+import type { ObjectUpdate } from "./input/object-update";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -249,7 +249,7 @@ function useTabs() {
 }
 const tabs = useTabs();
 
-function updateScene() {
+function saveScene() {
   const sceneContent = serializeScene(scene.api.value.serialize(), true);
   if (sceneContent === null) {
     showError(
@@ -261,9 +261,11 @@ function updateScene() {
   }
 }
 
-function updateModels(ids: string[], update: VirtualModelUpdate) {
+function updateModels(ids: string[], update: ObjectUpdate<any>) {
   scene.api.value.updateModels(ids, update);
-  updateScene();
+  if (!update.isSliding) {
+    saveScene();
+  }
 }
 
 function addModel(name: string, shaderName: string) {
@@ -291,7 +293,7 @@ function addModel(name: string, shaderName: string) {
     };
 
     scene.api.value.addModel(newModel);
-    updateScene();
+    saveScene();
   }
 }
 
@@ -302,7 +304,7 @@ function removeModel(ids: string[]) {
     }
   }
 
-  updateScene();
+  saveScene();
 }
 </script>
 
