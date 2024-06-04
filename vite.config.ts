@@ -11,13 +11,13 @@ import vue from "@vitejs/plugin-vue";
 export default defineConfig({
   plugins: [
     vue(),
+    Icons(),
     Components({
       resolvers: [
         NaiveUiResolver(),
         IconsResolver({ prefix: false, enabledCollections: ["mdi"] }),
       ],
     }),
-    Icons(),
   ],
   resolve: {
     alias: {

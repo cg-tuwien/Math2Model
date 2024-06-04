@@ -8,7 +8,7 @@
     "start-bun": "bunx --bun vite",
     "dev": "vite --open",
     "dev-bun": "bunx --bun vite --open",
-    "build": "run-p type-check \"build-only {@}\" --",
+    "build": "run-s build-only type-check",
     "preview": "vite preview",
     "test:unit": "vitest",
     "build-only": "vite build",
