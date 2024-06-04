@@ -89,22 +89,13 @@ const filteredData = computed(() => {
   );
   return filteredData;
 });
-const fileSelection = ref<TreeSelection>({
+const treeSelection = ref<TreeSelection>({
   base: [],
   generation: makeSelectionGeneration(0),
 });
-watch(
-  () => fileSelection.value.generation,
-  () => {
-    const selectedFile = selectedFiles.value.at(0);
-    if (selectedFile !== undefined) {
-      openFile(selectedFile);
-    }
-  }
-);
 const selectedFiles = computed(() => {
   const selectedFiles: FilePath[] = [];
-  const generation = fileSelection.value.generation;
+  const generation = treeSelection.value.generation;
   for (const [node, _] of NodeTreeHelper.visibleNodesIter(filteredData.value)) {
     if (NodeTreeHelper.isSelected(node, generation)) {
       selectedFiles.push(makeFilePath(node.key));
@@ -112,6 +103,18 @@ const selectedFiles = computed(() => {
   }
   return selectedFiles;
 });
+watch(
+  () => treeSelection.value.generation,
+  () => {
+    const selectedFile = selectedFiles.value.at(0);
+    if (selectedFile !== undefined) {
+      openFile(selectedFile);
+    }
+  },
+  {
+    immediate: true,
+  }
+);
 
 function startAddFile() {
   let newFile = makeFilePath("untitled");
@@ -224,7 +227,7 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
     /></n-flex>
     <NodeTree
       :root="filteredData"
-      v-model:selection="fileSelection"
+      v-model:selection="treeSelection"
       @setExpanded="onNodeExpand"
       @setIsSelected="onNodeSelect"
     >

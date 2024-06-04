@@ -2,6 +2,13 @@ import { z } from "zod";
 
 export const SceneFileSchemaUrl = "http://virtual/scene-schema.json" as const;
 
+export const MaterialParameterSchema = z.object({
+  color: z.tuple([z.number(), z.number(), z.number()]),
+  roughness: z.number(),
+  metallic: z.number(),
+  emissive: z.tuple([z.number(), z.number(), z.number()]),
+});
+
 export const ModelSchema = z.object({
   type: z.literal("model"),
   id: z.string(),
@@ -10,7 +17,7 @@ export const ModelSchema = z.object({
   rotation: z.tuple([z.number(), z.number(), z.number()]),
   scale: z.number(),
   parametricShader: z.string(),
-  fragmentShader: z.string(),
+  material: MaterialParameterSchema,
 });
 
 export type SerializedModel = z.infer<typeof ModelSchema>;

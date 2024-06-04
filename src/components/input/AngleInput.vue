@@ -11,7 +11,7 @@ const emit = defineEmits<{
 
 const angleInDegrees = computed({
   get: () => radToDeg(props.modelValue),
-  set: (value: number) => {
+  set: (value: number): void => {
     emit("update:modelValue", degToRad(value));
   },
 });

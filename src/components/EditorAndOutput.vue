@@ -23,6 +23,7 @@ import {
   ReadonlyEulerAngles,
   ReadonlyVector3,
   useVirtualScene,
+  type VirtualModelState,
   type VirtualModelUpdate,
 } from "@/scenes/VirtualScene";
 import { getOrCreateScene } from "@/filesystem/start-files";
@@ -31,6 +32,7 @@ import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { serializeScene } from "@/filesystem/scene-file";
 import type { Engine } from "@/engine/engine";
 import HeartSphere from "../../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
+import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -57,7 +59,7 @@ watch(
     } catch (e) {
       console.log("Could not deserialize scene file.");
     }
-  },
+  }
 );
 if (sceneFile !== null) {
   scene.api.value.fromSerialized(sceneFile);
@@ -69,13 +71,6 @@ const baseScene = shallowRef(props.engine.createBaseScene());
 onUnmounted(() => {
   baseScene.value[Symbol.dispose]();
 });
-
-// TODO: Gizmo
-// Including
-// - GPU picking
-// - Dragging and then updating the filesystem (aka serialize the scene)
-// Excluding
-// - Switching to the shader. Instead we should have a scene tree/property editor, where the user can click on the referenced shaders to edit them.
 
 // Attach the canvas to the DOM
 watchEffect(() => {
@@ -91,9 +86,28 @@ onUnmounted(() => {
   stopRenderLoop.stop();
 });
 
+const shadersDropdown = computed<SelectMixedOption[]>(() => {
+  return [...props.files.fileNames.value.keys()]
+    .toSorted()
+    .filter((fileName) => fileName.endsWith(".wgsl"))
+    .map(
+      (fileName): SelectMixedOption => ({
+        label: fileName.substring(
+          0,
+          fileName.valueOf().length - ".wgsl".length
+        ),
+        value: fileName,
+      })
+    )
+    .concat({
+      label: "New Shader...",
+      value: undefined,
+    });
+});
+
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
   const keyedCode = ref<KeyedCode | null>(
-    startFile !== null ? readFile(startFile) : null,
+    startFile !== null ? readFile(startFile) : null
   );
 
   function readFile(name: FilePath): KeyedCode | null {
@@ -197,7 +211,7 @@ function updateScene() {
   if (sceneContent === null) {
     showError(
       "Could not serialize scene",
-      new Error("Could not serialize scene"),
+      new Error("Could not serialize scene")
     );
   } else {
     props.files.writeFile(scenePath, sceneContent);
@@ -209,40 +223,28 @@ function updateModels(ids: string[], update: VirtualModelUpdate) {
   updateScene();
 }
 
-function addModel(name: string, shaderName: FilePath) {
+function addModel(name: string, shaderName: string) {
   if (shaderName) {
-    const vertexSource = shaderName;
-    const fragmentSource = makeFilePath(
-      shaderName.replaceAll(".vert.wgsl", ".frag.wgsl"),
-    );
+    const vertexSource = makeFilePath(shaderName);
 
     if (!props.files.hasFile(vertexSource)) {
       props.files.writeFile(vertexSource, HeartSphere);
     }
-    if (!props.files.hasFile(fragmentSource)) {
-      props.files.writeFile(
-        fragmentSource,
-        `
-    varying vNormal : vec3<f32>;
-    varying vUV : vec2<f32>;
-    @fragment
-    fn main(input : FragmentInputs) -> FragmentOutputs {
-        fragmentOutputs.color = vec4<f32>(input.vUV,1.0, 1.0);
-    }
-`,
-      );
-    }
 
-    const newModel = {
+    const newModel: VirtualModelState = {
       id: crypto.randomUUID(),
       name: name,
-      code: {
-        vertexFile: vertexSource,
-        fragmentFile: fragmentSource,
-      },
+      code: vertexSource,
       position: ReadonlyVector3.zero,
       rotation: ReadonlyEulerAngles.identity,
       scale: 1,
+      material: {
+        // Random material, ugly colors but anyways
+        color: new ReadonlyVector3(Math.random(), Math.random(), Math.random()),
+        roughness: Math.random(),
+        metallic: Math.random(),
+        emissive: new ReadonlyVector3(0, 0, 0),
+      },
     };
 
     scene.api.value.addModel(newModel);
@@ -309,26 +311,7 @@ function removeModel(ids: string[]) {
               :scene="scene.api.value"
               :files="props.files"
               :scene-path="scenePath"
-              :shaders="
-                props.files
-                  .listFiles()
-                  .filter((fileName) => fileName.endsWith('.vert.wgsl'))
-                  .map((fileName) => {
-                    return {
-                      label: fileName
-                        .valueOf()
-                        .substring(
-                          0,
-                          fileName.valueOf().length - '.vert.wgsl'.length,
-                        ),
-                      value: fileName,
-                    };
-                  })
-                  .concat({
-                    label: 'New Shader...',
-                    value: makeFilePath('NEW...'),
-                  })
-              "
+              :shaders="shadersDropdown"
               @update="(keys, update) => updateModels(keys, update)"
               @addModel="
                 (modelName, shaderName) => addModel(modelName, shaderName)
