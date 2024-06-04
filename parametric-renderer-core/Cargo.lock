@@ -463,7 +463,7 @@ dependencies = [
 
 [[package]]
 name = "desktop"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "glam",
@@ -1442,7 +1442,7 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
 name = "renderer-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -2118,7 +2118,7 @@ dependencies = [
 
 [[package]]
 name = "web"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",

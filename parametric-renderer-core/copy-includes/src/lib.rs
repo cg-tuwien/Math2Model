@@ -58,8 +58,8 @@ fn delete_old_include<T: AsRef<str>>(lines: &mut Vec<T>, line_number: usize) {
         None => return,
     };
 
-    if next_line.starts_with(AUTOGEN_PREFIX) {
-        let sha2_hash = next_line[AUTOGEN_PREFIX.len()..].trim_start();
+    if let Some(next_line_with_prefix) = next_line.strip_prefix(AUTOGEN_PREFIX) {
+        let sha2_hash = next_line_with_prefix.trim_start();
 
         let prefix_index = line_number + 1;
         let suffix_index = lines
@@ -112,12 +112,8 @@ impl IncludeStatement {
 
 fn find_includes(file_path: PathBuf, contents: &str) -> Vec<IncludeStatement> {
     let mut includes = vec![];
-    let mut line_stream = contents.lines().enumerate();
-    loop {
-        let (line_number, line) = match line_stream.next() {
-            Some(v) => v,
-            None => break,
-        };
+    let line_stream = contents.lines().enumerate();
+    for (line_number, line) in line_stream {
         if let Some(include) = try_parse_include(file_path.clone(), line, line_number) {
             includes.push(include);
         }
