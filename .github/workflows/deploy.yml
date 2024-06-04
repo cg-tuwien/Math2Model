@@ -1,4 +1,4 @@
-name: Rust
+name: Deploy
 
 on:
   workflow_dispatch:
@@ -15,8 +15,11 @@ jobs:
     - name: Run copy-includes
       run: cargo run --bin copy-includes
       working-directory: ./parametric-renderer-core
-    - name: Build 
-      run: cargo build --verbose
+    - name: Install wasm-bindgen
+      run: npm ci
+      working-directory: ./parametric-renderer-core
+    - name: Build with wasm-bindgen
+      run: npm run build
       working-directory: ./parametric-renderer-core
     - name: Setup Node.js environment
       uses: actions/setup-node@v4.0.2
