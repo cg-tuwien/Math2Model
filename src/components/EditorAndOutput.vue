@@ -95,11 +95,9 @@ try {
     watchEffect(() => {
       let models = scene.state.value.models.map((v) => {
         let code = `fn evaluateImage(input2: vec2f) -> vec3f { return vec3(input2, 0.0); }`;
-        const vertexSourceId = props.files.fileNames.value.get(
-          v.code.vertexFile
-        );
+        const vertexSourceId = props.files.fileNames.value.get(v.code);
         if (vertexSourceId !== undefined) {
-          const vertexSource = props.files.readFile(v.code.vertexFile);
+          const vertexSource = props.files.readFile(v.code);
           if (vertexSource !== null) {
             code = vertexSource;
           }
