@@ -37,9 +37,9 @@ pub struct ProfilerSettings {
 
 #[derive(Debug, Clone)]
 pub struct ModelInfo {
-    pub label: String,
     pub transform: Transform,
     pub material_info: MaterialInfo,
+    pub label: String, // TODO: Make this a label for the shader only!
     pub evaluate_image_code: String,
 }
 
@@ -146,6 +146,7 @@ impl CpuApplication {
         self.models = models;
         if let Some(gpu) = &mut self.gpu {
             update_virtual_models(
+                &mut gpu.shader_arena,
                 &mut gpu.virtual_models,
                 &self.models,
                 &gpu.context,
@@ -236,6 +237,7 @@ pub struct GpuApplication {
     context: WgpuContext,
     depth_texture: Texture,
     scene_data: SceneData,
+    shader_arena: virtual_model::ShaderArena,
     virtual_models: Vec<VirtualModel>,
     compute_patches: ComputePatchesStep,
     copy_patches: CopyPatchesStep,
@@ -269,6 +271,7 @@ impl GpuApplication {
             .collect::<Vec<_>>();
         assert!(meshes.len() == PATCH_SIZES.len());
 
+        let shader_arena = virtual_model::ShaderArena::new();
         let virtual_models = vec![];
 
         let render_buffer_reset = compute_patches::RenderBuffer {
@@ -336,6 +339,7 @@ impl GpuApplication {
             depth_texture,
             scene_data,
             meshes,
+            shader_arena,
             virtual_models,
             threshold_factor,
             cursor_capture: WindowCursorCapture::Free,
@@ -449,6 +453,7 @@ impl GpuApplication {
                 .scope("Render", &mut command_encoder, &self.context.device);
 
         for model in self.virtual_models.iter() {
+            let shaders = self.shader_arena.get_shader(model.shaders_key);
             // Each round, we do a ping-pong and pong-ping
             // 2*4 rounds is enough to subdivide a 4k screen into 16x16 pixel patches
             let double_number_of_rounds = 4;
@@ -465,7 +470,7 @@ impl GpuApplication {
                         format!("Compute Patches From-To {i}"),
                         &self.context.device,
                     );
-                    compute_pass.set_pipeline(&model.compute_patches.pipeline[0]);
+                    compute_pass.set_pipeline(&shaders.compute_patches[0]);
                     compute_patches::set_bind_groups(
                         &mut compute_pass,
                         &self.compute_patches.bind_group_0,
@@ -488,9 +493,9 @@ impl GpuApplication {
                         &self.context.device,
                     );
                     if is_last_round {
-                        compute_pass.set_pipeline(&model.compute_patches.pipeline[1]);
+                        compute_pass.set_pipeline(&shaders.compute_patches[1]);
                     } else {
-                        compute_pass.set_pipeline(&model.compute_patches.pipeline[0]);
+                        compute_pass.set_pipeline(&shaders.compute_patches[0]);
                     }
                     compute_patches::set_bind_groups(
                         &mut compute_pass,
@@ -545,8 +550,9 @@ impl GpuApplication {
             },
         );
         for model in self.virtual_models.iter() {
+            let shaders = self.shader_arena.get_shader(model.shaders_key);
             {
-                render_pass.set_pipeline(&model.render_step.pipeline);
+                render_pass.set_pipeline(&shaders.render);
                 let indirect_draw_offsets = [
                     std::mem::offset_of!(copy_patches::DrawIndexedBuffers, indirect_draw_2)
                         as wgpu::BufferAddress,
@@ -607,26 +613,44 @@ impl GpuApplication {
 }
 
 fn update_virtual_models(
+    shader_arena: &mut virtual_model::ShaderArena,
     virtual_models: &mut Vec<VirtualModel>,
     models: &[ModelInfo],
     context: &WgpuContext,
     meshes: &[Mesh],
 ) -> anyhow::Result<()> {
-    // Throwing away and recreating all models is a bit wasteful, but it's fine for now
-    *virtual_models = models
-        .iter()
-        .map(|model| -> Result<VirtualModel, anyhow::Error> {
+    // Update existing models
+    for (virtual_model, model) in virtual_models.iter_mut().zip(models.iter()) {
+        virtual_model.transform = model.transform.clone();
+        virtual_model.material_info = model.material_info.clone();
+        virtual_model.shaders_key = shader_arena.get_or_create_shader(
+            &model.label,
+            context,
+            model.evaluate_image_code.as_str(),
+        );
+    }
+    // Resize virtual models
+    if virtual_models.len() > models.len() {
+        virtual_models.truncate(models.len());
+    } else if virtual_models.len() < models.len() {
+        for model in models.iter().skip(virtual_models.len()) {
             let mut virtual_model = VirtualModel::new(
-                Some(model.label.clone()),
                 context,
                 meshes,
-                Some(model.evaluate_image_code.as_str()),
+                shader_arena.get_or_create_shader(
+                    &model.label,
+                    context,
+                    model.evaluate_image_code.as_str(),
+                ),
             )?;
             virtual_model.transform = model.transform.clone();
             virtual_model.material_info = model.material_info.clone();
-            Ok(virtual_model)
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+            virtual_models.push(virtual_model);
+        }
+    }
+
+    // Clean up unused shaders
+    shader_arena.retain(virtual_models.iter().map(|model| model.shaders_key));
     Ok(())
 }
 pub struct RenderData<'a> {

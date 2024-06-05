@@ -12,11 +12,73 @@ use crate::{
 };
 
 use super::{wgpu_context::WgpuContext, MAX_PATCH_COUNT, PATCH_SIZES};
+use std::collections::HashMap;
+
+use slotmap::{DefaultKey, SlotMap};
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct NamedShader {
+    pub label: String,
+    pub shader: String,
+}
+
+pub struct ShaderArena {
+    shader_keys: HashMap<NamedShader, DefaultKey>,
+    shaders: SlotMap<DefaultKey, ShaderPipelines>,
+}
+
+pub struct ShaderPipelines {
+    /// Pipeline per model, for different parametric functions.
+    /// The second one is for "force_render"
+    pub compute_patches: [wgpu::ComputePipeline; 2],
+    /// Pipeline per model, for different parametric functions.
+    pub render: wgpu::RenderPipeline,
+}
+
+impl ShaderArena {
+    pub fn new() -> Self {
+        Self {
+            shader_keys: HashMap::new(),
+            shaders: SlotMap::new(),
+        }
+    }
+
+    pub fn get_shader(&self, key: DefaultKey) -> &ShaderPipelines {
+        &self.shaders[key]
+    }
+
+    pub fn get_or_create_shader(
+        &mut self,
+        label: &str,
+        context: &WgpuContext,
+        evaluate_image_code: &str,
+    ) -> DefaultKey {
+        let key = NamedShader {
+            label: label.to_string(),
+            shader: evaluate_image_code.to_owned(),
+        };
+        *self.shader_keys.entry(key).or_insert_with(|| {
+            let compute_patches = create_compute_patches_pipeline(
+                Some(label),
+                &context.device,
+                Some(evaluate_image_code),
+            );
+            let render = create_render_pipeline(Some(label), context, Some(evaluate_image_code));
+            self.shaders.insert(ShaderPipelines {
+                compute_patches,
+                render,
+            })
+        })
+    }
+
+    pub fn retain(&mut self, used_keys: impl Iterator<Item = DefaultKey>) {
+        let keys_set: std::collections::HashSet<_> = used_keys.collect();
+        self.shader_keys.retain(|_, key| keys_set.contains(key));
+        self.shaders.retain(|key, _| keys_set.contains(&key));
+    }
+}
 
 pub struct ComputePatchesStep {
-    /// Pipeline per model, for different materials.
-    /// The second one is for "force_render"
-    pub pipeline: [wgpu::ComputePipeline; 2],
     pub input_buffer: TypedBuffer<compute_patches::InputBuffer>,
     pub patches_buffer: [TypedBuffer<compute_patches::Patches>; 2],
     pub render_buffer: Vec<TypedBuffer<compute_patches::RenderBuffer>>,
@@ -26,16 +88,10 @@ pub struct ComputePatchesStep {
 }
 
 impl ComputePatchesStep {
-    pub fn new(
-        label: Option<&str>,
-        device: &wgpu::Device,
-        user_code: Option<&str>,
-    ) -> anyhow::Result<Self> {
-        let pipeline = create_compute_patches_pipeline(label, device, user_code);
-        let label = label.unwrap_or_default();
+    pub fn new(device: &wgpu::Device) -> anyhow::Result<Self> {
         let input_buffer = TypedBuffer::new_uniform(
             device,
-            &format!("Input Buffer {}", label),
+            "Input Buffer",
             &compute_patches::InputBuffer {
                 model_view_projection: Matrix4::<f32>::IDENTITY.to_raw(),
                 threshold_factor: 1.0,
@@ -51,14 +107,14 @@ impl ComputePatchesStep {
         let patches_buffer = [
             TypedBuffer::new_storage_with_runtime_array(
                 device,
-                &format!("Patches Buffer 0 {}", label),
+                "Patches Buffer 0",
                 &patches_buffer_empty,
                 MAX_PATCH_COUNT as u64,
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
             )?,
             TypedBuffer::new_storage_with_runtime_array(
                 device,
-                &format!("Patches Buffer 1 {}", label),
+                "Patches Buffer 1",
                 &patches_buffer_empty,
                 MAX_PATCH_COUNT as u64,
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
@@ -72,10 +128,10 @@ impl ComputePatchesStep {
         };
         let render_buffer = PATCH_SIZES
             .iter()
-            .map(|size| {
+            .map(|_| {
                 TypedBuffer::new_storage_with_runtime_array(
                     device,
-                    &format!("Render Buffer {}", size),
+                    "Render Buffer",
                     &render_buffer_initial,
                     MAX_PATCH_COUNT as u64,
                     wgpu::BufferUsages::COPY_DST,
@@ -87,13 +143,13 @@ impl ComputePatchesStep {
         let indirect_compute_buffer = [
             TypedBuffer::new_storage(
                 device,
-                &format!("Indirect Compute Dispatch Buffer 0 {}", label),
+                "Indirect Compute Dispatch Buffer 0",
                 &indirect_compute_empty,
                 wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
             )?,
             TypedBuffer::new_storage(
                 device,
-                &format!("Indirect Compute Dispatch Buffer 1 {}", label),
+                "Indirect Compute Dispatch Buffer 1",
                 &indirect_compute_empty,
                 wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
             )?,
@@ -130,7 +186,6 @@ impl ComputePatchesStep {
         ];
 
         Ok(Self {
-            pipeline,
             input_buffer,
             patches_buffer,
             render_buffer,
@@ -148,13 +203,10 @@ pub struct CopyPatchesStep {
 
 impl CopyPatchesStep {
     pub fn new(
-        label: Option<&str>,
         device: &wgpu::Device,
         compute_patches: &ComputePatchesStep,
         meshes: &[crate::mesh::Mesh],
     ) -> anyhow::Result<Self> {
-        let label = label.unwrap_or_default();
-
         let indirect_draw_data = meshes
             .iter()
             .map(|mesh| copy_patches::DrawIndexedIndirectArgs {
@@ -168,7 +220,7 @@ impl CopyPatchesStep {
 
         let indirect_draw_buffers = TypedBuffer::new_storage(
             device,
-            &format!("Indirect Draw Buffers {}", label),
+            "Indirect Draw Buffers",
             &copy_patches::DrawIndexedBuffers {
                 indirect_draw_2: indirect_draw_data[0],
                 indirect_draw_4: indirect_draw_data[1],
@@ -199,8 +251,6 @@ impl CopyPatchesStep {
 }
 
 pub struct RenderStep {
-    /// Pipeline per model, for different materials.
-    pub pipeline: wgpu::RenderPipeline,
     pub model_buffer: TypedBuffer<shader::Model>,
     pub material_buffer: TypedBuffer<shader::Material>,
     pub bind_group_1: Vec<shader::bind_groups::BindGroup1>,
@@ -208,17 +258,12 @@ pub struct RenderStep {
 
 impl RenderStep {
     pub fn new(
-        label: Option<&str>,
         context: &WgpuContext,
         compute_patches: &ComputePatchesStep,
-        user_code: Option<&str>,
     ) -> anyhow::Result<Self> {
-        let pipeline = create_render_pipeline(label, context, user_code);
-
-        let label = label.unwrap_or_default();
         let model_buffer = TypedBuffer::new_uniform(
             &context.device,
-            &format!("Model Buffer {}", label),
+            "Model Buffer",
             &shader::Model {
                 model_similarity: Matrix4::<f32>::IDENTITY.to_raw(),
             },
@@ -248,7 +293,6 @@ impl RenderStep {
             .collect();
 
         Ok(Self {
-            pipeline,
             model_buffer,
             material_buffer,
             bind_group_1,
@@ -257,12 +301,11 @@ impl RenderStep {
 }
 
 pub struct VirtualModel {
-    /// For debugging purposes, this will show up in RenderDoc
-    label: Option<String>,
     pub compute_patches: ComputePatchesStep,
     pub copy_patches: CopyPatchesStep,
     pub render_step: RenderStep,
 
+    pub shaders_key: DefaultKey,
     pub transform: Transform,
     pub material_info: MaterialInfo,
 }
@@ -316,27 +359,20 @@ impl Default for MaterialInfo {
 
 impl VirtualModel {
     pub fn new(
-        label: Option<String>,
         context: &WgpuContext,
         meshes: &[Mesh],
-        user_code: Option<&str>,
+        shaders_key: DefaultKey,
     ) -> anyhow::Result<Self> {
-        let compute_patches_step =
-            ComputePatchesStep::new(label.as_deref(), &context.device, user_code)?;
-        let copy_patches_step = CopyPatchesStep::new(
-            label.as_deref(),
-            &context.device,
-            &compute_patches_step,
-            meshes,
-        )?;
-        let render_step =
-            RenderStep::new(label.as_deref(), context, &compute_patches_step, user_code)?;
+        let compute_patches_step = ComputePatchesStep::new(&context.device)?;
+        let copy_patches_step =
+            CopyPatchesStep::new(&context.device, &compute_patches_step, meshes)?;
+        let render_step = RenderStep::new(context, &compute_patches_step)?;
 
         Ok(Self {
-            label,
             compute_patches: compute_patches_step,
             copy_patches: copy_patches_step,
             render_step,
+            shaders_key,
             transform: Transform::default(),
             material_info: MaterialInfo::default(),
         })
@@ -348,13 +384,6 @@ impl VirtualModel {
 
     pub fn get_model_view_projection(&self, camera: &Camera) -> Matrix4<f32> {
         camera.projection_matrix() * camera.view_matrix() * self.transform.to_matrix()
-    }
-
-    pub fn update_code(&mut self, context: &WgpuContext, user_code: Option<&str>) {
-        self.compute_patches.pipeline =
-            create_compute_patches_pipeline(self.label.as_deref(), &context.device, user_code);
-        self.render_step.pipeline =
-            create_render_pipeline(self.label.as_deref(), context, user_code);
     }
 }
 

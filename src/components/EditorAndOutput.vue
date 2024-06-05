@@ -104,7 +104,6 @@ try {
         }
 
         let model = {
-          label: v.name,
           transform: {
             position: [v.position.x, v.position.y, v.position.z],
             rotation: [v.rotation.x, v.rotation.y, v.rotation.z],
@@ -120,6 +119,7 @@ try {
             roughness: v.material.roughness,
             metallic: v.material.metallic,
           },
+          label: v.code,
           evaluate_image_code: code,
         };
         return model;

@@ -1449,6 +1449,7 @@ dependencies = [
  "encase",
  "glam",
  "glamour",
+ "slotmap",
  "thiserror",
  "tracing",
  "web-time",
