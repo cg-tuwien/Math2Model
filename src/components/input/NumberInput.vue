@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { ObjectUpdate } from "./object-update";
 import { useThrottleFn } from "@vueuse/core";
 
@@ -14,7 +14,12 @@ const emit = defineEmits<{
 const speed = computed(() => (props.step ?? 1.0) / 10.0);
 
 const slidingX = ref(0);
-
+watch(
+  () => props.value,
+  () => {
+    slidingX.value = 0;
+  }
+);
 const emitSliding = useThrottleFn((value: number) => {
   emit(
     "update",
@@ -29,13 +34,13 @@ function round(value: number, decimals: number) {
 
 const showValue = computed(() => round(props.value + slidingX.value, 4));
 
-async function onPointerDown(event: PointerEvent) {
+function onPointerDown(event: PointerEvent) {
   const element = event.currentTarget;
   if (element === null) return;
   if (!(element instanceof HTMLElement)) {
     return;
   }
-  await element?.requestPointerLock();
+  element?.requestPointerLock();
   slidingX.value = 0;
 }
 function onPointerMove(event: PointerEvent) {
