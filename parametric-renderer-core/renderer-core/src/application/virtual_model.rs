@@ -68,6 +68,8 @@ impl ShaderArena {
                 compute_patches,
                 render,
             })
+
+            // TODO: Report compilation errors (async)
         })
     }
 

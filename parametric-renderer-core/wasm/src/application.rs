@@ -9,21 +9,99 @@ use renderer_core::{
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
-use web_sys::HtmlCanvasElement;
+use web_sys::{js_sys, HtmlCanvasElement};
 use winit::{
     application::ApplicationHandler, dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window,
 };
+
+#[wasm_bindgen(typescript_custom_section)]
+const ENGINE_IMPORTS: &'static str = r#"
+interface CompilationMessage {
+    file: string;
+    utf8_offset: number;
+    utf8_length: number;
+    message: string;
+    type: "error" | "info" | "warning";
+}
+"#;
+
+#[derive(Serialize, Deserialize)]
+struct WasmCompilationMessage {
+    file: String,
+    utf8_offset: u32,
+    utf8_length: u32,
+    message: String,
+    r#type: WasmCompilationMessageType,
+}
+#[derive(Serialize, Deserialize)]
+enum WasmCompilationMessageType {
+    #[serde(rename = "error")]
+    Error,
+    #[serde(rename = "info")]
+    Info,
+    #[serde(rename = "warning")]
+    Warning,
+}
+
+#[allow(dead_code)]
+pub struct EngineSettings {
+    pub canvas: HtmlCanvasElement,
+    pub on_compile_error: js_sys::Function,
+}
+
+impl EngineSettings {
+    fn report_compile_error(&self, error: WasmCompilationMessage) {
+        let _ = self.on_compile_error.call1(
+            &JsValue::NULL,
+            &serde_wasm_bindgen::to_value(&error).unwrap(),
+        );
+    }
+}
+
+#[wasm_bindgen]
+pub fn update_models(js_models: JsValue) {
+    APP_COMMANDS.with(|commands| {
+        if let Some(proxy) = &*commands.lock().unwrap() {
+            let js_models: Vec<WasmModelInfo> = serde_wasm_bindgen::from_value(js_models).unwrap();
+            let models = js_models
+                .into_iter()
+                .map(|v| ModelInfo {
+                    label: v.label,
+                    transform: renderer_core::transform::Transform {
+                        position: v.transform.position.into(),
+                        rotation: glam::Quat::from_euler(
+                            glam::EulerRot::XYZ,
+                            v.transform.rotation[0],
+                            v.transform.rotation[1],
+                            v.transform.rotation[2],
+                        ),
+                        scale: v.transform.scale,
+                    },
+                    material_info: renderer_core::application::MaterialInfo {
+                        color: v.material_info.color.into(),
+                        emissive: v.material_info.emissive.into(),
+                        roughness: v.material_info.roughness,
+                        metallic: v.material_info.metallic,
+                    },
+                    evaluate_image_code: v.evaluate_image_code,
+                })
+                .collect();
+            let _ = proxy.send_event(AppCommand::UpdateModels(models));
+        }
+    });
+}
+
 pub struct Application {
     window: Option<Arc<Window>>,
     app: CpuApplication,
     /** For wasm32 */
-    _canvas: HtmlCanvasElement,
+    engine_settings: EngineSettings,
 }
 
 impl Application {
     const DEFAULT_SHADER_CODE: &'static str = include_str!("../../shaders/HeartSphere.wgsl");
 
-    pub fn new(canvas: HtmlCanvasElement) -> anyhow::Result<Self> {
+    pub fn new(engine_settings: EngineSettings) -> anyhow::Result<Self> {
         let mut app = CpuApplication::new()?;
         app.camera_controller = CameraController::new(
             camera_controller::GeneralController {
@@ -52,7 +130,7 @@ impl Application {
         Ok(Self {
             window: None,
             app,
-            _canvas: canvas,
+            engine_settings,
         })
     }
 
@@ -116,45 +194,12 @@ pub struct WasmMaterialInfo {
     pub metallic: f32,
 }
 
-#[wasm_bindgen]
-pub fn update_models(js_models: JsValue) {
-    APP_COMMANDS.with(|commands| {
-        if let Some(proxy) = &*commands.lock().unwrap() {
-            let js_models: Vec<WasmModelInfo> = serde_wasm_bindgen::from_value(js_models).unwrap();
-            let models = js_models
-                .into_iter()
-                .map(|v| ModelInfo {
-                    label: v.label,
-                    transform: renderer_core::transform::Transform {
-                        position: v.transform.position.into(),
-                        rotation: glam::Quat::from_euler(
-                            glam::EulerRot::XYZ,
-                            v.transform.rotation[0],
-                            v.transform.rotation[1],
-                            v.transform.rotation[2],
-                        ),
-                        scale: v.transform.scale,
-                    },
-                    material_info: renderer_core::application::MaterialInfo {
-                        color: v.material_info.color.into(),
-                        emissive: v.material_info.emissive.into(),
-                        roughness: v.material_info.roughness,
-                        metallic: v.material_info.metallic,
-                    },
-                    evaluate_image_code: v.evaluate_image_code,
-                })
-                .collect();
-            let _ = proxy.send_event(AppCommand::UpdateModels(models));
-        }
-    });
-}
-
-pub async fn run(canvas: HtmlCanvasElement) -> anyhow::Result<()> {
+pub async fn run(engine_settings: EngineSettings) -> anyhow::Result<()> {
     let event_loop = winit::event_loop::EventLoop::<AppCommand>::with_user_event().build()?;
     APP_COMMANDS.with(|commands| {
         *commands.lock().unwrap() = Some(event_loop.create_proxy());
     });
-    let application = Application::new(canvas)?;
+    let application = Application::new(engine_settings)?;
     #[cfg(target_arch = "wasm32")]
     {
         use winit::platform::web::EventLoopExtWebSys;
@@ -178,7 +223,7 @@ impl ApplicationHandler<AppCommand> for Application {
         #[cfg(target_arch = "wasm32")]
         let window_attributes = {
             use winit::platform::web::WindowAttributesExtWebSys;
-            window_attributes.with_canvas(Some(self._canvas.clone()))
+            window_attributes.with_canvas(Some(self.engine_settings.canvas.clone()))
         };
 
         let window = event_loop.create_window(window_attributes).unwrap();
