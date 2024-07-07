@@ -33,12 +33,14 @@ import type { Engine } from "@/engine/engine";
 import HeartSphere from "@/shaders/HeartSphere.wgsl?raw";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import type { ObjectUpdate } from "./input/object-update";
+import WebGpu from "@/components/WebGpu.vue";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
   files: ReactiveFiles;
   canvas: HTMLCanvasElement;
   engine: Engine;
+  gpuDevice: GPUDevice;
 }>();
 
 const store = useStore();
@@ -372,6 +374,7 @@ function removeModel(ids: string[]) {
       </template>
       <template #2>
         <div class="flex h-full w-full">
+          <WebGpu :gpuDevice="props.gpuDevice"></WebGpu>
           <div
             ref="canvasContainer"
             class="self-stretch overflow-hidden flex-1"
