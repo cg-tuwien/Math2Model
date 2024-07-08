@@ -5,7 +5,7 @@ import {
   type VirtualModelState,
 } from "@/scenes/VirtualScene";
 import { computed, h, ref, watch, watchEffect, type DeepReadonly } from "vue";
-import { NButton, NInput } from "naive-ui";
+import { NButton, NInput, NText } from "naive-ui";
 import NumberInput from "@/components/input/NumberInput.vue";
 import VectorInput from "@/components/input/VectorInput.vue";
 import EulerInput from "@/components/input/EulerInput.vue";
@@ -123,7 +123,7 @@ watchEffect(() => {
 });
 
 function renderLabel({ option }: { option: TreeNode }) {
-  return h("span", option.label);
+  return h(NText, null, () => [h("span", null, option.label)]);
 }
 
 type VirtualModelPath =
