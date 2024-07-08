@@ -26,7 +26,6 @@ import {
   type VirtualModelState,
 } from "@/scenes/VirtualScene";
 import { getOrCreateScene } from "@/filesystem/start-files";
-import VirtualModel from "@/components/VirtualModel.vue";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { serializeScene } from "@/filesystem/scene-file";
 import type { Engine } from "@/engine/engine";

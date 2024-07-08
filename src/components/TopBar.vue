@@ -1,16 +1,22 @@
 <script setup lang="ts">
 import { useStore } from "@/stores/store";
 import type { DropdownOption } from "naive-ui/es/dropdown/src/interface";
-import { computed, h, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { computed, h } from "vue";
+import { useRouter } from "vue-router";
 import IconMoon from "~icons/mdi/moon-and-stars";
 import IconSun from "~icons/mdi/white-balance-sunny";
 import IconGithub from "~icons/mdi/github";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { homepage } from "@/../package.json";
+import type { ReactiveFiles } from "@/filesystem/reactive-files";
+import { BlobWriter, ZipWriter } from "@zip.js/zip.js";
 
 const store = useStore();
 const router = useRouter();
+
+const props = defineProps<{
+  files: ReactiveFiles | null;
+}>();
 
 type FileDropdownOption = DropdownOption & {
   key: "open" | "save-as" | "examples";
@@ -21,18 +27,21 @@ const fileOptions = computed((): FileDropdownOption[] => {
     {
       label: "Open",
       key: "open",
+      disabled: props.files === null,
     },
     {
       label: "Save As",
       key: "save-as",
+      disabled: props.files === null,
     },
     {
       label: "Examples",
       key: "examples",
+      disabled: props.files === null,
     },
   ];
 });
-function handleFile(key: FileDropdownOption["key"]) {
+async function handleFile(key: FileDropdownOption["key"]) {
   if (key === "open") {
     // TODO: Open any file (or folder?)
     // Then
@@ -45,6 +54,25 @@ function handleFile(key: FileDropdownOption["key"]) {
     // TODO: Drag and drop support (onto the file list)
   } else if (key === "save-as") {
     // TODO: Save project as zip
+    if (props.files === null) return;
+    const files = props.files.listFiles().flatMap((filePath) => {
+      const file = props.files?.readFile(filePath) ?? null;
+      return file === null ? [] : [{ filePath, file }];
+    });
+    const zip = new ZipWriter(new BlobWriter("application/zip"), {
+      bufferedWrite: true,
+    });
+    await Promise.all(
+      files.map(({ filePath, file }) =>
+        zip.add(filePath, new Blob([file]).stream())
+      )
+    );
+    const blobUrl = URL.createObjectURL(await zip.close());
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = "project.zip";
+    a.click();
+    URL.revokeObjectURL(blobUrl);
   } else if (key === "examples") {
     // Do nothing
   } else {
