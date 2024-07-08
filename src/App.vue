@@ -2,16 +2,10 @@
 import { darkTheme, lightTheme } from "naive-ui";
 import { RouterView } from "vue-router";
 import { useStore } from "./stores/store";
-import { computed, markRaw, shallowRef } from "vue";
-import type { ReactiveFiles } from "./filesystem/reactive-files";
-import { sceneFilesPromise } from "./globals";
+import { computed } from "vue";
 
 const store = useStore();
 const theme = computed(() => (store.isDark ? darkTheme : lightTheme));
-const sceneFiles = shallowRef<ReactiveFiles | null>(null);
-sceneFilesPromise.then((v) => {
-  sceneFiles.value = markRaw(v);
-});
 </script>
 
 <template>
@@ -20,7 +14,7 @@ sceneFilesPromise.then((v) => {
       :theme="theme"
       class="h-full flex items-stretch flex-col"
     >
-      <TopBar :files="sceneFiles"></TopBar>
+      <TopBar></TopBar>
 
       <RouterView> </RouterView>
     </n-config-provider>

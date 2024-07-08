@@ -8,15 +8,10 @@ import IconSun from "~icons/mdi/white-balance-sunny";
 import IconGithub from "~icons/mdi/github";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { homepage } from "@/../package.json";
-import type { ReactiveFiles } from "@/filesystem/reactive-files";
 import { BlobWriter, ZipWriter } from "@zip.js/zip.js";
 
 const store = useStore();
 const router = useRouter();
-
-const props = defineProps<{
-  files: ReactiveFiles | null;
-}>();
 
 type FileDropdownOption = DropdownOption & {
   key: "open" | "save-as" | "examples";
@@ -27,17 +22,25 @@ const fileOptions = computed((): FileDropdownOption[] => {
     {
       label: "Open",
       key: "open",
-      disabled: props.files === null,
     },
     {
       label: "Save As",
       key: "save-as",
-      disabled: props.files === null,
     },
     {
       label: "Examples",
       key: "examples",
-      disabled: props.files === null,
+      children: [
+        // TODO: Add examples
+        {
+          label: "Chicken",
+          key: "chicken",
+        },
+        {
+          label: "Beef",
+          key: "beef",
+        },
+      ],
     },
   ];
 });
@@ -53,26 +56,7 @@ async function handleFile(key: FileDropdownOption["key"]) {
     // - Or open as new project
     // TODO: Drag and drop support (onto the file list)
   } else if (key === "save-as") {
-    // TODO: Save project as zip
-    if (props.files === null) return;
-    const files = props.files.listFiles().flatMap((filePath) => {
-      const file = props.files?.readFile(filePath) ?? null;
-      return file === null ? [] : [{ filePath, file }];
-    });
-    const zip = new ZipWriter(new BlobWriter("application/zip"), {
-      bufferedWrite: true,
-    });
-    await Promise.all(
-      files.map(({ filePath, file }) =>
-        zip.add(filePath, new Blob([file]).stream())
-      )
-    );
-    const blobUrl = URL.createObjectURL(await zip.close());
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = "project.zip";
-    a.click();
-    URL.revokeObjectURL(blobUrl);
+    await store.exportToZip();
   } else if (key === "examples") {
     // Do nothing
   } else {
