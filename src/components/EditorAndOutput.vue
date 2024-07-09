@@ -49,8 +49,7 @@ const props = defineProps<{
 const store = useStore();
 
 // The underlying data
-const scenePath = makeFilePath("scene.json");
-const sceneFile = useTextFile(scenePath, props.fs);
+const sceneFile = useTextFile(SceneFileName, props.fs);
 const scene = useVirtualScene();
 watchEffect(() => {
   if (sceneFile.value === null) {
@@ -61,7 +60,7 @@ watchEffect(() => {
     const sceneData = deserializeScene(sceneFile.value);
     scene.api.value.fromSerialized(sceneData);
   } catch (e) {
-    showFileError("Could not load scene file", scenePath, e);
+    showFileError("Could not load scene file", SceneFileName, e);
   }
 });
 
@@ -95,18 +94,39 @@ try {
   showError("Could not start render loop", e);
 }
 {
+  // TODO: Make the Rust side pull files instead of this
+  const referencedFiles = shallowRef(
+    new Map<FilePath, Readonly<Ref<string | null>>>()
+  );
+  watchImmediate(
+    () => scene.state.value.models,
+    (models) => {
+      const newReferencedFiles = new Map<
+        FilePath,
+        Readonly<Ref<string | null>>
+      >();
+      for (let model of models) {
+        const fileName = model.code;
+        if (newReferencedFiles.has(fileName)) {
+          continue;
+        }
+        const fileReference =
+          referencedFiles.value.get(fileName) ??
+          useTextFile(fileName, props.fs);
+        newReferencedFiles.set(fileName, fileReference);
+      }
+
+      referencedFiles.value = newReferencedFiles;
+    }
+  );
+
   let wgpuScene = baseScene.value.asWgpu();
   if (wgpuScene !== null) {
     watchEffect(() => {
       let models = scene.state.value.models.map((v) => {
-        let code = `fn evaluateImage(input2: vec2f) -> vec3f { return vec3(input2, 0.0); }`;
-        const vertexSourceId = props.fs.fileNames.value.get(v.code);
-        if (vertexSourceId !== undefined) {
-          const vertexSource = props.fs.readFile(v.code);
-          if (vertexSource !== null) {
-            code = vertexSource;
-          }
-        }
+        let code =
+          referencedFiles.value.get(v.code)?.value ??
+          `fn evaluateImage(input2: vec2f) -> vec3f { return vec3(input2, 0.0); }`;
 
         let model = {
           transform: {
@@ -281,7 +301,7 @@ function saveScene() {
       new Error("Could not serialize scene")
     );
   } else {
-    props.fs.writeTextFile(scenePath, sceneContent);
+    props.fs.writeTextFile(SceneFileName, sceneContent);
   }
 }
 

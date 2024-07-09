@@ -1,4 +1,5 @@
 import {
+  SceneFileName,
   SceneFileSchemaUrl,
   type SerializedScene,
 } from "@/filesystem/scene-file";
@@ -44,7 +45,7 @@ export const createDefaultProject = (): ExampleProject => {
     name: "Example Project",
     files: [
       {
-        name: makeFilePath("scene.json"),
+        name: SceneFileName,
         value: JSON.stringify(scene, null, 2),
       },
       {
@@ -84,7 +85,7 @@ export const createHeartSphereProject = (): ExampleProject => {
     name: "Example Project",
     files: [
       {
-        name: makeFilePath("scene.json"),
+        name: SceneFileName,
         value: JSON.stringify(scene, null, 2),
       },
       {
