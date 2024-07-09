@@ -13,7 +13,7 @@ const store = useStore();
 const router = useRouter();
 
 type FileDropdownOption = DropdownOption & {
-  key: "open" | "save-as" | "examples";
+  key: "open" | "save-as" | "examples" | "example-scene" | "heart-sphere-scene";
 };
 
 const inputFileElement = ref<HTMLInputElement | null>(null);
@@ -31,16 +31,15 @@ const fileOptions = computed((): FileDropdownOption[] => {
       label: "Examples",
       key: "examples",
       children: [
-        // TODO: Add examples
         {
-          label: "Chicken",
-          key: "chicken",
+          label: "Example Scene",
+          key: "example-scene",
         },
         {
-          label: "Beef",
-          key: "beef",
+          label: "Heart Sphere Scene",
+          key: "heart-sphere-scene",
         },
-      ],
+      ] as FileDropdownOption[],
     },
   ];
 });
@@ -51,6 +50,10 @@ async function handleFile(key: FileDropdownOption["key"]) {
     await store.exportToZip();
   } else if (key === "examples") {
     // Do nothing
+  } else if (key === "example-scene") {
+    // TODO: Load that scene (and use the asking dialog (switch or open new))
+  } else if (key === "heart-sphere-scene") {
+    // TODO: Load that scene (and use the asking dialog (switch or open new))
   } else {
     assertUnreachable(key);
   }
