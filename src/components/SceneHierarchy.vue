@@ -290,6 +290,13 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
           ></NumberInput>
         </div>
         <div>
+          <n-text>Parametric Function</n-text>
+          <n-select
+            placeholder="Select a shader for the model"
+            :options="props.shaders"
+            :value="currentModel.code"
+            @update="(v) => change('code', new ObjectUpdate([], () => v + ''))"
+          ></n-select>
           <n-text>Material</n-text>
           <n-text>Color</n-text>
           <VectorInput
