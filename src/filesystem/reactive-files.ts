@@ -1,32 +1,24 @@
-import { reactive, type ComputedRef, computed } from "vue";
+import { computedAsync } from "@vueuse/core";
+import {
+  reactive,
+  computed,
+  type Ref,
+  type MaybeRefOrGetter,
+  toValue,
+} from "vue";
 
 export interface ReadonlyFiles {
   listFiles(): FilePath[];
-  readFile(name: FilePath): string | null;
+  readTextFile(name: FilePath): Promise<string> | null;
+  readBinaryFile(name: FilePath): Promise<ArrayBuffer> | null;
   hasFile(name: FilePath): boolean;
-  waitFinished(): Promise<void>;
 }
 
 export interface WritableFiles extends ReadonlyFiles {
-  writeFile(name: FilePath, content: string): void;
-  deleteFile(name: FilePath): void;
-}
-
-export interface HasReactiveFiles {
-  readonly fileNames: ComputedRef<Map<FilePath, number>>;
-}
-
-export function readOrCreateFile(
-  sceneFiles: WritableFiles,
-  name: FilePath,
-  defaultContent: () => string
-): string {
-  let content = sceneFiles.readFile(name);
-  if (content === null) {
-    content = defaultContent();
-    sceneFiles.writeFile(name, content);
-  }
-  return content;
+  writeTextFile(name: FilePath, content: string): Promise<void>;
+  writeBinaryFile(name: FilePath, content: ArrayBuffer): Promise<void>;
+  renameFile(oldName: FilePath, newName: FilePath): Promise<void>;
+  deleteFile(name: FilePath): Promise<void>;
 }
 
 export function makeFilePath(path: string): FilePath {
@@ -35,75 +27,63 @@ export function makeFilePath(path: string): FilePath {
 
 export type FilePath = string & { __filePath: never };
 
-/**
- * An implementation of SceneFiles that delegates to another SceneFiles implementation.
- */
-export class ReactiveFiles implements WritableFiles, HasReactiveFiles {
-  /**
-   * A *reactive* map of file names and a version ID.
-   */
-  private _fileNames: Map<FilePath, number> = reactive(new Map());
-  public fileNames: ComputedRef<Map<FilePath, number>> = computed(
-    () => this._fileNames
-  );
-
-  private constructor(public readonly sceneFiles: WritableFiles) {}
-
-  /**
-   * Create a new ReactiveSceneFiles instance that delegates to the given SceneFiles instance.
-   */
-  static async create(sceneFiles: WritableFiles) {
-    const instance = new ReactiveFiles(sceneFiles);
-    const files = instance.listFiles();
-    for (const file of files) {
-      instance._fileNames.set(file, 0);
-    }
-    return instance;
-  }
-
-  listFiles() {
-    return this.sceneFiles.listFiles();
-  }
-
-  readFile(name: FilePath) {
-    return this.sceneFiles.readFile(name);
-  }
-
-  hasFile(name: FilePath) {
-    return this.sceneFiles.hasFile(name);
-  }
-
-  writeFile(name: FilePath, content: string) {
-    this.sceneFiles.writeFile(name, content);
-    this._fileNames.set(name, (this._fileNames.get(name) ?? 0) + 1);
-  }
-
-  deleteFile(name: FilePath) {
-    this.sceneFiles.deleteFile(name);
-    this._fileNames.delete(name);
-  }
-
-  waitFinished() {
-    return this.sceneFiles.waitFinished();
+export class FileMetadata {
+  constructor(public readonly version: number) {}
+  equals(other: FileMetadata) {
+    return this.version === other.version;
   }
 }
 
-export class FilesWithFilesystem implements WritableFiles {
-  private files: Map<FilePath, string> = new Map();
+export function useTextFile(
+  name: MaybeRefOrGetter<FilePath | null>,
+  fs: ReactiveFilesystem
+): Readonly<Ref<string | null>> {
+  return computedAsync(async () => {
+    // Accessed synchronously, will be tracked
+    const fileName = toValue(name);
+    if (fileName === null) return null;
+    const metadata = fs.files.value.get(fileName) ?? null;
+    if (metadata === null) return null;
+    // No longer tracked
+    return await fs.readTextFile(fileName);
+  }, null);
+}
+
+export function useBinaryFile(
+  name: MaybeRefOrGetter<FilePath | null>,
+  fs: ReactiveFilesystem
+): Ref<ArrayBuffer | null> {
+  return computedAsync(async () => {
+    // Accessed synchronously, will be tracked
+    const fileName = toValue(name);
+    if (fileName === null) return null;
+    const metadata = fs.files.value.get(fileName) ?? null;
+    if (metadata === null) return null;
+    // No longer tracked
+    return await fs.readBinaryFile(fileName);
+  }, null);
+}
+
+export class ReactiveFilesystem implements WritableFiles {
+  private _files: Map<FilePath, FileMetadata> = reactive(new Map());
   private taskQueue: Promise<void> = Promise.resolve();
+  private _filesReadonly = computed(
+    () => this._files as ReadonlyMap<FilePath, FileMetadata>
+  );
   private constructor(public readonly name: FilePath) {}
 
+  get files() {
+    return this._filesReadonly;
+  }
+
   static async create(name: FilePath) {
-    const instance = new FilesWithFilesystem(name);
-    const sceneDirectory = await instance.getSceneDirectory();
-    // TODO: Remove "as any" once TypeScript has support for this API
-    for await (const [key, value] of (sceneDirectory as any).entries()) {
-      // key: string
-      // value: FileSystemFileHandle
-      const file = await value.getFile();
-      const text = await file.text();
-      instance.files.set(key, text);
-    }
+    const instance = new ReactiveFilesystem(name);
+    await instance.addTask(async (sceneDirectory) => {
+      for await (const entry of (sceneDirectory as any).entries()) {
+        const key: string = entry[0];
+        instance._files.set(makeFilePath(key), new FileMetadata(0));
+      }
+    });
     return instance;
   }
 
@@ -112,57 +92,115 @@ export class FilesWithFilesystem implements WritableFiles {
     return await root.getDirectoryHandle(this.name, { create: true });
   }
 
-  listFiles(): FilePath[] {
-    return Array.from(this.files.keys());
+  private addTask<T>(
+    makeTask: (sceneDirectory: FileSystemDirectoryHandle) => Promise<T>
+  ) {
+    const orderedTask = this.taskQueue.then(async () => {
+      const sceneDirectory = await this.getSceneDirectory();
+      return makeTask(sceneDirectory);
+    });
+    this.taskQueue = orderedTask.then(
+      () => {},
+      () => {}
+    );
+    return orderedTask;
   }
 
-  writeFile(name: FilePath, content: string) {
-    this.files.set(name, content);
-    this.taskQueue = this.taskQueue.then(
-      async () => {
-        const sceneDirectory = await this.getSceneDirectory();
-        const fileHandle = await sceneDirectory.getFileHandle(
-          encodeFilePath(name),
-          {
-            create: true,
-          }
-        );
-        const writable = await fileHandle.createWritable();
-        await writable.write(content);
-        await writable.close();
-      },
-      (error) => {
-        console.error(error);
-      }
-    );
+  listFiles(): FilePath[] {
+    return Array.from(this._files.keys());
+  }
+
+  private setOrIncrementVersion(name: FilePath) {
+    const metadata = this._files.get(name);
+    if (metadata !== undefined) {
+      this._files.set(name, new FileMetadata(metadata.version + 1));
+    } else {
+      this._files.set(name, new FileMetadata(0));
+    }
+  }
+
+  writeTextFile(name: FilePath, content: string) {
+    this.setOrIncrementVersion(name);
+    return this.addTask(async (sceneDirectory) => {
+      const fileHandle = await sceneDirectory.getFileHandle(
+        encodeFilePath(name),
+        {
+          create: true,
+        }
+      );
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+    });
+  }
+
+  writeBinaryFile(name: FilePath, content: ArrayBuffer) {
+    this.setOrIncrementVersion(name);
+    return this.addTask(async (sceneDirectory) => {
+      const fileHandle = await sceneDirectory.getFileHandle(
+        encodeFilePath(name),
+        {
+          create: true,
+        }
+      );
+      const writable = await fileHandle.createWritable();
+      await writable.write(content);
+      await writable.close();
+    });
   }
 
   deleteFile(name: FilePath) {
-    this.files.delete(name);
-    this.taskQueue = this.taskQueue.then(
-      async () => {
-        const sceneDirectory = await this.getSceneDirectory();
-        await sceneDirectory.removeEntry(encodeFilePath(name));
-      },
-      (error) => {
-        console.error(error);
-      }
-    );
+    this._files.delete(name);
+    return this.addTask(async (sceneDirectory) => {
+      await sceneDirectory.removeEntry(encodeFilePath(name));
+    });
   }
 
-  readFile(name: FilePath) {
-    if (this.files.has(name)) {
-      return this.files.get(name) ?? null;
-    }
-    return null;
+  renameFile(oldName: FilePath, newName: FilePath) {
+    if (!this._files.has(oldName)) return Promise.resolve();
+    this._files.delete(oldName);
+    this.setOrIncrementVersion(newName);
+    return this.addTask(async (sceneDirectory) => {
+      // Ugh, the filesystem API doesn't have a rename function.
+      const oldFileHandle = await sceneDirectory.getFileHandle(
+        encodeFilePath(oldName)
+      );
+      const oldFile = await oldFileHandle.getFile();
+
+      const newFileHandle = await sceneDirectory.getFileHandle(
+        encodeFilePath(newName),
+        { create: true }
+      );
+      const writable = await newFileHandle.createWritable();
+      writable.write(oldFile);
+      await writable.close();
+
+      sceneDirectory.removeEntry(encodeFilePath(oldName));
+    });
+  }
+
+  readTextFile(name: FilePath) {
+    if (!this._files.has(name)) return null;
+
+    return this.addTask(async (sceneDirectory) => {
+      const handle = await sceneDirectory.getFileHandle(encodeFilePath(name));
+      const file = await handle.getFile();
+      return file.text();
+    });
+  }
+
+  readBinaryFile(name: FilePath) {
+    if (!this._files.has(name)) return null;
+
+    return this.addTask(async (sceneDirectory) => {
+      const handle = await sceneDirectory.getFileHandle(encodeFilePath(name));
+      const file = await handle.getFile();
+      return file.arrayBuffer();
+    });
   }
 
   hasFile(name: FilePath) {
-    return this.files.has(name);
-  }
-
-  waitFinished() {
-    return this.taskQueue.finally(() => {});
+    return this._files.has(name);
   }
 }
 

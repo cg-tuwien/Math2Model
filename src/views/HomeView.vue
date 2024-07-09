@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ReactiveFiles } from "@/filesystem/reactive-files";
+import { ReactiveFilesystem } from "@/filesystem/reactive-files";
 import { markRaw, shallowRef } from "vue";
 import { sceneFilesPromise } from "@/globals";
 import type { Engine } from "@/engine/engine";
 import { getEngine } from "@/engine/babylon-engine-promise";
 
-const sceneFiles = shallowRef<ReactiveFiles | null>(null);
+const sceneFiles = shallowRef<ReactiveFilesystem | null>(null);
 sceneFilesPromise.then((v) => {
   sceneFiles.value = markRaw(v);
 });
@@ -20,7 +20,7 @@ getEngine().then((v) => {
 <template>
   <EditorAndOutput
     v-if="sceneFiles !== null && engine !== null && canvas !== null"
-    :files="sceneFiles"
+    :fs="sceneFiles"
     :canvas="canvas"
     :engine="engine"
   ></EditorAndOutput>

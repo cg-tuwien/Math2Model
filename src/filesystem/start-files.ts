@@ -1,44 +1,32 @@
 import { ReadonlyEulerAngles } from "@/scenes/VirtualScene";
 import {
   makeFilePath,
-  readOrCreateFile,
-  type ReactiveFiles,
+  ReactiveFilesystem,
   type FilePath,
+  type WritableFiles,
 } from "./reactive-files";
-import {
-  type SerializedScene,
-  SceneFileSchemaUrl,
-  deserializeScene,
-} from "./scene-file";
+import { type SerializedScene, SceneFileSchemaUrl } from "./scene-file";
 import HeartSphere from "@/shaders/HeartSphere.wgsl?raw";
 import { assert } from "@stefnotch/typestef/assert";
-import { showError } from "@/notification";
 
-export function getOrCreateScene(files: ReactiveFiles, scenePath: FilePath) {
-  const { sceneData } = createDefaults(files, scenePath);
-  const sceneFile = deserializeScene(sceneData);
-  if (sceneFile === null) {
-    // TODO: Properly show the error in the UI
-    showError("Failed to deserialize scene file", sceneData);
-    // Deserialization failed, which is likely due to a syntax error in the scene file.
-    // Point the start file to the scene file so that the user can fix it!
-    return { sceneFile: null, startFile: scenePath };
-  } else {
-    // Tries to find a parametric shader that exists in the scene file.
-    // Otherwise it falls back to the scene file itself.
-    const startFile = makeFilePath(
-      sceneFile.models.find((model) =>
-        files.hasFile(makeFilePath(model.parametricShader))
-      )?.parametricShader ?? scenePath
-    );
-    return { sceneFile, startFile };
+async function readOrCreateFile(
+  sceneFiles: WritableFiles,
+  name: FilePath,
+  defaultContent: () => string
+): Promise<string> {
+  let content = await sceneFiles.readTextFile(name);
+  if (content === null) {
+    content = defaultContent();
+    sceneFiles.writeTextFile(name, content);
   }
+  return content;
 }
 
+// TODO: Use this function to create an example.
 /**
  * Creates the default files if they don't exist.
  */
-function createDefaults(files: ReactiveFiles, scenePath: FilePath) {
+export function createDefaults(files: ReactiveFilesystem, scenePath: FilePath) {
   const defaultParametricShader = {
     name: makeFilePath("my-shader.wgsl"),
     value: () => HeartSphere,
@@ -71,7 +59,7 @@ function createDefaults(files: ReactiveFiles, scenePath: FilePath) {
     },
   };
   if (files.hasFile(defaultScene.name)) {
-    const sceneData = files.readFile(defaultScene.name);
+    const sceneData = files.readTextFile(defaultScene.name);
     assert(sceneData !== null);
     return { sceneData };
   }

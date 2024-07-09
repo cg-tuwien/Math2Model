@@ -1,14 +1,8 @@
-import {
-  ReactiveFiles,
-  FilesWithFilesystem,
-  makeFilePath,
-} from "./filesystem/reactive-files";
+import { ReactiveFilesystem, makeFilePath } from "./filesystem/reactive-files";
 
-export const sceneFilesPromise = (async () => {
-  const fs = await FilesWithFilesystem.create(makeFilePath("some-key"));
-  return await ReactiveFiles.create(fs);
-})();
-
+export const sceneFilesPromise = ReactiveFilesystem.create(
+  makeFilePath("some-key")
+);
 const canvasElement = document.createElement("canvas");
 canvasElement.style.width = "100%";
 canvasElement.style.height = "100%";
