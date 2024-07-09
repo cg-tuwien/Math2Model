@@ -27,7 +27,7 @@ import {
 } from "@/scenes/VirtualScene";
 import { getOrCreateScene } from "@/filesystem/start-files";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
-import { serializeScene } from "@/filesystem/scene-file";
+import { SceneFileName, serializeScene } from "@/filesystem/scene-file";
 import type { Engine } from "@/engine/engine";
 import HeartSphere from "@/shaders/HeartSphere.wgsl?raw";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
@@ -43,14 +43,16 @@ const props = defineProps<{
 const store = useStore();
 
 // The underlying data
-const scenePath = makeFilePath("scene.json");
-const { sceneFile, startFile } = getOrCreateScene(props.files, scenePath);
+const { sceneFile, startFile } = getOrCreateScene(props.files, SceneFileName);
 const scene = useVirtualScene();
 watch(
-  () => props.files.fileNames.value.get(scenePath),
+  () => props.files.fileNames.value.get(SceneFileName),
   () => {
     try {
-      const { sceneFile, startFile } = getOrCreateScene(props.files, scenePath);
+      const { sceneFile, startFile } = getOrCreateScene(
+        props.files,
+        SceneFileName
+      );
 
       if (sceneFile !== null) {
         scene.api.value.fromSerialized(sceneFile);
@@ -256,7 +258,7 @@ function saveScene() {
       new Error("Could not serialize scene")
     );
   } else {
-    props.files.writeFile(scenePath, sceneContent);
+    props.files.writeFile(SceneFileName, sceneContent);
   }
 }
 
@@ -354,7 +356,7 @@ function removeModel(ids: string[]) {
               :models="scene.state.value.models"
               :scene="scene.api.value"
               :files="props.files"
-              :scene-path="scenePath"
+              :scene-path="SceneFileName"
               :shaders="shadersDropdown"
               @update="(keys, update) => updateModels(keys, update)"
               @addModel="

@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import { useStore } from "@/stores/store";
+import { startImportFiles, useStore } from "@/stores/store";
 import type { DropdownOption } from "naive-ui/es/dropdown/src/interface";
-import { computed, h } from "vue";
+import { computed, h, ref } from "vue";
 import { useRouter } from "vue-router";
 import IconMoon from "~icons/mdi/moon-and-stars";
 import IconSun from "~icons/mdi/white-balance-sunny";
 import IconGithub from "~icons/mdi/github";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { homepage } from "@/../package.json";
-import { BlobWriter, ZipWriter } from "@zip.js/zip.js";
 
 const store = useStore();
 const router = useRouter();
@@ -17,6 +16,7 @@ type FileDropdownOption = DropdownOption & {
   key: "open" | "save-as" | "examples";
 };
 
+const inputFileElement = ref<HTMLInputElement | null>(null);
 const fileOptions = computed((): FileDropdownOption[] => {
   return [
     {
@@ -46,15 +46,7 @@ const fileOptions = computed((): FileDropdownOption[] => {
 });
 async function handleFile(key: FileDropdownOption["key"]) {
   if (key === "open") {
-    // TODO: Open any file (or folder?)
-    // Then
-    // - If it is a file list: Import all files
-    // - If it is a folder: Import all files
-    // - If it looks like a zip: Import all files
-    // TODO: If the file list has a `scene.json`, then ask the user
-    // - Add to current project
-    // - Or open as new project
-    // TODO: Drag and drop support (onto the file list)
+    inputFileElement.value?.click();
   } else if (key === "save-as") {
     await store.exportToZip();
   } else if (key === "examples") {
@@ -128,6 +120,10 @@ function handleHelp(key: HelpDropdownOption["key"]) {
     assertUnreachable(key);
   }
 }
+
+async function openFiles(inputFiles: FileList) {
+  const { isProject, files } = await startImportFiles(inputFiles);
+}
 </script>
 
 <template>
@@ -142,6 +138,18 @@ function handleHelp(key: HelpDropdownOption["key"]) {
           />
         </span>
         <span class="ml-1">
+          <input
+            type="file"
+            multiple
+            class="hidden"
+            ref="inputFileElement"
+            @change="
+              (ev) =>
+                openFiles(
+                  inputFileElement?.files ?? (ev.target as any).files ?? []
+                )
+            "
+          />
           <n-dropdown
             trigger="click"
             :options="fileOptions"

@@ -1,9 +1,10 @@
 import { readonly } from "vue";
 import { acceptHMRUpdate, defineStore } from "pinia";
 import { useDark } from "@vueuse/core";
-import type { ReactiveFiles } from "@/filesystem/reactive-files";
+import { makeFilePath, type ReactiveFiles } from "@/filesystem/reactive-files";
 import { sceneFilesPromise } from "@/globals";
-import { BlobWriter, ZipWriter } from "@zip.js/zip.js";
+import { BlobReader, BlobWriter, ZipReader, ZipWriter } from "@zip.js/zip.js";
+import { SceneFileName } from "@/filesystem/scene-file";
 
 class FilesystemCommands {
   private commands: Promise<any>;
@@ -20,6 +21,16 @@ class FilesystemCommands {
     return newPromise;
   }
 }
+
+const textFileExtensions = [
+  "wgsl",
+  "json",
+  "txt",
+  "md",
+  "glsl",
+  "vert",
+  "frag",
+];
 
 /**
  * The main store for the app
@@ -66,4 +77,55 @@ export const useStore = defineStore("store", () => {
 
 if (import.meta.hot) {
   import.meta.hot.accept(acceptHMRUpdate(useStore, import.meta.hot));
+}
+
+export async function startImportFiles(files: FileList): Promise<{
+  isProject: boolean;
+  files: FileList;
+}> {
+  if (files.length === 1 && files[0].name.endsWith(".zip")) {
+    const entries = new ZipReader(
+      new BlobReader(files[0])
+    ).getEntriesGenerator();
+    for await (const entry of entries) {
+      if (entry.filename === SceneFileName) {
+        return { isProject: true, files };
+      }
+    }
+  }
+  for (let i = 0; i < files.length; i++) {
+    if (makeFilePath(files[i].name) === SceneFileName) {
+      return { isProject: true, files };
+    }
+  }
+  return { isProject: false, files };
+
+  /*const filesList: {
+    name: string;
+    value: string;
+  }[] = [];
+  if (files.length === 1) {
+    const isZip = files[0].name.endsWith(".zip");
+  }
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const reader = new FileReader();
+    reader.onload = () => {
+      const value = reader.result as string;
+      filesList.push({ name: file.name, value });
+    };
+
+    reader.readAsText(files[i], "utf-8");
+  }*/
+
+  // TODO: Open any file (or folder?)
+  // Then
+  // - If it is a file list: Import all files
+  // - If it is a folder: Import all files
+  // - If it looks like a zip: Import all files
+  // TODO: If the file list has a `scene.json`, then ask the user
+  // - Add to current project
+  // - Or open as new project
+  // TODO: Drag and drop support (onto the file list)
 }
