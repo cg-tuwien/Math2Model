@@ -83,7 +83,6 @@ function replaceAutogen(shader: string, innerCode: string | null) {
 fn evaluateImage(input2: vec2f) -> vec3f {
   return vec3f(input2, 0.0);
 }
-}
 `;
   }
 
