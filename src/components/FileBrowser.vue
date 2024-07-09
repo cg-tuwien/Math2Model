@@ -14,11 +14,11 @@ import {
 import {
   makeFilePath,
   type FilePath,
-  type ReactiveFiles,
+  type ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
 
 const props = defineProps<{
-  files: ReactiveFiles;
+  fs: ReactiveFilesystem;
 }>();
 
 const emit = defineEmits<{
@@ -58,7 +58,7 @@ const data = ref<TreeNode>({
   children: [],
 });
 watch(
-  props.files.fileNames,
+  props.fs.files,
   (fileNames) => {
     const oldDataMap = new Map(
       (data.value.children ?? []).map((node) => [node.key, node])
@@ -119,7 +119,7 @@ watch(
 function startAddFile() {
   let newFile = makeFilePath("untitled");
   let i = 0;
-  while (props.files.hasFile(newFile)) {
+  while (props.fs.hasFile(newFile)) {
     newFile = makeFilePath(`untitled${i}`);
     i++;
   }

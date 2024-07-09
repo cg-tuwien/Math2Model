@@ -29,21 +29,17 @@ export const SceneFileSchema = z.object({
 
 export type SerializedScene = z.infer<typeof SceneFileSchema>;
 
+/**
+ * @throws Error if the scene cannot be serialized.
+ */
 export function serializeScene(scene: SerializedScene, pretty = false) {
-  const result = SceneFileSchema.safeParse(scene);
-  if (result.success) {
-    return JSON.stringify(result.data, null, pretty ? 2 : undefined);
-  } else {
-    console.error(result.error);
-    return null;
-  }
+  const result = SceneFileSchema.parse(scene);
+  return JSON.stringify(result, null, pretty ? 2 : undefined);
 }
 
-export function deserializeScene(scene: string): SerializedScene | null {
-  try {
-    return SceneFileSchema.parse(JSON.parse(scene));
-  } catch (e) {
-    console.error(e);
-    return null;
-  }
+/**
+ * @throws Error if the scene is invalid.
+ */
+export function deserializeScene(scene: string): SerializedScene {
+  return SceneFileSchema.parse(JSON.parse(scene));
 }

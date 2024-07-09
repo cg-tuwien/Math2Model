@@ -1,8 +1,9 @@
 <template><slot></slot></template>
 <script setup lang="ts">
-import type {
-  HasReactiveFiles,
-  ReadonlyFiles,
+import {
+  useTextFile,
+  type ReactiveFilesystem,
+  type ReadonlyFiles,
 } from "@/filesystem/reactive-files";
 import type { BabylonBaseScene } from "@/scenes/BaseScene";
 import type {
@@ -49,7 +50,7 @@ import {
 
 const props = defineProps<{
   scene: BabylonBaseScene;
-  files: ReadonlyFiles & HasReactiveFiles;
+  files: ReactiveFilesystem;
   model: DeepReadonly<VirtualModelState>;
 }>();
 const engineRef = computed(() => props.scene.engine);
@@ -145,13 +146,9 @@ watchEffect(() => {
   );
 });
 
+const codeFile = useTextFile(() => props.model.code, props.files);
 const shaderMaterial = babylonEffectRef<ShaderMaterial | null>(() => {
-  // This is neccessary to make it fully reactive (otherwise it would not update when the file changes)
-  const vertexSourceId = props.files.fileNames.value.get(props.model.code);
-  if (vertexSourceId === undefined) {
-    return null;
-  }
-  const vertexSource = props.files.readFile(props.model.code);
+  const vertexSource = codeFile.value;
   if (vertexSource === null) {
     return null;
   }
@@ -476,12 +473,7 @@ onUnmounted(() => {
 
 const computePatchesShader = shallowEffectRef<[ComputeShader, ComputeShader]>(
   () => {
-    const vertexSourceId = props.files.fileNames.value.get(props.model.code);
-    const vertexSource =
-      vertexSourceId === undefined
-        ? null
-        : props.files.readFile(props.model.code);
-
+    const vertexSource = codeFile.value;
     const computeSource = assembleComputeShader(vertexSource);
     // Apparently the compute shader cannot be disposed of.
     const cs0 = new ComputeShader(
