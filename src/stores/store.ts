@@ -1,4 +1,4 @@
-import { readonly } from "vue";
+import { readonly, ref } from "vue";
 import { acceptHMRUpdate, defineStore } from "pinia";
 import { useDark } from "@vueuse/core";
 import {
@@ -29,15 +29,14 @@ class FilesystemCommands {
   }
 }
 
-const textFileExtensions = [
-  "wgsl",
-  "json",
-  "txt",
-  "md",
-  "glsl",
-  "vert",
-  "frag",
-];
+export type ImportProjectDialog = {
+  data:
+    | {
+        type: "files";
+        value: FileList;
+      }
+    | { type: "zip"; value: ZipReader<unknown> };
+};
 
 /**
  * The main store for the app
@@ -73,11 +72,33 @@ export const useStore = defineStore("store", () => {
     });
   }
 
+  const importProjectDialog = ref<ImportProjectDialog | null>(null);
+
+  async function importFilesOrProject(files: FileList) {
+    const maybeProject = await tryImportProject(files);
+    if (maybeProject !== null) {
+      importProjectDialog.value = maybeProject;
+      // TODO: If the file list has a `scene.json`, then ask the user
+      // - Add to current project
+      // - Or open as new project
+    } else {
+      filesystemCommands.add(async (sceneFiles) => {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          await sceneFiles.writeBinaryFile(makeFilePath(file.name), file);
+        }
+      });
+    }
+
+    // TODO: Drag and drop support (onto the file list)
+  }
+
   return {
     isDark: readonly(isDark),
     setIsDark: (newValue: boolean) => {
       isDark.value = newValue;
     },
+    importFilesOrProject,
     exportToZip,
   };
 });
@@ -86,53 +107,22 @@ if (import.meta.hot) {
   import.meta.hot.accept(acceptHMRUpdate(useStore, import.meta.hot));
 }
 
-export async function startImportFiles(files: FileList): Promise<{
-  isProject: boolean;
-  files: FileList;
-}> {
+async function tryImportProject(
+  files: FileList
+): Promise<ImportProjectDialog | null> {
   if (files.length === 1 && files[0].name.endsWith(".zip")) {
-    const entries = new ZipReader(
-      new BlobReader(files[0])
-    ).getEntriesGenerator();
+    const reader = new ZipReader(new BlobReader(files[0]));
+    const entries = reader.getEntriesGenerator();
     for await (const entry of entries) {
       if (entry.filename === SceneFileName) {
-        return { isProject: true, files };
+        return { data: { type: "zip", value: reader } };
       }
     }
   }
   for (let i = 0; i < files.length; i++) {
     if (makeFilePath(files[i].name) === SceneFileName) {
-      return { isProject: true, files };
+      return { data: { type: "files", value: files } };
     }
   }
-  return { isProject: false, files };
-
-  /*const filesList: {
-    name: string;
-    value: string;
-  }[] = [];
-  if (files.length === 1) {
-    const isZip = files[0].name.endsWith(".zip");
-  }
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const reader = new FileReader();
-    reader.onload = () => {
-      const value = reader.result as string;
-      filesList.push({ name: file.name, value });
-    };
-
-    reader.readAsText(files[i], "utf-8");
-  }*/
-
-  // TODO: Open any file (or folder?)
-  // Then
-  // - If it is a file list: Import all files
-  // - If it is a folder: Import all files
-  // - If it looks like a zip: Import all files
-  // TODO: If the file list has a `scene.json`, then ask the user
-  // - Add to current project
-  // - Or open as new project
-  // TODO: Drag and drop support (onto the file list)
+  return null;
 }

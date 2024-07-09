@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { startImportFiles, useStore } from "@/stores/store";
+import { useStore } from "@/stores/store";
 import type { DropdownOption } from "naive-ui/es/dropdown/src/interface";
 import { computed, h, ref } from "vue";
 import { useRouter } from "vue-router";
@@ -125,7 +125,7 @@ function handleHelp(key: HelpDropdownOption["key"]) {
 }
 
 async function openFiles(inputFiles: FileList) {
-  const { isProject, files } = await startImportFiles(inputFiles);
+  store.importFilesOrProject(inputFiles);
 }
 </script>
 
