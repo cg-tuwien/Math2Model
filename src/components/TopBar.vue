@@ -12,6 +12,8 @@ import { homepage } from "@/../package.json";
 const store = useStore();
 const router = useRouter();
 
+const examplesModule = () => import("@/scenes/example-scenes");
+
 type FileDropdownOption = DropdownOption & {
   key: "open" | "save-as" | "examples" | "example-scene" | "heart-sphere-scene";
 };
@@ -51,9 +53,11 @@ async function handleFile(key: FileDropdownOption["key"]) {
   } else if (key === "examples") {
     // Do nothing
   } else if (key === "example-scene") {
-    // TODO: Load that scene (and use the asking dialog (switch or open new))
+    const module = await examplesModule();
+    store.importInMemoryProject(module.createDefaultProject().files);
   } else if (key === "heart-sphere-scene") {
-    // TODO: Load that scene (and use the asking dialog (switch or open new))
+    const module = await examplesModule();
+    store.importInMemoryProject(module.createHeartSphereProject().files);
   } else {
     assertUnreachable(key);
   }

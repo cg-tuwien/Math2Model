@@ -35,7 +35,14 @@ export type ImportProjectDialog = {
         type: "files";
         value: FileList;
       }
-    | { type: "zip"; value: ZipReader<unknown> };
+    | { type: "zip"; value: ZipReader<unknown> }
+    | {
+        type: "in-memory";
+        value: {
+          name: string;
+          value: ArrayBuffer;
+        }[];
+      };
 };
 
 /**
@@ -93,12 +100,24 @@ export const useStore = defineStore("store", () => {
     // TODO: Drag and drop support (onto the file list)
   }
 
+  async function importInMemoryProject(
+    files: {
+      name: string;
+      value: ArrayBuffer;
+    }[]
+  ) {
+    importProjectDialog.value = {
+      data: { type: "in-memory", value: files },
+    };
+  }
+
   return {
     isDark: readonly(isDark),
     setIsDark: (newValue: boolean) => {
       isDark.value = newValue;
     },
     importFilesOrProject,
+    importInMemoryProject,
     exportToZip,
   };
 });

@@ -1,8 +1,4 @@
-import {
-  SceneFileName,
-  SceneFileSchemaUrl,
-  type SerializedScene,
-} from "@/filesystem/scene-file";
+import { SceneFileName, SceneFileSchemaUrl } from "@/filesystem/scene-file";
 import { ReadonlyEulerAngles } from "./VirtualScene";
 import { makeFilePath } from "@/filesystem/reactive-files";
 import DefaultParametric from "@/shaders/DefaultParametric.wgsl?raw";
@@ -12,9 +8,11 @@ type ExampleProject = {
   name: string;
   files: {
     name: string;
-    value: string;
+    value: ArrayBuffer;
   }[];
 };
+
+const textEncoder = new TextEncoder();
 
 export const createDefaultProject = (): ExampleProject => {
   const shaderName = makeFilePath("my-shader.wgsl");
@@ -46,11 +44,11 @@ export const createDefaultProject = (): ExampleProject => {
     files: [
       {
         name: SceneFileName,
-        value: JSON.stringify(scene, null, 2),
+        value: textEncoder.encode(JSON.stringify(scene, null, 2)),
       },
       {
         name: shaderName,
-        value: shader,
+        value: textEncoder.encode(shader),
       },
     ],
   };
@@ -86,11 +84,11 @@ export const createHeartSphereProject = (): ExampleProject => {
     files: [
       {
         name: SceneFileName,
-        value: JSON.stringify(scene, null, 2),
+        value: textEncoder.encode(JSON.stringify(scene, null, 2)),
       },
       {
         name: shaderName,
-        value: shader,
+        value: textEncoder.encode(shader),
       },
     ],
   };
