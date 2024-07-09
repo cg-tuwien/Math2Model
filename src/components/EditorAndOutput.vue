@@ -192,7 +192,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
   function addFiles(files: Set<FilePath>) {
     files.forEach((file) => {
       if (fs.hasFile(file)) return;
-      fs.writeFile(file, "");
+      fs.writeTextFile(file, "");
     });
   }
   function renameFile(oldName: FilePath, newName: FilePath) {
@@ -223,7 +223,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
       ...keyedCode.value,
       code: value,
     };
-    fs.writeFile(keyedCode.value.name, value);
+    fs.writeTextFile(keyedCode.value.name, value);
   }, 500);
 
   return {
@@ -278,7 +278,7 @@ function saveScene() {
       new Error("Could not serialize scene")
     );
   } else {
-    props.fs.writeFile(scenePath, sceneContent);
+    props.fs.writeTextFile(scenePath, sceneContent);
   }
 }
 
@@ -294,7 +294,7 @@ function addModel(name: string, shaderName: string) {
     const vertexSource = makeFilePath(shaderName);
 
     if (!props.fs.hasFile(vertexSource)) {
-      props.fs.writeFile(vertexSource, HeartSphere);
+      props.fs.writeTextFile(vertexSource, HeartSphere);
     }
 
     const newModel: VirtualModelState = {
