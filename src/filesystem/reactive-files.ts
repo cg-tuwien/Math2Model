@@ -21,19 +21,6 @@ export interface WritableFiles extends ReadonlyFiles {
   deleteFile(name: FilePath): Promise<void>;
 }
 
-export async function readOrCreateFile(
-  sceneFiles: WritableFiles,
-  name: FilePath,
-  defaultContent: () => string
-): Promise<string> {
-  let content = await sceneFiles.readTextFile(name);
-  if (content === null) {
-    content = defaultContent();
-    sceneFiles.writeTextFile(name, content);
-  }
-  return content;
-}
-
 export function makeFilePath(path: string): FilePath {
   return path as FilePath;
 }

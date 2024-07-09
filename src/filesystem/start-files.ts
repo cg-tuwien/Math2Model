@@ -2,12 +2,25 @@ import { ReadonlyEulerAngles } from "@/scenes/VirtualScene";
 import {
   makeFilePath,
   ReactiveFilesystem,
-  readOrCreateFile,
   type FilePath,
+  type WritableFiles,
 } from "./reactive-files";
 import { type SerializedScene, SceneFileSchemaUrl } from "./scene-file";
 import HeartSphere from "@/shaders/HeartSphere.wgsl?raw";
 import { assert } from "@stefnotch/typestef/assert";
+
+async function readOrCreateFile(
+  sceneFiles: WritableFiles,
+  name: FilePath,
+  defaultContent: () => string
+): Promise<string> {
+  let content = await sceneFiles.readTextFile(name);
+  if (content === null) {
+    content = defaultContent();
+    sceneFiles.writeTextFile(name, content);
+  }
+  return content;
+}
 
 // TODO: Use this function to create an example.
 /**
