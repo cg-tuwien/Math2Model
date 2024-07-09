@@ -1,4 +1,4 @@
-import { readonly, ref } from "vue";
+import { computed, readonly, ref } from "vue";
 import { acceptHMRUpdate, defineStore } from "pinia";
 import { useDark } from "@vueuse/core";
 import {
@@ -6,8 +6,15 @@ import {
   type ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
 import { sceneFilesPromise } from "@/globals";
-import { BlobReader, BlobWriter, ZipReader, ZipWriter } from "@zip.js/zip.js";
+import {
+  BlobReader,
+  BlobWriter,
+  Uint8ArrayWriter,
+  ZipReader,
+  ZipWriter,
+} from "@zip.js/zip.js";
 import { SceneFileName } from "@/filesystem/scene-file";
+import { assertUnreachable } from "@stefnotch/typestef/assert";
 
 /**
  * Deals with the fact that the filesystem is created asynchronously.
@@ -30,20 +37,22 @@ class FilesystemCommands {
 }
 
 export type ImportProjectDialog = {
-  data:
-    | {
-        type: "files";
-        value: FileList;
-      }
-    | { type: "zip"; value: ZipReader<unknown> }
-    | {
-        type: "in-memory";
-        value: {
-          name: string;
-          value: ArrayBuffer;
-        }[];
-      };
+  data: ImportFilesList;
 };
+
+export type ImportFilesList =
+  | {
+      type: "files";
+      value: FileList;
+    }
+  | { type: "zip"; value: ZipReader<unknown> }
+  | {
+      type: "in-memory";
+      value: {
+        name: string;
+        value: ArrayBuffer;
+      }[];
+    };
 
 /**
  * The main store for the app
@@ -79,27 +88,38 @@ export const useStore = defineStore("store", () => {
     });
   }
 
+  /**
+   * Limitations:
+   * - No drag and drop
+   * - Doesn't ask before overwriting
+   */
   const importProjectDialog = ref<ImportProjectDialog | null>(null);
 
+  function hasProject(): Promise<boolean> {
+    return filesystemCommands.add((sceneFiles) =>
+      Promise.resolve(sceneFiles.files.value.has(SceneFileName))
+    );
+  }
+
+  /**
+   * Can trigger an import dialog.
+   */
   async function importFilesOrProject(files: FileList) {
     const maybeProject = await tryImportProject(files);
     if (maybeProject !== null) {
       importProjectDialog.value = maybeProject;
-      // TODO: If the file list has a `scene.json`, then ask the user
-      // - Add to current project
-      // - Or open as new project
+      const noProject = !(await hasProject());
+      if (noProject) {
+        await finishImport("project");
+      }
     } else {
-      filesystemCommands.add(async (sceneFiles) => {
-        for (let i = 0; i < files.length; i++) {
-          const file = files[i];
-          await sceneFiles.writeBinaryFile(makeFilePath(file.name), file);
-        }
-      });
+      importFiles({ type: "files", value: files });
     }
-
-    // TODO: Drag and drop support (onto the file list)
   }
 
+  /**
+   * Can trigger an import dialog.
+   */
   async function importInMemoryProject(
     files: {
       name: string;
@@ -109,6 +129,57 @@ export const useStore = defineStore("store", () => {
     importProjectDialog.value = {
       data: { type: "in-memory", value: files },
     };
+    const noProject = !(await hasProject());
+    if (noProject) {
+      await finishImport("project");
+    }
+  }
+
+  async function importFiles(filesToImport: ImportFilesList) {
+    filesystemCommands.add(async (sceneFiles) => {
+      if (filesToImport.type === "in-memory") {
+        for (let i = 0; i < filesToImport.value.length; i++) {
+          const file = filesToImport.value[i];
+          await sceneFiles.writeBinaryFile(makeFilePath(file.name), file.value);
+        }
+      } else if (filesToImport.type === "zip") {
+        const entries = filesToImport.value.getEntriesGenerator();
+        for await (const entry of entries) {
+          const file = (await entry.getData?.(new Uint8ArrayWriter())) ?? null;
+          if (file === null) continue;
+          await sceneFiles.writeBinaryFile(makeFilePath(entry.filename), file);
+        }
+      } else if (filesToImport.type === "files") {
+        for (let i = 0; i < filesToImport.value.length; i++) {
+          const file = filesToImport.value[i];
+          await sceneFiles.writeBinaryFile(makeFilePath(file.name), file);
+        }
+      } else {
+        assertUnreachable(filesToImport);
+      }
+    });
+  }
+
+  async function finishImport(importAs: "files" | "project" | "cancel") {
+    const dialog = importProjectDialog.value;
+    if (dialog === null) return;
+    importProjectDialog.value = null;
+
+    if (importAs === "cancel") {
+      // Nothing to do
+    } else if (importAs === "files") {
+      await importFiles(dialog.data);
+    } else if (importAs === "project") {
+      // Clear the current project before importing the new one
+      await filesystemCommands.add((sceneFiles) =>
+        Promise.all(
+          sceneFiles.listFiles().map((file) => sceneFiles.deleteFile(file))
+        )
+      );
+      await importFiles(dialog.data);
+    } else {
+      assertUnreachable(importAs);
+    }
   }
 
   return {
@@ -116,8 +187,10 @@ export const useStore = defineStore("store", () => {
     setIsDark: (newValue: boolean) => {
       isDark.value = newValue;
     },
+    importProjectDialog: computed(() => importProjectDialog.value),
     importFilesOrProject,
     importInMemoryProject,
+    finishImport,
     exportToZip,
   };
 });
