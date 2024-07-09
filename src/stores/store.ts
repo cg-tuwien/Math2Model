@@ -1,21 +1,28 @@
 import { readonly } from "vue";
 import { acceptHMRUpdate, defineStore } from "pinia";
 import { useDark } from "@vueuse/core";
-import { makeFilePath, type ReactiveFiles } from "@/filesystem/reactive-files";
+import {
+  makeFilePath,
+  type ReactiveFilesystem,
+} from "@/filesystem/reactive-files";
 import { sceneFilesPromise } from "@/globals";
 import { BlobReader, BlobWriter, ZipReader, ZipWriter } from "@zip.js/zip.js";
 import { SceneFileName } from "@/filesystem/scene-file";
 
+/**
+ * Deals with the fact that the filesystem is created asynchronously.
+ * It just queues up commands until the filesystem is ready.
+ */
 class FilesystemCommands {
   private commands: Promise<any>;
-  private sceneFiles: ReactiveFiles = null as any;
-  constructor(sceneFilesPromise: Promise<ReactiveFiles>) {
+  private sceneFiles: ReactiveFilesystem = null as any;
+  constructor(sceneFilesPromise: Promise<ReactiveFilesystem>) {
     this.commands = sceneFilesPromise.then((v) => {
       this.sceneFiles = v;
     });
   }
 
-  add<T>(callback: (sceneFiles: ReactiveFiles) => Promise<T>): Promise<T> {
+  add<T>(callback: (sceneFiles: ReactiveFilesystem) => Promise<T>): Promise<T> {
     const newPromise = this.commands.then(() => callback(this.sceneFiles));
     this.commands = newPromise;
     return newPromise;
@@ -45,18 +52,18 @@ export const useStore = defineStore("store", () => {
 
   function exportToZip() {
     return filesystemCommands.add(async (sceneFiles) => {
-      const files = sceneFiles.listFiles().flatMap((filePath) => {
-        const file = sceneFiles.readFile(filePath);
-        return file === null ? [] : [{ filePath, file }];
-      });
       const zip = new ZipWriter(new BlobWriter("application/zip"), {
         bufferedWrite: true,
       });
+
       await Promise.all(
-        files.map(({ filePath, file }) =>
-          zip.add(filePath, new Blob([file]).stream())
-        )
+        sceneFiles.listFiles().map(async (filePath) => {
+          const file = await sceneFiles.readBinaryFile(filePath);
+          if (file === null) return;
+          await zip.add(filePath, new Blob([file]).stream());
+        })
       );
+
       const blobUrl = URL.createObjectURL(await zip.close());
       const a = document.createElement("a");
       a.href = blobUrl;

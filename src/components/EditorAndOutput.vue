@@ -28,9 +28,12 @@ import {
   useVirtualScene,
   type VirtualModelState,
 } from "@/scenes/VirtualScene";
-import { getOrCreateScene } from "@/filesystem/start-files";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
-import { SceneFileName, serializeScene } from "@/filesystem/scene-file";
+import {
+  deserializeScene,
+  SceneFileName,
+  serializeScene,
+} from "@/filesystem/scene-file";
 import type { Engine } from "@/engine/engine";
 import HeartSphere from "@/shaders/HeartSphere.wgsl?raw";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
