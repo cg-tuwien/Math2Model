@@ -19,6 +19,14 @@ wgpu-profiler = "0.17.0"
 winit = { workspace = true }
 slotmap = "1.0.7"
 
+[dev-dependencies]
+criterion = "0.5.1"
+pollster = "0.3"
+
+[[bench]]
+name = "gpu_bench"
+harness = false
+
 [build-dependencies]
 wgsl_to_wgpu = "0.8.1"
 
