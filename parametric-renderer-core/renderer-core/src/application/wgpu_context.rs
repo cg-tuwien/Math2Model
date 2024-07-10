@@ -6,9 +6,18 @@ use winit::window::Window;
 
 use super::ProfilerSettings;
 
+enum SurfaceOrFallback {
+    Surface(wgpu::Surface<'static>),
+    Fallback { texture: wgpu::Texture },
+}
+
+struct FallbackSurface {
+    texture: wgpu::Texture,
+}
+
 pub struct WgpuContext {
     pub instance: wgpu::Instance,
-    pub surface: wgpu::Surface<'static>,
+    pub surface: Option<wgpu::Surface<'static>>,
     pub adapter: wgpu::Adapter,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
@@ -108,7 +117,7 @@ impl WgpuContext {
 
         Ok(WgpuContext {
             instance,
-            surface,
+            surface: Some(surface),
             adapter,
             device,
             queue,
@@ -118,5 +127,14 @@ impl WgpuContext {
             size,
             view_format,
         })
+    }
+
+    pub fn surface_texture(&self) -> &wgpu::Texture {
+        self.surface
+            .as_ref()
+            .unwrap()
+            .get_current_texture()
+            .unwrap()
+            .view
     }
 }

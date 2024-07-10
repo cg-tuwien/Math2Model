@@ -356,9 +356,9 @@ impl GpuApplication {
             self.context.size = new_size;
             self.context.config.width = new_size.width;
             self.context.config.height = new_size.height;
-            self.context
-                .surface
-                .configure(&self.context.device, &self.context.config);
+            if let Some(surface) = &self.context.surface {
+                surface.configure(&self.context.device, &self.context.config);
+            }
             self.depth_texture = Texture::create_depth_texture(
                 &self.context.device,
                 &self.context.config,
@@ -371,14 +371,19 @@ impl GpuApplication {
     }
 
     pub fn render(&mut self, render_data: RenderData) -> Result<(), wgpu::SurfaceError> {
-        let output = self.context.surface.get_current_texture()?;
+        let output = match self.context.surface {
+            Some(ref surface) => Some(surface.get_current_texture()?),
+            None => None,
+        };
         let mut command_encoder = self.render_commands(&output, render_data)?;
         self.context.profiler.resolve_queries(&mut command_encoder);
         // Submit the commands
         self.context
             .queue
             .submit(std::iter::once(command_encoder.finish()));
-        output.present();
+        if let Some(output) = output {
+            output.present();
+        }
 
         // Finish the frame after all commands have been submitted
         self.context.profiler.end_frame().unwrap();
@@ -387,16 +392,14 @@ impl GpuApplication {
 
     pub fn render_commands(
         &self,
-        surface_texture: &wgpu::SurfaceTexture,
+        surface_texture: &wgpu::Texture,
         render_data: RenderData,
     ) -> Result<wgpu::CommandEncoder, wgpu::SurfaceError> {
         let queue = &self.context.queue;
-        let view = surface_texture
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor {
-                format: Some(self.context.view_format),
-                ..Default::default()
-            });
+        let view = surface_texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(self.context.view_format),
+            ..Default::default()
+        });
 
         self.scene_data.write_buffers(&render_data, queue);
 
