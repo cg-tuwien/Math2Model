@@ -1,8 +1,7 @@
 export type SelectionGeneration = number & { __selectionGeneration: true };
-export type NodeKey = string;
-export type NodePath = NodeKey[];
+export type NodePath = readonly number[];
 export interface TreeNode {
-  key: NodeKey;
+  key: string;
   label: string;
   isExpanded?: boolean;
   isSelected?: [SelectionGeneration, boolean];
@@ -11,35 +10,15 @@ export interface TreeNode {
 }
 
 export const NodeTreeHelper = {
-  getNode(root: TreeNode, path: NodePath): TreeNode | null {
-    if (path.length === 0) {
-      return root;
-    }
-
-    const impl = (node: TreeNode, pathIndex: number): TreeNode | null => {
-      if (pathIndex >= path.length) {
+  getNode(root: TreeNode, path: Readonly<NodePath>): TreeNode | null {
+    for (const pathIndex of path) {
+      const child = root.children?.at(pathIndex) ?? null;
+      if (child === null) {
         return null;
       }
-      if (pathIndex === path.length - 1) {
-        if (node.key === path[pathIndex]) {
-          return node;
-        }
-      }
-      for (const child of node.children ?? []) {
-        const result = impl(child, pathIndex + 1);
-        if (result !== null) {
-          return result;
-        }
-      }
-      return null;
-    };
-    for (const child of root.children ?? []) {
-      const result = impl(child, 0);
-      if (result !== null) {
-        return result;
-      }
+      root = child;
     }
-    return null;
+    return root;
   },
 
   *visibleNodesIter(root: TreeNode): Generator<[TreeNode, NodePath]> {
@@ -49,13 +28,17 @@ export const NodeTreeHelper = {
     ): Generator<[TreeNode, NodePath]> {
       yield [node, path];
       if (node.isExpanded === true) {
-        for (const child of node.children ?? []) {
-          yield* impl(child, path.concat([child.key]));
+        const children = node.children ?? [];
+        for (let i = 0; i < children.length; i++) {
+          const child = children[i];
+          yield* impl(child, path.concat([i]));
         }
       }
     }
-    for (const child of root.children ?? []) {
-      yield* impl(child, [child.key]);
+    const children = root.children ?? [];
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
+      yield* impl(child, [i]);
     }
   },
 

@@ -1,6 +1,10 @@
 export type ObjectPathPart = string | number;
 export type NewValueFunction<Value = any> = (current: any) => Value;
 
+// I am so tempted to add a type like
+// type Path<T> = T extends Record<infer K extends string | number, any> ? K extends keyof T ? ([K, Path<T[K]>] | [K]) : never : never;
+// to the ObjectUpdate class. But I think it's better to keep it simple.
+
 export class ObjectUpdate<Value = any> {
   constructor(
     /**

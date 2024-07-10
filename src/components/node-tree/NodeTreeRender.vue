@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import {
-  type NodeKey,
   type NodePath,
-  type SelectionGeneration,
   NodeTreeHelper,
   type TreeNode,
   type TreeSelection,
@@ -32,7 +30,7 @@ const slots = defineSlots<{
 }>();
 
 const nodePaths = computed(() => {
-  return props.data.map((node) => props.path.concat([node.key]));
+  return props.data.map((node, i) => props.path.concat([i]));
 });
 </script>
 <template>
