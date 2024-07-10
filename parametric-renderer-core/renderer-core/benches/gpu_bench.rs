@@ -25,21 +25,37 @@ fn get_timer() -> &'static WgpuTimer {
 fn main() {
     use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
-    pub fn criterion_benchmark(c: &mut Criterion) {
+    pub fn criterion_benchmark(c: &mut Criterion<&WgpuTimer>) {
+        // Maybe also measure throughput? https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#throughput-measurements
+        // See https://github.com/FL33TW00D/wgpu-bench/blob/db76a8dc5508ba183f36df9f6b2551712d582355/src/bench.rs#L165
+        // which gets the throughput from https://github.com/FL33TW00D/wgpu-bench/blob/db76a8dc5508ba183f36df9f6b2551712d582355/benches/mlx-gemv/gemv.rs#L114
+
+        let timer = get_timer();
+        let handle = timer.handle();
+
+        // TOOD: Create an application
+
         c.bench_function("render", |b| {
             b.iter(|| {
-                let timer = get_timer();
                 let tsw = timer.timestamp_writes();
+                // The render loop
+                // https://github.com/FL33TW00D/wgpu-bench/blob/db76a8dc5508ba183f36df9f6b2551712d582355/src/bench.rs#L52-L78
+
+                // call render_commands
                 dispatch(handle, &workload, &bind_groups, &pipeline, Some(tsw));
                 timer.increment_query();
             })
         });
     }
 
-    criterion_group!(benches, criterion_benchmark);
+    criterion_group!(
+        name = benches;
+        config = Criterion::default().with_measurement(&*get_timer());
+        targets = criterion_benchmark
+    );
     criterion_main!(benches);
 }
-// From https://github.com/FL33TW00D/wgpu-bench/blob/master/src/handle.rs#L17
+// From https://github.com/FL33TW00D/wgpu-bench/blob/93754d88ed55218d53eef40f3e3814eff8f52467/src/handle.rs#L17
 pub struct GPUHandle {
     pub inner: Arc<GPUHandleInner>,
 }
@@ -139,7 +155,8 @@ impl GPUHandle {
     }
 }
 
-// From https://github.com/FL33TW00D/wgpu-bench/blob/master/src/lib.rs#L165
+// From https://github.com/FL33TW00D/wgpu-bench/blob/db76a8dc5508ba183f36df9f6b2551712d582355/src/lib.rs#L36
+// But log has been replaced with tracing.
 pub const MAX_QUERIES: u32 = 4096;
 
 /// Start and end index in the counter sample buffer

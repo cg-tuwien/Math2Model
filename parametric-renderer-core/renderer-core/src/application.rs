@@ -371,13 +371,32 @@ impl GpuApplication {
     }
 
     pub fn render(&mut self, render_data: RenderData) -> Result<(), wgpu::SurfaceError> {
-        let surface = &self.context.surface;
+        let output = self.context.surface.get_current_texture()?;
+        let mut command_encoder = self.render_commands(&output, render_data)?;
+        self.context.profiler.resolve_queries(&mut command_encoder);
+        // Submit the commands
+        self.context
+            .queue
+            .submit(std::iter::once(command_encoder.finish()));
+        output.present();
+
+        // Finish the frame after all commands have been submitted
+        self.context.profiler.end_frame().unwrap();
+        Ok(())
+    }
+
+    pub fn render_commands(
+        &self,
+        surface_texture: &wgpu::SurfaceTexture,
+        render_data: RenderData,
+    ) -> Result<wgpu::CommandEncoder, wgpu::SurfaceError> {
         let queue = &self.context.queue;
-        let output = surface.get_current_texture()?;
-        let view = output.texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(self.context.view_format),
-            ..Default::default()
-        });
+        let view = surface_texture
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor {
+                format: Some(self.context.view_format),
+                ..Default::default()
+            });
 
         self.scene_data.write_buffers(&render_data, queue);
 
@@ -529,7 +548,7 @@ impl GpuApplication {
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1, // render_data.time_data.elapsed.sin().abs() as f64
+                            r: 0.1,
                             g: 0.2,
                             b: 0.3,
                             a: 1.0,
@@ -591,16 +610,8 @@ impl GpuApplication {
         // Finish the profiler
         std::mem::drop(render_pass);
         std::mem::drop(commands);
-        self.context.profiler.resolve_queries(&mut command_encoder);
-        // Submit the commands
-        self.context
-            .queue
-            .submit(std::iter::once(command_encoder.finish()));
-        output.present();
 
-        // Finish the frame after all commands have been submitted
-        self.context.profiler.end_frame().unwrap();
-        Ok(())
+        Ok(command_encoder)
     }
 
     pub fn request_redraw(&self) {
