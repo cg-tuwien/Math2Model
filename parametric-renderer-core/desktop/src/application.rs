@@ -48,7 +48,7 @@ impl Application {
         app.update_models(vec![ModelInfo {
             label: "Default Model".to_owned(),
             transform: Transform {
-                position: Point3::new(0.0, 1.0, 0.0),
+                position: Point3::new(0.0, 0.0, 0.0),
                 ..Default::default()
             },
             material_info: MaterialInfo {
