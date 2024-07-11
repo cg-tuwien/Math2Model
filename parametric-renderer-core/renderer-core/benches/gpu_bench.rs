@@ -1,4 +1,4 @@
-use std::{cell::Cell, ops::Range, sync::OnceLock};
+use std::{cell::Cell, sync::OnceLock};
 
 use criterion::{
     criterion_group, criterion_main,
@@ -14,6 +14,8 @@ fn get_timer() -> &'static WgpuTimer {
     TIMER.get_or_init(|| WgpuTimer::new())
 }
 
+const DEFAULT_SHADER_CODE: &'static str = include_str!("../../shaders/HeartSphere.wgsl");
+
 pub fn criterion_benchmark(c: &mut Criterion<&WgpuTimer>) {
     // Maybe also measure throughput? https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#throughput-measurements
     // See https://github.com/FL33TW00D/wgpu-bench/blob/db76a8dc5508ba183f36df9f6b2551712d582355/src/bench.rs#L165
@@ -23,6 +25,21 @@ pub fn criterion_benchmark(c: &mut Criterion<&WgpuTimer>) {
 
     let mut app = CpuApplication::new().unwrap();
     app.set_profiling(ProfilerSettings { gpu: true });
+
+    app.update_models(vec![renderer_core::application::ModelInfo {
+        label: "Default Model".to_owned(),
+        transform: renderer_core::transform::Transform {
+            position: glamour::Point3::new(0.0, 0.0, 0.0),
+            ..Default::default()
+        },
+        material_info: renderer_core::application::MaterialInfo {
+            color: glamour::Vector3::new(0.6, 1.0, 1.0),
+            emissive: glamour::Vector3::new(0.0, 0.0, 0.0),
+            roughness: 0.7,
+            metallic: 0.1,
+        },
+        evaluate_image_code: DEFAULT_SHADER_CODE.to_owned(),
+    }]);
     app.create_surface(WindowOrFallback::Headless {
         size: Vector2::new(1280, 720),
     })
@@ -39,11 +56,7 @@ pub fn criterion_benchmark(c: &mut Criterion<&WgpuTimer>) {
             // If we aren't allowed to mutate, then we'll either use a different criterion function
             // or we'll use the internal render_commands function
             app.render().unwrap();
-            app.gpu
-                .as_ref()
-                .unwrap()
-                .device()
-                .poll(wgpu::Maintain::Wait);
+            app.gpu.as_ref().unwrap().force_wait();
             timer.increment_query(app.get_profiling_data().unwrap());
         })
     });
@@ -59,38 +72,6 @@ criterion_main!(benches);
 
 // From https://github.com/FL33TW00D/wgpu-bench/blob/db76a8dc5508ba183f36df9f6b2551712d582355/src/lib.rs#L36
 // But log has been replaced with tracing.
-pub const MAX_QUERIES: u32 = 4096;
-
-/// Start and end index in the counter sample buffer
-#[derive(Debug, Clone, Copy)]
-pub struct QueryPair {
-    pub start: u32,
-    pub end: u32,
-}
-
-impl QueryPair {
-    pub fn first() -> Self {
-        Self { start: 0, end: 1 }
-    }
-
-    pub fn size(&self) -> wgpu::BufferAddress {
-        ((self.end - self.start + 1) as usize * std::mem::size_of::<u64>()) as wgpu::BufferAddress
-    }
-
-    pub fn start_address(&self) -> wgpu::BufferAddress {
-        (self.start as usize * std::mem::size_of::<u64>()) as wgpu::BufferAddress
-    }
-
-    pub fn end_address(&self) -> wgpu::BufferAddress {
-        ((self.end + 1) as usize * std::mem::size_of::<u64>()) as wgpu::BufferAddress
-    }
-}
-
-impl From<QueryPair> for Range<u32> {
-    fn from(val: QueryPair) -> Self {
-        val.start..val.end + 1
-    }
-}
 
 pub struct WgpuTimer {
     current_query: Cell<(f64, f64)>,
@@ -114,6 +95,9 @@ impl WgpuTimer {
             if let Some(time) = query.time {
                 range = (range.0.min(time.start), range.1.max(time.end));
             }
+        }
+        if range.0 == f64::INFINITY {
+            panic!("No queries found");
         }
         self.current_query.set((range.0, range.1));
     }

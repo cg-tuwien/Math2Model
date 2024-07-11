@@ -606,6 +606,10 @@ impl GpuApplication {
     pub fn device(&self) -> &wgpu::Device {
         &self.context.device
     }
+
+    pub fn force_wait(&self) {
+        self.context.instance.poll_all(true);
+    }
 }
 
 fn update_virtual_models(

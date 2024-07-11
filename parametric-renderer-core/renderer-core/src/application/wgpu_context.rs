@@ -8,7 +8,7 @@ use winit::window::Window;
 use super::WindowOrFallback;
 
 pub struct WgpuContext {
-    pub _instance: wgpu::Instance,
+    pub instance: wgpu::Instance,
     pub surface: SurfaceOrFallback,
     pub _adapter: wgpu::Adapter,
     pub device: wgpu::Device,
@@ -127,7 +127,7 @@ impl WgpuContext {
         let profiler = GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler");
 
         Ok(WgpuContext {
-            _instance: instance,
+            instance,
             surface: surface_or_fallback,
             _adapter: adapter,
             device,
