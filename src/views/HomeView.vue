@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ReactiveFilesystem } from "@/filesystem/reactive-files";
-import EditorAndOutput from "@/components/EditorAndOutput.vue";
 import { markRaw, shallowRef } from "vue";
 import { sceneFilesPromise } from "@/globals";
 import type { Engine } from "@/engine/engine";

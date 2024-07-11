@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TreeNode } from "./node-tree/NodeTreeHelper";
+import { NText } from "naive-ui";
 
 const props = defineProps<{
   node: TreeNode;

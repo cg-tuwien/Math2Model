@@ -145,7 +145,7 @@ export function useVirtualScene() {
   const api = shallowRef<VirtualScene>(new VirtualScene(state));
 
   return {
-    state: computed(() => state.value),
+    state: computed<VirtualSceneState>(() => state.value),
     api,
   };
 }

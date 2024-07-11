@@ -10,8 +10,8 @@ const router = createRouter({
       component: () => import("../views/HomeView.vue"),
     },
     {
-      path: "/wgpu",
-      name: "wgpu",
+      path: "/webgpu",
+      name: "webgpu",
       component: () => import("../views/WgpuHomeView.vue"),
     },
     {

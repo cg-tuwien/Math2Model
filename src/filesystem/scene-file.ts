@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { makeFilePath } from "./reactive-files";
+
+export const SceneFileName = makeFilePath("scene.json");
 
 export const SceneFileSchemaUrl = "http://virtual/scene-schema.json" as const;
 

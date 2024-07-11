@@ -3,15 +3,15 @@ resolver = "2"
 members = ["copy-includes", "desktop", "renderer-core", "wasm"]
 
 [workspace.dependencies]
-wgpu = { version = "0.20.0", default-features = false, features = [
+wgpu = { version = "0.20.1", default-features = false, features = [
   "webgpu",
   "wgsl",
 ] }
-winit = { version = "0.30.0" }
+winit = { version = "0.30.3" }
 tracing = { version = "0.1.40" }
 thiserror = "1.0.60"
 glam = { version = "0.27", features = ["bytemuck"] }
 glamour = "0.11.1"
 encase = { version = "0.8", features = ["glam"] }
-bytemuck = { version = "1.16.0", features = ["derive"] }
+bytemuck = { version = "1.16.1", features = ["derive"] }
 nanoserde = "0.1.37"

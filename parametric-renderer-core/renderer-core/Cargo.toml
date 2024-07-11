@@ -5,7 +5,7 @@ edition = "2021"
 build = "build.rs"
 
 [dependencies]
-anyhow = "1.0.86"
+anyhow = "1.0"
 bytemuck = { workspace = true }
 encase = { workspace = true }
 glam = { workspace = true }
@@ -20,7 +20,7 @@ winit = { workspace = true }
 slotmap = "1.0.7"
 
 [build-dependencies]
-wgsl_to_wgpu = "0.8.0"
+wgsl_to_wgpu = "0.8.1"
 
 [features]
 tracy = ["wgpu-profiler/tracy"]
