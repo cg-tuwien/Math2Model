@@ -1,6 +1,36 @@
 # Parametric Renderer Core
 
+This is the core library for the parametric renderer. It is written in Rust, and uses the WGPU library for rendering.
+
+To start the project
+
+```bash
+cargo run
+```
+
+To get a release build
+
+```bash
+cargo build --release
+```
+
+To run the benchmarks
+
+```bash
+cargo bench
+```
+
+## Controls
+
+- Right click, and then `W` `A` `S` `D` to move the camera.
+- Right click, and then `Space` `Shift` to move the camera up and down.
+- `P` to get a benchmark of the current frame. It gets written to a `profile-*.json` file and can be viewed on [ui.perfetto.dev](https://ui.perfetto.dev/).
+
+
+
 ## To update the WGSL shaders
+
+Whenever you are editing the WGSL shaders, you might want to update their "imports". To do so, run
 
 ```bash
 cargo run --bin copy-includes
