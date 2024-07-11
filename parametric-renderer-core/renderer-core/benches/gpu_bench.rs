@@ -55,6 +55,27 @@ pub fn criterion_benchmark(c: &mut Criterion<&WgpuTimer>) {
 
             // If we aren't allowed to mutate, then we'll either use a different criterion function
             // or we'll use the internal render_commands function
+            let dummy_set_0 = Default::default();
+            let dummy_set_1 = Default::default();
+            let dummy_set_2 = Default::default();
+            app.update(&renderer_core::input::WindowInputs {
+                mouse: renderer_core::input::WindowMouseInputs {
+                    position: Default::default(),
+                    position_delta: Default::default(),
+                    motion: Default::default(),
+                    scroll_delta: Default::default(),
+                    inputs: Default::default(),
+                    held: &dummy_set_0,
+                },
+                keyboard: renderer_core::input::WindowKeyboardInputs {
+                    inputs: Default::default(),
+                    physical_held: &dummy_set_1,
+                    logical_held: &dummy_set_2,
+                },
+                new_size: Default::default(),
+                new_scale_factor: Default::default(),
+                close_requested: Default::default(),
+            });
             app.render().unwrap();
             app.gpu.as_ref().unwrap().force_wait();
             timer.increment_query(app.get_profiling_data().unwrap());
