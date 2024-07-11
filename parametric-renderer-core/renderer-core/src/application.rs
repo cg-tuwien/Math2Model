@@ -2,8 +2,7 @@ mod frame_counter;
 mod scene;
 mod virtual_model;
 mod wgpu_context;
-
-use std::sync::Arc;
+mod window_or_fallback;
 
 use frame_counter::{FrameCounter, FrameTime, Seconds};
 use glamour::{Point3, ToRaw, Vector2};
@@ -12,8 +11,7 @@ pub use virtual_model::MaterialInfo;
 use virtual_model::VirtualModel;
 use web_time::Instant;
 use wgpu_context::WgpuContext;
-use wgpu_profiler::GpuProfilerSettings;
-use winit::{dpi::PhysicalPosition, window::Window};
+pub use window_or_fallback::WindowOrFallback;
 
 use crate::{
     buffer::TypedBuffer,
@@ -92,17 +90,11 @@ impl CpuApplication {
     pub fn set_profiling(&mut self, new_settings: ProfilerSettings) {
         self.profiler_settings = new_settings;
         if let Some(gpu) = &mut self.gpu {
-            gpu.context
-                .profiler
-                .change_settings(GpuProfilerSettings {
-                    enable_timer_queries: self.profiler_settings.gpu,
-                    ..GpuProfilerSettings::default()
-                })
-                .unwrap();
+            gpu.context.set_profiling(self.profiler_settings.gpu);
         }
     }
 
-    pub async fn create_surface(&mut self, window: Arc<Window>) -> anyhow::Result<()> {
+    pub async fn create_surface(&mut self, window: WindowOrFallback) -> anyhow::Result<()> {
         if self.gpu.is_some() {
             return Ok(());
         }
@@ -111,10 +103,8 @@ impl CpuApplication {
         Ok(())
     }
 
-    pub fn start_create_gpu(&mut self, window: Arc<Window>) -> GpuApplicationBuilder {
-        let size = window.inner_size();
-        self.camera
-            .update_size(Vector2::new(size.width, size.height));
+    pub fn start_create_gpu(&mut self, window: WindowOrFallback) -> GpuApplicationBuilder {
+        self.camera.update_size(window.size());
 
         GpuApplicationBuilder {
             camera: self.camera.clone(),
@@ -124,7 +114,7 @@ impl CpuApplication {
     }
 
     pub fn set_gpu(&mut self, gpu_application: GpuApplication) {
-        let size = gpu_application.context.window.inner_size();
+        let size = gpu_application.context.size();
         self.gpu = Some(gpu_application);
         self.set_profiling(self.profiler_settings.clone());
         self.resize(size);
@@ -132,12 +122,11 @@ impl CpuApplication {
         self.update_models(models);
     }
 
-    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+    pub fn resize(&mut self, new_size: Vector2<u32>) {
         if let Some(gpu) = &mut self.gpu {
             let new_size = gpu.resize(new_size);
             if let Some(new_size) = new_size {
-                self.camera
-                    .update_size(Vector2::new(new_size.width, new_size.height));
+                self.camera.update_size(new_size);
             }
         }
     }
@@ -224,7 +213,7 @@ struct CopyPatchesStep {
 pub struct GpuApplicationBuilder {
     pub camera: Camera,
     pub profiler_settings: ProfilerSettings,
-    pub window: Arc<Window>,
+    pub window: WindowOrFallback,
 }
 
 impl GpuApplicationBuilder {
@@ -255,11 +244,12 @@ const MAX_PATCH_COUNT: u32 = 100_000;
 
 impl GpuApplication {
     pub async fn new(
-        window: Arc<Window>,
+        window: WindowOrFallback,
         camera: &Camera,
         profiler_settings: &ProfilerSettings,
     ) -> anyhow::Result<Self> {
-        let context = WgpuContext::new(window, profiler_settings).await?;
+        let mut context = WgpuContext::new(window).await?;
+        context.set_profiling(profiler_settings.gpu);
         let device = &context.device;
 
         let scene_data = SceneData::new(device, camera)?;
@@ -280,7 +270,7 @@ impl GpuApplication {
             patches: vec![],
         };
 
-        let depth_texture = Texture::create_depth_texture(device, &context.config, "Depth Texture");
+        let depth_texture = Texture::create_depth_texture(device, context.size(), "Depth Texture");
 
         let render_step = RenderStep {
             bind_group_0: scene_data.as_bind_group_0(device),
@@ -347,45 +337,37 @@ impl GpuApplication {
     }
 
     #[must_use]
-    pub fn resize(
-        &mut self,
-        new_size: winit::dpi::PhysicalSize<u32>,
-    ) -> Option<winit::dpi::PhysicalSize<u32>> {
-        let new_size = new_size.max(winit::dpi::PhysicalSize::new(1, 1));
-        if new_size != self.context.size {
-            self.context.size = new_size;
-            self.context.config.width = new_size.width;
-            self.context.config.height = new_size.height;
-            if let Some(surface) = &self.context.surface {
-                surface.configure(&self.context.device, &self.context.config);
-            }
-            self.depth_texture = Texture::create_depth_texture(
-                &self.context.device,
-                &self.context.config,
-                "Depth Texture",
-            );
-            Some(new_size)
-        } else {
-            None
+    pub fn resize(&mut self, new_size: Vector2<u32>) -> Option<Vector2<u32>> {
+        let new_size = new_size.max(Vector2::new(1, 1));
+        if new_size == self.context.size() {
+            return None;
         }
+        self.context.resize(new_size);
+        self.depth_texture =
+            Texture::create_depth_texture(&self.context.device, new_size.clone(), "Depth Texture");
+        Some(new_size)
     }
 
     pub fn render(&mut self, render_data: RenderData) -> Result<(), wgpu::SurfaceError> {
-        let output = match self.context.surface {
-            Some(ref surface) => Some(surface.get_current_texture()?),
-            None => None,
+        match &self.context.surface {
+            wgpu_context::SurfaceOrFallback::Surface { surface, .. } => {
+                let output = surface.get_current_texture()?;
+                let mut command_encoder = self.render_commands(&output.texture, render_data)?;
+                self.context.profiler.resolve_queries(&mut command_encoder);
+                self.context
+                    .queue
+                    .submit(std::iter::once(command_encoder.finish()));
+                output.present();
+            }
+            wgpu_context::SurfaceOrFallback::Fallback { texture } => {
+                let mut command_encoder = self.render_commands(&texture, render_data)?;
+                self.context.profiler.resolve_queries(&mut command_encoder);
+                self.context
+                    .queue
+                    .submit(std::iter::once(command_encoder.finish()));
+            }
         };
-        let mut command_encoder = self.render_commands(&output, render_data)?;
-        self.context.profiler.resolve_queries(&mut command_encoder);
-        // Submit the commands
-        self.context
-            .queue
-            .submit(std::iter::once(command_encoder.finish()));
-        if let Some(output) = output {
-            output.present();
-        }
 
-        // Finish the frame after all commands have been submitted
         self.context.profiler.end_frame().unwrap();
         Ok(())
     }
@@ -617,12 +599,12 @@ impl GpuApplication {
         Ok(command_encoder)
     }
 
-    pub fn request_redraw(&self) {
-        self.context.window.request_redraw();
+    pub fn size(&self) -> Vector2<u32> {
+        self.context.size()
     }
 
-    pub fn size(&self) -> winit::dpi::PhysicalSize<u32> {
-        self.context.size
+    pub fn device(&self) -> &wgpu::Device {
+        &self.context.device
     }
 }
 
@@ -682,12 +664,15 @@ pub enum CursorCapture {
 #[derive(Debug, Clone, Copy)]
 enum WindowCursorCapture {
     Free,
-    LockedAndHidden(PhysicalPosition<f64>),
+    LockedAndHidden(winit::dpi::PhysicalPosition<f64>),
 }
 
 impl GpuApplication {
     pub fn update_cursor_capture(&mut self, cursor_capture: CursorCapture, inputs: &WindowInputs) {
-        let window = &self.context.window;
+        let window = match &self.context.surface {
+            wgpu_context::SurfaceOrFallback::Surface { window, .. } => window,
+            wgpu_context::SurfaceOrFallback::Fallback { .. } => return,
+        };
         match (self.cursor_capture, cursor_capture) {
             (WindowCursorCapture::LockedAndHidden(position), CursorCapture::Free) => {
                 window

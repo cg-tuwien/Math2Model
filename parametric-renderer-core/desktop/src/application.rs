@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use glamour::{Point3, Vector3};
+use glamour::{Point3, Vector2, Vector3};
 use pollster::FutureExt;
 use renderer_core::{
-    application::{CpuApplication, MaterialInfo, ModelInfo, ProfilerSettings},
+    application::{CpuApplication, MaterialInfo, ModelInfo, ProfilerSettings, WindowOrFallback},
     camera::camera_controller::{self, CameraController, IsCameraController},
     input::{InputHandler, WindowInputs, WinitAppHelper},
     transform::Transform,
@@ -89,11 +89,16 @@ impl Application {
     }
 
     fn create_surface(&mut self, window: Arc<Window>) {
-        self.app.create_surface(window).block_on().unwrap();
+        self.app
+            .create_surface(WindowOrFallback::Window(window.clone()))
+            .block_on()
+            .unwrap();
+        window.request_redraw();
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        self.app.resize(new_size);
+        self.app
+            .resize(Vector2::new(new_size.width, new_size.height));
     }
 
     pub fn update(&mut self, inputs: &WindowInputs) {
