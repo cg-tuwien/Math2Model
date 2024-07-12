@@ -351,6 +351,7 @@ impl GpuApplication {
     pub fn render(&mut self, render_data: RenderData) -> Result<(), wgpu::SurfaceError> {
         match &self.context.surface {
             wgpu_context::SurfaceOrFallback::Surface { surface, .. } => {
+                // TODO: Handle all cases properly https://github.com/gfx-rs/wgpu/blob/a0c185a28c232ee2ab63f72d6fd3a63a3f787309/examples/src/framework.rs#L216
                 let output = surface.get_current_texture()?;
                 let mut command_encoder = self.render_commands(&output.texture, render_data)?;
                 self.context.profiler.resolve_queries(&mut command_encoder);

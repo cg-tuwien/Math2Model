@@ -36,6 +36,24 @@ Whenever you are editing the WGSL shaders, you might want to update their "impor
 cargo run --bin copy-includes
 ```
 
+## Benchmarking
+
+We have multiple forms of benchmarking. The simplest one is pressing `P` at runtime, which will save a profile of the current frame. 
+
+The proper one uses the `criterion` library. To compare two commits, check out the first one, then run
+
+```bash
+cargo bench -p renderer-core -- --save-baseline base
+```
+
+Then check out the second commit, and run
+
+```bash
+cargo bench -p renderer-core -- --baseline base
+```
+
+[Documentation link](https://bheisler.github.io/criterion.rs/book/user_guide/command_line_options.html#baselines).
+
 ## Developer Notes
 
 - WGPU Tutorial https://sotrh.github.io/learn-wgpu/#what-is-wgpu

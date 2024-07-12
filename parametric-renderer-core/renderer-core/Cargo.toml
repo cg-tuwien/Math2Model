@@ -4,6 +4,9 @@ version = "0.2.0"
 edition = "2021"
 build = "build.rs"
 
+[lib]
+bench = false
+
 [dependencies]
 anyhow = "1.0"
 bytemuck = { workspace = true }

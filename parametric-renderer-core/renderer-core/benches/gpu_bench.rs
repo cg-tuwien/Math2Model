@@ -1,30 +1,23 @@
-use std::{
-    cell::Cell,
-    sync::{Arc, OnceLock},
-};
+use std::{cell::Cell, sync::Arc};
 
 use criterion::{
-    criterion_group, criterion_main,
     measurement::{Measurement, ValueFormatter},
     Criterion, Throughput,
 };
-use glamour::Vector2;
 use pollster::FutureExt;
 use renderer_core::application::{CpuApplication, ProfilerSettings, WindowOrFallback};
 
-fn get_timer() -> &'static WgpuTimer {
-    static TIMER: OnceLock<WgpuTimer> = OnceLock::new();
-    TIMER.get_or_init(|| WgpuTimer::new())
-}
-
 const DEFAULT_SHADER_CODE: &'static str = include_str!("../../shaders/HeartSphere.wgsl");
 
-pub fn criterion_benchmark(c: &mut Criterion<&WgpuTimer>) {
+fn main() {
+    let timer = WgpuTimer::new();
+    let mut c = Criterion::default()
+        .configure_from_args()
+        .with_measurement(&timer);
+
     // Maybe also measure throughput? https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#throughput-measurements
     // See https://github.com/FL33TW00D/wgpu-bench/blob/db76a8dc5508ba183f36df9f6b2551712d582355/src/bench.rs#L165
     // which gets the throughput from https://github.com/FL33TW00D/wgpu-bench/blob/db76a8dc5508ba183f36df9f6b2551712d582355/benches/mlx-gemv/gemv.rs#L114
-
-    let timer = get_timer();
 
     let mut app = CpuApplication::new().unwrap();
     app.set_profiling(ProfilerSettings { gpu: true });
@@ -100,13 +93,6 @@ pub fn criterion_benchmark(c: &mut Criterion<&WgpuTimer>) {
     });
     group.finish();
 }
-
-criterion_group!(
-    name = benches;
-    config = Criterion::default().with_measurement(&*get_timer());
-    targets = criterion_benchmark
-);
-criterion_main!(benches);
 
 // From https://github.com/FL33TW00D/wgpu-bench/blob/db76a8dc5508ba183f36df9f6b2551712d582355/src/lib.rs#L36
 // But log has been replaced with tracing.
