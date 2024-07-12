@@ -39,6 +39,7 @@ fn main() {
 
     // TODO: Why is this needed for benchmarking?
     let event_loop = winit::event_loop::EventLoop::new().unwrap();
+    #[allow(deprecated)]
     let window = Arc::new(
         event_loop
             .create_window(

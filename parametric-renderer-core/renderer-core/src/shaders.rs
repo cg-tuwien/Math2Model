@@ -7,8 +7,6 @@ pub mod shader {
 #[allow(dead_code)]
 pub mod compute_patches {
     pub const SOURCE: &str = include_str!("../../shaders/ComputePatches.wgsl");
-    // TODO: This exists because of a web backend limitation =w=
-    pub const SOURCE_FINAL: &str = include_str!("../../shaders/ComputePatchesFinal.wgsl");
     include!(concat!(env!("OUT_DIR"), "/ComputePatches.rs"));
 }
 

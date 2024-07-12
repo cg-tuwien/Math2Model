@@ -232,6 +232,7 @@ pub struct GpuApplication {
     copy_patches: CopyPatchesStep,
     render_step: RenderStep,
     patches_buffer_reset: TypedBuffer<compute_patches::Patches>,
+    force_render_values: [TypedBuffer<compute_patches::ForceRenderFlag>; 2],
     render_buffer_reset: compute_patches::RenderBuffer,
     indirect_compute_buffer_reset: TypedBuffer<compute_patches::DispatchIndirectArgs>,
     meshes: Vec<Mesh>,
@@ -297,6 +298,21 @@ impl GpuApplication {
             wgpu::BufferUsages::COPY_SRC,
         )?;
 
+        let force_render_values = [
+            TypedBuffer::new_uniform(
+                device,
+                "Disable Force Render",
+                &compute_patches::ForceRenderFlag { flag: 0 },
+                wgpu::BufferUsages::COPY_SRC,
+            )?,
+            TypedBuffer::new_uniform(
+                device,
+                "Enable Force Render",
+                &compute_patches::ForceRenderFlag { flag: 1 },
+                wgpu::BufferUsages::COPY_SRC,
+            )?,
+        ];
+
         let compute_patches = ComputePatchesStep {
             bind_group_0: compute_patches::bind_groups::BindGroup0::from_bindings(
                 device,
@@ -326,6 +342,7 @@ impl GpuApplication {
             copy_patches,
             patches_buffer_reset,
             render_buffer_reset,
+            force_render_values,
             depth_texture,
             scene_data,
             meshes,
@@ -475,7 +492,7 @@ impl GpuApplication {
                         format!("Compute Patches From-To {i}"),
                         &self.context.device,
                     );
-                    compute_pass.set_pipeline(&shaders.compute_patches[0]);
+                    compute_pass.set_pipeline(&shaders.compute_patches);
                     compute_patches::set_bind_groups(
                         &mut compute_pass,
                         &self.compute_patches.bind_group_0,
@@ -487,6 +504,13 @@ impl GpuApplication {
                         0,
                     );
                 }
+                if is_last_round {
+                    // Set to true
+                    model
+                        .compute_patches
+                        .force_render_uniform
+                        .copy_all_from(&self.force_render_values[1], &mut commands);
+                }
                 {
                     model.compute_patches.patches_buffer[0]
                         .copy_all_from(&self.patches_buffer_reset, &mut commands);
@@ -497,11 +521,7 @@ impl GpuApplication {
                         format!("Compute Patches To-From {i}"),
                         &self.context.device,
                     );
-                    if is_last_round {
-                        compute_pass.set_pipeline(&shaders.compute_patches[1]);
-                    } else {
-                        compute_pass.set_pipeline(&shaders.compute_patches[0]);
-                    }
+                    compute_pass.set_pipeline(&shaders.compute_patches);
                     compute_patches::set_bind_groups(
                         &mut compute_pass,
                         &self.compute_patches.bind_group_0,
@@ -512,6 +532,13 @@ impl GpuApplication {
                         &model.compute_patches.indirect_compute_buffer[1],
                         0,
                     );
+                }
+                if is_last_round {
+                    // Set to false
+                    model
+                        .compute_patches
+                        .force_render_uniform
+                        .copy_all_from(&self.force_render_values[0], &mut commands);
                 }
             }
 
