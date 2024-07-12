@@ -1,4 +1,7 @@
-use std::{cell::Cell, sync::OnceLock};
+use std::{
+    cell::Cell,
+    sync::{Arc, OnceLock},
+};
 
 use criterion::{
     criterion_group, criterion_main,
@@ -40,11 +43,25 @@ pub fn criterion_benchmark(c: &mut Criterion<&WgpuTimer>) {
         },
         evaluate_image_code: DEFAULT_SHADER_CODE.to_owned(),
     }]);
-    app.create_surface(WindowOrFallback::Headless {
+
+    // TODO: Why is this needed for benchmarking?
+    let event_loop = winit::event_loop::EventLoop::new().unwrap();
+    let window = Arc::new(
+        event_loop
+            .create_window(
+                winit::window::WindowAttributes::default()
+                    .with_inner_size(winit::dpi::LogicalSize::new(1280, 720)),
+            )
+            .unwrap(),
+    );
+    app.create_surface(WindowOrFallback::Window(window))
+        .block_on()
+        .unwrap();
+    /*app.create_surface(WindowOrFallback::Headless {
         size: Vector2::new(1280, 720),
     })
     .block_on()
-    .unwrap();
+    .unwrap();*/
 
     let mut group = c.benchmark_group("render");
     // group.throughput(throughput);
