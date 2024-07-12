@@ -29,8 +29,7 @@ pub struct ShaderArena {
 
 pub struct ShaderPipelines {
     /// Pipeline per model, for different parametric functions.
-    /// The second one is for "force_render"
-    pub compute_patches: [wgpu::ComputePipeline; 2],
+    pub compute_patches: wgpu::ComputePipeline,
     /// Pipeline per model, for different parametric functions.
     pub render: wgpu::RenderPipeline,
 }
@@ -85,6 +84,7 @@ pub struct ComputePatchesStep {
     pub indirect_compute_buffer: [TypedBuffer<compute_patches::DispatchIndirectArgs>; 2],
     pub bind_group_1: compute_patches::bind_groups::BindGroup1,
     pub bind_group_2: [compute_patches::bind_groups::BindGroup2; 2],
+    pub force_render_uniform: TypedBuffer<compute_patches::ForceRenderFlag>,
 }
 
 impl ComputePatchesStep {
@@ -155,6 +155,13 @@ impl ComputePatchesStep {
             )?,
         ];
 
+        let force_render_uniform = TypedBuffer::new_uniform(
+            device,
+            "Force Render Uniform",
+            &compute_patches::ForceRenderFlag { flag: 0 },
+            wgpu::BufferUsages::COPY_DST,
+        )?;
+
         let bind_group_1 = compute_patches::bind_groups::BindGroup1::from_bindings(
             device,
             compute_patches::bind_groups::BindGroupLayout1 {
@@ -173,6 +180,7 @@ impl ComputePatchesStep {
                     patches_from_buffer: patches_buffer[0].as_entire_buffer_binding(),
                     patches_to_buffer: patches_buffer[1].as_entire_buffer_binding(),
                     dispatch_next: indirect_compute_buffer[1].as_entire_buffer_binding(),
+                    force_render: force_render_uniform.as_entire_buffer_binding(),
                 },
             ),
             compute_patches::bind_groups::BindGroup2::from_bindings(
@@ -181,6 +189,7 @@ impl ComputePatchesStep {
                     patches_from_buffer: patches_buffer[1].as_entire_buffer_binding(), // Swap the order :)
                     patches_to_buffer: patches_buffer[0].as_entire_buffer_binding(),
                     dispatch_next: indirect_compute_buffer[0].as_entire_buffer_binding(),
+                    force_render: force_render_uniform.as_entire_buffer_binding(),
                 },
             ),
         ];
@@ -192,6 +201,7 @@ impl ComputePatchesStep {
             indirect_compute_buffer,
             bind_group_1,
             bind_group_2,
+            force_render_uniform,
         })
     }
 }
@@ -446,39 +456,20 @@ fn create_compute_patches_pipeline(
     label: Option<&str>,
     device: &wgpu::Device,
     evaluate_image_code: Option<&str>,
-) -> [wgpu::ComputePipeline; 2] {
+) -> wgpu::ComputePipeline {
     let label = label.unwrap_or_default();
     let source = replace_evaluate_image_code(compute_patches::SOURCE, evaluate_image_code);
-    let source_final =
-        replace_evaluate_image_code(compute_patches::SOURCE_FINAL, evaluate_image_code);
-    [
-        device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some(&format!("Compute Patches {}", label)),
-            layout: Some(&compute_patches::create_pipeline_layout(device)),
-            module: &device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: None,
-                source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(source.as_ref())),
-            }),
-            entry_point: compute_patches::ENTRY_MAIN,
-            compilation_options: Default::default(),
+
+    device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+        label: Some(&format!("Compute Patches {}", label)),
+        layout: Some(&compute_patches::create_pipeline_layout(device)),
+        module: &device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: None,
+            source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(source.as_ref())),
         }),
-        device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some(&format!("Compute Patches Force Render {}", label)),
-            layout: Some(&compute_patches::create_pipeline_layout(device)),
-            module: &device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: None,
-                source: wgpu::ShaderSource::Wgsl(source_final),
-            }),
-            entry_point: compute_patches::ENTRY_MAIN,
-            compilation_options: wgpu::PipelineCompilationOptions {
-                constants: &compute_patches::OverrideConstants {
-                    force_render: Some(true),
-                }
-                .constants(),
-                ..Default::default()
-            },
-        }),
-    ]
+        entry_point: compute_patches::ENTRY_MAIN,
+        compilation_options: Default::default(),
+    })
 }
 
 fn replace_evaluate_image_code<'a>(

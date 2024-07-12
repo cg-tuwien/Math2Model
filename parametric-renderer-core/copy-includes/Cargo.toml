@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 thiserror = "1.0"
 sha2 = "0.10"
+
+[lib]
+bench = false

@@ -1,8 +1,8 @@
 use std::sync::{Arc, Mutex};
 
-use glamour::Point3;
+use glamour::{Point3, Vector2};
 use renderer_core::{
-    application::{CpuApplication, GpuApplication, ModelInfo},
+    application::{CpuApplication, GpuApplication, ModelInfo, WindowOrFallback},
     camera::camera_controller::{self, CameraController},
     input::{InputHandler, WindowInputs, WinitAppHelper},
 };
@@ -60,7 +60,7 @@ impl Application {
         let window = Arc::new(window);
         self.window = Some(window.clone());
 
-        let gpu_builder = self.app.start_create_gpu(window);
+        let gpu_builder = self.app.start_create_gpu(WindowOrFallback::Window(window));
 
         let task = async move {
             let gpu_application = gpu_builder.create_surface().await.unwrap();
@@ -74,7 +74,8 @@ impl Application {
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        self.app.resize(new_size);
+        self.app
+            .resize(Vector2::new(new_size.width, new_size.height));
     }
 
     pub fn update(&mut self, inputs: &WindowInputs) {
@@ -190,7 +191,12 @@ impl ApplicationHandler<AppCommand> for Application {
             AppCommand::UpdateModels(models) => {
                 self.app.update_models(models);
             }
-            AppCommand::CreateGpu(gpu_application) => self.app.set_gpu(gpu_application),
+            AppCommand::CreateGpu(gpu_application) => {
+                self.app.set_gpu(gpu_application);
+                if let Some(window) = &self.window {
+                    window.request_redraw();
+                }
+            }
         }
     }
 
@@ -201,12 +207,12 @@ impl ApplicationHandler<AppCommand> for Application {
         event: winit::event::WindowEvent,
     ) {
         match &event {
-            winit::event::WindowEvent::RedrawRequested => match self.app.gpu {
-                Some(ref mut gpu) => gpu.request_redraw(),
+            winit::event::WindowEvent::RedrawRequested => match self.window {
+                Some(ref mut window) => window.request_redraw(),
                 None => {}
             },
-            winit::event::WindowEvent::CursorMoved { .. } => match self.app.gpu {
-                Some(ref mut gpu) => gpu.request_redraw(),
+            winit::event::WindowEvent::CursorMoved { .. } => match self.window {
+                Some(ref mut window) => window.request_redraw(),
                 None => {}
             },
             _ => {}
