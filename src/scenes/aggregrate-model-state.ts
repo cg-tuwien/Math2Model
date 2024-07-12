@@ -3,7 +3,7 @@ import {
   ReadonlyEulerAngles,
   ReadonlyVector3,
   type VirtualModelState,
-} from "@/scenes/VirtualScene";
+} from "@/scenes/scene-state";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 
 export function commonModelState(

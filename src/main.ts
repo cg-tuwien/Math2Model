@@ -6,7 +6,7 @@ import { Notification } from "@/notification";
 import "@/monaco-setup";
 
 import App from "./App.vue";
-import router from "./router";
+import router from "./views/router";
 
 globalThis.addEventListener("unhandledrejection", (event) => {
   Notification.error({

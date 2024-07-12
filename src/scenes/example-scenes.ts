@@ -1,8 +1,8 @@
 import { SceneFileName, SceneFileSchemaUrl } from "@/filesystem/scene-file";
-import { ReadonlyEulerAngles } from "./VirtualScene";
 import { makeFilePath } from "@/filesystem/reactive-files";
-import DefaultParametric from "@/shaders/DefaultParametric.wgsl?raw";
-import HeartSphere from "@/shaders/HeartSphere.wgsl?raw";
+import DefaultParametric from "@/../parametric-renderer-core/shaders/DefaultParametric.wgsl?raw";
+import HeartSphere from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
+import { ReadonlyEulerAngles } from "./scene-state";
 
 type ExampleProject = {
   name: string;
