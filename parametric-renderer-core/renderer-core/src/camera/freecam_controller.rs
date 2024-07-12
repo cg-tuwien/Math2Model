@@ -80,12 +80,12 @@ impl FreecamController {
         delta_time: f32,
         settings: &GeneralControllerSettings,
     ) {
-        let horizontal_movement = (direction * Vector3::new(1.0, 0.0, 1.0)).normalize_or_zero();
+        let horizontal_movement = Quat::from_rotation_y(self.yaw.radians)
+            * (direction * Vector3::new(1.0, 0.0, 1.0)).normalize_or_zero();
         let vertical_movement = Camera::up() * direction.y;
-        let horizontal_movement = Quat::from_rotation_y(self.yaw.radians) * horizontal_movement;
 
-        self.position += horizontal_movement * settings.fly_speed * delta_time;
-        self.position += vertical_movement * settings.fly_speed * delta_time;
+        self.position +=
+            (horizontal_movement + vertical_movement) * settings.fly_speed * delta_time;
     }
 }
 

@@ -137,7 +137,9 @@ struct InputBuffer {
     model_view_projection: mat4x4<f32>,
 };
 
-override force_render: bool = false;
+struct ForceRenderFlag {
+  flag: u32 // if flag == 0 { false } else { true }
+}
 
 // Group 1 is for things that change once per model
 // TODO: Read back the patches_length on the CPU to know when we're going out of bounds
@@ -152,6 +154,7 @@ override force_render: bool = false;
 @group(2) @binding(0) var<storage, read_write> dispatch_next : DispatchIndirectArgs;
 @group(2) @binding(1) var<storage, read> patches_from_buffer : PatchesRead;
 @group(2) @binding(2) var<storage, read_write> patches_to_buffer : Patches;
+@group(2) @binding(3) var<uniform> force_render: ForceRenderFlag;
 
 fn triangle_area(a: vec3f, b: vec3f, c: vec3f) -> f32 {
   return 0.5 * length(cross(b - a, c - a));
@@ -195,7 +198,7 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
   let patch_bottom_left = patch_bottom_left_child(quad_encoded);
 
   let splits_bitflags = (u32(split_top) << 3) | (u32(split_bottom) << 2) | (u32(split_left) << 1) | u32(split_right);
-  if (splits_bitflags == 0u || force_render) {
+  if (splits_bitflags == 0u || force_render.flag != 0u) {
     /* No splits, render the patch
     +---+---+
     |       |

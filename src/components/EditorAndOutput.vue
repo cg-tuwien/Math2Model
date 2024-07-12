@@ -10,25 +10,30 @@ import {
   onUnmounted,
   computed,
   h,
+  type Ref,
+  reactive,
 } from "vue";
-import { useDebounceFn } from "@vueuse/core";
+import { useDebounceFn, watchImmediate } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import {
-  ReactiveFiles,
+  ReactiveFilesystem,
   makeFilePath,
+  useTextFile,
   type FilePath,
 } from "@/filesystem/reactive-files";
-import { showError } from "@/notification";
+import { showError, showFileError } from "@/notification";
 import {
   ReadonlyEulerAngles,
   ReadonlyVector3,
   useVirtualScene,
   type VirtualModelState,
 } from "@/scenes/VirtualScene";
-import { getOrCreateScene } from "@/filesystem/start-files";
-import VirtualModel from "@/components/VirtualModel.vue";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
-import { serializeScene } from "@/filesystem/scene-file";
+import {
+  deserializeScene,
+  SceneFileName,
+  serializeScene,
+} from "@/filesystem/scene-file";
 import type { Engine } from "@/engine/engine";
 import HeartSphere from "@/shaders/HeartSphere.wgsl?raw";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
@@ -37,7 +42,7 @@ import WebGpu from "@/components/WebGpu.vue";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
-  files: ReactiveFiles;
+  fs: ReactiveFilesystem;
   canvas: HTMLCanvasElement;
   engine: Engine;
   gpuDevice: GPUDevice;
@@ -46,27 +51,26 @@ const props = defineProps<{
 const store = useStore();
 
 // The underlying data
-const scenePath = makeFilePath("scene.json");
-const { sceneFile, startFile } = getOrCreateScene(props.files, scenePath);
+const sceneFile = useTextFile(SceneFileName, props.fs);
 const scene = useVirtualScene();
-watch(
-  () => props.files.fileNames.value.get(scenePath),
-  () => {
-    try {
-      const { sceneFile, startFile } = getOrCreateScene(props.files, scenePath);
-
-      if (sceneFile !== null) {
-        scene.api.value.fromSerialized(sceneFile);
-      }
-    } catch (e) {
-      console.log("Could not deserialize scene file.");
-    }
+watchEffect(() => {
+  if (sceneFile.value === null) {
+    scene.api.value.clear();
+    return;
   }
+  try {
+    const sceneData = deserializeScene(sceneFile.value);
+    scene.api.value.fromSerialized(sceneData);
+  } catch (e) {
+    showFileError("Could not load scene file", SceneFileName, e);
+  }
+});
+
+const openFile = useOpenFile(
+  // Open the first .wgsl file if it exists
+  props.fs.listFiles().find((v) => v.endsWith(".wgsl")) ?? null,
+  props.fs
 );
-if (sceneFile !== null) {
-  scene.api.value.fromSerialized(sceneFile);
-}
-const openFile = useOpenFile(startFile, props.files);
 
 const canvasContainer = ref<HTMLDivElement | null>(null);
 const baseScene = shallowRef(props.engine.createBaseScene());
@@ -92,18 +96,39 @@ try {
   showError("Could not start render loop", e);
 }
 {
+  // TODO: Make the Rust side pull files instead of this
+  const referencedFiles = shallowRef(
+    new Map<FilePath, Readonly<Ref<string | null>>>()
+  );
+  watchImmediate(
+    () => scene.state.value.models,
+    (models) => {
+      const newReferencedFiles = new Map<
+        FilePath,
+        Readonly<Ref<string | null>>
+      >();
+      for (let model of models) {
+        const fileName = model.code;
+        if (newReferencedFiles.has(fileName)) {
+          continue;
+        }
+        const fileReference =
+          referencedFiles.value.get(fileName) ??
+          useTextFile(fileName, props.fs);
+        newReferencedFiles.set(fileName, fileReference);
+      }
+
+      referencedFiles.value = newReferencedFiles;
+    }
+  );
+
   let wgpuScene = baseScene.value.asWgpu();
   if (wgpuScene !== null) {
     watchEffect(() => {
       let models = scene.state.value.models.map((v) => {
-        let code = `fn evaluateImage(input2: vec2f) -> vec3f { return vec3(input2, 0.0); }`;
-        const vertexSourceId = props.files.fileNames.value.get(v.code);
-        if (vertexSourceId !== undefined) {
-          const vertexSource = props.files.readFile(v.code);
-          if (vertexSource !== null) {
-            code = vertexSource;
-          }
-        }
+        let code =
+          referencedFiles.value.get(v.code)?.value ??
+          `fn evaluateImage(input2: vec2f) -> vec3f { return vec3(input2, 0.0); }`;
 
         let model = {
           transform: {
@@ -132,7 +157,7 @@ try {
 }
 
 const shadersDropdown = computed<SelectMixedOption[]>(() => {
-  return [...props.files.fileNames.value.keys()]
+  return [...props.fs.files.value.keys()]
     .toSorted()
     .filter((fileName) => fileName.endsWith(".wgsl"))
     .map(
@@ -150,48 +175,63 @@ const shadersDropdown = computed<SelectMixedOption[]>(() => {
     });
 });
 
-function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
-  const keyedCode = ref<KeyedCode | null>(
-    startFile !== null ? readFile(startFile) : null
-  );
+function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
+  const openedFileName = ref<FilePath | null>(startFile);
+  const keyedCode = ref<KeyedCode | null>(null);
 
-  function readFile(name: FilePath): KeyedCode | null {
-    let code = fs.readFile(name);
-    if (code === null) {
-      return null;
+  watchImmediate(openedFileName, (fileName) => {
+    if (fileName === null) {
+      keyedCode.value = null;
+      return;
     }
-    return {
-      id: crypto.randomUUID(),
-      code,
-      name,
+
+    const id = crypto.randomUUID();
+    keyedCode.value = {
+      id,
+      code: "",
+      name: fileName,
     };
-  }
+
+    // And now asynchronously load the file
+    let file = fs.readTextFile(fileName);
+    if (file === null) {
+      showFileError("Could not read file", fileName);
+      return;
+    }
+    file.then((v) => {
+      if (keyedCode.value?.id !== id) {
+        // We already opened another file
+        return;
+      }
+      keyedCode.value = {
+        id: crypto.randomUUID(),
+        code: v,
+        name: fileName,
+      };
+    });
+  });
 
   function openFile(v: FilePath) {
-    keyedCode.value = readFile(v);
+    openedFileName.value = v;
   }
   function addFiles(files: Set<FilePath>) {
     files.forEach((file) => {
       if (fs.hasFile(file)) return;
-      fs.writeFile(file, "");
+      fs.writeTextFile(file, "");
     });
   }
   function renameFile(oldName: FilePath, newName: FilePath) {
     if (oldName === newName) return;
-    const fileData = fs.readFile(oldName);
-    if (fileData === null) return;
-    fs.deleteFile(oldName);
-    fs.writeFile(newName, fileData);
-
-    if (oldName === keyedCode.value?.name) {
-      keyedCode.value = readFile(newName);
+    fs.renameFile(oldName, newName);
+    if (oldName === openedFileName.value) {
+      openFile(newName);
     }
   }
   function deleteFiles(files: Set<FilePath>) {
     files.forEach((file) => {
       fs.deleteFile(file);
-      if (file === keyedCode.value?.name) {
-        keyedCode.value = null;
+      if (file === openedFileName.value) {
+        openedFileName.value = null;
       }
     });
   }
@@ -202,9 +242,13 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFiles) {
       showError("No file selected", new Error("No file selected"));
       return;
     }
-    // Purposefully doesn't update the `keyedCode` value
-    // This is to avoid triggering a reactivity loop when using this with the CodeEditor component
-    fs.writeFile(keyedCode.value.name, value);
+    // Keeps the ID intact, but updates the code
+    // This ID scheme is used to avoid triggering recursive updates (the CodeEditor has a copy of the code)
+    keyedCode.value = {
+      ...keyedCode.value,
+      code: value,
+    };
+    fs.writeTextFile(keyedCode.value.name, value);
   }, 500);
 
   return {
@@ -259,7 +303,7 @@ function saveScene() {
       new Error("Could not serialize scene")
     );
   } else {
-    props.files.writeFile(scenePath, sceneContent);
+    props.fs.writeTextFile(SceneFileName, sceneContent);
   }
 }
 
@@ -274,8 +318,8 @@ function addModel(name: string, shaderName: string) {
   if (shaderName) {
     const vertexSource = makeFilePath(shaderName);
 
-    if (!props.files.hasFile(vertexSource)) {
-      props.files.writeFile(vertexSource, HeartSphere);
+    if (!props.fs.hasFile(vertexSource)) {
+      props.fs.writeTextFile(vertexSource, HeartSphere);
     }
 
     const newModel: VirtualModelState = {
@@ -343,7 +387,7 @@ function removeModel(ids: string[]) {
         <div class="pt-2 h-full w-full overflow-y-auto">
           <div v-if="tabs.selectedTab.value === 'filebrowser'">
             <FileBrowser
-              :files="props.files"
+              :fs="props.fs"
               @open-file="openFile.openFile($event)"
               @add-files="openFile.addFiles($event)"
               @rename-file="
@@ -356,8 +400,8 @@ function removeModel(ids: string[]) {
             <SceneHierarchy
               :models="scene.state.value.models"
               :scene="scene.api.value"
-              :files="props.files"
-              :scene-path="scenePath"
+              :files="props.fs"
+              :scene-path="SceneFileName"
               :shaders="shadersDropdown"
               @update="(keys, update) => updateModels(keys, update)"
               @addModel="
@@ -378,13 +422,15 @@ function removeModel(ids: string[]) {
           <div
             ref="canvasContainer"
             class="self-stretch overflow-hidden flex-1"
-          ></div>
+          >
+            <div v-if="sceneFile == null">Missing scene.json</div>
+          </div>
           <div v-if="baseScene.asBabylon() !== null">
             <VirtualModel
               v-for="model in scene.state.value.models"
               :key="model.id"
               :scene="baseScene.asBabylon()"
-              :files="props.files"
+              :files="props.fs"
               :model="model"
             ></VirtualModel>
           </div>

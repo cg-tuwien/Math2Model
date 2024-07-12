@@ -96,6 +96,10 @@ export class VirtualScene {
     this.state = state;
   }
 
+  clear() {
+    this.state.value.models = [];
+  }
+
   serialize(): SerializedScene {
     const models = this.state.value.models.map(serializeModel);
     return {
@@ -141,7 +145,7 @@ export function useVirtualScene() {
   const api = shallowRef<VirtualScene>(new VirtualScene(state));
 
   return {
-    state: computed(() => state.value),
+    state: computed<VirtualSceneState>(() => state.value),
     api,
   };
 }

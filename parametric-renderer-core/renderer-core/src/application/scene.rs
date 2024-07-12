@@ -83,7 +83,7 @@ impl SceneData {
         )
     }
 
-    pub fn write_buffers(&mut self, render_data: &RenderData, queue: &wgpu::Queue) {
+    pub fn write_buffers(&self, render_data: &RenderData, queue: &wgpu::Queue) {
         self.time_buffer
             .write_buffer(queue, &render_data.time_data)
             .unwrap();
