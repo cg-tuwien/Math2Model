@@ -27,7 +27,12 @@ WgpuEngine.createEngine(canvasElement).then((v) => {
 
 <template>
   <EditorAndOutput
-    v-if="sceneFiles !== null && engine !== null && canvasElement !== null"
+    v-if="
+      sceneFiles !== null &&
+      engine !== null &&
+      canvasElement !== null &&
+      gpuDevice !== null
+    "
     :fs="sceneFiles"
     :canvas="canvasElement"
     :engine="engine"
