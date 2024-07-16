@@ -11,14 +11,16 @@ Read our [CONTRIBUTING.md](./CONTRIBUTING.md)
 
 ## Project Setup
 
-```sh
-npm install
-```
+This project depends on Node.js with npm and Rust. 
 
-and run it with
+1. Install Node.js and Rust
+2. `npm install` in the main folder
+3. `cd parametric-renderer-core` and `npm install`
 
-```sh
-npm run dev
-```
+Now the dependencies have been installed.
 
-and for everything else, check out our [CONTRIBUTING.md](./CONTRIBUTING.md)
+To run it
+1. `npm run dev` to start up the web server
+2. `cd parametric-renderer-core` and `npm run build` in a separate terminal to build the WASM package.
+
+As for everything else, check out our [CONTRIBUTING.md](./CONTRIBUTING.md)
