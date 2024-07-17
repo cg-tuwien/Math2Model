@@ -8,10 +8,12 @@ import {
   watch,
   watchEffect,
   onUnmounted,
+  onMounted,
   computed,
   h,
   type Ref,
   reactive,
+  defineComponent,
 } from "vue";
 import { useDebounceFn, watchImmediate } from "@vueuse/core";
 import { useStore } from "@/stores/store";
@@ -38,12 +40,14 @@ import type { Engine } from "@/engine/engine";
 import HeartSphere from "@/shaders/HeartSphere.wgsl?raw";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import type { ObjectUpdate } from "./input/object-update";
+import CodeGraph from "@/components/visual-programming/CodeGraph.vue";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
   fs: ReactiveFilesystem;
   canvas: HTMLCanvasElement;
   engine: Engine;
+  visual: boolean;
 }>();
 
 const store = useStore();
@@ -67,7 +71,7 @@ watchEffect(() => {
 const openFile = useOpenFile(
   // Open the first .wgsl file if it exists
   props.fs.listFiles().find((v) => v.endsWith(".wgsl")) ?? null,
-  props.fs
+  props.fs,
 );
 
 const canvasContainer = ref<HTMLDivElement | null>(null);
@@ -96,7 +100,7 @@ try {
 {
   // TODO: Make the Rust side pull files instead of this
   const referencedFiles = shallowRef(
-    new Map<FilePath, Readonly<Ref<string | null>>>()
+    new Map<FilePath, Readonly<Ref<string | null>>>(),
   );
   watchImmediate(
     () => scene.state.value.models,
@@ -117,7 +121,7 @@ try {
       }
 
       referencedFiles.value = newReferencedFiles;
-    }
+    },
   );
 
   let wgpuScene = baseScene.value.asWgpu();
@@ -162,10 +166,10 @@ const shadersDropdown = computed<SelectMixedOption[]>(() => {
       (fileName): SelectMixedOption => ({
         label: fileName.substring(
           0,
-          fileName.valueOf().length - ".wgsl".length
+          fileName.valueOf().length - ".wgsl".length,
         ),
         value: fileName,
-      })
+      }),
     )
     .concat({
       label: "New Shader...",
@@ -298,7 +302,7 @@ function saveScene() {
   if (sceneContent === null) {
     showError(
       "Could not serialize scene",
-      new Error("Could not serialize scene")
+      new Error("Could not serialize scene"),
     );
   } else {
     props.fs.writeTextFile(SceneFileName, sceneContent);
@@ -432,12 +436,17 @@ function removeModel(ids: string[]) {
             ></VirtualModel>
           </div>
           <CodeEditor
+            v-if="!props.visual"
             class="self-stretch overflow-hidden flex-1"
             :keyed-code="openFile.code.value"
             :is-dark="store.isDark"
             @update="openFile.setNewCode($event)"
           >
           </CodeEditor>
+          <CodeGraph
+            v-if="props.visual"
+            style="height: 500px; width: 500px"
+          ></CodeGraph>
         </div>
       </template>
     </n-split>

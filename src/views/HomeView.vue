@@ -23,6 +23,7 @@ getEngine().then((v) => {
     :fs="sceneFiles"
     :canvas="canvas"
     :engine="engine"
+    :visual="true"
   ></EditorAndOutput>
   <span v-else>Loading...</span>
 </template>
