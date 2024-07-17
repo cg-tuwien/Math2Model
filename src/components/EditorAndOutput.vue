@@ -285,7 +285,7 @@ function saveScene() {
   if (sceneContent === null) {
     showError(
       "Could not serialize scene",
-      new Error("Could not serialize scene")
+      new Error("Could not serialize scene"),
     );
   } else {
     props.fs.writeTextFile(SceneFileName, sceneContent);
@@ -409,22 +409,18 @@ function removeModel(ids: string[]) {
           >
             <div v-if="sceneFile == null">Missing scene.json</div>
           </div>
-          <div v-if="baseScene.asBabylon() !== null">
-            <VirtualModel
-              v-for="model in scene.state.value.models"
-              :key="model.id"
-              :scene="baseScene.asBabylon()"
-              :files="props.fs"
-              :model="model"
-            ></VirtualModel>
-          </div>
           <CodeEditor
+            v-if="!props.visual"
             class="self-stretch overflow-hidden flex-1"
             :keyed-code="openFile.code.value"
             :is-dark="store.isDark"
             @update="openFile.setNewCode($event)"
           >
           </CodeEditor>
+          <CodeGraph
+            v-if="props.visual"
+            style="width: 500px; height: 1000px"
+          ></CodeGraph>
         </div>
       </template>
     </n-split>

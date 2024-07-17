@@ -23,6 +23,7 @@ import {
   reteSocket as socket,
   AddNode,
   Vector2Node,
+  Seperate2Node,
 } from "@/vpnodes/nodes";
 import { DataflowEngine } from "rete-engine";
 
@@ -34,13 +35,17 @@ onMounted(() => {
   createEditor();
 });
 
-type Nodes = NumberNode | AddNode | Vector2Node;
+type Nodes = NumberNode | AddNode | Vector2Node | Seperate2Node;
 class Connection<
   A extends Nodes,
   B extends Nodes,
 > extends ClassicPreset.Connection<A, B> {}
 
-type Conns = Connection<NumberNode, AddNode> | Connection<AddNode, AddNode>;
+type Conns =
+  | Connection<NumberNode, AddNode>
+  | Connection<AddNode, AddNode>
+  | Connection<Vector2Node, Seperate2Node>
+  | Connection<Seperate2Node, AddNode>;
 
 async function createEditor() {
   type Schemes = GetSchemes<Nodes, Conns>;
@@ -65,6 +70,10 @@ async function createEditor() {
       ["Number", () => new NumberNode()],
       ["Add", () => new AddNode((c) => area.update("control", c.id))],
       ["Vector2", () => new Vector2Node((c) => area.update("control", c.id))],
+      [
+        "Seperate2",
+        () => new Seperate2Node((c) => area.update("control", c.id)),
+      ],
     ]),
   });
 
