@@ -2,35 +2,16 @@ import init, {
   init_engine,
   update_models,
 } from "../../parametric-renderer-core/pkg";
-import type { BaseScene, Engine } from "./engine";
 
 await init();
 
-export class WgpuEngine implements Engine {
+export class WgpuEngine {
   private constructor(private engine: void) {}
   static async createEngine(canvasElement: HTMLCanvasElement) {
     const engine = init_engine(canvasElement);
     return new WgpuEngine(engine);
   }
-  createBaseScene(): BaseScene {
-    return new WgpuBaseScene();
+  updateModels(js_models: any) {
+    update_models(js_models);
   }
-  startRenderLoop(_value: () => void): { stop: () => void } {
-    return { stop: () => {} };
-  }
-}
-
-// Dummy implementation
-export class WgpuBaseScene implements BaseScene {
-  update(): void {}
-  render(): void {}
-  asBabylon() {
-    return null;
-  }
-  asWgpu() {
-    return {
-      updateModels: update_models,
-    };
-  }
-  [Symbol.dispose](): void {}
 }

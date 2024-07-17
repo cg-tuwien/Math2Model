@@ -3,14 +3,14 @@ import {
   ReadonlyEulerAngles,
   ReadonlyVector3,
   type VirtualModelState,
-} from "@/scenes/VirtualScene";
-import { computed, h, ref, watch, watchEffect, type DeepReadonly } from "vue";
+} from "@/scenes/scene-state";
+import { computed, h, ref, watchEffect, type DeepReadonly } from "vue";
 import { NButton, NInput, NText } from "naive-ui";
 import NumberInput from "@/components/input/NumberInput.vue";
 import VectorInput from "@/components/input/VectorInput.vue";
 import EulerInput from "@/components/input/EulerInput.vue";
 import { showError } from "@/notification";
-import { commonModelState } from "@/sceneview/writeablemodelstate";
+import { commonModelState } from "@/scenes/aggregrate-model-state";
 import { type FilePath, makeFilePath } from "@/filesystem/reactive-files";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import {

@@ -1,5 +1,5 @@
 import { createRouter, createWebHashHistory } from "vue-router";
-import NotFoundView from "../views/NotFoundView.vue";
+import NotFoundView from "./NotFoundView.vue";
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -7,12 +7,7 @@ const router = createRouter({
     {
       path: "/",
       name: "home",
-      component: () => import("../views/HomeView.vue"),
-    },
-    {
-      path: "/webgpu",
-      name: "webgpu",
-      component: () => import("../views/WgpuHomeView.vue"),
+      component: () => import("./HomeView.vue"),
     },
     {
       path: "/about",
@@ -20,7 +15,7 @@ const router = createRouter({
       // route level code-splitting
       // this generates a separate chunk (About.[hash].js) for this route
       // which is lazy-loaded when the route is visited.
-      component: () => import("../views/AboutView.vue"),
+      component: () => import("./AboutView.vue"),
     },
     { path: "/:pathMatch(.*)*", name: "NotFound", component: NotFoundView },
   ],
