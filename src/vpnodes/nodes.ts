@@ -1,6 +1,7 @@
 import { ClassicPreset } from "rete";
 import type { Vec2 } from "webgpu-matrix/dist/1.x/vec2";
-import { vec2 } from "webgpu-matrix";
+import { vec2, vec3 } from "webgpu-matrix";
+import type { Vec3 } from "webgpu-matrix/dist/1.x/vec3";
 
 export const reteSocket = new ClassicPreset.Socket("socket");
 
@@ -69,14 +70,12 @@ export class Vector2Node extends ClassicPreset.Node {
       "x",
       new ClassicPreset.InputControl("number", {
         initial: 0,
-        change: this.chgX,
       }),
     );
     this.addControl(
       "y",
       new ClassicPreset.InputControl("number", {
         initial: 0,
-        change: this.chgY,
       }),
     );
 
@@ -110,34 +109,6 @@ export class Vector2Node extends ClassicPreset.Node {
 
     return { vec: vec2.create(xCont?.value ?? 0, yCont?.value ?? 0) };
   }
-
-  chgX(value: number): void {
-    console.log("Update X: " + value.toString() + this.controls);
-    const vecCont: ClassicPreset.InputControl<"text", string> | undefined = this
-      .controls?.vector as ClassicPreset.InputControl<"text", string>;
-    const yCont: ClassicPreset.InputControl<"number", number> | undefined = this
-      .controls?.y as ClassicPreset.InputControl<"number", number>;
-    console.log(vecCont);
-    console.log(yCont);
-
-    vecCont?.setValue(
-      "(" + value.toString() + ", " + yCont?.value?.toString() ?? "0" + ")",
-    );
-    console.log("New vector: " + vecCont?.value?.toString() ?? "(0, 0)");
-    if (this.update) this.update(vecCont);
-  }
-
-  chgY(value: number): void {
-    const vecCont: ClassicPreset.InputControl<"text", string> | undefined = this
-      .controls?.vector as ClassicPreset.InputControl<"text", string>;
-    const xCont: ClassicPreset.InputControl<"number", number> | undefined = this
-      .controls?.y as ClassicPreset.InputControl<"number", number>;
-
-    vecCont?.setValue(
-      "(" + xCont?.value?.toString() ?? "0" + ", " + value.toString() + ")",
-    );
-    if (this.update) this.update(vecCont);
-  }
 }
 
 export class Seperate2Node extends ClassicPreset.Node {
@@ -146,7 +117,7 @@ export class Seperate2Node extends ClassicPreset.Node {
   ) {
     super("Seperate2");
 
-    this.addInput("vector", new ClassicPreset.Input(reteSocket, "Vector2"));
+    this.addInput("vector", new ClassicPreset.Input(reteSocket, "Vector"));
 
     this.addOutput("x", new ClassicPreset.Output(reteSocket, "X"));
     this.addOutput("y", new ClassicPreset.Output(reteSocket, "Y"));
@@ -156,8 +127,91 @@ export class Seperate2Node extends ClassicPreset.Node {
     const vector = inputs.vector;
     console.log(vec2.len(vector ?? vec2.zero()));
     return {
-      x: vector ? vector[0] : 0,
-      y: vector ? vector[1] : 0,
+      x: vector ? vector[0][0] : 0,
+      y: vector ? vector[0][1] : 0,
+    };
+  }
+}
+
+export class Join2Node extends ClassicPreset.Node {
+  constructor(
+    private update?: (control: ClassicPreset.InputControl<"text">) => void,
+  ) {
+    super("Join2");
+
+    this.addInput("x", new ClassicPreset.Input(reteSocket, "X"));
+    this.addInput("y", new ClassicPreset.Input(reteSocket, "Y"));
+
+    this.addOutput("vector", new ClassicPreset.Output(reteSocket, "Vector2"));
+  }
+
+  data(inputs: { x?: number; y?: number }): { vector: Vec2 } {
+    const { x, y } = inputs;
+    return {
+      vector: vec2.create(x ?? 0, y ?? 0),
+    };
+  }
+}
+
+export class Vector3Node extends ClassicPreset.Node {
+  constructor(
+    private update?: (control: ClassicPreset.InputControl<"text">) => void,
+  ) {
+    super("Vector3");
+
+    this.addControl(
+      "x",
+      new ClassicPreset.InputControl("number", {
+        initial: 0,
+      }),
+    );
+    this.addControl(
+      "y",
+      new ClassicPreset.InputControl("number", {
+        initial: 0,
+      }),
+    );
+    this.addControl(
+      "z",
+      new ClassicPreset.InputControl("number", {
+        initial: 0,
+      }),
+    );
+
+    this.addControl(
+      "vector",
+      new ClassicPreset.InputControl("text", {
+        readonly: true,
+        initial: "(0, 0, 0)",
+      }),
+    );
+
+    this.addOutput("vec", new ClassicPreset.Output(reteSocket));
+  }
+
+  data(): { vec: Vec3 } {
+    const xCont: ClassicPreset.InputControl<"number", number> | undefined = this
+      .controls?.x as ClassicPreset.InputControl<"number", number>;
+    const yCont: ClassicPreset.InputControl<"number", number> | undefined = this
+      .controls?.y as ClassicPreset.InputControl<"number", number>;
+    const zCont: ClassicPreset.InputControl<"number", number> | undefined = this
+      .controls?.z as ClassicPreset.InputControl<"number", number>;
+    const vecCont: ClassicPreset.InputControl<"text", string> | undefined = this
+      .controls?.vector as ClassicPreset.InputControl<"text", string>;
+
+    vecCont?.setValue(
+      "(" +
+        (xCont?.value?.toString() ?? "0") +
+        ", " +
+        (yCont?.value?.toString() ?? "0") +
+        ", " +
+        (zCont?.value?.toString() ?? "0") +
+        ")",
+    );
+    if (this.update) this.update(vecCont);
+
+    return {
+      vec: vec3.create(xCont?.value ?? 0, yCont?.value ?? 0, zCont?.value ?? 0),
     };
   }
 }

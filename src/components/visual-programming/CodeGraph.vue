@@ -24,8 +24,11 @@ import {
   AddNode,
   Vector2Node,
   Seperate2Node,
+  Join2Node,
+  Vector3Node,
 } from "@/vpnodes/nodes";
 import { DataflowEngine } from "rete-engine";
+import { DockPlugin, DockPresets } from "rete-dock-plugin";
 
 const container = ref<HTMLElement | null>(null);
 
@@ -35,7 +38,13 @@ onMounted(() => {
   createEditor();
 });
 
-type Nodes = NumberNode | AddNode | Vector2Node | Seperate2Node;
+type Nodes =
+  | NumberNode
+  | AddNode
+  | Vector2Node
+  | Seperate2Node
+  | Join2Node
+  | Vector3Node;
 class Connection<
   A extends Nodes,
   B extends Nodes,
@@ -45,7 +54,11 @@ type Conns =
   | Connection<NumberNode, AddNode>
   | Connection<AddNode, AddNode>
   | Connection<Vector2Node, Seperate2Node>
-  | Connection<Seperate2Node, AddNode>;
+  | Connection<Seperate2Node, AddNode>
+  | Connection<Seperate2Node, Join2Node>
+  | Connection<Join2Node, Seperate2Node>
+  | Connection<NumberNode, Join2Node>
+  | Connection<Vector3Node, Seperate2Node>;
 
 async function createEditor() {
   type Schemes = GetSchemes<Nodes, Conns>;
@@ -70,12 +83,20 @@ async function createEditor() {
       ["Number", () => new NumberNode()],
       ["Add", () => new AddNode((c) => area.update("control", c.id))],
       ["Vector2", () => new Vector2Node((c) => area.update("control", c.id))],
+      ["Vector3", () => new Vector3Node((c) => area.update("control", c.id))],
       [
         "Seperate2",
         () => new Seperate2Node((c) => area.update("control", c.id)),
       ],
+      ["Join2", () => new Join2Node((c) => area.update("control", c.id))],
     ]),
   });
+
+  const dock = new DockPlugin<Schemes>();
+
+  dock.addPreset(DockPresets.classic.setup({ area, size: 30, scale: 0.7 }));
+  //
+  //
 
   area.use(contextMenu);
 
@@ -92,6 +113,14 @@ async function createEditor() {
   editor.use(engine);
   area.use(connection);
   area.use(render);
+  area.use(dock);
+
+  dock.add(() => new NumberNode());
+  dock.add(() => new AddNode((c) => area.update("control", c.id)));
+  dock.add(() => new Vector2Node((c) => area.update("control", c.id)));
+  dock.add(() => new Vector3Node((c) => area.update("control", c.id)));
+  dock.add(() => new Seperate2Node((c) => area.update("control", c.id)));
+  dock.add(() => new Join2Node((c) => area.update("control", c.id)));
 
   editor.addPipe((context) => {
     if (["connectioncreated", "connectionremoved"].includes(context.type)) {
