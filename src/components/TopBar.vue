@@ -64,11 +64,7 @@ async function handleFile(key: FileDropdownOption["key"]) {
 }
 
 type ViewDropdownOption = DropdownOption & {
-  key:
-    | "switch-to-dark"
-    | "switch-to-light"
-    | "switch-to-babylon"
-    | "switch-to-webgpu";
+  key: "switch-to-dark" | "switch-to-light";
 };
 const viewOptions = computed((): ViewDropdownOption[] => {
   return [
@@ -83,14 +79,6 @@ const viewOptions = computed((): ViewDropdownOption[] => {
           key: "switch-to-dark",
           icon: () => h(IconMoon),
         },
-    {
-      label: "Babylon.js Renderer",
-      key: "switch-to-babylon",
-    },
-    {
-      label: "WebGPU Renderer",
-      key: "switch-to-webgpu",
-    },
   ];
 });
 function handleView(key: ViewDropdownOption["key"]) {
@@ -98,10 +86,6 @@ function handleView(key: ViewDropdownOption["key"]) {
     store.setIsDark(true);
   } else if (key === "switch-to-light") {
     store.setIsDark(false);
-  } else if (key === "switch-to-babylon") {
-    router.push("/");
-  } else if (key === "switch-to-webgpu") {
-    router.push("/webgpu");
   } else {
     assertUnreachable(key);
   }

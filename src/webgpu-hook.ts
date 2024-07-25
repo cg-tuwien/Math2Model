@@ -4,7 +4,7 @@ let hasDevice = false;
 if (globalThis.navigator.gpu !== undefined) {
   hookFunction(globalThis.navigator.gpu, "requestAdapter", async (fn, args) => {
     const adapter = await fn(...args);
-    if (adapter !== undefined) {
+    if (adapter) {
       hookFunction(adapter, "requestDevice", async (fn, args) => {
         const device = await fn(...args);
         gpuDevicePromise.resolve(device);

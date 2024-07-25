@@ -26,18 +26,6 @@ Remember to use a browser that supports WebGPU.
 npm run build
 ```
 
-Different base URL:
-```sh
-npm run build-release
-```
-
-### Run Unit Tests with [Vitest](https://vitest.dev/)
-
-```sh
-npm run test:unit
-```
-
-
 ## Tooling
 
 [VSCode](https://code.visualstudio.com/) with
@@ -61,7 +49,7 @@ I also totally recommend trying out the following browser extensions
 - `src/components/` contains proper Vue.js components that can be used everywhere.
 - `src/filesystem/` deals with saving and loading files. Uses the latest filesystem API together with a sandboxed "origin private filesystem".
 - `src/router/` contains the Vue.js router stuff, reponsible for mapping URLs to different pages/views.
-- `src/scenes/` contains the existing Babylon.js scenes. 
+- `src/scenes/` contains the CPU state of the scenes.
 - `src/stores/` contains Pinia stores. They're globally accessible, reactive objects.
 - `src/views/` contains the different pages. Currently the HomeView.vue is the only one that matters.
 - `src/App.vue/` is the main Vue.js file.
@@ -71,7 +59,6 @@ I also totally recommend trying out the following browser extensions
 - `tsconfig.json` is required to tell Typescript what to do. It's split up, because there are technically multiple different Typescript configs that apply to our code.
   - `tsconfig.app.json` is for the website.
   - `tsconfig.node.json` is for configuration files, like the `vite.config.ts`.
-  - `tsconfig.vitest.json` is for the unit tests. It tries to mimick the website's config.
 - `vite.config.ts` is the configuration file for the Vite bundler.
 
 
@@ -93,5 +80,5 @@ Other libraries where one can look up the documentation as needed are
 The `index.html` loads the `main.ts` file, which creates a Vue.js instance.
 From there `App.vue` gets loaded, which is responsible for the overall layout of the site. It embeds a `<RouterView>`, which is where all the views/pages go. (`HomeView.vue`)
 
-`HomeView.vue` asynchronously loads the filesystem code, and Babylon.js. They're a bit slow to initialize, so we load them very early, and we're avoiding doing hot module reloading with them. Once they've finished loading, we create our `EditorAndOutput.vue` component.
+`HomeView.vue` asynchronously loads the filesystem code, and WebGPU engine. They're a bit slow to initialize, so we load them very early, and we're avoiding doing hot module reloading with them. Once they've finished loading, we create our `EditorAndOutput.vue` component.
 
