@@ -27,23 +27,25 @@ import {
   ReadonlyVector3,
   useVirtualScene,
   type VirtualModelState,
-} from "@/scenes/VirtualScene";
+} from "@/scenes/scene-state";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import {
   deserializeScene,
   SceneFileName,
   serializeScene,
 } from "@/filesystem/scene-file";
-import type { Engine } from "@/engine/engine";
-import HeartSphere from "@/shaders/HeartSphere.wgsl?raw";
+import type { WgpuEngine } from "@/engine/wgpu-engine";
+import HeartSphere from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import type { ObjectUpdate } from "./input/object-update";
+import WebGpu from "@/components/WebGpu.vue";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
   fs: ReactiveFilesystem;
   canvas: HTMLCanvasElement;
-  engine: Engine;
+  engine: WgpuEngine;
+  gpuDevice: GPUDevice;
 }>();
 
 const store = useStore();
@@ -71,28 +73,12 @@ const openFile = useOpenFile(
 );
 
 const canvasContainer = ref<HTMLDivElement | null>(null);
-const baseScene = shallowRef(props.engine.createBaseScene());
-onUnmounted(() => {
-  baseScene.value[Symbol.dispose]();
-});
 
 // Attach the canvas to the DOM
 watchEffect(() => {
   canvasContainer.value?.appendChild(props.canvas);
 });
 
-function renderLoop() {
-  baseScene.value.update();
-  baseScene.value.render();
-}
-try {
-  let stopRenderLoop = props.engine.startRenderLoop(renderLoop);
-  onUnmounted(() => {
-    stopRenderLoop.stop();
-  });
-} catch (e) {
-  showError("Could not start render loop", e);
-}
 {
   // TODO: Make the Rust side pull files instead of this
   const referencedFiles = shallowRef(
@@ -120,38 +106,35 @@ try {
     }
   );
 
-  let wgpuScene = baseScene.value.asWgpu();
-  if (wgpuScene !== null) {
-    watchEffect(() => {
-      let models = scene.state.value.models.map((v) => {
-        let code =
-          referencedFiles.value.get(v.code)?.value ??
-          `fn evaluateImage(input2: vec2f) -> vec3f { return vec3(input2, 0.0); }`;
+  watchEffect(() => {
+    let models = scene.state.value.models.map((v) => {
+      let code =
+        referencedFiles.value.get(v.code)?.value ??
+        `fn evaluateImage(input2: vec2f) -> vec3f { return vec3(input2, 0.0); }`;
 
-        let model = {
-          transform: {
-            position: [v.position.x, v.position.y, v.position.z],
-            rotation: [v.rotation.x, v.rotation.y, v.rotation.z],
-            scale: v.scale,
-          },
-          material_info: {
-            color: [v.material.color.x, v.material.color.y, v.material.color.z],
-            emissive: [
-              v.material.emissive.x,
-              v.material.emissive.y,
-              v.material.emissive.z,
-            ],
-            roughness: v.material.roughness,
-            metallic: v.material.metallic,
-          },
-          label: v.code,
-          evaluate_image_code: code,
-        };
-        return model;
-      });
-      wgpuScene.updateModels(models);
+      let model = {
+        transform: {
+          position: [v.position.x, v.position.y, v.position.z],
+          rotation: [v.rotation.x, v.rotation.y, v.rotation.z],
+          scale: v.scale,
+        },
+        material_info: {
+          color: [v.material.color.x, v.material.color.y, v.material.color.z],
+          emissive: [
+            v.material.emissive.x,
+            v.material.emissive.y,
+            v.material.emissive.z,
+          ],
+          roughness: v.material.roughness,
+          metallic: v.material.metallic,
+        },
+        label: v.code,
+        evaluate_image_code: code,
+      };
+      return model;
     });
-  }
+    props.engine.updateModels(models);
+  });
 }
 
 const shadersDropdown = computed<SelectMixedOption[]>(() => {
@@ -416,20 +399,12 @@ function removeModel(ids: string[]) {
       </template>
       <template #2>
         <div class="flex h-full w-full">
+          <WebGpu :gpuDevice="props.gpuDevice"></WebGpu>
           <div
             ref="canvasContainer"
             class="self-stretch overflow-hidden flex-1"
           >
             <div v-if="sceneFile == null">Missing scene.json</div>
-          </div>
-          <div v-if="baseScene.asBabylon() !== null">
-            <VirtualModel
-              v-for="model in scene.state.value.models"
-              :key="model.id"
-              :scene="baseScene.asBabylon()"
-              :files="props.fs"
-              :model="model"
-            ></VirtualModel>
           </div>
           <CodeEditor
             class="self-stretch overflow-hidden flex-1"
