@@ -1,10 +1,10 @@
-use glam::Quat;
-use glamour::{Angle, Point3, Vector2, Vector3};
+use glam::{Quat, Vec2, Vec3};
 use winit::event::MouseButton;
 
 use crate::{application::CursorCapture, input::WindowInputs};
 
 use super::{
+    angle::Angle,
     camera_controller::{GeneralController, GeneralControllerSettings, IsCameraController},
     Camera,
 };
@@ -21,7 +21,7 @@ impl LogarithmicDistance {
 }
 
 pub struct OrbitcamController {
-    pub center: Point3,
+    pub center: Vec3,
     pub pitch: Angle,
     pub yaw: Angle,
     logarithmic_distance: LogarithmicDistance,
@@ -36,8 +36,8 @@ impl OrbitcamController {
 
         Self {
             center,
-            pitch: Angle::from(pitch),
-            yaw: Angle::from(yaw),
+            pitch: Angle::new(pitch),
+            yaw: Angle::new(yaw),
             logarithmic_distance: LogarithmicDistance::new(controller.distance_to_center),
         }
     }
@@ -48,7 +48,7 @@ impl OrbitcamController {
         settings: &GeneralControllerSettings,
     ) -> CursorCapture {
         let mut cursor_capture = CursorCapture::Free;
-        let mouse_delta = Vector2::new(input.mouse.motion.0 as f32, input.mouse.motion.1 as f32);
+        let mouse_delta = Vec2::new(input.mouse.motion.0 as f32, input.mouse.motion.1 as f32);
         if input.mouse.pressed(MouseButton::Right) {
             self.update_orientation(mouse_delta, settings);
             cursor_capture = CursorCapture::LockedAndHidden;
@@ -65,7 +65,7 @@ impl OrbitcamController {
         cursor_capture
     }
 
-    fn update_orientation(&mut self, mouse_delta: Vector2, settings: &GeneralControllerSettings) {
+    fn update_orientation(&mut self, mouse_delta: Vec2, settings: &GeneralControllerSettings) {
         self.set_pitch_yaw(
             self.pitch - Angle::new(mouse_delta.y * settings.rotation_sensitivity),
             self.yaw - Angle::new(mouse_delta.x * settings.rotation_sensitivity),
@@ -83,7 +83,7 @@ impl OrbitcamController {
 
     fn update_pan_position(
         &mut self,
-        direction: Vector2,
+        direction: Vec2,
         delta_time: f32,
         settings: &GeneralControllerSettings,
     ) {
@@ -95,9 +95,8 @@ impl OrbitcamController {
 }
 
 impl IsCameraController for OrbitcamController {
-    fn position(&self) -> Point3 {
-        self.center
-            + self.orientation() * Vector3::new(0.0, 0.0, self.logarithmic_distance.distance())
+    fn position(&self) -> Vec3 {
+        self.center + self.orientation() * Vec3::new(0.0, 0.0, self.logarithmic_distance.distance())
     }
 
     fn orientation(&self) -> Quat {

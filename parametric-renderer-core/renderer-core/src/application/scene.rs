@@ -1,6 +1,5 @@
-use glamour::{ToRaw, Vector2, Vector4};
-
 use crate::{buffer::TypedBuffer, camera::Camera, shaders::shader};
+use glam::{Vec2, Vec4};
 
 use super::RenderData;
 
@@ -30,12 +29,8 @@ impl SceneData {
                 device,
                 "Screen Buffer",
                 &shader::Screen {
-                    resolution: size.to_raw(),
-                    inv_resolution: Vector2::<f32>::new(
-                        1.0 / (size.x as f32),
-                        1.0 / (size.y as f32),
-                    )
-                    .to_raw(),
+                    resolution: size,
+                    inv_resolution: Vec2::new(1.0 / (size.x as f32), 1.0 / (size.y as f32)),
                 },
                 wgpu::BufferUsages::COPY_DST,
             )?,
@@ -43,7 +38,7 @@ impl SceneData {
                 device,
                 "Mouse Buffer",
                 &shader::Mouse {
-                    pos: Vector2::<f32>::ZERO.to_raw(),
+                    pos: Vec2::ZERO,
                     buttons: 0,
                 },
                 wgpu::BufferUsages::COPY_DST,
@@ -58,11 +53,11 @@ impl SceneData {
                 device,
                 "Light Buffer",
                 &shader::Lights {
-                    ambient: Vector4::<f32>::new(0.1, 0.1, 0.1, 0.0).to_raw(),
+                    ambient: Vec4::new(0.1, 0.1, 0.1, 0.0),
                     points_length: 1,
                     points: vec![shader::PointLight {
-                        position_range: Vector4::<f32>::new(0.0, 4.0, 2.0, 40.0).to_raw(),
-                        color_intensity: Vector4::<f32>::new(1.0, 1.0, 1.0, 3.0).to_raw(),
+                        position_range: Vec4::new(0.0, 4.0, 2.0, 40.0),
+                        color_intensity: Vec4::new(1.0, 1.0, 1.0, 3.0),
                     }],
                 },
                 wgpu::BufferUsages::COPY_DST,
@@ -92,12 +87,8 @@ impl SceneData {
             .write_buffer(
                 queue,
                 &shader::Screen {
-                    resolution: size.to_raw(),
-                    inv_resolution: Vector2::<f32>::new(
-                        1.0 / (size.x as f32),
-                        1.0 / (size.y as f32),
-                    )
-                    .to_raw(),
+                    resolution: size,
+                    inv_resolution: Vec2::new(1.0 / (size.x as f32), 1.0 / (size.y as f32)),
                 },
             )
             .unwrap();
@@ -113,9 +104,9 @@ impl SceneData {
 impl Camera {
     pub fn to_shader(&self) -> shader::Camera {
         shader::Camera {
-            view: self.view_matrix().to_raw(),
-            projection: self.projection_matrix().to_raw(),
-            world_position: self.position.to_raw().extend(1.0),
+            view: self.view_matrix(),
+            projection: self.projection_matrix(),
+            world_position: self.position.extend(1.0),
         }
     }
 }
