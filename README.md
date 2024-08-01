@@ -2,9 +2,6 @@
 
 Build [the Shadertoy of Parametric Modeling](https://math2model.cg.tuwien.ac.at/). View the [demo](https://math2model.cg.tuwien.ac.at/).
 
-- Link to Trello board: https://trello.com/b/ck4VJiMs/main
-- Link to Math2Model repository: https://github.com/johannesugb/BabylonJsPlayground
-
 ## Contributing
 
 Read our [CONTRIBUTING.md](./CONTRIBUTING.md)
