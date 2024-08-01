@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use glamour::Vector2;
+use glam::UVec2;
 use tracing::info;
 use wgpu_profiler::{GpuProfiler, GpuProfilerSettings};
 use winit::window::Window;
@@ -14,13 +14,13 @@ pub struct WgpuContext {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub profiler: GpuProfiler,
-    size: Vector2<u32>,
+    size: UVec2,
     pub view_format: wgpu::TextureFormat,
 }
 
 impl WgpuContext {
     pub async fn new(window: WindowOrFallback) -> anyhow::Result<Self> {
-        let size = window.size().max(Vector2::ONE);
+        let size = window.size().max(UVec2::ONE);
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             ..Default::default()
@@ -49,6 +49,7 @@ impl WgpuContext {
                         | (adapter.features() & wgpu::Features::POLYGON_MODE_LINE),
                     required_limits: wgpu::Limits::default(),
                     label: None,
+                    memory_hints: Default::default(),
                 },
                 None,
             )
@@ -147,8 +148,8 @@ impl WgpuContext {
             .unwrap();
     }
 
-    pub fn resize(&mut self, new_size: Vector2<u32>) {
-        let new_size = new_size.max(Vector2::new(1, 1));
+    pub fn resize(&mut self, new_size: UVec2) {
+        let new_size = new_size.max(UVec2::new(1, 1));
         if new_size == self.size {
             return;
         }
@@ -167,13 +168,13 @@ impl WgpuContext {
         }
     }
 
-    pub fn size(&self) -> Vector2<u32> {
+    pub fn size(&self) -> UVec2 {
         self.size
     }
 
     fn create_fallback_texture(
         device: &wgpu::Device,
-        size: Vector2<u32>,
+        size: UVec2,
         format: wgpu::TextureFormat,
     ) -> wgpu::Texture {
         device.create_texture(&wgpu::TextureDescriptor {

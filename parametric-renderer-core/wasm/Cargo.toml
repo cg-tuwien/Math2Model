@@ -10,7 +10,6 @@ crate-type = ["cdylib"]
 anyhow = "1.0"
 console_error_panic_hook = "0.1.7"
 glam = { workspace = true }
-glamour = { workspace = true }
 renderer-core = { path = "../renderer-core" }
 time = { version = "0.3.36", features = ["wasm-bindgen"] }
 tracing = { workspace = true }
