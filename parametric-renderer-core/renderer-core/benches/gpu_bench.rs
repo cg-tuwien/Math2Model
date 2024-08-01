@@ -4,6 +4,7 @@ use criterion::{
     measurement::{Measurement, ValueFormatter},
     Criterion, Throughput,
 };
+use glam::Vec3;
 use pollster::FutureExt;
 use renderer_core::application::{CpuApplication, ProfilerSettings, WindowOrFallback};
 
@@ -25,12 +26,12 @@ fn main() {
     app.update_models(vec![renderer_core::application::ModelInfo {
         label: "Default Model".to_owned(),
         transform: renderer_core::transform::Transform {
-            position: glamour::Point3::new(0.0, 0.0, 0.0),
+            position: Vec3::new(0.0, 0.0, 0.0),
             ..Default::default()
         },
         material_info: renderer_core::application::MaterialInfo {
-            color: glamour::Vector3::new(0.6, 1.0, 1.0),
-            emissive: glamour::Vector3::new(0.0, 0.0, 0.0),
+            color: Vec3::new(0.6, 1.0, 1.0),
+            emissive: Vec3::new(0.0, 0.0, 0.0),
             roughness: 0.7,
             metallic: 0.1,
         },
@@ -52,7 +53,7 @@ fn main() {
         .block_on()
         .unwrap();
     /*app.create_surface(WindowOrFallback::Headless {
-        size: Vector2::new(1280, 720),
+        size: Vec2::new(1280, 720),
     })
     .block_on()
     .unwrap();*/

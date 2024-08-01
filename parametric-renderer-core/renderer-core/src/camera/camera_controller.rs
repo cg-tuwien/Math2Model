@@ -1,12 +1,11 @@
-use glam::Quat;
-use glamour::Point3;
+use glam::{Quat, Vec3};
 
 use crate::{application::CursorCapture, input::WindowInputs};
 
 use super::{freecam_controller::FreecamController, orbitcam_controller::OrbitcamController};
 
 pub trait IsCameraController {
-    fn position(&self) -> Point3;
+    fn position(&self) -> Vec3;
     fn orientation(&self) -> Quat;
     fn general_controller(&self) -> GeneralController;
 }
@@ -44,7 +43,7 @@ impl ChosenController {
 
 #[derive(Debug, Clone)]
 pub struct GeneralController {
-    pub position: Point3,
+    pub position: Vec3,
     pub orientation: Quat,
     pub distance_to_center: f32,
 }
@@ -87,7 +86,7 @@ impl CameraController {
 }
 
 impl IsCameraController for CameraController {
-    fn position(&self) -> Point3 {
+    fn position(&self) -> Vec3 {
         match &self.chosen {
             ChosenController::Orbitcam(v) => v.position(),
             ChosenController::Freecam(v) => v.position(),

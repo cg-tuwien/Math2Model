@@ -1,16 +1,16 @@
-use glam::Quat;
-use glamour::{Angle, Point3, Vector2, Vector3};
+use glam::{Quat, Vec2, Vec3};
 use winit::{event::MouseButton, keyboard::KeyCode};
 
 use crate::{application::CursorCapture, input::WindowInputs};
 
 use super::{
+    angle::Angle,
     camera_controller::{GeneralController, GeneralControllerSettings, IsCameraController},
     Camera,
 };
 
 pub struct FreecamController {
-    pub position: Point3,
+    pub position: Vec3,
     pub pitch: Angle,
     pub yaw: Angle,
 }
@@ -21,8 +21,8 @@ impl FreecamController {
 
         Self {
             position: controller.position,
-            pitch: Angle::from(pitch),
-            yaw: Angle::from(yaw),
+            pitch: Angle::new(pitch),
+            yaw: Angle::new(yaw),
         }
     }
     pub fn update(
@@ -32,7 +32,7 @@ impl FreecamController {
         settings: &GeneralControllerSettings,
     ) -> CursorCapture {
         let mut cursor_capture = CursorCapture::Free;
-        let mouse_delta = Vector2::new(input.mouse.motion.0 as f32, input.mouse.motion.1 as f32);
+        let mouse_delta = Vec2::new(input.mouse.motion.0 as f32, input.mouse.motion.1 as f32);
         if input.mouse.pressed(MouseButton::Right) {
             self.update_orientation(mouse_delta, settings);
             cursor_capture = CursorCapture::LockedAndHidden;
@@ -46,7 +46,7 @@ impl FreecamController {
         cursor_capture
     }
 
-    fn update_orientation(&mut self, mouse_delta: Vector2, settings: &GeneralControllerSettings) {
+    fn update_orientation(&mut self, mouse_delta: Vec2, settings: &GeneralControllerSettings) {
         self.set_pitch_yaw(
             self.pitch - Angle::new(mouse_delta.y * settings.rotation_sensitivity),
             self.yaw - Angle::new(mouse_delta.x * settings.rotation_sensitivity),
@@ -55,7 +55,7 @@ impl FreecamController {
 
     fn update_pan_position(
         &mut self,
-        direction: Vector2,
+        direction: Vec2,
         delta_time: f32,
         settings: &GeneralControllerSettings,
     ) {
@@ -76,12 +76,12 @@ impl FreecamController {
 
     fn update_position(
         &mut self,
-        direction: Vector3,
+        direction: Vec3,
         delta_time: f32,
         settings: &GeneralControllerSettings,
     ) {
         let horizontal_movement = Quat::from_rotation_y(self.yaw.radians)
-            * (direction * Vector3::new(1.0, 0.0, 1.0)).normalize_or_zero();
+            * (direction * Vec3::new(1.0, 0.0, 1.0)).normalize_or_zero();
         let vertical_movement = Camera::up() * direction.y;
 
         self.position +=
@@ -93,7 +93,7 @@ impl FreecamController {
 const FREECAM_DISTANCE_TO_CENTER: f32 = 15.;
 
 impl IsCameraController for FreecamController {
-    fn position(&self) -> Point3 {
+    fn position(&self) -> Vec3 {
         self.position
     }
 
@@ -115,8 +115,8 @@ impl IsCameraController for FreecamController {
     }
 }
 
-fn input_to_direction(input: &WindowInputs) -> Vector3 {
-    let mut direction = Vector3::ZERO;
+fn input_to_direction(input: &WindowInputs) -> Vec3 {
+    let mut direction = Vec3::ZERO;
     if input.keyboard.pressed_physical(KeyCode::KeyW) {
         direction += Camera::forward();
     }

@@ -1,4 +1,4 @@
-use glamour::Vector2;
+use glam::UVec2;
 
 pub struct Texture {
     pub texture: wgpu::Texture,
@@ -9,7 +9,7 @@ pub struct Texture {
 impl Texture {
     pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
-    pub fn create_depth_texture(device: &wgpu::Device, size: Vector2<u32>, label: &str) -> Self {
+    pub fn create_depth_texture(device: &wgpu::Device, size: UVec2, label: &str) -> Self {
         let size = wgpu::Extent3d {
             width: size.x.max(1),
             height: size.y.max(1),

@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use glamour::{Point3, Vector2};
+use glam::{UVec2, Vec3};
 use renderer_core::{
     application::{CpuApplication, GpuApplication, ModelInfo, WindowOrFallback},
     camera::camera_controller::{self, CameraController},
@@ -27,7 +27,7 @@ impl Application {
         let mut app = CpuApplication::new()?;
         app.camera_controller = CameraController::new(
             camera_controller::GeneralController {
-                position: Point3::new(0.0, 0.0, 4.0),
+                position: Vec3::new(0.0, 0.0, 4.0),
                 orientation: glam::Quat::IDENTITY,
                 distance_to_center: 4.0,
             },
@@ -38,12 +38,12 @@ impl Application {
         app.update_models(vec![ModelInfo {
             label: "Default Model".to_owned(),
             transform: renderer_core::transform::Transform {
-                position: glamour::Point3::new(0.0, 1.0, 0.0),
+                position: Vec3::new(0.0, 1.0, 0.0),
                 ..Default::default()
             },
             material_info: renderer_core::application::MaterialInfo {
-                color: glamour::Vector3::new(0.6, 1.0, 1.0),
-                emissive: glamour::Vector3::new(0.0, 0.0, 0.0),
+                color: Vec3::new(0.6, 1.0, 1.0),
+                emissive: Vec3::new(0.0, 0.0, 0.0),
                 roughness: 0.7,
                 metallic: 0.1,
             },
@@ -74,8 +74,7 @@ impl Application {
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        self.app
-            .resize(Vector2::new(new_size.width, new_size.height));
+        self.app.resize(UVec2::new(new_size.width, new_size.height));
     }
 
     pub fn update(&mut self, inputs: &WindowInputs) {

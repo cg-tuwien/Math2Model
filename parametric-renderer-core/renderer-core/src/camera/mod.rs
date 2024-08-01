@@ -1,3 +1,4 @@
+mod angle;
 mod camera_and_settings;
 pub mod camera_controller;
 pub mod freecam_controller;

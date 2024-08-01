@@ -1,19 +1,19 @@
 use std::sync::Arc;
 
-use glamour::Vector2;
+use glam::UVec2;
 use winit::window::Window;
 
 pub enum WindowOrFallback {
     Window(Arc<Window>),
-    Headless { size: Vector2<u32> },
+    Headless { size: UVec2 },
 }
 
 impl WindowOrFallback {
-    pub fn size(&self) -> Vector2<u32> {
+    pub fn size(&self) -> UVec2 {
         match self {
             WindowOrFallback::Window(window) => {
                 let window_size = window.inner_size();
-                Vector2::new(window_size.width, window_size.height)
+                UVec2::new(window_size.width, window_size.height)
             }
             WindowOrFallback::Headless { size } => *size,
         }
