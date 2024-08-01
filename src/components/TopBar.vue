@@ -2,15 +2,13 @@
 import { useStore } from "@/stores/store";
 import type { DropdownOption } from "naive-ui/es/dropdown/src/interface";
 import { computed, h, ref } from "vue";
-import { useRouter } from "vue-router";
 import IconMoon from "~icons/mdi/moon-and-stars";
 import IconSun from "~icons/mdi/white-balance-sunny";
 import IconGithub from "~icons/mdi/github";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
-import { homepage } from "@/../package.json";
+import { homepage, version } from "@/../package.json";
 
 const store = useStore();
-const router = useRouter();
 
 const examplesModule = () => import("@/scenes/example-scenes");
 
@@ -92,10 +90,14 @@ function handleView(key: ViewDropdownOption["key"]) {
 }
 
 type HelpDropdownOption = DropdownOption & {
-  key: "go-to-github";
+  key: "go-to-github" | "version";
 };
 const helpOptions = computed((): HelpDropdownOption[] => {
   return [
+    {
+      label: `Version ${version}`,
+      key: "version",
+    },
     {
       label: "GitHub",
       key: "go-to-github",
@@ -107,6 +109,8 @@ const helpOptions = computed((): HelpDropdownOption[] => {
 function handleHelp(key: HelpDropdownOption["key"]) {
   if (key === "go-to-github") {
     window.open(homepage, "_blank")?.focus();
+  } else if (key === "version") {
+    // Do nothing
   } else {
     assertUnreachable(key);
   }
