@@ -22,10 +22,9 @@ import {
   NumberNode,
   reteSocket as socket,
   MathOpNode,
-  Vector2Node,
-  Seperate2Node,
+  VectorNode,
+  SeparateNode,
   Join2Node,
-  Vector3Node,
 } from "@/vpnodes/nodes";
 import { DataflowEngine } from "rete-engine";
 import { DockPlugin, DockPresets } from "rete-dock-plugin";
@@ -40,13 +39,7 @@ onMounted(() => {
   createEditor();
 });
 
-type Nodes =
-  | NumberNode
-  | MathOpNode
-  | Vector2Node
-  | Seperate2Node
-  | Join2Node
-  | Vector3Node;
+type Nodes = NumberNode | MathOpNode | VectorNode | SeparateNode | Join2Node;
 class Connection<
   A extends Nodes,
   B extends Nodes,
@@ -55,12 +48,11 @@ class Connection<
 type Conns =
   | Connection<NumberNode, MathOpNode>
   | Connection<MathOpNode, MathOpNode>
-  | Connection<Vector2Node, Seperate2Node>
-  | Connection<Seperate2Node, MathOpNode>
-  | Connection<Seperate2Node, Join2Node>
-  | Connection<Join2Node, Seperate2Node>
-  | Connection<NumberNode, Join2Node>
-  | Connection<Vector3Node, Seperate2Node>;
+  | Connection<VectorNode, SeparateNode>
+  | Connection<SeparateNode, MathOpNode>
+  | Connection<SeparateNode, Join2Node>
+  | Connection<Join2Node, SeparateNode>
+  | Connection<NumberNode, Join2Node>;
 
 type Schemes = GetSchemes<Nodes, Conns>;
 
@@ -100,12 +92,10 @@ async function createEditor() {
         "Modulo",
         () => new MathOpNode("%", (c) => area.update("control", c.id)),
       ],
-      ["Vector2", () => new Vector2Node((c) => area.update("control", c.id))],
-      ["Vector3", () => new Vector3Node((c) => area.update("control", c.id))],
-      [
-        "Seperate2",
-        () => new Seperate2Node((c) => area.update("control", c.id)),
-      ],
+      ["Vector2", () => new VectorNode(2, (c) => area.update("control", c.id))],
+      ["Vector3", () => new VectorNode(3, (c) => area.update("control", c.id))],
+      ["Vector4", () => new VectorNode(4, (c) => area.update("control", c.id))],
+      ["Separate", () => new SeparateNode((c) => area.update("control", c.id))],
       ["Join2", () => new Join2Node((c) => area.update("control", c.id))],
     ]),
   });
@@ -133,25 +123,65 @@ async function createEditor() {
   area.use(render);
   area.use(dock);
 
-  dock.add(() => new NumberNode());
-  dock.add(() => new MathOpNode("+", (c) => area.update("control", c.id)));
-  dock.add(() => new MathOpNode("-", (c) => area.update("control", c.id)));
-  dock.add(() => new MathOpNode("*", (c) => area.update("control", c.id)));
-  dock.add(() => new MathOpNode("/", (c) => area.update("control", c.id)));
-  dock.add(() => new MathOpNode("%", (c) => area.update("control", c.id)));
-  dock.add(() => new Vector2Node((c) => area.update("control", c.id)));
-  dock.add(() => new Vector3Node((c) => area.update("control", c.id)));
-  dock.add(() => new Seperate2Node((c) => area.update("control", c.id)));
+  dock.add(() => new NumberNode((n) => area.update("node", n.id)));
+  dock.add(
+    () =>
+      new MathOpNode("+", (n, c) => {
+        area.update("control", c.id);
+        area.update("node", n.id);
+      }),
+  );
+  dock.add(
+    () =>
+      new MathOpNode("-", (n, c) => {
+        area.update("control", c.id);
+        area.update("node", n.id);
+      }),
+  );
+  dock.add(
+    () =>
+      new MathOpNode("*", (n, c) => {
+        area.update("control", c.id);
+        area.update("node", n.id);
+      }),
+  );
+  dock.add(
+    () =>
+      new MathOpNode("/", (n, c) => {
+        area.update("control", c.id);
+        area.update("node", n.id);
+      }),
+  );
+  dock.add(
+    () =>
+      new MathOpNode("%", (n, c) => {
+        area.update("control", c.id);
+        area.update("node", n.id);
+      }),
+  );
+  dock.add(() => new VectorNode(2, (n) => area.update("node", n.id)));
+  dock.add(() => new VectorNode(3, (n) => area.update("node", n.id)));
+  dock.add(() => new VectorNode(4, (n) => area.update("node", n.id)));
+  dock.add(
+    () =>
+      new SeparateNode((n) => {
+        console.log("Separate.Update(1)");
+        area.update("node", n.id);
+        console.log("Separate.Update(2)");
+      }),
+  );
   dock.add(() => new Join2Node((c) => area.update("control", c.id)));
 
   editor.addPipe((context) => {
-    if (["connectioncreated", "connectionremoved"].includes(context.type)) {
+    if (
+      [
+        "connectioncreated",
+        "connectionremoved",
+        "nodecreated",
+        "noderemoved",
+      ].includes(context.type)
+    ) {
       engine.reset();
-
-      editor
-        .getNodes()
-        .filter((n) => n instanceof MathOpNode)
-        .forEach((n) => engine.fetch(n.id));
       logCode();
     }
 
@@ -162,9 +192,11 @@ async function createEditor() {
 async function getNodesCode(node: Nodes) {
   const nodeData = await engine.fetch(node.id);
   let fullCode = "";
-  if (node instanceof Seperate2Node) {
+  if (node instanceof SeparateNode) {
     fullCode += "\t" + nodeData.x.code + "\n";
     fullCode += "\t" + nodeData.y.code + "\n";
+    fullCode += nodeData.z.code !== "" ? "\t" + nodeData.z.code + "\n" : "";
+    fullCode += nodeData.w.code !== "" ? "\t" + nodeData.w.code + "\n" : "";
   } else {
     fullCode += "\t" + nodeData.value.code + "\n";
   }
@@ -177,6 +209,9 @@ async function logCode() {
   const rootNodes = graph.roots().nodes();
   const leafNodes = graph.leaves().nodes();
   const allNodes = graph.nodes();
+
+  if (allNodes.length <= 0) return;
+
   let visited = [];
   let fullCode = "{\n";
   for (let node of rootNodes) {
@@ -225,18 +260,6 @@ async function logCode() {
 
     fullCode += await getNodesCode(node);
   }
-  /**const rest = graph.nodes();
-  for (let node of rest) {
-    if (rootNodes.includes(node)) continue;
-    const nodeData = await engine.fetch(node.id);
-
-    if (node instanceof Seperate2Node) {
-      fullCode += "\t" + nodeData.x.code + "\n";
-      fullCode += "\t" + nodeData.y.code + "\n";
-      continue;
-    }
-    fullCode += "\t" + nodeData.value.code + "\n";
-  }*/
 
   fullCode += "}";
   console.log(fullCode);

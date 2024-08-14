@@ -1,6 +1,6 @@
 import { ClassicPreset } from "rete";
 import type { Vec2 } from "webgpu-matrix/dist/1.x/vec2";
-import { vec2, vec3 } from "webgpu-matrix";
+import { vec2, vec3, vec4 } from "webgpu-matrix";
 import type { Vec3 } from "webgpu-matrix/dist/1.x/vec3";
 
 export const reteSocket = new ClassicPreset.Socket("socket");
@@ -34,7 +34,7 @@ function applyOperator(
 
   if (op === "+") result += right;
   else if (op === "-") result -= right;
-  else if (op === "/") result /= right;
+  else if (op === "/") result /= right === 0 ? 1 : right;
   else if (op === "*") result *= right;
   else result %= right;
 
@@ -50,20 +50,22 @@ export class NodeReturn {
 }
 
 export class NumberNode extends ClassicPreset.Node {
-  constructor() {
+  private valueControl: ClassicPreset.InputControl<"number", number>;
+  constructor(private update?: (node: ClassicPreset.Node) => void) {
     super("Number");
 
-    this.addControl(
-      "value",
-      new ClassicPreset.InputControl("number", { initial: 0 }),
-    );
+    this.valueControl = new ClassicPreset.InputControl("number", {
+      initial: 0,
+    });
+    this.addControl("value", this.valueControl);
+    this.addInput("value", new ClassicPreset.Input(reteSocket, "in"));
     this.addOutput("value", new ClassicPreset.Output(reteSocket));
   }
 
-  data(): { value: NodeReturn } {
+  data(inputs: { value?: NodeReturn[] }): { value: NodeReturn } {
     const control: ClassicPreset.InputControl<"number", number> | undefined =
       this.controls?.value as ClassicPreset.InputControl<"number", number>;
-    return {
+    let result = {
       value: {
         value: control?.value ?? 0,
         code:
@@ -74,15 +76,45 @@ export class NumberNode extends ClassicPreset.Node {
         refId: idToVariableName(this.id),
       },
     };
+    if (inputs.value) {
+      result.value.value = inputs.value[0].value ?? 0;
+      result.value.code = `${nodeToVariableDeclaration(this)} = ${inputs.value[0].refId};`;
+      if (this.hasControl("value")) this.removeControl("value");
+    } else {
+      if (!this.hasControl("value"))
+        this.addControl("value", this.valueControl);
+    }
+
+    if (this.update) this.update(this);
+
+    return result;
   }
 }
 
 export class MathOpNode extends ClassicPreset.Node {
+  private leftControl: ClassicPreset.InputControl<"number", number>;
+  private rightControl: ClassicPreset.InputControl<"number", number>;
   constructor(
     private operator: "+" | "-" | "/" | "*" | "%",
-    private update?: (control: ClassicPreset.InputControl<"number">) => void,
+    private update?: (
+      node: ClassicPreset.Node,
+      control: ClassicPreset.InputControl<"number">,
+    ) => void,
   ) {
     super(opToName(operator));
+
+    this.leftControl = new ClassicPreset.InputControl<"number", number>(
+      "number",
+      {
+        initial: 0,
+      },
+    );
+    this.rightControl = new ClassicPreset.InputControl<"number", number>(
+      "number",
+      {
+        initial: 0,
+      },
+    );
     this.addInput("left", new ClassicPreset.Input(reteSocket, "X"));
     this.addInput("right", new ClassicPreset.Input(reteSocket, "Y"));
 
@@ -93,6 +125,9 @@ export class MathOpNode extends ClassicPreset.Node {
         initial: 0,
       }),
     );
+
+    this.addControl("left", this.leftControl);
+    this.addControl("right", this.rightControl);
     this.addOutput("value", new ClassicPreset.Output(reteSocket, "Result"));
   }
 
@@ -105,7 +140,7 @@ export class MathOpNode extends ClassicPreset.Node {
     console.log(left);
     console.log(right);
 
-    let leftValue = 0;
+    let leftValue = this.leftControl.value ?? 0;
     let leftId = "";
     if (left) {
       if (typeof left[0] != "number") {
@@ -114,9 +149,13 @@ export class MathOpNode extends ClassicPreset.Node {
       } else {
         leftValue = left[0];
       }
+
+      if (this.hasControl("left")) this.removeControl("left");
+    } else {
+      if (!this.hasControl("left")) this.addControl("left", this.leftControl);
     }
 
-    let rightValue = 0;
+    let rightValue = this.rightControl.value ?? 0;
     let rightId = "";
     if (right) {
       if (typeof right[0] != "number") {
@@ -125,6 +164,11 @@ export class MathOpNode extends ClassicPreset.Node {
       } else {
         rightValue = right[0];
       }
+
+      if (this.hasControl("right")) this.removeControl("right");
+    } else {
+      if (!this.hasControl("right"))
+        this.addControl("right", this.rightControl);
     }
 
     console.log(leftValue);
@@ -136,7 +180,11 @@ export class MathOpNode extends ClassicPreset.Node {
       " = " +
       (leftId === "" ? leftValue.toString() : leftId) +
       ` ${this.operator} ` +
-      (rightId === "" ? rightValue.toString() : rightId) +
+      (rightId === ""
+        ? this.operator === "/"
+          ? "1"
+          : rightValue.toString()
+        : rightId) +
       ";";
     console.log(value);
 
@@ -144,7 +192,7 @@ export class MathOpNode extends ClassicPreset.Node {
       this.controls?.result as ClassicPreset.InputControl<"number", number>;
     control?.setValue(value);
 
-    if (this.update) this.update(control);
+    if (this.update) this.update(this, control);
 
     return {
       value: {
@@ -156,86 +204,150 @@ export class MathOpNode extends ClassicPreset.Node {
   }
 }
 
-export class Vector2Node extends ClassicPreset.Node {
+export class VectorNode extends ClassicPreset.Node {
+  private xControl: ClassicPreset.InputControl<"number", number>;
+  private yControl: ClassicPreset.InputControl<"number", number>;
+  private zControl: ClassicPreset.InputControl<"number", number>;
+  private wControl: ClassicPreset.InputControl<"number", number>;
   constructor(
-    private update?: (control: ClassicPreset.InputControl<"text">) => void,
+    private n: 2 | 3 | 4,
+    private update?: (node: ClassicPreset.Node) => void,
   ) {
-    super("Vector2");
+    super("Vector" + n.toString());
 
-    this.addControl(
-      "x",
-      new ClassicPreset.InputControl("number", {
-        initial: 0,
-      }),
-    );
-    this.addControl(
-      "y",
-      new ClassicPreset.InputControl("number", {
-        initial: 0,
-      }),
-    );
+    this.xControl = new ClassicPreset.InputControl("number", {
+      initial: 0,
+    });
+    this.yControl = new ClassicPreset.InputControl("number", {
+      initial: 0,
+    });
+    this.zControl = new ClassicPreset.InputControl("number", {
+      initial: 0,
+    });
+    this.wControl = new ClassicPreset.InputControl("number", {
+      initial: 0,
+    });
 
-    this.addControl(
-      "vector",
-      new ClassicPreset.InputControl("text", {
-        readonly: true,
-        initial: "(0, 0)",
-      }),
-    );
+    this.addControl("x", this.xControl);
+    this.addInput("x", new ClassicPreset.Input(reteSocket, "X"));
+
+    this.addControl("y", this.yControl);
+    this.addInput("y", new ClassicPreset.Input(reteSocket, "Y"));
+
+    if (n >= 3) {
+      this.addControl("z", this.zControl);
+      this.addInput("z", new ClassicPreset.Input(reteSocket, "Z"));
+    }
+
+    if (n === 4) {
+      this.addControl("w", this.wControl);
+      this.addInput("w", new ClassicPreset.Input(reteSocket, "W"));
+    }
 
     this.addOutput("value", new ClassicPreset.Output(reteSocket));
   }
 
-  data(): { value: NodeReturn } {
-    const xCont: ClassicPreset.InputControl<"number", number> | undefined = this
-      .controls?.x as ClassicPreset.InputControl<"number", number>;
-    const yCont: ClassicPreset.InputControl<"number", number> | undefined = this
-      .controls?.y as ClassicPreset.InputControl<"number", number>;
-    const vecCont: ClassicPreset.InputControl<"text", string> | undefined = this
-      .controls?.vector as ClassicPreset.InputControl<"text", string>;
+  data(inputs: {
+    x?: NodeReturn[];
+    y?: NodeReturn[];
+    z?: NodeReturn[];
+    w?: NodeReturn[];
+  }): { value: NodeReturn } {
+    let xVal = this.xControl?.value ?? 0;
+    let yVal = this.yControl?.value ?? 0;
+    let zVal = this.zControl?.value ?? 0;
+    let wVal = this.wControl?.value ?? 0;
+    let xRef = "";
+    let yRef = "";
+    let zRef = "";
+    let wRef = "";
 
-    vecCont?.setValue(
-      "(" +
-        (xCont?.value?.toString() ?? "0") +
+    const { x, y, z, w } = inputs;
+
+    if (x) {
+      xVal = x[0].value ?? xVal;
+      xRef = x[0].refId ?? "";
+      if (this.hasControl("x")) this.removeControl("x");
+    } else {
+      if (!this.hasControl("x")) this.addControl("x", this.xControl);
+    }
+    if (y) {
+      yVal = y[0].value ?? yVal;
+      yRef = y[0].refId ?? "";
+      if (this.hasControl("y")) this.removeControl("y");
+    } else {
+      if (!this.hasControl("y")) this.addControl("y", this.xControl);
+    }
+    if (z) {
+      zVal = z[0].value ?? zVal;
+      zRef = z[0].refId ?? "";
+      if (this.hasControl("z")) this.removeControl("z");
+    } else {
+      if (!this.hasControl("z") && this.n >= 3)
+        this.addControl("z", this.xControl);
+    }
+    if (w) {
+      wVal = w[0].value ?? wVal;
+      wRef = w[0].refId ?? "";
+      if (this.hasControl("w")) this.removeControl("w");
+    } else {
+      if (!this.hasControl("w") && this.n === 4)
+        this.addControl("w", this.xControl);
+    }
+
+    let vecResult = {
+      value: vec2.create(xVal ?? 0, yVal ?? 0),
+      code:
+        nodeToVariableDeclaration(this) +
+        " = " +
+        "vec2(" +
+        (xRef == "" ? xVal.toString() : xRef) +
         ", " +
-        (yCont?.value?.toString() ?? "0") +
-        ")",
-    );
-    if (this.update) this.update(vecCont);
+        (yRef == "" ? yVal.toString() : yRef) +
+        ");",
+      refId: idToVariableName(this.id),
+    };
+    if (this.n >= 3) {
+      vecResult.value = vec3.create(xVal ?? 0, yVal ?? 0, zVal ?? 0);
+      vecResult.code = `${nodeToVariableDeclaration(this)} = vec3(${xRef == "" ? xVal : xRef}, ${yRef == "" ? yVal : yRef}, ${zRef == "" ? zVal : zRef});`;
+    }
+
+    if (this.n === 4) {
+      vecResult.value = vec4.create(xVal ?? 0, yVal ?? 0, zVal ?? 0, wVal ?? 0);
+      vecResult.code = `${nodeToVariableDeclaration(this)} = vec4(${xRef == "" ? xVal : xRef}, ${yRef == "" ? yVal : yRef}, ${zRef == "" ? zVal : zRef}, ${wRef == "" ? wVal : wRef});`;
+    }
+
+    if (this.update) this.update(this);
 
     return {
-      value: {
-        value: vec2.create(xCont?.value ?? 0, yCont?.value ?? 0),
-        code:
-          nodeToVariableDeclaration(this) +
-          " = " +
-          "vec2(" +
-          (xCont?.value?.toString() ?? "0") +
-          ", " +
-          (yCont?.value?.toString() ?? "0") +
-          ");",
-        refId: idToVariableName(this.id),
-      },
+      value: vecResult,
     };
   }
 }
 
-export class Seperate2Node extends ClassicPreset.Node {
-  constructor(
-    private update?: (control: ClassicPreset.InputControl<"text">) => void,
-  ) {
-    super("Seperate2");
+export class SeparateNode extends ClassicPreset.Node {
+  private zOutput: ClassicPreset.Output<ClassicPreset.Socket>;
+  private wOutput: ClassicPreset.Output<ClassicPreset.Socket>;
+  constructor(private update?: (node: SeparateNode) => void) {
+    super("Separate");
 
     this.addInput("vector", new ClassicPreset.Input(reteSocket, "Vector"));
 
     this.addOutput("x", new ClassicPreset.Output(reteSocket, "X"));
     this.addOutput("y", new ClassicPreset.Output(reteSocket, "Y"));
+
+    this.zOutput = new ClassicPreset.Output(reteSocket, "Z");
+    this.wOutput = new ClassicPreset.Output(reteSocket, "W");
+
+    // this.addOutput("z", new ClassicPreset.Output(reteSocket, "Z"));
+    // this.addOutput("w", new ClassicPreset.Output(reteSocket, "W"));
   }
 
   data(inputs: { vector?: NodeReturn[] }): { x: NodeReturn; y: NodeReturn } {
     const vector = inputs.vector;
     console.log(vector ? vector[0].value : "Hello");
-    return {
+
+    let result = {
       x: {
         value: vector ? vector[0].value[0] : 0,
         code: `${nodeToVariableDeclaration(this)}_1 = ${vector ? vector[0].refId + "[0]" : "0"};`,
@@ -246,7 +358,53 @@ export class Seperate2Node extends ClassicPreset.Node {
         code: `${nodeToVariableDeclaration(this)}_2 = ${vector ? vector[0].refId + "[1]" : "0"};`,
         refId: idToVariableName(this.id) + "_2",
       },
+      z: {
+        value: 0,
+        code: "",
+        refId: idToVariableName(this.id) + "_3",
+      },
+      w: {
+        value: 0,
+        code: "",
+        refId: idToVariableName(this.id) + "_4",
+      },
     };
+
+    if (vector && vector[0].value.length >= 3) {
+      result.z.value = vector[0].value[2];
+      result.z.code = `${nodeToVariableDeclaration(this)}_3 = ${vector ? vector[0].refId + "[2]" : "0"};`;
+      if (!this.hasOutput("z")) {
+        this.addOutput("z", this.zOutput);
+
+        if (this.update) {
+          this.update(this);
+          console.log("Updated Node, added output for z");
+        }
+      }
+    } else {
+      if (this.hasOutput("z")) this.removeOutput("z");
+
+      if (this.update) this.update(this);
+    }
+
+    if (vector && vector[0].value.length >= 4) {
+      result.w.value = vector[0].value[3];
+      result.w.code = `${nodeToVariableDeclaration(this)}_4 = ${vector ? vector[0].refId + "[3]" : "0"};`;
+      if (!this.hasOutput("w")) {
+        this.addOutput("w", this.wOutput);
+
+        if (this.update) {
+          this.update(this);
+          console.log("Updated Node, added output for w");
+        }
+      }
+    } else {
+      if (this.hasOutput("w")) this.removeOutput("w");
+
+      if (this.update) this.update(this);
+    }
+
+    return result;
   }
 }
 
@@ -271,80 +429,6 @@ export class Join2Node extends ClassicPreset.Node {
           nodeToVariableDeclaration(this) +
           " = " +
           `vec2(${x ? x[0].refId : 0}, ${y ? y[0].refId : 0});`,
-        refId: idToVariableName(this.id),
-      },
-    };
-  }
-}
-
-export class Vector3Node extends ClassicPreset.Node {
-  constructor(
-    private update?: (control: ClassicPreset.InputControl<"text">) => void,
-  ) {
-    super("Vector3");
-
-    this.addControl(
-      "x",
-      new ClassicPreset.InputControl("number", {
-        initial: 0,
-      }),
-    );
-    this.addControl(
-      "y",
-      new ClassicPreset.InputControl("number", {
-        initial: 0,
-      }),
-    );
-    this.addControl(
-      "z",
-      new ClassicPreset.InputControl("number", {
-        initial: 0,
-      }),
-    );
-
-    this.addControl(
-      "vector",
-      new ClassicPreset.InputControl("text", {
-        readonly: true,
-        initial: "(0, 0, 0)",
-      }),
-    );
-
-    this.addOutput("value", new ClassicPreset.Output(reteSocket));
-  }
-
-  data(): { value: NodeReturn } {
-    const xCont: ClassicPreset.InputControl<"number", number> | undefined = this
-      .controls?.x as ClassicPreset.InputControl<"number", number>;
-    const yCont: ClassicPreset.InputControl<"number", number> | undefined = this
-      .controls?.y as ClassicPreset.InputControl<"number", number>;
-    const zCont: ClassicPreset.InputControl<"number", number> | undefined = this
-      .controls?.z as ClassicPreset.InputControl<"number", number>;
-    const vecCont: ClassicPreset.InputControl<"text", string> | undefined = this
-      .controls?.vector as ClassicPreset.InputControl<"text", string>;
-
-    vecCont?.setValue(
-      "(" +
-        (xCont?.value?.toString() ?? "0") +
-        ", " +
-        (yCont?.value?.toString() ?? "0") +
-        ", " +
-        (zCont?.value?.toString() ?? "0") +
-        ")",
-    );
-    if (this.update) this.update(vecCont);
-
-    return {
-      value: {
-        value: vec3.create(
-          xCont?.value ?? 0,
-          yCont?.value ?? 0,
-          zCont?.value ?? 0,
-        ),
-        code:
-          nodeToVariableDeclaration(this) +
-          " = " +
-          `vec3(${xCont?.value?.toString() ?? 0}, ${yCont?.value?.toString() ?? 0}, ${zCont?.value?.toString() ?? 0});`,
         refId: idToVariableName(this.id),
       },
     };
