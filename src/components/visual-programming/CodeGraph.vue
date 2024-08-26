@@ -24,12 +24,17 @@ import {
   MathOpNode,
   VectorNode,
   SeparateNode,
-  Join2Node,
+  JoinNode,
+  VPNode,
 } from "@/vpnodes/nodes";
 import { DataflowEngine } from "rete-engine";
 import { DockPlugin, DockPresets } from "rete-dock-plugin";
 import { structures } from "rete-structures";
 import { root } from "postcss";
+import { ScopesPlugin, Presets as ScopesPresets } from "rete-scopes-plugin";
+import { BlockNode, ConditionNode, ScopeNode } from "@/vpnodes/blocks";
+import type { Structures } from "rete-structures/_types/types";
+import { get } from "@vueuse/core";
 
 const container = ref<HTMLElement | null>(null);
 
@@ -39,7 +44,14 @@ onMounted(() => {
   createEditor();
 });
 
-type Nodes = NumberNode | MathOpNode | VectorNode | SeparateNode | Join2Node;
+type Nodes =
+  | NumberNode
+  | MathOpNode
+  | VectorNode
+  | SeparateNode
+  | JoinNode
+  | ConditionNode
+  | ScopeNode;
 class Connection<
   A extends Nodes,
   B extends Nodes,
@@ -50,14 +62,32 @@ type Conns =
   | Connection<MathOpNode, MathOpNode>
   | Connection<VectorNode, SeparateNode>
   | Connection<SeparateNode, MathOpNode>
-  | Connection<SeparateNode, Join2Node>
-  | Connection<Join2Node, SeparateNode>
-  | Connection<NumberNode, Join2Node>;
+  | Connection<SeparateNode, JoinNode>
+  | Connection<JoinNode, SeparateNode>
+  | Connection<NumberNode, JoinNode>
+  | Connection<ConditionNode, JoinNode>
+  | Connection<ConditionNode, NumberNode>
+  | Connection<ConditionNode, SeparateNode>
+  | Connection<ConditionNode, MathOpNode>;
 
 type Schemes = GetSchemes<Nodes, Conns>;
 
 const editor = new NodeEditor<Schemes>();
 const engine = new DataflowEngine<Schemes>();
+
+function newConditionNode(
+  scope1: string,
+  scope2: string,
+  area: AreaPlugin<Schemes>,
+): BlockNode {
+  const sc1 = new ScopeNode(scope1, (n) => area.update("node", n.id));
+  const sc2 = new ScopeNode(scope2, (n) => area.update("node", n.id));
+
+  editor.addNode(sc1);
+  editor.addNode(sc2);
+
+  return new BlockNode("Condition");
+}
 
 async function createEditor() {
   type AreaExtra = VueArea2D<Schemes> | ContextMenuExtra;
@@ -68,9 +98,9 @@ async function createEditor() {
   AreaExtensions.selectableNodes(area, AreaExtensions.selector(), {
     accumulating: AreaExtensions.accumulateOnCtrl(),
   });
-  AreaExtensions.snapGrid(area, {
-    size: 20,
-  });
+  //AreaExtensions.snapGrid(area, {
+  //  size: 20,
+  //});
 
   const contextMenu = new ContextMenuPlugin<Schemes>({
     items: ContextMenuPresets.classic.setup([
@@ -96,11 +126,14 @@ async function createEditor() {
       ["Vector3", () => new VectorNode(3, (c) => area.update("control", c.id))],
       ["Vector4", () => new VectorNode(4, (c) => area.update("control", c.id))],
       ["Separate", () => new SeparateNode((c) => area.update("control", c.id))],
-      ["Join2", () => new Join2Node((c) => area.update("control", c.id))],
+      ["Join", () => new JoinNode((n) => area.update("node", n.id))],
+      ["Equals", () => new ConditionNode("Equals", "==")],
     ]),
   });
 
   const dock = new DockPlugin<Schemes>();
+
+  const scopes = new ScopesPlugin<Schemes>();
 
   dock.addPreset(DockPresets.classic.setup({ area, size: 30, scale: 0.7 }));
   //
@@ -116,12 +149,14 @@ async function createEditor() {
 
   render.addPreset(VuePresets.classic.setup());
   render.addPreset(VuePresets.contextMenu.setup());
+  scopes.addPreset(ScopesPresets.classic.setup());
 
   editor.use(area);
   editor.use(engine);
   area.use(connection);
   area.use(render);
   area.use(dock);
+  area.use(scopes);
 
   dock.add(() => new NumberNode((n) => area.update("node", n.id)));
   dock.add(
@@ -170,7 +205,7 @@ async function createEditor() {
         console.log("Separate.Update(2)");
       }),
   );
-  dock.add(() => new Join2Node((c) => area.update("control", c.id)));
+  dock.add(() => new JoinNode((n) => area.update("node", n.id)));
 
   editor.addPipe((context) => {
     if (
@@ -189,7 +224,11 @@ async function createEditor() {
   });
 }
 
-async function getNodesCode(node: Nodes) {
+async function getNodesCode(
+  node: Nodes,
+  visited: string[],
+  graph: Structures<Nodes, Conns>,
+) {
   const nodeData = await engine.fetch(node.id);
   let fullCode = "";
   if (node instanceof SeparateNode) {
@@ -197,6 +236,14 @@ async function getNodesCode(node: Nodes) {
     fullCode += "\t" + nodeData.y.code + "\n";
     fullCode += nodeData.z.code !== "" ? "\t" + nodeData.z.code + "\n" : "";
     fullCode += nodeData.w.code !== "" ? "\t" + nodeData.w.code + "\n" : "";
+  } else if (node instanceof ConditionNode) {
+    fullCode += "\t" + nodeData.true.code + "\n";
+    const blockContent = graph.outgoers(node.id).nodes();
+    for (let content of blockContent) {
+      visited.push(content.id);
+      fullCode += "\t" + (await getNodesCode(content, visited, graph));
+    }
+    fullCode += "}\n";
   } else {
     fullCode += "\t" + nodeData.value.code + "\n";
   }
@@ -216,7 +263,7 @@ async function logCode() {
   let fullCode = "{\n";
   for (let node of rootNodes) {
     visited.push(node.id);
-    fullCode += await getNodesCode(node);
+    fullCode += await getNodesCode(node, visited, graph);
   }
 
   let ind = 0;
@@ -225,7 +272,7 @@ async function logCode() {
   while (!leafNodes.includes(currentNode)) {
     const outgoers = graph.outgoers(currentNode.id).nodes();
     if (!visited.includes(currentNode.id)) {
-      fullCode += await getNodesCode(currentNode);
+      fullCode += await getNodesCode(currentNode, visited, graph);
       visited.push(currentNode.id);
     }
 
@@ -233,7 +280,7 @@ async function logCode() {
       if (visited.includes(node.id)) continue;
       visited.push(node.id);
 
-      fullCode += await getNodesCode(node);
+      fullCode += await getNodesCode(node, visited, graph);
     }
 
     if (!rootsDone) {
@@ -258,7 +305,7 @@ async function logCode() {
     if (visited.includes(node.id)) continue;
     visited.push(node.id);
 
-    fullCode += await getNodesCode(node);
+    fullCode += await getNodesCode(node, visited, graph);
   }
 
   fullCode += "}";

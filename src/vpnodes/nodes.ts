@@ -13,7 +13,7 @@ export function idToVariableName(id: string): string {
   return `ref_${id.substring(0, 5)}`;
 }
 
-function opToName(op: "+" | "-" | "/" | "*" | "%"): string {
+export function opToName(op: "+" | "-" | "/" | "*" | "%"): string {
   return op === "+"
     ? "Add"
     : op === "-"
@@ -25,7 +25,7 @@ function opToName(op: "+" | "-" | "/" | "*" | "%"): string {
           : "Modulo";
 }
 
-function applyOperator(
+export function applyOperator(
   left: number,
   right: number,
   op: "+" | "-" | "/" | "*" | "%",
@@ -41,6 +41,10 @@ function applyOperator(
   return result;
 }
 
+export class VPNode extends ClassicPreset.Node {
+  parent?: string;
+}
+
 export class NodeReturn {
   constructor(
     public value: any,
@@ -49,7 +53,7 @@ export class NodeReturn {
   ) {}
 }
 
-export class NumberNode extends ClassicPreset.Node {
+export class NumberNode extends VPNode {
   private valueControl: ClassicPreset.InputControl<"number", number>;
   constructor(private update?: (node: ClassicPreset.Node) => void) {
     super("Number");
@@ -91,7 +95,7 @@ export class NumberNode extends ClassicPreset.Node {
   }
 }
 
-export class MathOpNode extends ClassicPreset.Node {
+export class MathOpNode extends VPNode {
   private leftControl: ClassicPreset.InputControl<"number", number>;
   private rightControl: ClassicPreset.InputControl<"number", number>;
   constructor(
@@ -204,7 +208,7 @@ export class MathOpNode extends ClassicPreset.Node {
   }
 }
 
-export class VectorNode extends ClassicPreset.Node {
+export class VectorNode extends VPNode {
   private xControl: ClassicPreset.InputControl<"number", number>;
   private yControl: ClassicPreset.InputControl<"number", number>;
   private zControl: ClassicPreset.InputControl<"number", number>;
@@ -325,7 +329,7 @@ export class VectorNode extends ClassicPreset.Node {
   }
 }
 
-export class SeparateNode extends ClassicPreset.Node {
+export class SeparateNode extends VPNode {
   private zOutput: ClassicPreset.Output<ClassicPreset.Socket>;
   private wOutput: ClassicPreset.Output<ClassicPreset.Socket>;
   constructor(private update?: (node: SeparateNode) => void) {
@@ -408,29 +412,73 @@ export class SeparateNode extends ClassicPreset.Node {
   }
 }
 
-export class Join2Node extends ClassicPreset.Node {
-  constructor(
-    private update?: (control: ClassicPreset.InputControl<"text">) => void,
-  ) {
-    super("Join2");
+export class JoinNode extends VPNode {
+  private zInput: ClassicPreset.Input<ClassicPreset.Socket>;
+  private wInput: ClassicPreset.Input<ClassicPreset.Socket>;
+  constructor(private update?: (node: ClassicPreset.Node) => void) {
+    super("Join");
+
+    this.zInput = new ClassicPreset.Input(reteSocket, "Z");
+    this.wInput = new ClassicPreset.Input(reteSocket, "W");
 
     this.addInput("x", new ClassicPreset.Input(reteSocket, "X"));
     this.addInput("y", new ClassicPreset.Input(reteSocket, "Y"));
 
-    this.addOutput("value", new ClassicPreset.Output(reteSocket, "Vector2"));
+    this.addOutput("value", new ClassicPreset.Output(reteSocket, "Vector"));
   }
 
-  data(inputs: { x?: NodeReturn[]; y?: NodeReturn[] }): { value: NodeReturn } {
-    const { x, y } = inputs;
-    return {
+  data(inputs: {
+    x?: NodeReturn[];
+    y?: NodeReturn[];
+    z?: NodeReturn[];
+    w?: NodeReturn[];
+  }): { value: NodeReturn } {
+    const { x, y, z, w } = inputs;
+    let xVal = x ? x[0].value : 0;
+    let yVal = y ? y[0].value : 0;
+    let zVal = z ? z[0].value : 0;
+    let wVal = w ? w[0].value : 0;
+    let xRef = x ? x[0].refId ?? "" : "";
+    let yRef = y ? y[0].refId ?? "" : "";
+    let zRef = z ? z[0].refId ?? "" : "";
+    let wRef = w ? w[0].refId ?? "" : "";
+
+    let result = {
       value: {
-        value: [vec2.create(x ? x[0].value : 0, y ? y[0].value : 0)],
-        code:
-          nodeToVariableDeclaration(this) +
-          " = " +
-          `vec2(${x ? x[0].refId : 0}, ${y ? y[0].refId : 0});`,
+        value: vec2.create(xVal, yVal),
+        code: `${nodeToVariableDeclaration(this)} = vec2(${xRef == "" ? xVal : xRef}, ${yRef == "" ? yVal : yRef}`,
         refId: idToVariableName(this.id),
       },
     };
+
+    if (x && y) {
+      if (!this.hasInput("z")) this.addInput("z", this.zInput);
+    } else {
+      if (this.hasInput("z") && !z) this.removeInput("z");
+    }
+
+    if (x && y && z) {
+      if (!this.hasInput("w")) this.addInput("w", this.wInput);
+    } else {
+      if (this.hasInput("w") && !w) this.removeInput("w");
+    }
+    if (this.update) this.update(this);
+
+    if (z) {
+      result.value.code = result.value.code.replace("vec2", "vec3");
+      result.value.code += ", " + (zRef == "" ? zVal : zRef);
+      result.value.value = vec3.create(xVal, yVal, zVal);
+    }
+
+    if (w) {
+      result.value.code = result.value.code.replace("vec2", "vec4");
+      result.value.code = result.value.code.replace("vec3", "vec4");
+      result.value.code += ", " + (wRef == "" ? wVal : wRef);
+      result.value.value = vec4.create(xVal, yVal, zVal, wVal);
+    }
+
+    result.value.code += ");";
+
+    return result;
   }
 }
