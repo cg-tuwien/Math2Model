@@ -2,6 +2,7 @@ import { ClassicPreset } from "rete";
 import type { Vec2 } from "webgpu-matrix/dist/1.x/vec2";
 import { vec2, vec3, vec4 } from "webgpu-matrix";
 import type { Vec3 } from "webgpu-matrix/dist/1.x/vec3";
+import { AreaPlugin } from "rete-area-plugin";
 
 export const reteSocket = new ClassicPreset.Socket("socket");
 
@@ -42,7 +43,19 @@ export function applyOperator(
 }
 
 export class VPNode extends ClassicPreset.Node {
+  width = 180;
+  height = 140;
   parent?: string;
+
+  updateSize(area?: AreaPlugin<any, any>) {
+    this.width = 180;
+    this.height =
+      140 +
+      20 *
+        (Object.keys(this.inputs).length + Object.keys(this.outputs).length) +
+      30 * Object.keys(this.controls).length;
+    if (area) area.update("node", this.id);
+  }
 }
 
 export class NodeReturn {
@@ -59,11 +72,13 @@ export class NumberNode extends VPNode {
     super("Number");
 
     this.valueControl = new ClassicPreset.InputControl("number", {
-      initial: 0,
+      initial: 0.0,
     });
     this.addControl("value", this.valueControl);
     this.addInput("value", new ClassicPreset.Input(reteSocket, "in"));
     this.addOutput("value", new ClassicPreset.Output(reteSocket));
+
+    this.updateSize();
   }
 
   data(inputs: { value?: NodeReturn[] }): { value: NodeReturn } {
@@ -71,11 +86,11 @@ export class NumberNode extends VPNode {
       this.controls?.value as ClassicPreset.InputControl<"number", number>;
     let result = {
       value: {
-        value: control?.value ?? 0,
+        value: parseFloat(control?.value?.toFixed(20) ?? "0.0"),
         code:
           nodeToVariableDeclaration(this) +
           " = " +
-          (control?.value?.toString() ?? "0") +
+          (control?.value?.toFixed(20) ?? "0.0") +
           ";",
         refId: idToVariableName(this.id),
       },
@@ -133,6 +148,8 @@ export class MathOpNode extends VPNode {
     this.addControl("left", this.leftControl);
     this.addControl("right", this.rightControl);
     this.addOutput("value", new ClassicPreset.Output(reteSocket, "Result"));
+
+    this.updateSize();
   }
 
   data(inputs: {
@@ -148,10 +165,10 @@ export class MathOpNode extends VPNode {
     let leftId = "";
     if (left) {
       if (typeof left[0] != "number") {
-        leftValue = left[0].value;
+        leftValue = parseFloat(left[0].value.toFixed(20));
         leftId = left[0].refId ? left[0].refId : "";
       } else {
-        leftValue = left[0];
+        leftValue = parseFloat(left[0].toFixed(20));
       }
 
       if (this.hasControl("left")) this.removeControl("left");
@@ -163,10 +180,10 @@ export class MathOpNode extends VPNode {
     let rightId = "";
     if (right) {
       if (typeof right[0] != "number") {
-        rightValue = right[0].value;
+        rightValue = parseFloat(right[0].value.toFixed(20));
         rightId = right[0].refId ? right[0].refId : "";
       } else {
-        rightValue = right[0];
+        rightValue = parseFloat(right[0].toFixed(20));
       }
 
       if (this.hasControl("right")) this.removeControl("right");
@@ -186,7 +203,7 @@ export class MathOpNode extends VPNode {
       ` ${this.operator} ` +
       (rightId === ""
         ? this.operator === "/"
-          ? "1"
+          ? "1.0"
           : rightValue.toString()
         : rightId) +
       ";";
@@ -249,6 +266,8 @@ export class VectorNode extends VPNode {
     }
 
     this.addOutput("value", new ClassicPreset.Output(reteSocket));
+
+    this.updateSize();
   }
 
   data(inputs: {
@@ -304,7 +323,7 @@ export class VectorNode extends VPNode {
       code:
         nodeToVariableDeclaration(this) +
         " = " +
-        "vec2(" +
+        "vec2f(" +
         (xRef == "" ? xVal.toString() : xRef) +
         ", " +
         (yRef == "" ? yVal.toString() : yRef) +
@@ -313,12 +332,12 @@ export class VectorNode extends VPNode {
     };
     if (this.n >= 3) {
       vecResult.value = vec3.create(xVal ?? 0, yVal ?? 0, zVal ?? 0);
-      vecResult.code = `${nodeToVariableDeclaration(this)} = vec3(${xRef == "" ? xVal : xRef}, ${yRef == "" ? yVal : yRef}, ${zRef == "" ? zVal : zRef});`;
+      vecResult.code = `${nodeToVariableDeclaration(this)} = vec3f(${xRef == "" ? xVal : xRef}, ${yRef == "" ? yVal : yRef}, ${zRef == "" ? zVal : zRef});`;
     }
 
     if (this.n === 4) {
       vecResult.value = vec4.create(xVal ?? 0, yVal ?? 0, zVal ?? 0, wVal ?? 0);
-      vecResult.code = `${nodeToVariableDeclaration(this)} = vec4(${xRef == "" ? xVal : xRef}, ${yRef == "" ? yVal : yRef}, ${zRef == "" ? zVal : zRef}, ${wRef == "" ? wVal : wRef});`;
+      vecResult.code = `${nodeToVariableDeclaration(this)} = vec4f(${xRef == "" ? xVal : xRef}, ${yRef == "" ? yVal : yRef}, ${zRef == "" ? zVal : zRef}, ${wRef == "" ? wVal : wRef});`;
     }
 
     if (this.update) this.update(this);
@@ -345,6 +364,8 @@ export class SeparateNode extends VPNode {
 
     // this.addOutput("z", new ClassicPreset.Output(reteSocket, "Z"));
     // this.addOutput("w", new ClassicPreset.Output(reteSocket, "W"));
+
+    this.updateSize();
   }
 
   data(inputs: { vector?: NodeReturn[] }): { x: NodeReturn; y: NodeReturn } {
@@ -425,6 +446,8 @@ export class JoinNode extends VPNode {
     this.addInput("y", new ClassicPreset.Input(reteSocket, "Y"));
 
     this.addOutput("value", new ClassicPreset.Output(reteSocket, "Vector"));
+
+    this.updateSize();
   }
 
   data(inputs: {
@@ -446,7 +469,7 @@ export class JoinNode extends VPNode {
     let result = {
       value: {
         value: vec2.create(xVal, yVal),
-        code: `${nodeToVariableDeclaration(this)} = vec2(${xRef == "" ? xVal : xRef}, ${yRef == "" ? yVal : yRef}`,
+        code: `${nodeToVariableDeclaration(this)} = vec2f(${xRef == "" ? xVal : xRef}, ${yRef == "" ? yVal : yRef}`,
         refId: idToVariableName(this.id),
       },
     };
@@ -478,6 +501,127 @@ export class JoinNode extends VPNode {
     }
 
     result.value.code += ");";
+
+    return result;
+  }
+}
+
+export class ReturnNode extends VPNode {
+  constructor(
+    private def: any,
+    customName?: string,
+  ) {
+    super(customName ?? "Return");
+
+    this.addInput(
+      "returnIn",
+      new ClassicPreset.Input(reteSocket, "Return Value"),
+    );
+  }
+
+  data(inputs: { returnIn: NodeReturn[] }): { value: NodeReturn } {
+    const result = {
+      value: {
+        value: this.def,
+        code: "return " + this.def.toString() + ";",
+      },
+    };
+    const { returnIn } = inputs;
+
+    if (returnIn) {
+      result.value.value = returnIn[0].value;
+      result.value.code =
+        "return " + (returnIn[0].refId ?? returnIn[0].value.toString()) + ";";
+    }
+
+    return result;
+  }
+}
+
+export class VariableNode extends VPNode {
+  constructor(
+    private value: any,
+    private code: any,
+    private ref?: string,
+  ) {
+    super(ref ?? "Variable");
+
+    this.addOutput("value", new ClassicPreset.Output(reteSocket, "out"));
+  }
+
+  data(): { value: NodeReturn } {
+    return {
+      value: {
+        value: this.value,
+        code: this.code,
+        refId: this.ref,
+      },
+    };
+  }
+}
+
+export class FunctionCallNode extends VPNode {
+  constructor(
+    private functionName?: string,
+    private numParams?: 0 | 1 | 2 | 3 | 4,
+  ) {
+    super(functionName ?? "Function Call");
+
+    if (!functionName) {
+      this.addControl(
+        "functionName",
+        new ClassicPreset.InputControl("text", { initial: "abs" }),
+      );
+
+      this.addControl(
+        "numParams",
+        new ClassicPreset.InputControl("number", { initial: 1 }),
+      );
+    }
+
+    for (let i = 1; i < (numParams ?? 1) + 1; i++) {
+      this.addInput(
+        "param" + i.toString(),
+        new ClassicPreset.Input(reteSocket, "Param " + i.toString()),
+      );
+    }
+
+    this.addOutput("value", new ClassicPreset.Output(reteSocket, "Result"));
+  }
+
+  data(inputs: {
+    param1: NodeReturn[];
+    param2: NodeReturn[];
+    param3: NodeReturn[];
+    param4: NodeReturn[];
+  }): { value: NodeReturn } {
+    const result = {
+      value: {
+        value: 0,
+        code: nodeToVariableDeclaration(this) + " = " + this.functionName + "(",
+        refId: idToVariableName(this.id),
+      },
+    };
+    const { param1, param2, param3, param4 } = inputs;
+
+    if (this.numParams) {
+      if (this.numParams >= 1) {
+        result.value.code +=
+          (param1 ? param1[0].refId ?? param1[0].value : "0.0") + ", ";
+      } else if (this.numParams >= 2) {
+        result.value.code +=
+          (param2 ? param2[0].refId ?? param2[0].value : "0.0") + ", ";
+      } else if (this.numParams >= 3) {
+        result.value.code +=
+          (param3 ? param3[0].refId ?? param3[0].value : "0.0") + ", ";
+      } else if (this.numParams === 4) {
+        result.value.code +=
+          (param4 ? param4[0].refId ?? param4[0].value : "0.0") + ", ";
+      }
+    }
+
+    result.value.code =
+      result.value.code.substring(0, result.value.code.length - 2) + ");";
 
     return result;
   }

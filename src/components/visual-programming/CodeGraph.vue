@@ -26,6 +26,9 @@ import {
   SeparateNode,
   JoinNode,
   VPNode,
+  ReturnNode,
+  VariableNode,
+  FunctionCallNode,
 } from "@/vpnodes/nodes";
 import { DataflowEngine } from "rete-engine";
 import { DockPlugin, DockPresets } from "rete-dock-plugin";
@@ -35,6 +38,13 @@ import { ScopesPlugin, Presets as ScopesPresets } from "rete-scopes-plugin";
 import { BlockNode, ConditionNode, ScopeNode } from "@/vpnodes/blocks";
 import type { Structures } from "rete-structures/_types/types";
 import { get } from "@vueuse/core";
+import {
+  AutoArrangePlugin,
+  Presets as ArrangePresets,
+} from "rete-auto-arrange-plugin";
+import { vec2 } from "webgpu-matrix";
+
+const emit = defineEmits<{ update: [code: () => string] }>();
 
 const container = ref<HTMLElement | null>(null);
 
@@ -51,7 +61,10 @@ type Nodes =
   | SeparateNode
   | JoinNode
   | ConditionNode
-  | ScopeNode;
+  | ScopeNode
+  | ReturnNode
+  | FunctionCallNode
+  | VariableNode;
 class Connection<
   A extends Nodes,
   B extends Nodes,
@@ -68,30 +81,38 @@ type Conns =
   | Connection<ConditionNode, JoinNode>
   | Connection<ConditionNode, NumberNode>
   | Connection<ConditionNode, SeparateNode>
-  | Connection<ConditionNode, MathOpNode>;
+  | Connection<ConditionNode, MathOpNode>
+  | Connection<ReturnNode, VectorNode>
+  | Connection<NumberNode, FunctionCallNode>;
 
 type Schemes = GetSchemes<Nodes, Conns>;
 
 const editor = new NodeEditor<Schemes>();
 const engine = new DataflowEngine<Schemes>();
+const arrange = new AutoArrangePlugin<Schemes>();
 
 function newConditionNode(
   scope1: string,
   scope2: string,
-  area: AreaPlugin<Schemes>,
-): BlockNode {
+  area: AreaPlugin<Schemes, AreaExtra>,
+  operator: "==" | "!=" | ">" | "<" | ">=" | "<=",
+): ConditionNode {
   const sc1 = new ScopeNode(scope1, (n) => area.update("node", n.id));
   const sc2 = new ScopeNode(scope2, (n) => area.update("node", n.id));
 
   editor.addNode(sc1);
   editor.addNode(sc2);
 
-  return new BlockNode("Condition");
+  arrange.layout();
+
+  return new ConditionNode("Condition", operator, sc1, sc2, editor);
 }
+type AreaExtra = VueArea2D<Schemes> | ContextMenuExtra;
+
+const endNode = new ReturnNode("vec3f(input2.x, 0, input2.y)", "Output Vertex");
+const startNode = new VariableNode(vec2.create(1, 1), "input2;", "input2");
 
 async function createEditor() {
-  type AreaExtra = VueArea2D<Schemes> | ContextMenuExtra;
-
   const area = new AreaPlugin<Schemes, AreaExtra>(
     container.value ?? new HTMLElement(),
   );
@@ -127,7 +148,12 @@ async function createEditor() {
       ["Vector4", () => new VectorNode(4, (c) => area.update("control", c.id))],
       ["Separate", () => new SeparateNode((c) => area.update("control", c.id))],
       ["Join", () => new JoinNode((n) => area.update("node", n.id))],
-      ["Equals", () => new ConditionNode("Equals", "==")],
+      ["Equals", () => newConditionNode("True", "False", area, "==")],
+      ["Sin", () => new FunctionCallNode("sin", 1)],
+      ["Cos", () => new FunctionCallNode("cos", 1)],
+      ["Tan", () => new FunctionCallNode("tan", 1)],
+      ["Sqrt", () => new FunctionCallNode("sqrt", 1)],
+      ["Abs", () => new FunctionCallNode("abs", 1)],
     ]),
   });
 
@@ -138,6 +164,8 @@ async function createEditor() {
   dock.addPreset(DockPresets.classic.setup({ area, size: 30, scale: 0.7 }));
   //
   //
+
+  arrange.addPreset(ArrangePresets.classic.setup());
 
   area.use(contextMenu);
 
@@ -157,6 +185,7 @@ async function createEditor() {
   area.use(render);
   area.use(dock);
   area.use(scopes);
+  area.use(arrange);
 
   dock.add(() => new NumberNode((n) => area.update("node", n.id)));
   dock.add(
@@ -200,12 +229,16 @@ async function createEditor() {
   dock.add(
     () =>
       new SeparateNode((n) => {
-        console.log("Separate.Update(1)");
         area.update("node", n.id);
-        console.log("Separate.Update(2)");
       }),
   );
   dock.add(() => new JoinNode((n) => area.update("node", n.id)));
+
+  await editor.addNode(startNode);
+  await editor.addNode(endNode);
+  //await editor.addConnection(
+  //  new ClassicPreset.Connection(startNode, "out", endNode, "returnIn"),
+  //);
 
   editor.addPipe((context) => {
     if (
@@ -214,9 +247,15 @@ async function createEditor() {
         "connectionremoved",
         "nodecreated",
         "noderemoved",
+        "scopeupdated",
       ].includes(context.type)
     ) {
       engine.reset();
+      // arrange.layout();
+      editor
+        .getNodes()
+        .filter((n) => !(n instanceof BlockNode))
+        .forEach((n) => n.updateSize(area));
       logCode();
     }
 
@@ -240,10 +279,29 @@ async function getNodesCode(
     fullCode += "\t" + nodeData.true.code + "\n";
     const blockContent = graph.outgoers(node.id).nodes();
     for (let content of blockContent) {
+      if (content.label != "True") continue;
       visited.push(content.id);
-      fullCode += "\t" + (await getNodesCode(content, visited, graph));
+      const scopeChildren = editor
+        .getNodes()
+        .filter((n) => n.parent === content.id);
+      if (scopeChildren.length > 0)
+        fullCode += await getScopeCode(scopeChildren, visited);
+
+      fullCode += await getNodesCode(content, visited, graph);
     }
-    fullCode += "}\n";
+
+    fullCode += "\t" + nodeData.false.code + "\n";
+    for (let content of blockContent) {
+      if (content.label != "False") continue;
+      visited.push(content.id);
+      const scopeChildren = editor
+        .getNodes()
+        .filter((n) => n.parent === content.id);
+      if (scopeChildren.length > 0)
+        fullCode += await getScopeCode(scopeChildren, visited);
+
+      fullCode += await getNodesCode(content, visited, graph);
+    }
   } else {
     fullCode += "\t" + nodeData.value.code + "\n";
   }
@@ -251,65 +309,55 @@ async function getNodesCode(
   return fullCode;
 }
 
+async function getScopeCode(scopeChildren: Nodes[], visited: string[]) {
+  if (scopeChildren.length <= 0) return;
+
+  return orderedCode(scopeChildren, visited, "\t");
+}
+
 async function logCode() {
   const graph = structures(editor);
-  const rootNodes = graph.roots().nodes();
-  const leafNodes = graph.leaves().nodes();
-  const allNodes = graph.nodes();
+  const allNodes = graph.nodes().filter((n) => n.id !== endNode.id);
 
   if (allNodes.length <= 0) return;
 
-  let visited = [];
-  let fullCode = "{\n";
-  for (let node of rootNodes) {
-    visited.push(node.id);
-    fullCode += await getNodesCode(node, visited, graph);
-  }
+  let visited: string[] = [startNode.id, endNode.id];
+  let fullCode =
+    "fn evaluateImage(input2: vec2f) -> vec3f {\n" +
+    (await orderedCode(allNodes, visited));
 
-  let ind = 0;
-  let currentNode = rootNodes[ind];
-  let rootsDone = false;
-  while (!leafNodes.includes(currentNode)) {
-    const outgoers = graph.outgoers(currentNode.id).nodes();
-    if (!visited.includes(currentNode.id)) {
-      fullCode += await getNodesCode(currentNode, visited, graph);
-      visited.push(currentNode.id);
-    }
-
-    for (let node of outgoers) {
-      if (visited.includes(node.id)) continue;
-      visited.push(node.id);
-
-      fullCode += await getNodesCode(node, visited, graph);
-    }
-
-    if (!rootsDone) {
-      ind += 1;
-      if (ind >= rootNodes.length) {
-        ind = 0;
-        rootsDone = true;
-        currentNode = allNodes[ind];
-      } else {
-        currentNode = rootNodes[ind];
-      }
-    } else {
-      ind += 1;
-      if (ind >= allNodes.length) {
-        break;
-      }
-      currentNode = allNodes[ind];
-    }
-  }
-
-  for (let node of leafNodes) {
-    if (visited.includes(node.id)) continue;
-    visited.push(node.id);
-
-    fullCode += await getNodesCode(node, visited, graph);
-  }
-
-  fullCode += "}";
+  fullCode += (await getNodesCode(endNode, [], graph)) + "}";
   console.log(fullCode);
+  emit("update", () => fullCode);
+}
+
+async function orderedCode(
+  allNodes: Nodes[],
+  visited: string[],
+  indent: string = "",
+) {
+  if (allNodes.length <= 0) return "";
+  const graph = structures(editor);
+  let fullCode = "";
+  let nodeQueue = allNodes.filter(
+    (n) => n.id !== endNode.id && n.id !== startNode.id,
+  );
+
+  while (nodeQueue.length > 0) {
+    const node = nodeQueue.shift();
+    if (!node) break;
+    if (visited.includes(node.id)) continue;
+    const incomers = graph.incomers(node.id).nodes();
+    if (incomers.some((inc) => !visited.includes(inc.id))) {
+      nodeQueue.push(node);
+      continue;
+    }
+
+    visited.push(node.id);
+    fullCode += indent + (await getNodesCode(node, visited, graph));
+  }
+
+  return fullCode;
 }
 </script>
 

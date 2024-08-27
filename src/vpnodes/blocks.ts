@@ -1,4 +1,4 @@
-﻿import { ClassicPreset } from "rete";
+﻿import { ClassicPreset, type NodeEditor } from "rete";
 import {
   idToVariableName,
   NodeReturn,
@@ -27,12 +27,9 @@ function applyLogic(
   }
 }
 
-export class BlockNode extends ClassicPreset.Node {
-  children?: ClassicPreset.Node[];
-}
+export class BlockNode extends VPNode {}
 
 export class ScopeNode extends BlockNode {
-  private lineno = 1;
   constructor(
     name: string,
     private update?: (node: ClassicPreset.Node) => void,
@@ -41,10 +38,7 @@ export class ScopeNode extends BlockNode {
 
     this.addInput("context", new ClassicPreset.Input(reteSocket, "Context"));
 
-    this.addOutput(
-      "line" + this.lineno.toString(),
-      new ClassicPreset.Output(reteSocket, "Lines"),
-    );
+    // this.addOutput("value", new ClassicPreset.Output(reteSocket, "Next"));
   }
 
   data(input: { context: NodeReturn[] }): { value: NodeReturn } {
@@ -58,15 +52,6 @@ export class ScopeNode extends BlockNode {
     };
     if (!context) return result;
 
-    if (this.outputs["line" + this.lineno.toString()]) {
-      this.lineno++;
-      this.addOutput(
-        "line" + this.lineno.toString(),
-        new ClassicPreset.Output(reteSocket, "Line " + this.lineno.toString()),
-      );
-      if (this.update) this.update(this);
-    }
-
     result.value.value = context[0].value;
     result.value.code = "}";
     result.value.refId = context[0].refId ?? "";
@@ -75,10 +60,13 @@ export class ScopeNode extends BlockNode {
   }
 }
 
-export class ConditionNode extends BlockNode {
+export class ConditionNode extends VPNode {
   constructor(
     name: string,
     private operator: "==" | "!=" | ">" | "<" | ">=" | "<=",
+    trueScope: ScopeNode,
+    falseScope: ScopeNode,
+    editor: NodeEditor<any>,
   ) {
     super(name);
 
@@ -87,6 +75,15 @@ export class ConditionNode extends BlockNode {
 
     this.addOutput("true", new ClassicPreset.Output(reteSocket, "True"));
     this.addOutput("false", new ClassicPreset.Output(reteSocket, "False"));
+
+    editor.addConnection(
+      new ClassicPreset.Connection(this, "true", trueScope, "context"),
+    );
+    editor.addConnection(
+      new ClassicPreset.Connection(this, "false", falseScope, "context"),
+    );
+
+    this.updateSize();
   }
 
   data(input: { left?: NodeReturn[]; right?: NodeReturn[] }): {
@@ -115,3 +112,5 @@ export class ConditionNode extends BlockNode {
     };
   }
 }
+
+export class TemplateNode extends VPNode {}

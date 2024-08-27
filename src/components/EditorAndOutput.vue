@@ -420,6 +420,7 @@ function removeModel(ids: string[]) {
           <CodeGraph
             v-if="props.visual"
             style="width: 500px; height: 1000px"
+            @update="openFile.setNewCode($event)"
           ></CodeGraph>
         </div>
       </template>
