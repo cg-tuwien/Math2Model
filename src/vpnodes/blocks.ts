@@ -1,10 +1,15 @@
 ﻿import { ClassicPreset, type NodeEditor } from "rete";
 import {
+  VPNode,
   idToVariableName,
   NodeReturn,
+  nodeToVariableDeclaration,
   reteSocket,
-  VPNode,
+  VariableInNode,
+  VariableOutNode,
 } from "@/vpnodes/nodes";
+import { type Nodes } from "@/components/visual-programming/CodeGraph.vue";
+import { ref } from "vue";
 
 function applyLogic(
   left: any,
@@ -30,19 +35,32 @@ function applyLogic(
 export class BlockNode extends VPNode {}
 
 export class ScopeNode extends BlockNode {
+  private varOutNode?: VariableOutNode;
+  private varInNode?: VariableInNode;
   constructor(
     name: string,
     private update?: (node: ClassicPreset.Node) => void,
+    private addNode?: (node: Nodes) => void,
+    private removeNode?: (node: Nodes) => void,
   ) {
     super(name);
 
     this.addInput("context", new ClassicPreset.Input(reteSocket, "Context"));
+    this.addInput(
+      "reference",
+      new ClassicPreset.Input(reteSocket, "Outside Variable"),
+    );
 
-    // this.addOutput("value", new ClassicPreset.Output(reteSocket, "Next"));
+    this.addOutput(
+      "value",
+      new ClassicPreset.Output(reteSocket, "Outside Variable Result"),
+    );
   }
 
-  data(input: { context: NodeReturn[] }): { value: NodeReturn } {
-    const { context } = input;
+  data(input: { context: NodeReturn[]; reference: NodeReturn[] }): {
+    value: NodeReturn;
+  } {
+    const { context, reference } = input;
     let result = {
       value: {
         value: 0,
@@ -52,9 +70,35 @@ export class ScopeNode extends BlockNode {
     };
     if (!context) return result;
 
-    result.value.value = context[0].value;
-    result.value.code = "}";
-    result.value.refId = context[0].refId ?? "";
+    if (reference && this.addNode && !this.varOutNode && !this.varInNode) {
+      this.varOutNode = new VariableOutNode(
+        reference[0].value,
+        "",
+        reference[0].refId,
+      );
+      this.varInNode = new VariableInNode(reference[0].refId ?? "");
+
+      this.varOutNode.parent = this.id;
+      this.varInNode.parent = this.id;
+
+      this.addNode(this.varOutNode);
+      this.addNode(this.varInNode);
+    }
+
+    if (!reference) {
+      if (this.varOutNode && this.varInNode && this.removeNode) {
+        this.removeNode(this.varOutNode);
+        this.removeNode(this.varInNode);
+      }
+      this.varOutNode = undefined;
+      this.varInNode = undefined;
+      result.value.code = "}";
+      return result;
+    }
+
+    result.value.value = reference[0].value ?? 0;
+    result.value.code = `}`;
+    result.value.refId = reference[0].refId ?? "";
 
     return result;
   }
@@ -64,9 +108,6 @@ export class ConditionNode extends VPNode {
   constructor(
     name: string,
     private operator: "==" | "!=" | ">" | "<" | ">=" | "<=",
-    trueScope: ScopeNode,
-    falseScope: ScopeNode,
-    editor: NodeEditor<any>,
   ) {
     super(name);
 
@@ -76,14 +117,7 @@ export class ConditionNode extends VPNode {
     this.addOutput("true", new ClassicPreset.Output(reteSocket, "True"));
     this.addOutput("false", new ClassicPreset.Output(reteSocket, "False"));
 
-    editor.addConnection(
-      new ClassicPreset.Connection(this, "true", trueScope, "context"),
-    );
-    editor.addConnection(
-      new ClassicPreset.Connection(this, "false", falseScope, "context"),
-    );
-
-    this.updateSize();
+    //this.updateSize();
   }
 
   data(input: { left?: NodeReturn[]; right?: NodeReturn[] }): {
@@ -99,7 +133,7 @@ export class ConditionNode extends VPNode {
           right ? right[0].value : 0,
           this.operator,
         ),
-        code: `if(${left ? left[0].refId : 0} ${this.operator} ${right ? right[0].value : 0}) {`,
+        code: `if(${left ? left[0].refId ?? left[0].value : 0} ${this.operator} ${right ? right[0].refId ?? right[0].value : 0}) {`,
       },
       false: {
         value: applyLogic(

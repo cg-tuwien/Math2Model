@@ -27,8 +27,12 @@ import {
   JoinNode,
   VPNode,
   ReturnNode,
-  VariableNode,
+  VariableOutNode,
   FunctionCallNode,
+  InitializeNode,
+  VariableInNode,
+  NULL,
+  NothingNode,
 } from "@/vpnodes/nodes";
 import { DataflowEngine } from "rete-engine";
 import { DockPlugin, DockPresets } from "rete-dock-plugin";
@@ -43,6 +47,7 @@ import {
   Presets as ArrangePresets,
 } from "rete-auto-arrange-plugin";
 import { vec2 } from "webgpu-matrix";
+import type { NodeFactory } from "rete-context-menu-plugin/_types/presets/classic/types";
 
 const emit = defineEmits<{ update: [code: () => string] }>();
 
@@ -54,7 +59,7 @@ onMounted(() => {
   createEditor();
 });
 
-type Nodes =
+export type Nodes =
   | NumberNode
   | MathOpNode
   | VectorNode
@@ -64,7 +69,11 @@ type Nodes =
   | ScopeNode
   | ReturnNode
   | FunctionCallNode
-  | VariableNode;
+  | VariableOutNode
+  | VariableInNode
+  | InitializeNode
+  | NothingNode;
+
 class Connection<
   A extends Nodes,
   B extends Nodes,
@@ -83,7 +92,8 @@ type Conns =
   | Connection<ConditionNode, SeparateNode>
   | Connection<ConditionNode, MathOpNode>
   | Connection<ReturnNode, VectorNode>
-  | Connection<NumberNode, FunctionCallNode>;
+  | Connection<NumberNode, FunctionCallNode>
+  | Connection<InitializeNode, ScopeNode>;
 
 type Schemes = GetSchemes<Nodes, Conns>;
 
@@ -91,26 +101,66 @@ const editor = new NodeEditor<Schemes>();
 const engine = new DataflowEngine<Schemes>();
 const arrange = new AutoArrangePlugin<Schemes>();
 
-function newConditionNode(
+let shouldUpdate = true;
+
+async function newConditionNode(
   scope1: string,
   scope2: string,
   area: AreaPlugin<Schemes, AreaExtra>,
   operator: "==" | "!=" | ">" | "<" | ">=" | "<=",
-): ConditionNode {
-  const sc1 = new ScopeNode(scope1, (n) => area.update("node", n.id));
-  const sc2 = new ScopeNode(scope2, (n) => area.update("node", n.id));
+): Promise<Nodes> {
+  shouldUpdate = false;
+  const sc1 = new ScopeNode(
+    scope1,
+    (n) => area.update("node", n.id),
+    (n) => editor.addNode(n),
+    (n) => editor.removeNode(n.id),
+  );
+  const sc2 = new ScopeNode(
+    scope2,
+    (n) => area.update("node", n.id),
+    (n) => editor.addNode(n),
+    (n) => editor.removeNode(n.id),
+  );
 
-  editor.addNode(sc1);
-  editor.addNode(sc2);
+  await editor.addNode(sc1);
+  await editor.addNode(sc2);
 
-  arrange.layout();
+  const c = new ConditionNode(operator, operator);
 
-  return new ConditionNode("Condition", operator, sc1, sc2, editor);
+  await editor.addNode(c);
+  editor
+    .addConnection(new ClassicPreset.Connection(c, "true", sc1, "context"))
+    .catch((e) => console.log(e));
+  editor
+    .addConnection(new ClassicPreset.Connection(c, "false", sc2, "context"))
+    .catch((e) => console.log(e));
+
+  await arrange.layout();
+
+  shouldUpdate = true;
+
+  return new NothingNode();
 }
 type AreaExtra = VueArea2D<Schemes> | ContextMenuExtra;
 
 const endNode = new ReturnNode("vec3f(input2.x, 0, input2.y)", "Output Vertex");
-const startNode = new VariableNode(vec2.create(1, 1), "input2;", "input2");
+const startNode = new VariableOutNode(vec2.create(1, 1), "input2;", "input2");
+const piNode = new VariableOutNode(
+  3.14159265359,
+  "var PI = 3.14159265359;",
+  "PI",
+);
+const halfPiNode = new VariableOutNode(
+  3.14159265359 / 2,
+  "var HALF_PI = 3.14159265359 / 2.0;",
+  "HALF_PI",
+);
+const twoPiNode = new VariableOutNode(
+  3.14159265359 * 2,
+  "var TWO_PI = 3.14159265359 * 2.0;",
+  "TWO_PI",
+);
 
 async function createEditor() {
   const area = new AreaPlugin<Schemes, AreaExtra>(
@@ -125,35 +175,79 @@ async function createEditor() {
 
   const contextMenu = new ContextMenuPlugin<Schemes>({
     items: ContextMenuPresets.classic.setup([
-      ["Number", () => new NumberNode()],
-      ["Add", () => new MathOpNode("+", (c) => area.update("control", c.id))],
       [
-        "Subtract",
-        () => new MathOpNode("-", (c) => area.update("control", c.id)),
+        "Refresh",
+        () => {
+          arrange.layout();
+          if (editor.getNode(NULL.id)) editor.removeNode(NULL.id);
+          return NULL;
+        },
+      ],
+      ["Initialize", () => new InitializeNode()],
+      [
+        "Math",
+        [
+          ["Number", () => new NumberNode()],
+          [
+            "Add",
+            () => new MathOpNode("+", (c) => area.update("control", c.id)),
+          ],
+          [
+            "Subtract",
+            () => new MathOpNode("-", (c) => area.update("control", c.id)),
+          ],
+          [
+            "Multiply",
+            () => new MathOpNode("*", (c) => area.update("control", c.id)),
+          ],
+          [
+            "Divide",
+            () => new MathOpNode("/", (c) => area.update("control", c.id)),
+          ],
+          [
+            "Modulo",
+            () => new MathOpNode("%", (c) => area.update("control", c.id)),
+          ],
+          ["Sin", () => new FunctionCallNode("sin", 1)],
+          ["Cos", () => new FunctionCallNode("cos", 1)],
+          ["Tan", () => new FunctionCallNode("tan", 1)],
+          ["Sqrt", () => new FunctionCallNode("sqrt", 1)],
+          ["Abs", () => new FunctionCallNode("abs", 1)],
+        ],
       ],
       [
-        "Multiply",
-        () => new MathOpNode("*", (c) => area.update("control", c.id)),
+        "Vectors",
+        [
+          [
+            "Vector2",
+            () => new VectorNode(2, (c) => area.update("control", c.id)),
+          ],
+          [
+            "Vector3",
+            () => new VectorNode(3, (c) => area.update("control", c.id)),
+          ],
+          [
+            "Vector4",
+            () => new VectorNode(4, (c) => area.update("control", c.id)),
+          ],
+          [
+            "Separate",
+            () => new SeparateNode((c) => area.update("control", c.id)),
+          ],
+          ["Join", () => new JoinNode((n) => area.update("node", n.id))],
+        ],
       ],
       [
-        "Divide",
-        () => new MathOpNode("/", (c) => area.update("control", c.id)),
+        "Logic",
+        [
+          ["Equals", () => newConditionNode("True", "False", area, "==")],
+          ["Not Equals", () => newConditionNode("True", "False", area, "!=")],
+          ["Lt", () => newConditionNode("True", "False", area, "<")],
+          ["Le", () => newConditionNode("True", "False", area, "<=")],
+          ["Gt", () => newConditionNode("True", "False", area, ">")],
+          ["Ge", () => newConditionNode("True", "False", area, ">=")],
+        ],
       ],
-      [
-        "Modulo",
-        () => new MathOpNode("%", (c) => area.update("control", c.id)),
-      ],
-      ["Vector2", () => new VectorNode(2, (c) => area.update("control", c.id))],
-      ["Vector3", () => new VectorNode(3, (c) => area.update("control", c.id))],
-      ["Vector4", () => new VectorNode(4, (c) => area.update("control", c.id))],
-      ["Separate", () => new SeparateNode((c) => area.update("control", c.id))],
-      ["Join", () => new JoinNode((n) => area.update("node", n.id))],
-      ["Equals", () => newConditionNode("True", "False", area, "==")],
-      ["Sin", () => new FunctionCallNode("sin", 1)],
-      ["Cos", () => new FunctionCallNode("cos", 1)],
-      ["Tan", () => new FunctionCallNode("tan", 1)],
-      ["Sqrt", () => new FunctionCallNode("sqrt", 1)],
-      ["Abs", () => new FunctionCallNode("abs", 1)],
     ]),
   });
 
@@ -235,10 +329,14 @@ async function createEditor() {
   dock.add(() => new JoinNode((n) => area.update("node", n.id)));
 
   await editor.addNode(startNode);
+  await editor.addNode(piNode);
+  await editor.addNode(halfPiNode);
+  await editor.addNode(twoPiNode);
   await editor.addNode(endNode);
   //await editor.addConnection(
   //  new ClassicPreset.Connection(startNode, "out", endNode, "returnIn"),
   //);
+  await arrange.layout();
 
   editor.addPipe((context) => {
     if (
@@ -251,6 +349,7 @@ async function createEditor() {
       ].includes(context.type)
     ) {
       engine.reset();
+      if (!shouldUpdate) return;
       // arrange.layout();
       editor
         .getNodes()
@@ -276,31 +375,54 @@ async function getNodesCode(
     fullCode += nodeData.z.code !== "" ? "\t" + nodeData.z.code + "\n" : "";
     fullCode += nodeData.w.code !== "" ? "\t" + nodeData.w.code + "\n" : "";
   } else if (node instanceof ConditionNode) {
-    fullCode += "\t" + nodeData.true.code + "\n";
+    let trueCode = "";
+    let falseCode = "";
+    // fullCode += "\t" + nodeData.true.code + "\n";
+
     const blockContent = graph.outgoers(node.id).nodes();
+    for (let content of blockContent) {
+      const scopeIncomers = graph.incomers(content.id).nodes();
+      let incomersCode = "";
+      if (scopeIncomers.length > 0) {
+        incomersCode += await orderedCode(scopeIncomers, visited);
+      }
+      fullCode += incomersCode;
+    }
     for (let content of blockContent) {
       if (content.label != "True") continue;
       visited.push(content.id);
       const scopeChildren = editor
         .getNodes()
         .filter((n) => n.parent === content.id);
-      if (scopeChildren.length > 0)
-        fullCode += await getScopeCode(scopeChildren, visited);
+      if (scopeChildren.length > 0) {
+        trueCode += await getScopeCode(scopeChildren, visited);
+      }
 
-      fullCode += await getNodesCode(content, visited, graph);
+      fullCode +=
+        "\t" +
+        nodeData.true.code +
+        "\n" +
+        trueCode +
+        (await getNodesCode(content, visited, graph));
     }
 
-    fullCode += "\t" + nodeData.false.code + "\n";
+    // fullCode += "\t" + nodeData.false.code + "\n";
     for (let content of blockContent) {
       if (content.label != "False") continue;
       visited.push(content.id);
       const scopeChildren = editor
         .getNodes()
         .filter((n) => n.parent === content.id);
-      if (scopeChildren.length > 0)
-        fullCode += await getScopeCode(scopeChildren, visited);
+      if (scopeChildren.length > 0) {
+        falseCode += await getScopeCode(scopeChildren, visited);
+      }
 
-      fullCode += await getNodesCode(content, visited, graph);
+      fullCode +=
+        "\t" +
+        nodeData.false.code +
+        "\n" +
+        falseCode +
+        (await getNodesCode(content, visited, graph));
     }
   } else {
     fullCode += "\t" + nodeData.value.code + "\n";
@@ -317,7 +439,10 @@ async function getScopeCode(scopeChildren: Nodes[], visited: string[]) {
 
 async function logCode() {
   const graph = structures(editor);
-  const allNodes = graph.nodes().filter((n) => n.id !== endNode.id);
+  const allNodes = graph
+    .nodes()
+    .filter((n) => n.id !== endNode.id)
+    .filter((n) => !n.parent);
 
   if (allNodes.length <= 0) return;
 
@@ -347,6 +472,10 @@ async function orderedCode(
     const node = nodeQueue.shift();
     if (!node) break;
     if (visited.includes(node.id)) continue;
+    if (node instanceof NothingNode) {
+      await editor.removeNode(node.id);
+      continue;
+    }
     const incomers = graph.incomers(node.id).nodes();
     if (incomers.some((inc) => !visited.includes(inc.id))) {
       nodeQueue.push(node);

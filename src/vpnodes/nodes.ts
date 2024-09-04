@@ -2,7 +2,8 @@ import { ClassicPreset } from "rete";
 import type { Vec2 } from "webgpu-matrix/dist/1.x/vec2";
 import { vec2, vec3, vec4 } from "webgpu-matrix";
 import type { Vec3 } from "webgpu-matrix/dist/1.x/vec3";
-import { AreaPlugin } from "rete-area-plugin";
+import { Area, AreaPlugin } from "rete-area-plugin";
+import { type Nodes } from "../components/visual-programming/CodeGraph.vue";
 
 export const reteSocket = new ClassicPreset.Socket("socket");
 
@@ -42,6 +43,22 @@ export function applyOperator(
   return result;
 }
 
+export class NothingNode extends ClassicPreset.Node {
+  width = 0;
+  height = 0;
+  parent?: string;
+
+  constructor() {
+    super("");
+  }
+
+  data(): {} {
+    return {};
+  }
+
+  updateSize(area?: AreaPlugin<any, any>) {}
+}
+
 export class VPNode extends ClassicPreset.Node {
   width = 180;
   height = 140;
@@ -68,22 +85,25 @@ export class NodeReturn {
 
 export class NumberNode extends VPNode {
   private valueControl: ClassicPreset.InputControl<"number", number>;
+  private valueIn: ClassicPreset.Input<ClassicPreset.Socket>;
   constructor(private update?: (node: ClassicPreset.Node) => void) {
     super("Number");
 
     this.valueControl = new ClassicPreset.InputControl("number", {
       initial: 0.0,
     });
-    this.addControl("value", this.valueControl);
-    this.addInput("value", new ClassicPreset.Input(reteSocket, "in"));
+    this.valueIn = new ClassicPreset.Input(reteSocket, "in");
+    // this.addControl("value", this.valueControl);
+    this.addInput("value", this.valueIn);
+    this.valueIn.addControl(this.valueControl);
     this.addOutput("value", new ClassicPreset.Output(reteSocket));
 
     this.updateSize();
   }
 
   data(inputs: { value?: NodeReturn[] }): { value: NodeReturn } {
-    const control: ClassicPreset.InputControl<"number", number> | undefined =
-      this.controls?.value as ClassicPreset.InputControl<"number", number>;
+    const control: ClassicPreset.InputControl<"number", number> | null = this
+      .valueIn.control as ClassicPreset.InputControl<"number", number>;
     let result = {
       value: {
         value: parseFloat(control?.value?.toFixed(20) ?? "0.0"),
@@ -98,10 +118,9 @@ export class NumberNode extends VPNode {
     if (inputs.value) {
       result.value.value = inputs.value[0].value ?? 0;
       result.value.code = `${nodeToVariableDeclaration(this)} = ${inputs.value[0].refId};`;
-      if (this.hasControl("value")) this.removeControl("value");
+      if (this.valueIn.control) this.valueIn.removeControl();
     } else {
-      if (!this.hasControl("value"))
-        this.addControl("value", this.valueControl);
+      if (!this.valueIn.control) this.valueIn.addControl(this.valueControl);
     }
 
     if (this.update) this.update(this);
@@ -538,7 +557,7 @@ export class ReturnNode extends VPNode {
   }
 }
 
-export class VariableNode extends VPNode {
+export class VariableOutNode extends VPNode {
   constructor(
     private value: any,
     private code: any,
@@ -554,6 +573,26 @@ export class VariableNode extends VPNode {
       value: {
         value: this.value,
         code: this.code,
+        refId: this.ref,
+      },
+    };
+  }
+}
+
+export class VariableInNode extends VPNode {
+  constructor(private ref: string) {
+    super(ref);
+
+    this.addInput("value", new ClassicPreset.Input(reteSocket, "set"));
+  }
+
+  data(inputs: { value: NodeReturn[] }): { value: NodeReturn } {
+    const { value } = inputs;
+
+    return {
+      value: {
+        value: value ? value[0].value : 0,
+        code: `${this.ref} = ${value ? value[0].refId ?? value[0].value : this.ref};`,
         refId: this.ref,
       },
     };
@@ -626,3 +665,33 @@ export class FunctionCallNode extends VPNode {
     return result;
   }
 }
+
+export class InitializeNode extends VPNode {
+  constructor() {
+    super("Initialize");
+
+    this.addControl(
+      "value",
+      new ClassicPreset.InputControl("text", { initial: "vec3f(0, 0, 0)" }),
+    );
+    this.addOutput("value", new ClassicPreset.Output(reteSocket, "Value"));
+  }
+
+  data(): { value: NodeReturn } {
+    const valueCont: ClassicPreset.InputControl<"text", string> = this.controls
+      .value as ClassicPreset.InputControl<"text", string>;
+    if (!valueCont) return { value: { value: 0, code: "" } };
+
+    return {
+      value: {
+        value: 0,
+        code: `${nodeToVariableDeclaration(this)} = ${valueCont.value};`,
+        refId: idToVariableName(this.id),
+      },
+    };
+  }
+}
+
+export const NULL = new NumberNode();
+NULL.width = 0;
+NULL.height = 0;
