@@ -2,7 +2,7 @@
 import { computed, h, ref, watch } from "vue";
 import { NButton, NInput } from "naive-ui";
 import NodeTree from "./node-tree/NodeTree.vue";
-import SingleFile from "./SingleFile.vue";
+import SingleFile from "./node-tree/SingleFile.vue";
 import {
   makeSelectionGeneration,
   NodeTreeHelper,

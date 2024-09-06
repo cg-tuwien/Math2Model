@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 import { computed, ref, shallowRef, watch, type DeepReadonly } from "vue";
-import { useDebounceFn, useElementSize } from "@vueuse/core";
+import { watchDebounced, useElementSize } from "@vueuse/core";
 import type { FilePath } from "@/filesystem/reactive-files";
 import { showInfo } from "@/notification";
 
@@ -22,12 +22,9 @@ const emit = defineEmits<{ update: [code: () => string] }>();
 const editor = shallowRef<monaco.editor.IStandaloneCodeEditor | null>(null);
 
 const { width, height } = useElementSize(monacoMount);
-watch(
-  [width, height],
-  useDebounceFn(() => {
-    editor.value?.layout();
-  }, 100)
-);
+watchDebounced([width, height], () => editor.value?.layout(), {
+  debounce: 100,
+});
 
 let surpressChange = false;
 watch(
@@ -80,12 +77,9 @@ watch(monacoMount, (element) => {
     readOnly: isReadonly.value,
   });
 
-  editor.value.addCommand(
-    monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
-    function () {
-      showInfo("You don't need to save!");
-    }
-  );
+  editor.value.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+    showInfo("You don't need to save!");
+  });
 
   editor.value.onDidChangeModelContent((e) => {
     if (surpressChange) return;
