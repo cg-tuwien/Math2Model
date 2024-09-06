@@ -2,18 +2,17 @@ import "./assets/main.css";
 
 import { createApp } from "vue";
 import { createPinia } from "pinia";
-import { Notification } from "@/notification";
+import { Notification, showError } from "@/notification";
 import "@/monaco-setup";
 
 import App from "./App.vue";
 import router from "./views/router";
 
 globalThis.addEventListener("unhandledrejection", (event) => {
-  Notification.error({
+  showError(event.reason, {
     title: "Unhandled Promise Rejection",
-    content: event.reason + "",
+    error: event,
   });
-  console.error(event);
 });
 globalThis.addEventListener("error", (event) => {
   if (
@@ -22,11 +21,9 @@ globalThis.addEventListener("error", (event) => {
   ) {
     return;
   }
-  Notification.error({
-    title: "Unhandled Error",
-    content: event.message + "",
+  showError(event.message, {
+    error: event,
   });
-  console.error(event);
 });
 
 const app = createApp(App);

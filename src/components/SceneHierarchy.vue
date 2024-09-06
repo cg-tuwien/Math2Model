@@ -179,23 +179,22 @@ function stopAddModel() {
 
 function addModel() {
   if (!toAddModel.value) {
-    showError("Illegal State!", null);
+    showError("Illegal State!");
     return;
   }
   if (!toAddModel.value[1]) {
-    showError("Please add a filename for the generated shaderfiles.", null);
+    showError("Please add a filename for the generated shaderfiles.");
     return;
   }
 
   if (toAddModel.value[1] == undefined) {
     if (!customShader) {
-      showError("Invalid State!", null);
+      showError("Invalid State!");
       return;
     }
     if (customShader.value === null) {
       showError(
-        "Please enter a name for the new shader or select an existing shader.",
-        null
+        "Please enter a name for the new shader or select an existing shader."
       );
       return;
     }
@@ -209,7 +208,7 @@ function addModel() {
 
 function removeModel() {
   if (selectedKeys.value.length < 1) {
-    showError("Select at least one Model to remove.", null);
+    showError("Select at least one Model to remove.");
     return;
   }
   emit("removeModel", selectedKeys.value);

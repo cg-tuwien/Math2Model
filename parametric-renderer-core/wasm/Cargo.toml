@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-anyhow = "1.0"
+anyhow = "1.0.86"
 console_error_panic_hook = "0.1.7"
 glam = { workspace = true }
 renderer-core = { path = "../renderer-core" }
@@ -21,10 +21,10 @@ tracing-subscriber = { version = "0.3.18", default-features = false, features = 
   "json",
 ] }
 tracing-web = "0.1.3"
-wasm-bindgen = "0.2.92"
-wasm-bindgen-futures = "0.4.42"
-serde = { version = "1.0", features = ["derive"] }
+wasm-bindgen = "0.2.93"
+wasm-bindgen-futures = "0.4.43"
+serde = { version = "1.0.209", features = ["derive"] }
 serde-wasm-bindgen = "0.6.5"
-web-sys = { version = "0.3.69", features = ["HtmlCanvasElement"] }
+web-sys = { version = "0.3.70", features = ["HtmlCanvasElement"] }
 wgpu = { workspace = true }
 winit = { workspace = true }

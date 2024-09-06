@@ -195,10 +195,6 @@ export const useStore = defineStore("store", () => {
   };
 });
 
-if (import.meta.hot) {
-  import.meta.hot.accept(acceptHMRUpdate(useStore, import.meta.hot));
-}
-
 async function tryImportProject(
   files: FileList
 ): Promise<ImportProjectDialog | null> {
@@ -217,4 +213,8 @@ async function tryImportProject(
     }
   }
   return null;
+}
+
+if (import.meta.hot) {
+  import.meta.hot.accept(acceptHMRUpdate(useStore, import.meta.hot));
 }

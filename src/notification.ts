@@ -8,16 +8,29 @@ const { message, notification, dialog, loadingBar } = createDiscreteApi([
   "loadingBar",
 ]);
 
-export function showError(msg: string, error: any) {
+export function showError(
+  msg: string,
+  opts: { error?: any; title?: string } = {}
+) {
   // TODO: show the entire error on request
-  console.error(msg, error);
-  message.error(msg);
+  console.error(msg, opts.error);
+  notification.error({
+    title: opts.title ?? "Error",
+    content: msg,
+  });
 }
 
-export function showFileError(msg: string, file: FilePath, error?: any) {
+export function showFileError(
+  msg: string,
+  file: FilePath,
+  opts: { error?: any; title?: string } = {}
+) {
   // TODO: Show the file path in the error message. And make it clickable to open the file.
-  console.error(msg, error);
-  message.error(msg);
+  console.error(msg, opts.error);
+  notification.error({
+    title: `Error in ${file}`,
+    content: msg,
+  });
 }
 
 export function showInfo(msg: string) {

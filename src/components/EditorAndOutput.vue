@@ -61,8 +61,8 @@ watchEffect(() => {
   try {
     const sceneData = deserializeScene(sceneFile.value);
     scene.api.value.fromSerialized(sceneData);
-  } catch (e) {
-    showFileError("Could not load scene file", SceneFileName, e);
+  } catch (error) {
+    showFileError("Could not load scene file", SceneFileName, { error });
   }
 });
 
@@ -220,7 +220,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
   const setNewCode = useDebounceFn((newCode: () => string) => {
     const value = newCode();
     if (keyedCode.value === null) {
-      showError("No file selected", new Error("No file selected"));
+      showError("No file selected");
       return;
     }
     // Keeps the ID intact, but updates the code
@@ -279,10 +279,7 @@ const tabs = useTabs();
 function saveScene() {
   const sceneContent = serializeScene(scene.api.value.serialize(), true);
   if (sceneContent === null) {
-    showError(
-      "Could not serialize scene",
-      new Error("Could not serialize scene")
-    );
+    showError("Could not serialize scene");
   } else {
     props.fs.writeTextFile(SceneFileName, sceneContent);
   }
@@ -327,7 +324,7 @@ function addModel(name: string, shaderName: string) {
 function removeModel(ids: string[]) {
   for (let id of ids) {
     if (!scene.api.value.removeModel(id)) {
-      showError("Could not delete model of id: " + id, null);
+      showError("Could not delete model of id: " + id);
     }
   }
 
