@@ -1,6 +1,6 @@
 {
   "name": "shadertoy-of-parametric-modeling",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "homepage": "https://github.com/cg-tuwien/ShadertoyOfParametricModeling",
