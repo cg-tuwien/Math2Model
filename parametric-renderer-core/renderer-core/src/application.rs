@@ -493,7 +493,7 @@ impl GpuApplication {
                     );
                     compute_pass.set_pipeline(&shaders.compute_patches);
                     compute_patches::set_bind_groups(
-                        &mut compute_pass,
+                        &mut compute_pass.recorder,
                         &self.compute_patches.bind_group_0,
                         &model.compute_patches.bind_group_1,
                         &model.compute_patches.bind_group_2[0],
@@ -522,7 +522,7 @@ impl GpuApplication {
                     );
                     compute_pass.set_pipeline(&shaders.compute_patches);
                     compute_patches::set_bind_groups(
-                        &mut compute_pass,
+                        &mut compute_pass.recorder,
                         &self.compute_patches.bind_group_0,
                         &model.compute_patches.bind_group_1,
                         &model.compute_patches.bind_group_2[1],
@@ -545,7 +545,10 @@ impl GpuApplication {
                 let mut compute_pass =
                     commands.scoped_compute_pass("Copy Patch Sizes Pass", &self.context.device);
                 compute_pass.set_pipeline(&self.copy_patches.pipeline);
-                copy_patches::set_bind_groups(&mut compute_pass, &model.copy_patches.bind_group_0);
+                copy_patches::set_bind_groups(
+                    &mut compute_pass.recorder,
+                    &model.copy_patches.bind_group_0,
+                );
                 compute_pass.dispatch_workgroups(1, 1, 1);
             }
         }
@@ -604,7 +607,7 @@ impl GpuApplication {
                     .zip(indirect_draw_offsets)
                 {
                     shader::set_bind_groups(
-                        &mut render_pass,
+                        &mut render_pass.recorder,
                         &self.render_step.bind_group_0,
                         bind_group_1,
                     );

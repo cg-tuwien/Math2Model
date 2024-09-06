@@ -5,7 +5,7 @@ edition = "2021"
 default-run = "desktop"
 
 [dependencies]
-anyhow = "1.0"
+anyhow = "1.0.86"
 glam = { workspace = true }
 nanoserde = { workspace = true }
 pollster = "0.3"
