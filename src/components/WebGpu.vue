@@ -165,7 +165,7 @@ fn main(
         loadOp: "clear",
         storeOp: "store",
       },
-    ],
+    ] as any,
     depthStencilAttachment: {
       view: depthTexture.createView(),
 
@@ -209,7 +209,7 @@ fn main(
       transformationMatrix.byteOffset,
       transformationMatrix.byteLength
     );
-    renderPassDescriptor.colorAttachments[0].view = context
+    (renderPassDescriptor.colorAttachments as any)[0].view = context
       .getCurrentTexture()
       .createView();
 

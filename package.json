@@ -23,7 +23,7 @@
     "naive-ui": "^2.39.0",
     "pinia": "^2.2.2",
     "seemly": "^0.3.8",
-    "vue": "^3.5.1",
+    "vue": "^3.5.3",
     "vue-router": "^4.4.3",
     "webgpu-matrix": "^1.0.0",
     "webgpu-utils": "^1.9.2",
