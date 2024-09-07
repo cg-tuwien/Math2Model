@@ -232,8 +232,8 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
     <n-flex vertical class="mr-1 ml-1">
       <n-h3 class="underline">Scene</n-h3>
       <n-flex>
-        <n-button @click="startAddModel()"> Add </n-button>
-        <n-button @click="removeModel()"> Delete </n-button>
+        <n-button size="small" @click="startAddModel()"> Add </n-button>
+        <n-button size="small" @click="removeModel()"> Delete </n-button>
       </n-flex>
       <NodeTree
         :root="filteredData"

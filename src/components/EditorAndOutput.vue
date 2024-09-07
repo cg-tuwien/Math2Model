@@ -333,7 +333,7 @@ function removeModel(ids: string[]) {
 </script>
 
 <template>
-  <main class="flex">
+  <main class="flex h-full">
     <n-tabs
       type="line"
       animated
@@ -355,7 +355,6 @@ function removeModel(ids: string[]) {
     </n-tabs>
     <n-split
       direction="horizontal"
-      style="height: 80vh"
       :max="0.75"
       :min="0"
       :default-size="0.2"

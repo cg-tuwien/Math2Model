@@ -192,8 +192,9 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
 <template>
   <n-flex vertical>
     <n-flex class="mx-2">
-      <n-button @click="startAddFile()"> Add </n-button>
+      <n-button size="small" @click="startAddFile()"> Add </n-button>
       <n-button
+        size="small"
         :disabled="selectedFiles.length !== 1"
         @click="
           {
@@ -212,7 +213,9 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
         @negative-click="() => {}"
       >
         <template #trigger>
-          <n-button :disabled="selectedFiles.length < 1"> Delete </n-button>
+          <n-button size="small" :disabled="selectedFiles.length < 1">
+            Delete
+          </n-button>
         </template>
         Are you sure you want to delete
         {{ selectedFiles.join(", ") }}?
