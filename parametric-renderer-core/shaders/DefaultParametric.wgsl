@@ -1,6 +1,6 @@
-fn evaluateImage(input2: vec2f) -> vec3f {
+fn sampleObject(input: vec2f) -> vec3f {
     // Write your shader code here!
     
-    let pos = vec3(input2.x, input2.y, 0.0);        
+    let pos = vec3(input.x, input.y, 0.0);        
     return pos;
 }

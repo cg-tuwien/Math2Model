@@ -472,8 +472,8 @@ fn replace_evaluate_image_code<'a>(
 ) -> std::borrow::Cow<'a, str> {
     // TODO: use wgsl-parser instead of this
     if let Some(evaluate_image_code) = evaluate_image_code {
-        let start = source.find("//// START evaluateImage").unwrap();
-        let end = source.find("//// END evaluateImage").unwrap();
+        let start = source.find("//// START sampleObject").unwrap();
+        let end = source.find("//// END sampleObject").unwrap();
 
         let mut result = String::with_capacity(
             source[..start].len() + evaluate_image_code.len() + source[end..].len(),

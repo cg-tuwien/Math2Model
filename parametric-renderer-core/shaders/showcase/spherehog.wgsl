@@ -1,5 +1,5 @@
-fn evaluateImage(input2: vec2f) -> vec3f {
-    let pos = vec3(input2.x, 0.0, 2. * input2.y) * 3.14159265359;
+fn sampleObject(input: vec2f) -> vec3f {
+    let pos = vec3(input.x, 0.0, 2. * input.y) * 3.14159265359;
     let u = pos.x;
     let v = pos.z;
     var object = vec3(

@@ -110,7 +110,7 @@ watchEffect(() => {
     let models = scene.state.value.models.map((v) => {
       let code =
         referencedFiles.value.get(v.code)?.value ??
-        `fn evaluateImage(input2: vec2f) -> vec3f { return vec3(input2, 0.0); }`;
+        `fn sampleObject(input: vec2f) -> vec3f { return vec3(input, 0.0); }`;
 
       let model = {
         transform: {
