@@ -52,7 +52,7 @@ I also totally recommend trying out the following browser extensions
 - `src/scenes/` contains the CPU state of the scenes.
 - `src/stores/` contains Pinia stores. They're globally accessible, reactive objects.
 - `src/views/` contains the different pages. Currently the HomeView.vue is the only one that matters.
-- `src/App.vue/` is the main Vue.js file.
+- `src/App.vue` is the main Vue.js file.
 - `src/main.ts` is the Typescript entrypoint.
 - `index.html` is the entrypoint for the website.
 - `package.json` is the dependency file. It also includes "scripts" that can be started with `npm run`.
@@ -82,3 +82,7 @@ From there `App.vue` gets loaded, which is responsible for the overall layout of
 
 `HomeView.vue` asynchronously loads the filesystem code, and WebGPU engine. They're a bit slow to initialize, so we load them very early, and we're avoiding doing hot module reloading with them. Once they've finished loading, we create our `EditorAndOutput.vue` component.
 
+
+## Deployment
+
+The website is hosted on GitHub Pages. The `gh-pages` branch is used for deployment. It is deployed using a GitHub action. [The action needs to be manually triggered](https://github.com/cg-tuwien/Math2Model/actions/workflows/deploy.yml).
