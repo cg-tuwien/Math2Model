@@ -19,27 +19,25 @@ import {
   Presets as ContextMenuPresets,
 } from "rete-context-menu-plugin";
 import {
-  NumberNode,
   reteSocket as socket,
-  MathOpNode,
-  VectorNode,
-  SeparateNode,
-  JoinNode,
   VPNode,
   ReturnNode,
   VariableOutNode,
   FunctionCallNode,
   InitializeNode,
   VariableInNode,
-  NULL,
   NothingNode,
-} from "@/vpnodes/nodes";
+} from "@/vpnodes/basic/nodes";
 import { DataflowEngine } from "rete-engine";
 import { DockPlugin, DockPresets } from "rete-dock-plugin";
 import { structures } from "rete-structures";
 import { root } from "postcss";
 import { ScopesPlugin, Presets as ScopesPresets } from "rete-scopes-plugin";
-import { BlockNode, ConditionNode, ScopeNode } from "@/vpnodes/blocks";
+import {
+  BlockNode,
+  ConditionNode,
+  LogicScopeNode,
+} from "@/vpnodes/basic/logic";
 import type { Structures } from "rete-structures/_types/types";
 import { get } from "@vueuse/core";
 import {
@@ -47,7 +45,15 @@ import {
   Presets as ArrangePresets,
 } from "rete-auto-arrange-plugin";
 import { vec2 } from "webgpu-matrix";
-import type { NodeFactory } from "rete-context-menu-plugin/_types/presets/classic/types";
+import { MathOpNode, NumberNode } from "@/vpnodes/basic/math";
+import { JoinNode, SeparateNode, VectorNode } from "@/vpnodes/basic/vector";
+import { DropdownControl } from "@/vpnodes/controls/dropdown";
+import DropdownComponent from "@/vpnodes/components/DropdownComponent.vue";
+import {
+  CallCustomFunctionNode,
+  CustomFunctionNode,
+  FunctionScopeNode,
+} from "@/vpnodes/basic/functions";
 
 const emit = defineEmits<{ update: [code: () => string] }>();
 
@@ -66,13 +72,16 @@ export type Nodes =
   | SeparateNode
   | JoinNode
   | ConditionNode
-  | ScopeNode
+  | LogicScopeNode
   | ReturnNode
   | FunctionCallNode
   | VariableOutNode
   | VariableInNode
   | InitializeNode
-  | NothingNode;
+  | NothingNode
+  | CustomFunctionNode
+  | CallCustomFunctionNode
+  | FunctionScopeNode;
 
 class Connection<
   A extends Nodes,
@@ -93,7 +102,7 @@ type Conns =
   | Connection<ConditionNode, MathOpNode>
   | Connection<ReturnNode, VectorNode>
   | Connection<NumberNode, FunctionCallNode>
-  | Connection<InitializeNode, ScopeNode>;
+  | Connection<InitializeNode, LogicScopeNode>;
 
 type Schemes = GetSchemes<Nodes, Conns>;
 
@@ -110,13 +119,13 @@ async function newConditionNode(
   operator: "==" | "!=" | ">" | "<" | ">=" | "<=",
 ): Promise<Nodes> {
   shouldUpdate = false;
-  const sc1 = new ScopeNode(
+  const sc1 = new LogicScopeNode(
     scope1,
     (n) => area.update("node", n.id),
     (n) => editor.addNode(n),
     (n) => editor.removeNode(n.id),
   );
-  const sc2 = new ScopeNode(
+  const sc2 = new LogicScopeNode(
     scope2,
     (n) => area.update("node", n.id),
     (n) => editor.addNode(n),
@@ -176,11 +185,10 @@ async function createEditor() {
   const contextMenu = new ContextMenuPlugin<Schemes>({
     items: ContextMenuPresets.classic.setup([
       [
-        "Refresh",
+        "Rearrange",
         () => {
           arrange.layout();
-          if (editor.getNode(NULL.id)) editor.removeNode(NULL.id);
-          return NULL;
+          return new NothingNode();
         },
       ],
       ["Initialize", () => new InitializeNode()],
@@ -208,11 +216,6 @@ async function createEditor() {
             "Modulo",
             () => new MathOpNode("%", (c) => area.update("control", c.id)),
           ],
-          ["Sin", () => new FunctionCallNode("sin", 1)],
-          ["Cos", () => new FunctionCallNode("cos", 1)],
-          ["Tan", () => new FunctionCallNode("tan", 1)],
-          ["Sqrt", () => new FunctionCallNode("sqrt", 1)],
-          ["Abs", () => new FunctionCallNode("abs", 1)],
         ],
       ],
       [
@@ -238,6 +241,20 @@ async function createEditor() {
         ],
       ],
       [
+        "Functions",
+        [
+          ["Sin", () => new FunctionCallNode("sin", 1)],
+          ["Cos", () => new FunctionCallNode("cos", 1)],
+          ["Tan", () => new FunctionCallNode("tan", 1)],
+          ["Sqrt", () => new FunctionCallNode("sqrt", 1)],
+          ["Abs", () => new FunctionCallNode("abs", 1)],
+          ["Exp", () => new FunctionCallNode("exp", 1)],
+          ["Round", () => new FunctionCallNode("round", 1)],
+          ["Pow", () => new FunctionCallNode("pow", 2)],
+          ["Mix", () => new FunctionCallNode("mix", 3)],
+        ],
+      ],
+      [
         "Logic",
         [
           ["Equals", () => newConditionNode("True", "False", area, "==")],
@@ -246,6 +263,25 @@ async function createEditor() {
           ["Le", () => newConditionNode("True", "False", area, "<=")],
           ["Gt", () => newConditionNode("True", "False", area, ">")],
           ["Ge", () => newConditionNode("True", "False", area, ">=")],
+        ],
+      ],
+      [
+        "Custom",
+        [
+          [
+            "New Function",
+            () =>
+              new CustomFunctionNode(
+                (n) => area.update("node", n.id),
+                (n) => editor.addNode(n),
+                (n) => editor.removeNode(n.id),
+                (nA, kA, nB, kB) =>
+                  editor.addConnection(
+                    new ClassicPreset.Connection(nA, kA, nB, kB),
+                  ),
+              ),
+          ],
+          ["Call Custom Function", () => new CallCustomFunctionNode()],
         ],
       ],
     ]),
@@ -269,7 +305,20 @@ async function createEditor() {
 
   const render = new VuePlugin<Schemes, AreaExtra>();
 
-  render.addPreset(VuePresets.classic.setup());
+  render.addPreset(
+    VuePresets.classic.setup({
+      customize: {
+        control(data) {
+          if (data.payload instanceof DropdownControl) {
+            return DropdownComponent;
+          }
+          if (data.payload instanceof ClassicPreset.InputControl) {
+            return VuePresets.classic.Control;
+          }
+        },
+      },
+    }),
+  );
   render.addPreset(VuePresets.contextMenu.setup());
   scopes.addPreset(ScopesPresets.classic.setup());
 
@@ -353,7 +402,10 @@ async function createEditor() {
       // arrange.layout();
       editor
         .getNodes()
-        .filter((n) => !(n instanceof BlockNode))
+        .filter(
+          (n) =>
+            !(n instanceof LogicScopeNode || n instanceof FunctionScopeNode),
+        )
         .forEach((n) => n.updateSize(area));
       logCode();
     }
@@ -366,14 +418,15 @@ async function getNodesCode(
   node: Nodes,
   visited: string[],
   graph: Structures<Nodes, Conns>,
+  indent: string = "",
 ) {
   const nodeData = await engine.fetch(node.id);
   let fullCode = "";
   if (node instanceof SeparateNode) {
-    fullCode += "\t" + nodeData.x.code + "\n";
-    fullCode += "\t" + nodeData.y.code + "\n";
-    fullCode += nodeData.z.code !== "" ? "\t" + nodeData.z.code + "\n" : "";
-    fullCode += nodeData.w.code !== "" ? "\t" + nodeData.w.code + "\n" : "";
+    fullCode += indent + nodeData.x.code + "\n";
+    fullCode += indent + nodeData.y.code + "\n";
+    fullCode += nodeData.z.code !== "" ? indent + nodeData.z.code + "\n" : "";
+    fullCode += nodeData.w.code !== "" ? indent + nodeData.w.code + "\n" : "";
   } else if (node instanceof ConditionNode) {
     let trueCode = "";
     let falseCode = "";
@@ -399,11 +452,11 @@ async function getNodesCode(
       }
 
       fullCode +=
-        "\t" +
+        indent +
         nodeData.true.code +
         "\n" +
         trueCode +
-        (await getNodesCode(content, visited, graph));
+        (await getNodesCode(content, visited, graph, indent));
     }
 
     // fullCode += "\t" + nodeData.false.code + "\n";
@@ -418,14 +471,31 @@ async function getNodesCode(
       }
 
       fullCode +=
-        "\t" +
+        indent +
         nodeData.false.code +
         "\n" +
         falseCode +
         (await getNodesCode(content, visited, graph));
     }
+  } else if (node instanceof CustomFunctionNode) {
+    let scopeCode = "";
+    fullCode += nodeData.value.code + "\n";
+
+    const blockContent = graph.outgoers(node.id).nodes();
+    for (let content of blockContent) {
+      visited.push(content.id);
+      const scopeChildren = editor
+        .getNodes()
+        .filter((n) => n.parent === content.id);
+      if (scopeChildren.length > 0) {
+        scopeCode += await getScopeCode(scopeChildren, visited);
+      }
+
+      fullCode +=
+        scopeCode + (await getNodesCode(content, visited, graph, indent));
+    }
   } else {
-    fullCode += "\t" + nodeData.value.code + "\n";
+    fullCode += indent + nodeData.value.code + "\n";
   }
 
   return fullCode;
@@ -434,7 +504,7 @@ async function getNodesCode(
 async function getScopeCode(scopeChildren: Nodes[], visited: string[]) {
   if (scopeChildren.length <= 0) return;
 
-  return orderedCode(scopeChildren, visited, "\t");
+  return orderedCode(scopeChildren, visited, "\t\t");
 }
 
 async function logCode() {
@@ -442,16 +512,21 @@ async function logCode() {
   const allNodes = graph
     .nodes()
     .filter((n) => n.id !== endNode.id)
-    .filter((n) => !n.parent);
+    .filter((n) => !n.parent)
+    .filter((n) => !(n instanceof CustomFunctionNode));
+  const customFunctionNodes = graph
+    .nodes()
+    .filter((n) => n instanceof CustomFunctionNode);
 
   if (allNodes.length <= 0) return;
 
   let visited: string[] = [startNode.id, endNode.id];
   let fullCode =
-    "fn evaluateImage(input2: vec2f) -> vec3f {\n" +
-    (await orderedCode(allNodes, visited));
+    (await orderedCode(customFunctionNodes, visited)) +
+    "\n\nfn evaluateImage(input2: vec2f) -> vec3f {\n" +
+    (await orderedCode(allNodes, visited, "\t"));
 
-  fullCode += (await getNodesCode(endNode, [], graph)) + "}";
+  fullCode += (await getNodesCode(endNode, [], graph, "\t")) + "}";
   console.log(fullCode);
   emit("update", () => fullCode);
 }
@@ -483,7 +558,7 @@ async function orderedCode(
     }
 
     visited.push(node.id);
-    fullCode += indent + (await getNodesCode(node, visited, graph));
+    fullCode += await getNodesCode(node, visited, graph, indent);
   }
 
   return fullCode;

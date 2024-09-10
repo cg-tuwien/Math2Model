@@ -7,9 +7,19 @@ import {
   reteSocket,
   VariableInNode,
   VariableOutNode,
-} from "@/vpnodes/nodes";
+} from "@/vpnodes/basic/nodes";
 import { type Nodes } from "@/components/visual-programming/CodeGraph.vue";
 import { ref } from "vue";
+import { DropdownControl } from "@/vpnodes/controls/dropdown";
+import {
+  addCustomFunction,
+  customFunctions,
+  getCustomFunction,
+  getCustomFunctionOptions,
+  removeCustomFunction,
+  subscribe,
+  typeOptions,
+} from "@/vpnodes/controls/dropdown-options";
 
 function applyLogic(
   left: any,
@@ -34,7 +44,7 @@ function applyLogic(
 
 export class BlockNode extends VPNode {}
 
-export class ScopeNode extends BlockNode {
+export class LogicScopeNode extends BlockNode {
   private varOutNode?: VariableOutNode;
   private varInNode?: VariableInNode;
   constructor(
@@ -146,5 +156,3 @@ export class ConditionNode extends VPNode {
     };
   }
 }
-
-export class TemplateNode extends VPNode {}
