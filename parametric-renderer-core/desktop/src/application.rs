@@ -3,7 +3,10 @@ use std::sync::Arc;
 use glam::{UVec2, Vec3};
 use pollster::FutureExt;
 use renderer_core::{
-    application::{CpuApplication, MaterialInfo, ModelInfo, ProfilerSettings, WindowOrFallback},
+    application::{
+        CpuApplication, MaterialInfo, ModelInfo, ProfilerSettings, ShaderId, ShaderInfo,
+        WindowOrFallback,
+    },
     camera::camera_controller::{self, CameraController, IsCameraController},
     input::{InputHandler, WindowInputs, WinitAppHelper},
     transform::Transform,
@@ -45,8 +48,15 @@ impl Application {
 
         let mut app = CpuApplication::new()?;
         app.set_profiling(ProfilerSettings { gpu: true });
+        let shader_id = ShaderId("HeartSphere.wgsl".into());
+        app.set_shader(
+            shader_id.clone(),
+            ShaderInfo {
+                label: "HeartSphere".into(),
+                code: Application::DEFAULT_SHADER_CODE.into(),
+            },
+        );
         app.update_models(vec![ModelInfo {
-            label: "Default Model".to_owned(),
             transform: Transform {
                 position: Vec3::new(0.0, 0.0, 0.0),
                 ..Default::default()
@@ -57,7 +67,7 @@ impl Application {
                 roughness: 0.7,
                 metallic: 0.1,
             },
-            evaluate_image_code: Application::DEFAULT_SHADER_CODE.to_owned(),
+            shader_id,
         }]);
 
         if let Some(CachedCamera {

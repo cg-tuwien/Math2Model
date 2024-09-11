@@ -39,6 +39,7 @@ import HeartSphere from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import type { ObjectUpdate } from "./input/object-update";
 import WebGpu from "@/components/WebGpu.vue";
+import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -112,7 +113,7 @@ watchEffect(() => {
         referencedFiles.value.get(v.code)?.value ??
         `fn sampleObject(input: vec2f) -> vec3f { return vec3(input, 0.0); }`;
 
-      let model = {
+      let model: WasmModelInfo = {
         transform: {
           position: [v.position.x, v.position.y, v.position.z],
           rotation: [v.rotation.x, v.rotation.y, v.rotation.z],
@@ -129,7 +130,10 @@ watchEffect(() => {
           metallic: v.material.metallic,
         },
         label: v.code,
-        evaluate_image_code: code,
+        evaluate_image_code: {
+          version: props.fs.files.value.get(v.code)?.version ?? 0,
+          code,
+        },
       };
       return model;
     });

@@ -4,6 +4,8 @@ mod virtual_model;
 mod wgpu_context;
 mod window_or_fallback;
 
+use std::collections::HashMap;
+
 use frame_counter::{FrameCounter, FrameTime, Seconds};
 use glam::{UVec2, Vec2, Vec3};
 use scene::SceneData;
@@ -37,14 +39,23 @@ pub struct ProfilerSettings {
 pub struct ModelInfo {
     pub transform: Transform,
     pub material_info: MaterialInfo,
-    pub label: String, // TODO: Make this a label for the shader only!
-    pub evaluate_image_code: String,
+    pub shader_id: ShaderId,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct ShaderId(pub String);
+
+#[derive(Clone)]
+pub struct ShaderInfo {
+    pub label: String,
+    pub code: String,
 }
 
 pub struct CpuApplication {
     pub gpu: Option<GpuApplication>,
     pub camera_controller: CameraController,
     models: Vec<ModelInfo>,
+    shaders: HashMap<ShaderId, ShaderInfo>,
     last_update_instant: Option<Instant>,
     frame_counter: FrameCounter,
     camera: Camera,
@@ -75,6 +86,7 @@ impl CpuApplication {
             camera,
             camera_controller,
             models: vec![],
+            shaders: HashMap::new(),
             last_update_instant: None,
             frame_counter: FrameCounter::new(),
             mouse: Vec2::ZERO,
@@ -119,6 +131,10 @@ impl CpuApplication {
         self.set_profiling(self.profiler_settings.clone());
         self.resize(size);
         let models = std::mem::take(&mut self.models);
+        let shaders = std::mem::take(&mut self.shaders);
+        for (shader_id, info) in shaders {
+            self.set_shader(shader_id, info);
+        }
         self.update_models(models);
     }
 
@@ -142,6 +158,26 @@ impl CpuApplication {
                 &gpu.meshes,
             )
             .unwrap();
+        }
+    }
+
+    pub fn set_shader(&mut self, shader_id: ShaderId, info: ShaderInfo) {
+        self.shaders.insert(shader_id.clone(), info);
+        if let Some(gpu) = &mut self.gpu {
+            let shader_info = self.shaders.get(&shader_id).unwrap();
+            gpu.shader_arena.set_shader(
+                shader_id,
+                &shader_info.label,
+                &shader_info.code,
+                &gpu.context,
+            );
+        }
+    }
+
+    pub fn remove_shader(&mut self, shader_id: &ShaderId) {
+        self.shaders.remove(shader_id);
+        if let Some(gpu) = &mut self.gpu {
+            gpu.shader_arena.remove_shader(shader_id);
         }
     }
 
@@ -653,11 +689,8 @@ fn update_virtual_models(
     for (virtual_model, model) in virtual_models.iter_mut().zip(models.iter()) {
         virtual_model.transform = model.transform.clone();
         virtual_model.material_info = model.material_info.clone();
-        virtual_model.shaders_key = shader_arena.get_or_create_shader(
-            &model.label,
-            context,
-            model.evaluate_image_code.as_str(),
-        );
+        virtual_model.shaders_key =
+            shader_arena.get_or_create_shader_key(&model.shader_id, context);
     }
     // Resize virtual models
     if virtual_models.len() > models.len() {
@@ -667,20 +700,13 @@ fn update_virtual_models(
             let mut virtual_model = VirtualModel::new(
                 context,
                 meshes,
-                shader_arena.get_or_create_shader(
-                    &model.label,
-                    context,
-                    model.evaluate_image_code.as_str(),
-                ),
+                shader_arena.get_or_create_shader_key(&model.shader_id, context),
             )?;
             virtual_model.transform = model.transform.clone();
             virtual_model.material_info = model.material_info.clone();
             virtual_models.push(virtual_model);
         }
     }
-
-    // Clean up unused shaders
-    shader_arena.retain(virtual_models.iter().map(|model| model.shaders_key));
     Ok(())
 }
 pub struct RenderData<'a> {

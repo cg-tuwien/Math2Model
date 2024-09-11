@@ -1,6 +1,8 @@
 use glam::{UVec2, Vec3};
 use renderer_core::{
-    application::{CpuApplication, GpuApplication, ModelInfo, WindowOrFallback},
+    application::{
+        CpuApplication, GpuApplication, ModelInfo, ShaderId, ShaderInfo, WindowOrFallback,
+    },
     camera::camera_controller::{self, CameraController},
     input::{InputHandler, WindowInputs, WinitAppHelper},
 };
@@ -21,8 +23,6 @@ pub struct Application {
 }
 
 impl Application {
-    const DEFAULT_SHADER_CODE: &'static str = include_str!("../../shaders/HeartSphere.wgsl");
-
     pub fn new(canvas: HtmlCanvasElement) -> anyhow::Result<Self> {
         let mut app = CpuApplication::new()?;
         app.camera_controller = CameraController::new(
@@ -35,20 +35,6 @@ impl Application {
             camera_controller::ChosenKind::Orbitcam,
         );
 
-        app.update_models(vec![ModelInfo {
-            label: "Default Model".to_owned(),
-            transform: renderer_core::transform::Transform {
-                position: Vec3::new(0.0, 1.0, 0.0),
-                ..Default::default()
-            },
-            material_info: renderer_core::application::MaterialInfo {
-                color: Vec3::new(0.6, 1.0, 1.0),
-                emissive: Vec3::new(0.0, 0.0, 0.0),
-                roughness: 0.7,
-                metallic: 0.1,
-            },
-            evaluate_image_code: Application::DEFAULT_SHADER_CODE.to_owned(),
-        }]);
         Ok(Self {
             window: None,
             app,
@@ -88,6 +74,10 @@ impl Application {
 
 pub enum AppCommand {
     UpdateModels(Vec<ModelInfo>),
+    UpdateShader {
+        shader_id: ShaderId,
+        info: Option<ShaderInfo>,
+    },
     CreateGpu(GpuApplication),
 }
 thread_local! {
@@ -97,10 +87,9 @@ thread_local! {
 #[derive(Tsify, Serialize, Deserialize)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmModelInfo {
-    pub label: String,
     pub transform: WasmTransform,
     pub material_info: WasmMaterialInfo,
-    pub evaluate_image_code: String,
+    pub shader_id: String,
 }
 
 #[derive(Tsify, Serialize, Deserialize)]
@@ -120,6 +109,41 @@ pub struct WasmMaterialInfo {
     pub metallic: f32,
 }
 
+#[derive(Tsify, Serialize, Deserialize)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct WasmShaderInfo {
+    pub id: String,
+    pub label: String,
+    pub code: String,
+}
+
+#[wasm_bindgen]
+pub fn update_shader(shader_info: WasmShaderInfo) {
+    APP_COMMANDS.with(|commands| {
+        if let Some(proxy) = &*commands.lock().unwrap() {
+            let _ = proxy.send_event(AppCommand::UpdateShader {
+                shader_id: ShaderId(shader_info.id),
+                info: Some(ShaderInfo {
+                    label: shader_info.label,
+                    code: shader_info.code,
+                }),
+            });
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn remove_shader(id: String) {
+    APP_COMMANDS.with(|commands| {
+        if let Some(proxy) = &*commands.lock().unwrap() {
+            let _ = proxy.send_event(AppCommand::UpdateShader {
+                shader_id: ShaderId(id),
+                info: None,
+            });
+        }
+    });
+}
+
 #[wasm_bindgen]
 pub fn update_models(js_models: Vec<WasmModelInfo>) {
     APP_COMMANDS.with(|commands| {
@@ -127,7 +151,6 @@ pub fn update_models(js_models: Vec<WasmModelInfo>) {
             let models = js_models
                 .into_iter()
                 .map(|v| ModelInfo {
-                    label: v.label,
                     transform: renderer_core::transform::Transform {
                         position: v.transform.position.into(),
                         rotation: glam::Quat::from_euler(
@@ -144,7 +167,7 @@ pub fn update_models(js_models: Vec<WasmModelInfo>) {
                         roughness: v.material_info.roughness,
                         metallic: v.material_info.metallic,
                     },
-                    evaluate_image_code: v.evaluate_image_code,
+                    shader_id: ShaderId(v.shader_id),
                 })
                 .collect();
             let _ = proxy.send_event(AppCommand::UpdateModels(models));
@@ -185,6 +208,9 @@ impl ApplicationHandler<AppCommand> for Application {
         };
 
         let window = event_loop.create_window(window_attributes).unwrap();
+        // TODO: Call event_loop.create_proxy() here (after https://github.com/rust-windowing/winit/issues/3741 is resolved in the next winit version)
+        // And pass that to create_surface
+        // Then, create_surface no longer needs the APP_COMMANDS thread_local!
         self.create_surface(window);
     }
 
@@ -198,6 +224,18 @@ impl ApplicationHandler<AppCommand> for Application {
                 if let Some(window) = &self.window {
                     window.request_redraw();
                 }
+            }
+            AppCommand::UpdateShader {
+                shader_id,
+                info: Some(info),
+            } => {
+                self.app.set_shader(shader_id, info);
+            }
+            AppCommand::UpdateShader {
+                shader_id,
+                info: None,
+            } => {
+                self.app.remove_shader(&shader_id);
             }
         }
     }

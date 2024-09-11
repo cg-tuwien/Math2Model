@@ -6,7 +6,9 @@ use criterion::{
 };
 use glam::Vec3;
 use pollster::FutureExt;
-use renderer_core::application::{CpuApplication, ProfilerSettings, WindowOrFallback};
+use renderer_core::application::{
+    CpuApplication, ProfilerSettings, ShaderId, ShaderInfo, WindowOrFallback,
+};
 
 const DEFAULT_SHADER_CODE: &'static str = include_str!("../../shaders/HeartSphere.wgsl");
 
@@ -23,8 +25,16 @@ fn main() {
     let mut app = CpuApplication::new().unwrap();
     app.set_profiling(ProfilerSettings { gpu: true });
 
+    let shader_id = ShaderId("HeartSphere.wgsl".into());
+    app.set_shader(
+        shader_id.clone(),
+        ShaderInfo {
+            label: "HeartSphere".into(),
+            code: DEFAULT_SHADER_CODE.into(),
+        },
+    );
+
     app.update_models(vec![renderer_core::application::ModelInfo {
-        label: "Default Model".to_owned(),
         transform: renderer_core::transform::Transform {
             position: Vec3::new(0.0, 0.0, 0.0),
             ..Default::default()
@@ -35,7 +45,7 @@ fn main() {
             roughness: 0.7,
             metallic: 0.1,
         },
-        evaluate_image_code: DEFAULT_SHADER_CODE.to_owned(),
+        shader_id,
     }]);
 
     // TODO: Why is this needed for benchmarking?

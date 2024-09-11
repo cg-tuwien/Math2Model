@@ -9,20 +9,14 @@ use crate::{
     transform::Transform,
 };
 
-use super::{wgpu_context::WgpuContext, MAX_PATCH_COUNT, PATCH_SIZES};
+use super::{wgpu_context::WgpuContext, ShaderId, MAX_PATCH_COUNT, PATCH_SIZES};
 use std::collections::HashMap;
 
 use glam::{Mat4, Vec3, Vec4};
 use slotmap::{DefaultKey, SlotMap};
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct NamedShader {
-    pub label: String,
-    pub shader: String,
-}
-
 pub struct ShaderArena {
-    shader_keys: HashMap<NamedShader, DefaultKey>,
+    shader_keys: HashMap<ShaderId, DefaultKey>,
     shaders: SlotMap<DefaultKey, ShaderPipelines>,
 }
 
@@ -45,34 +39,55 @@ impl ShaderArena {
         &self.shaders[key]
     }
 
-    pub fn get_or_create_shader(
-        &mut self,
-        label: &str,
-        context: &WgpuContext,
-        evaluate_image_code: &str,
-    ) -> DefaultKey {
-        let key = NamedShader {
-            label: label.to_string(),
-            shader: evaluate_image_code.to_owned(),
-        };
-        *self.shader_keys.entry(key).or_insert_with(|| {
-            let compute_patches = create_compute_patches_pipeline(
-                Some(label),
-                &context.device,
-                Some(evaluate_image_code),
-            );
-            let render = create_render_pipeline(Some(label), context, Some(evaluate_image_code));
-            self.shaders.insert(ShaderPipelines {
-                compute_patches,
-                render,
-            })
-        })
+    pub fn get_shader_key(&self, key: &ShaderId) -> Option<DefaultKey> {
+        self.shader_keys.get(key).copied()
     }
 
-    pub fn retain(&mut self, used_keys: impl Iterator<Item = DefaultKey>) {
-        let keys_set: std::collections::HashSet<_> = used_keys.collect();
-        self.shader_keys.retain(|_, key| keys_set.contains(key));
-        self.shaders.retain(|key, _| keys_set.contains(&key));
+    /// Gets a shader key if it exists, otherwise creates a new shader key with an empty shader.
+    pub fn get_or_create_shader_key(
+        &mut self,
+        key: &ShaderId,
+        context: &WgpuContext,
+    ) -> DefaultKey {
+        self.get_shader_key(key)
+            .unwrap_or_else(|| self.set_shader(key.clone(), "Missing shader", "", context))
+    }
+
+    pub fn set_shader(
+        &mut self,
+        key: ShaderId,
+        label: &str,
+        code: &str,
+        context: &WgpuContext,
+    ) -> DefaultKey {
+        use std::collections::hash_map::Entry;
+        let compute_patches = create_compute_patches_pipeline(label, &context.device, code);
+        let render = create_render_pipeline(label, context, code);
+
+        match self.shader_keys.entry(key) {
+            Entry::Occupied(v) => {
+                let key = *v.get();
+                *self.shaders.get_mut(key).unwrap() = ShaderPipelines {
+                    compute_patches,
+                    render,
+                };
+                key
+            }
+            Entry::Vacant(v) => {
+                let key = self.shaders.insert(ShaderPipelines {
+                    compute_patches,
+                    render,
+                });
+                v.insert(key);
+                key
+            }
+        }
+    }
+
+    pub fn remove_shader(&mut self, key: &ShaderId) {
+        if let Some(key) = self.shader_keys.remove(key) {
+            self.shaders.remove(key);
+        }
     }
 }
 
@@ -389,19 +404,11 @@ impl VirtualModel {
     }
 }
 
-fn create_render_pipeline(
-    label: Option<&str>,
-    context: &WgpuContext,
-    evaluate_image_code: Option<&str>,
-) -> wgpu::RenderPipeline {
-    let label = label.unwrap_or_default();
+fn create_render_pipeline(label: &str, context: &WgpuContext, code: &str) -> wgpu::RenderPipeline {
     let device = &context.device;
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some(&format!("Render Shader {}", label)),
-        source: wgpu::ShaderSource::Wgsl(replace_evaluate_image_code(
-            shader::SOURCE,
-            evaluate_image_code,
-        )),
+        source: wgpu::ShaderSource::Wgsl(replace_evaluate_image_code(shader::SOURCE, code).into()),
     });
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some(&format!("Render Pipeline {}", label)),
@@ -446,12 +453,11 @@ fn create_render_pipeline(
 }
 
 fn create_compute_patches_pipeline(
-    label: Option<&str>,
+    label: &str,
     device: &wgpu::Device,
-    evaluate_image_code: Option<&str>,
+    code: &str,
 ) -> wgpu::ComputePipeline {
-    let label = label.unwrap_or_default();
-    let source = replace_evaluate_image_code(compute_patches::SOURCE, evaluate_image_code);
+    let source = replace_evaluate_image_code(compute_patches::SOURCE, code);
 
     device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
         label: Some(&format!("Compute Patches {}", label)),
@@ -466,23 +472,16 @@ fn create_compute_patches_pipeline(
     })
 }
 
-fn replace_evaluate_image_code<'a>(
-    source: &'a str,
-    evaluate_image_code: Option<&str>,
-) -> std::borrow::Cow<'a, str> {
+fn replace_evaluate_image_code<'a>(source: &'a str, sample_object_code: &str) -> String {
     // TODO: use wgsl-parser instead of this
-    if let Some(evaluate_image_code) = evaluate_image_code {
-        let start = source.find("//// START sampleObject").unwrap();
-        let end = source.find("//// END sampleObject").unwrap();
+    let start = source.find("//// START sampleObject").unwrap();
+    let end = source.find("//// END sampleObject").unwrap();
 
-        let mut result = String::with_capacity(
-            source[..start].len() + evaluate_image_code.len() + source[end..].len(),
-        );
-        result.push_str(&source[..start]);
-        result.push_str(evaluate_image_code);
-        result.push_str(&source[end..]);
-        std::borrow::Cow::Owned(result)
-    } else {
-        std::borrow::Cow::Borrowed(source)
-    }
+    let mut result = String::with_capacity(
+        source[..start].len() + sample_object_code.len() + source[end..].len(),
+    );
+    result.push_str(&source[..start]);
+    result.push_str(sample_object_code);
+    result.push_str(&source[end..]);
+    result
 }
