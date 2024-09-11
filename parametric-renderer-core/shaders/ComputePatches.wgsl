@@ -126,9 +126,9 @@ fn mouse_held(button: u32) -> bool {
 @group(0) @binding(1) var<uniform> screen : Screen;
 @group(0) @binding(2) var<uniform> mouse : Mouse;
 
-//// START evaluateImage
-fn evaluateImage(input2: vec2f) -> vec3f { return vec3(input2, 0.0); }
-//// END evaluateImage
+//// START sampleObject
+fn sampleObject(input: vec2f) -> vec3f { return vec3(input, 0.0); }
+//// END sampleObject
 //// END OF AUTOGEN
 
 
@@ -391,7 +391,7 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
     (quad_size.y / 4.0) * f32(extra_sample_index.y)
   );
   if (sample_index < 25) {
-    let extra_sample = evaluateImage(extra_sample_location);
+    let extra_sample = sampleObject(extra_sample_location);
     let extra_clip_space = input_buffer.model_view_projection * vec4f(extra_sample.xyz, 1.0);
     frustum_sides[sample_index] = get_frustum_side(extra_clip_space);
   }
@@ -417,7 +417,7 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
     (quad_size.y / f32(U_Y) / 2.0) // top offset
     + (quad_size.y / f32(U_Y)) * f32(u_v_sample_index.y)
   );
-  let u_sample = evaluateImage(u_sample_location);
+  let u_sample = sampleObject(u_sample_location);
   let u_clip_space = input_buffer.model_view_projection * vec4f(u_sample.xyz, 1.0);
   let u_screen_space = u_clip_space.xy / u_clip_space.w;
   u_samples[u_v_sample_index.y][u_v_sample_index.x] = u_screen_space;
@@ -428,7 +428,7 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
     + (quad_size.x / f32(U_Y)) * f32(u_v_sample_index.y),
     (quad_size.y / f32(U_X - 1)) * f32(u_v_sample_index.x),
   );
-  let v_sample = evaluateImage(v_sample_location);
+  let v_sample = sampleObject(v_sample_location);
   let v_clip_space = input_buffer.model_view_projection * vec4f(v_sample.xyz, 1.0);
   let v_screen_space = v_clip_space.xy / v_clip_space.w;
   v_samples[u_v_sample_index.y][u_v_sample_index.x] = v_screen_space;
