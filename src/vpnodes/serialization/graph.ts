@@ -19,7 +19,7 @@ export class SerializedGraph {
   }
 
   toJSON() {
-    return JSON.stringify({ graph: this.nodes });
+    return JSON.stringify({ graph: this.nodes }, null, 2);
   }
 }
 

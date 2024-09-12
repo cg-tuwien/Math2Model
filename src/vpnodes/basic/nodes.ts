@@ -133,7 +133,15 @@ export class ReturnNode extends VPNode {
 
   serialize(sn: SerializedNode) {
     sn.nodeType = "Return";
+    sn.inputs.push({ key: "def", value: this.def, type: "text" });
     return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    for (let input of sn.inputs) {
+      if (input.type === "text" && input.key === "def") this.def = input.value;
+    }
+    super.deserialize(sn);
   }
 }
 

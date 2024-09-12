@@ -421,6 +421,11 @@ function removeModel(ids: string[]) {
             v-if="props.visual"
             style="width: 500px; height: 1000px"
             @update="openFile.setNewCode($event)"
+            @save="
+              (fileName, content) => {
+                props.fs.writeTextFile(fileName, content);
+              }
+            "
           ></CodeGraph>
         </div>
       </template>
