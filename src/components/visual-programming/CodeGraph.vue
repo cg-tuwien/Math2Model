@@ -29,7 +29,6 @@ import {
   NothingNode,
 } from "@/vpnodes/basic/nodes";
 import { DataflowEngine } from "rete-engine";
-import { DockPlugin, DockPresets } from "rete-dock-plugin";
 import { structures } from "rete-structures";
 import { root } from "postcss";
 import { ScopesPlugin, Presets as ScopesPresets } from "rete-scopes-plugin";
@@ -54,6 +53,8 @@ import {
   CustomFunctionNode,
   FunctionScopeNode,
 } from "@/vpnodes/basic/functions";
+import { graphFromJSON, SerializedGraph } from "@/vpnodes/serialization/graph";
+import { SerializedNode, toSerializedNode } from "@/vpnodes/serialization/node";
 
 const emit = defineEmits<{ update: [code: () => string] }>();
 
@@ -294,13 +295,7 @@ async function createEditor() {
     ]),
   });
 
-  const dock = new DockPlugin<Schemes>();
-
   const scopes = new ScopesPlugin<Schemes>();
-
-  dock.addPreset(DockPresets.classic.setup({ area, size: 30, scale: 0.7 }));
-  //
-  //
 
   arrange.addPreset(ArrangePresets.classic.setup());
 
@@ -333,56 +328,8 @@ async function createEditor() {
   editor.use(engine);
   area.use(connection);
   area.use(render);
-  area.use(dock);
   area.use(scopes);
   area.use(arrange);
-
-  dock.add(() => new NumberNode((n) => area.update("node", n.id)));
-  dock.add(
-    () =>
-      new MathOpNode("+", (n, c) => {
-        area.update("control", c.id);
-        area.update("node", n.id);
-      }),
-  );
-  dock.add(
-    () =>
-      new MathOpNode("-", (n, c) => {
-        area.update("control", c.id);
-        area.update("node", n.id);
-      }),
-  );
-  dock.add(
-    () =>
-      new MathOpNode("*", (n, c) => {
-        area.update("control", c.id);
-        area.update("node", n.id);
-      }),
-  );
-  dock.add(
-    () =>
-      new MathOpNode("/", (n, c) => {
-        area.update("control", c.id);
-        area.update("node", n.id);
-      }),
-  );
-  dock.add(
-    () =>
-      new MathOpNode("%", (n, c) => {
-        area.update("control", c.id);
-        area.update("node", n.id);
-      }),
-  );
-  dock.add(() => new VectorNode(2, (n) => area.update("node", n.id)));
-  dock.add(() => new VectorNode(3, (n) => area.update("node", n.id)));
-  dock.add(() => new VectorNode(4, (n) => area.update("node", n.id)));
-  dock.add(
-    () =>
-      new SeparateNode((n) => {
-        area.update("node", n.id);
-      }),
-  );
-  dock.add(() => new JoinNode((n) => area.update("node", n.id)));
 
   await editor.addNode(startNode);
   await editor.addNode(piNode);
@@ -578,10 +525,135 @@ async function orderedCode(
 
   return fullCode;
 }
+
+async function serialize() {
+  const sg = new SerializedGraph();
+  for (let node of editor.getNodes()) {
+    const sn = new SerializedNode();
+    sg.add(node.serialize(sn));
+  }
+
+  for (let connection of editor.getConnections()) {
+    const sn = sg.getNode(connection.target);
+    if (!sn) continue;
+    sn.inputs.push({
+      type: "node",
+      value: connection.source,
+      keyFrom: connection.sourceOutput,
+      keyTo: connection.targetInput,
+    });
+  }
+  console.log(sg.toJSON());
+}
+
+async function deserialize(json: string) {
+  shouldUpdate = false;
+  await editor.clear();
+  engine.reset();
+  const sg = graphFromJSON(json);
+  console.log(sg);
+
+  for (let snObj of sg.graph) {
+    const sn = toSerializedNode(snObj);
+    const node = serializedNodeToNode(sn);
+    node.deserialize(sn);
+    await editor.addNode(node as Nodes);
+  }
+
+  for (let snObj of sg.graph) {
+    const sn = toSerializedNode(snObj);
+    for (let input of sn.inputs) {
+      if (input.type === "node") {
+        await editor.addConnection(
+          new ClassicPreset.Connection(
+            editor.getNodes().filter((n) => n.id === input.value)[0],
+            input.keyFrom,
+            editor.getNodes().filter((n) => n.id === sn.uuid)[0],
+            input.keyTo,
+          ),
+        );
+      }
+    }
+  }
+
+  shouldUpdate = true;
+  engine.reset();
+  await arrange.layout();
+}
+
+function serializedNodeToNode(sn: SerializedNode): Nodes {
+  let node: Nodes;
+  switch (sn.nodeType) {
+    case "Number":
+      node = new NumberNode();
+      break;
+    case "Math":
+      node = new MathOpNode("+");
+      break;
+    case "Vector":
+      node = new VectorNode(4);
+      break;
+    case "Separate":
+      node = new SeparateNode();
+      break;
+    case "Join":
+      node = new JoinNode();
+      break;
+    case "FunctionCall":
+      node = new FunctionCallNode();
+      break;
+    case "Return":
+      node = new ReturnNode(0);
+      break;
+    case "VariableOut":
+      node = new VariableOutNode(0, "");
+      break;
+    case "VariableIn":
+      node = new VariableInNode("");
+      break;
+    case "Initialize":
+      node = new InitializeNode();
+      break;
+    case "FunctionScope":
+      node = new FunctionScopeNode("");
+      break;
+    case "CustomFunction":
+      node = new CustomFunctionNode();
+      break;
+    case "CallCustomFunction":
+      node = new CallCustomFunctionNode();
+      break;
+    case "LogicScope":
+      node = new LogicScopeNode("");
+      break;
+    case "Condition":
+      node = new ConditionNode("", "==");
+      break;
+  }
+
+  node.id = sn.uuid;
+  node.width = sn.size[0];
+  node.height = sn.size[1];
+  node.parent = sn.parent;
+  return node;
+}
 </script>
 
 <template>
-  <div class="rete" ref="container"></div>
+  <n-flex vertical style="width: 70%">
+    <div class="rete" ref="container" style="width: 100%; height: 71%"></div>
+    <n-flex
+      ><n-button v-on:click="serialize()">Save</n-button
+      ><n-button
+        v-on:click="
+          deserialize(
+            `{&quot;graph&quot;:[{&quot;size&quot;:[180,160],&quot;uuid&quot;:&quot;d641059243a2406c&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;input2;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;input2&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:{&quot;0&quot;:1,&quot;1&quot;:1}}]},{&quot;size&quot;:[180,160],&quot;uuid&quot;:&quot;4dacd91630ba22ec&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var PI = 3.14159265359;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:3.14159265359}]},{&quot;size&quot;:[180,160],&quot;uuid&quot;:&quot;8fb79ad568fe7f92&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var HALF_PI = 3.14159265359 / 2.0;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;HALF_PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:1.570796326795}]},{&quot;size&quot;:[180,160],&quot;uuid&quot;:&quot;a2d8ce38acc7a1d1&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var TWO_PI = 3.14159265359 * 2.0;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;TWO_PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:6.28318530718}]},{&quot;size&quot;:[180,160],&quot;uuid&quot;:&quot;5dbc7f70b13c6b77&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;Return&quot;},{&quot;size&quot;:[721.2785991295364,328.3845619739538],&quot;uuid&quot;:&quot;62c89ec612800696&quot;,&quot;inputs&quot;:[{&quot;type&quot;:&quot;node&quot;,&quot;value&quot;:&quot;8a2eb7573d39f6d7&quot;,&quot;keyFrom&quot;:&quot;value&quot;,&quot;keyTo&quot;:&quot;context&quot;}],&quot;nodeType&quot;:&quot;FunctionScope&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;Function Scope&quot;}]},{&quot;size&quot;:[180,290],&quot;uuid&quot;:&quot;8a2eb7573d39f6d7&quot;,&quot;inputs&quot;:[{&quot;key&quot;:&quot;name&quot;,&quot;value&quot;:&quot;funcref_8a2eb&quot;,&quot;type&quot;:&quot;text&quot;},{&quot;key&quot;:&quot;n&quot;,&quot;value&quot;:1,&quot;type&quot;:&quot;number&quot;},{&quot;key&quot;:&quot;ret&quot;,&quot;value&quot;:&quot;i32&quot;,&quot;type&quot;:&quot;text&quot;},{&quot;key&quot;:&quot;arg0&quot;,&quot;value&quot;:&quot;i32&quot;,&quot;type&quot;:&quot;text&quot;},{&quot;key&quot;:&quot;arg1&quot;,&quot;value&quot;:&quot;i32&quot;,&quot;type&quot;:&quot;text&quot;},{&quot;key&quot;:&quot;arg2&quot;,&quot;value&quot;:&quot;i32&quot;,&quot;type&quot;:&quot;text&quot;},{&quot;key&quot;:&quot;arg3&quot;,&quot;value&quot;:&quot;i32&quot;,&quot;type&quot;:&quot;text&quot;},{&quot;key&quot;:&quot;arg4&quot;,&quot;value&quot;:&quot;i32&quot;,&quot;type&quot;:&quot;text&quot;},{&quot;key&quot;:&quot;arg5&quot;,&quot;value&quot;:&quot;i32&quot;,&quot;type&quot;:&quot;text&quot;},{&quot;key&quot;:&quot;arg6&quot;,&quot;value&quot;:&quot;i32&quot;,&quot;type&quot;:&quot;text&quot;},{&quot;key&quot;:&quot;arg7&quot;,&quot;value&quot;:&quot;i32&quot;,&quot;type&quot;:&quot;text&quot;},{&quot;key&quot;:&quot;arg8&quot;,&quot;value&quot;:&quot;i32&quot;,&quot;type&quot;:&quot;text&quot;}],&quot;nodeType&quot;:&quot;CustomFunction&quot;},{&quot;size&quot;:[180,160],&quot;uuid&quot;:&quot;da1358fbd8f1e06a&quot;,&quot;inputs&quot;:[{&quot;type&quot;:&quot;node&quot;,&quot;value&quot;:&quot;17ecbf393bb49796&quot;,&quot;keyFrom&quot;:&quot;value&quot;,&quot;keyTo&quot;:&quot;returnIn&quot;}],&quot;nodeType&quot;:&quot;Return&quot;,&quot;parent&quot;:&quot;62c89ec612800696&quot;},{&quot;size&quot;:[180,160],&quot;uuid&quot;:&quot;17ecbf393bb49796&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;parent&quot;:&quot;62c89ec612800696&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;arg0&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:0}]}]}`,
+          )
+        "
+        >Load</n-button
+      >
+    </n-flex>
+  </n-flex>
 </template>
 
 <style scoped></style>

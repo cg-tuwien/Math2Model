@@ -7,6 +7,7 @@ import {
   reteSocket,
   VPNode,
 } from "@/vpnodes/basic/nodes";
+import type { SerializedNode } from "@/vpnodes/serialization/node";
 
 export class VectorNode extends VPNode {
   private xControl: ClassicPreset.InputControl<"number", number>;
@@ -129,6 +130,67 @@ export class VectorNode extends VPNode {
       value: vecResult,
     };
   }
+
+  serialize(sn: SerializedNode) {
+    sn.nodeType = "Vector";
+    if (this.hasControl("x")) {
+      sn.inputs = [
+        { type: "number", value: this.xControl.value ?? 0, key: "x" },
+      ];
+    } else {
+      sn.inputs = [];
+    }
+
+    if (this.hasControl("y")) {
+      sn.inputs.push({
+        type: "number",
+        value: this.yControl.value ?? 0,
+        key: "y",
+      });
+    }
+    if (this.hasControl("z")) {
+      sn.inputs.push({
+        type: "number",
+        value: this.zControl.value ?? 0,
+        key: "z",
+      });
+    }
+    if (this.hasControl("w")) {
+      sn.inputs.push({
+        type: "number",
+        value: this.wControl.value ?? 0,
+        key: "w",
+      });
+    }
+
+    sn.extraNumberInformation = [{ key: "n", value: this.n }];
+
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    for (let info of sn.inputs) {
+      if (info.type === "number" && info.key === "x")
+        this.xControl.value = info.value;
+      if (info.type === "number" && info.key === "y")
+        this.yControl.value = info.value;
+      if (info.type === "number" && info.key === "z")
+        this.zControl.value = info.value;
+      if (info.type === "number" && info.key === "w")
+        this.wControl.value = info.value;
+    }
+
+    if (sn.extraNumberInformation) {
+      for (let info of sn.extraNumberInformation) {
+        if (info.key === "n") {
+          this.n = info.value as 2 | 3 | 4;
+          this.label = "Vector" + info.value.toString();
+        }
+      }
+    }
+
+    super.deserialize(sn);
+  }
 }
 
 export class SeparateNode extends VPNode {
@@ -214,6 +276,11 @@ export class SeparateNode extends VPNode {
 
     return result;
   }
+
+  serialize(sn: SerializedNode): SerializedNode {
+    sn.nodeType = "Separate";
+    return super.serialize(sn);
+  }
 }
 
 export class JoinNode extends VPNode {
@@ -286,5 +353,10 @@ export class JoinNode extends VPNode {
     result.value.code += ");";
 
     return result;
+  }
+
+  serialize(sn: SerializedNode): SerializedNode {
+    sn.nodeType = "Join";
+    return super.serialize(sn);
   }
 }

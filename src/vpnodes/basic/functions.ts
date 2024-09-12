@@ -1,11 +1,9 @@
 import {
   idToVariableName,
-  InitializeNode,
   NodeReturn,
   nodeToVariableDeclaration,
   reteSocket,
   ReturnNode,
-  VariableInNode,
   VariableOutNode,
   VPNode,
 } from "@/vpnodes/basic/nodes";
@@ -23,12 +21,13 @@ import {
 import { BlockNode } from "@/vpnodes/basic/logic";
 import type { Nodes } from "@/components/visual-programming/CodeGraph.vue";
 import { vec2, vec3, vec4 } from "webgpu-matrix";
+import { type SerializedNode } from "@/vpnodes/serialization/node";
 
 export class FunctionScopeNode extends BlockNode {
   public retNode: ReturnNode = new ReturnNode(0);
   public paramNodes: VariableOutNode[] = [];
   constructor(
-    name: string,
+    private name: string,
     private update?: (node: ClassicPreset.Node) => void,
   ) {
     super(name);
@@ -59,6 +58,24 @@ export class FunctionScopeNode extends BlockNode {
     result.value.refId = reference[0].refId ?? "";
 
     return result;
+  }
+
+  serialize(sn: SerializedNode): SerializedNode {
+    sn.nodeType = "FunctionScope";
+    sn.extraStringInformation = [{ key: "name", value: this.name }];
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    if (sn.extraStringInformation) {
+      for (let info of sn.extraStringInformation) {
+        if (info.key === "name") {
+          this.name = info.value;
+          this.label = this.name;
+        }
+      }
+    }
+    super.deserialize(sn);
   }
 }
 
@@ -195,6 +212,46 @@ export class CustomFunctionNode extends VPNode {
 
     return result;
   }
+
+  serialize(sn: SerializedNode): SerializedNode {
+    sn.nodeType = "CustomFunction";
+
+    sn.inputs = [
+      { key: "name", value: this.nameControl.value ?? "", type: "text" },
+      { key: "n", value: this.nControl.value ?? 0, type: "number" },
+      { key: "ret", value: this.retControl.selected ?? "i32", type: "text" },
+    ];
+
+    for (let i = 0; i < 9; i++) {
+      sn.inputs.push({
+        key: "arg" + i.toString(),
+        value: this.paramControls[i].cont.selected ?? "i32",
+        type: "text",
+      });
+    }
+
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    for (let info of sn.inputs) {
+      if (info.type === "text" && info.key === "name") {
+        this.nameControl.value = info.value;
+        this.label = info.value;
+      }
+      if (info.type === "number" && info.key === "n")
+        this.nControl.value = info.value;
+      if (info.type === "text" && info.key === "ret")
+        this.retControl.selected = info.value;
+    }
+
+    for (let i = 0; i < 9; i++) {
+      const inp = sn.getTextOrNumberInput(this.paramControls[i].key);
+      this.paramControls[i].cont.selected = inp ? inp.value.toString() : "i32";
+    }
+
+    super.deserialize(sn);
+  }
 }
 
 export class CallCustomFunctionNode extends VPNode {
@@ -291,6 +348,27 @@ export class CallCustomFunctionNode extends VPNode {
     result.value.code += ");";
 
     return result;
+  }
+
+  serialize(sn: SerializedNode): SerializedNode {
+    sn.nodeType = "CallCustomFunction";
+
+    sn.inputs = [
+      { key: "function", value: this.funcControl.selected ?? "", type: "text" },
+      { key: "argN", value: this.argN, type: "number" },
+    ];
+
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    for (let info of sn.inputs) {
+      if (info.type === "text" && info.key === "function")
+        this.funcControl.selected = info.value;
+      if (info.type === "number" && info.key === "argN") this.argN = info.value;
+    }
+
+    super.deserialize(sn);
   }
 }
 

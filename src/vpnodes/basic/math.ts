@@ -8,6 +8,7 @@ import {
   reteSocket,
   VPNode,
 } from "@/vpnodes/basic/nodes";
+import { type SerializedNode } from "@/vpnodes/serialization/node";
 
 export class NumberNode extends VPNode {
   private valueControl: ClassicPreset.InputControl<"number", number>;
@@ -52,6 +53,28 @@ export class NumberNode extends VPNode {
     if (this.update) this.update(this);
 
     return result;
+  }
+
+  serialize(sn: SerializedNode): SerializedNode {
+    sn.nodeType = "Number";
+    const control: ClassicPreset.InputControl<"number", number> | null = this
+      .valueIn.control as ClassicPreset.InputControl<"number", number>;
+
+    if (control) {
+      sn.inputs = [{ type: "number", value: control.value ?? 0, key: "value" }];
+    }
+
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    for (let input of sn.inputs) {
+      if (input.type === "number" && input.key === "value") {
+        this.valueControl.value = input.value;
+      }
+    }
+
+    super.deserialize(sn);
   }
 }
 
@@ -166,5 +189,46 @@ export class MathOpNode extends VPNode {
         refId: idToVariableName(this.id),
       },
     };
+  }
+
+  serialize(sn: SerializedNode): SerializedNode {
+    sn.nodeType = "Math";
+
+    if (this.hasControl("left")) {
+      sn.inputs.push({
+        type: "number",
+        value: this.leftControl.value ?? 0,
+        key: "left",
+      });
+    }
+    if (this.hasControl("right")) {
+      sn.inputs.push({
+        type: "number",
+        value: this.rightControl.value ?? 0,
+        key: "right",
+      });
+    }
+
+    sn.extraStringInformation = [{ key: "op", value: this.operator }];
+
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    for (let info of sn.inputs) {
+      if (info.type === "number" && info.key === "left")
+        this.leftControl.value = info.value;
+      if (info.type === "number" && info.key === "right")
+        this.rightControl.value = info.value;
+    }
+
+    if (sn.extraStringInformation) {
+      for (let info of sn.extraStringInformation) {
+        if (info.key === "op")
+          this.operator = info.value as "+" | "-" | "/" | "*" | "%";
+      }
+    }
+
+    super.deserialize(sn);
   }
 }

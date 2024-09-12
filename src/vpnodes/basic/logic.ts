@@ -1,25 +1,13 @@
-﻿import { ClassicPreset, type NodeEditor } from "rete";
+﻿import { ClassicPreset } from "rete";
 import {
   VPNode,
-  idToVariableName,
   NodeReturn,
-  nodeToVariableDeclaration,
   reteSocket,
   VariableInNode,
   VariableOutNode,
 } from "@/vpnodes/basic/nodes";
 import { type Nodes } from "@/components/visual-programming/CodeGraph.vue";
-import { ref } from "vue";
-import { DropdownControl } from "@/vpnodes/controls/dropdown";
-import {
-  addCustomFunction,
-  customFunctions,
-  getCustomFunction,
-  getCustomFunctionOptions,
-  removeCustomFunction,
-  subscribe,
-  typeOptions,
-} from "@/vpnodes/controls/dropdown-options";
+import { type SerializedNode } from "@/vpnodes/serialization/node";
 
 function applyLogic(
   left: any,
@@ -48,7 +36,7 @@ export class LogicScopeNode extends BlockNode {
   private varOutNode: VariableOutNode = new VariableOutNode(0, "");
   private varInNode: VariableInNode = new VariableInNode("");
   constructor(
-    name: string,
+    private name: string,
     private update?: (node: ClassicPreset.Node) => void,
     private addNode?: (node: Nodes) => void,
     private removeNode?: (node: Nodes) => void,
@@ -118,11 +106,30 @@ export class LogicScopeNode extends BlockNode {
 
     return result;
   }
+
+  serialize(sn: SerializedNode): SerializedNode {
+    sn.nodeType = "LogicScope";
+    sn.extraStringInformation = [{ key: "name", value: this.name }];
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    if (sn.extraStringInformation) {
+      for (let info of sn.extraStringInformation) {
+        if (info.key === "name") {
+          this.name = info.value;
+          this.label = info.value;
+        }
+      }
+    }
+
+    super.deserialize(sn);
+  }
 }
 
 export class ConditionNode extends VPNode {
   constructor(
-    name: string,
+    private name: string,
     private operator: "==" | "!=" | ">" | "<" | ">=" | "<=",
   ) {
     super(name);
@@ -160,5 +167,32 @@ export class ConditionNode extends VPNode {
         code: `else {`,
       },
     };
+  }
+
+  serialize(sn: SerializedNode): SerializedNode {
+    sn.nodeType = "Condition";
+
+    sn.extraStringInformation = [
+      { key: "name", value: this.name },
+      { key: "op", value: this.operator },
+    ];
+
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    if (sn.extraStringInformation) {
+      for (let info of sn.extraStringInformation) {
+        if (info.key === "name") {
+          this.name = info.value;
+          this.label = info.value;
+        }
+        if (info.key === "op") {
+          this.operator = info.value as "==" | ">=" | "<=" | ">" | "<" | "!=";
+        }
+      }
+    }
+
+    super.deserialize(sn);
   }
 }

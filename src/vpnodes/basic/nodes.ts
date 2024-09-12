@@ -1,9 +1,6 @@
 import { ClassicPreset } from "rete";
-import type { Vec2 } from "webgpu-matrix/dist/1.x/vec2";
-import { vec2, vec3, vec4 } from "webgpu-matrix";
-import type { Vec3 } from "webgpu-matrix/dist/1.x/vec3";
 import { Area, AreaPlugin } from "rete-area-plugin";
-import { type Nodes } from "../../components/visual-programming/CodeGraph.vue";
+import { type SerializedNode } from "@/vpnodes/serialization/node";
 
 export const reteSocket = new ClassicPreset.Socket("socket");
 
@@ -57,6 +54,11 @@ export class NothingNode extends ClassicPreset.Node {
   }
 
   updateSize(area?: AreaPlugin<any, any>) {}
+  serialize(sn: SerializedNode) {
+    return sn;
+  }
+
+  deserialize(sn: SerializedNode) {}
 }
 
 export class VPNode extends ClassicPreset.Node {
@@ -79,6 +81,15 @@ export class VPNode extends ClassicPreset.Node {
         Object.keys(this.controls).length;
     if (area) area.update("node", this.id);
   }
+
+  serialize(sn: SerializedNode) {
+    sn.size = [this.width, this.height];
+    sn.parent = this.parent;
+    sn.uuid = this.id;
+    return sn;
+  }
+
+  deserialize(sn: SerializedNode) {}
 }
 
 export class NodeReturn {
@@ -119,6 +130,11 @@ export class ReturnNode extends VPNode {
 
     return result;
   }
+
+  serialize(sn: SerializedNode) {
+    sn.nodeType = "Return";
+    return super.serialize(sn);
+  }
 }
 
 export class VariableOutNode extends VPNode {
@@ -141,6 +157,33 @@ export class VariableOutNode extends VPNode {
       },
     };
   }
+
+  serialize(sn: SerializedNode) {
+    sn.nodeType = "VariableOut";
+    sn.extraNumberInformation = [{ key: "value", value: this.value }];
+    sn.extraStringInformation = [{ key: "code", value: this.code }];
+    if (this.ref)
+      sn.extraStringInformation.push({ key: "ref", value: this.ref });
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    if (sn.extraNumberInformation) {
+      for (let info of sn.extraNumberInformation) {
+        if (info.key === "value") this.value = info.value;
+      }
+    }
+    if (sn.extraStringInformation) {
+      for (let info of sn.extraStringInformation) {
+        if (info.key === "code") this.code = info.value;
+        if (info.key === "ref") {
+          this.ref = info.value;
+          this.label = info.value;
+        }
+      }
+    }
+    super.deserialize(sn);
+  }
 }
 
 export class VariableInNode extends VPNode {
@@ -160,6 +203,21 @@ export class VariableInNode extends VPNode {
         refId: this.ref,
       },
     };
+  }
+
+  serialize(sn: SerializedNode) {
+    sn.nodeType = "VariableIn";
+    sn.extraStringInformation = [{ key: "ref", value: this.ref }];
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    if (sn.extraStringInformation) {
+      for (let info of sn.extraStringInformation) {
+        if (info.key === "ref") this.ref = info.value;
+      }
+    }
+    super.deserialize(sn);
   }
 }
 
@@ -231,6 +289,56 @@ export class FunctionCallNode extends VPNode {
 
     return result;
   }
+
+  serialize(sn: SerializedNode) {
+    sn.nodeType = "FunctionCall";
+    sn.extraStringInformation = [
+      { key: "function", value: this.functionName ?? "" },
+    ];
+    sn.extraNumberInformation = [
+      { key: "nParams", value: this.numParams ?? 0 },
+    ];
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    if (sn.extraNumberInformation) {
+      for (let info of sn.extraNumberInformation) {
+        if (info.key === "nParams") {
+          if (info.value === 0) {
+            this.numParams = 0;
+          } else if (info.value === 1) {
+            this.numParams = 1;
+          } else if (info.value === 2) {
+            this.numParams = 2;
+          } else if (info.value === 3) {
+            this.numParams = 3;
+          } else if (info.value === 4) {
+            this.numParams = 4;
+          } else {
+            this.numParams = undefined;
+          }
+        }
+      }
+    }
+    if (sn.extraStringInformation) {
+      for (let info of sn.extraStringInformation) {
+        if (info.key === "function") {
+          this.functionName = info.value;
+          this.label = info.value;
+
+          if (this.hasControl("functionName")) {
+            this.removeControl("functionName");
+          }
+
+          if (this.hasControl("numParams")) {
+            this.removeControl("numParams");
+          }
+        }
+      }
+    }
+    super.deserialize(sn);
+  }
 }
 
 export class InitializeNode extends VPNode {
@@ -256,5 +364,33 @@ export class InitializeNode extends VPNode {
         refId: idToVariableName(this.id),
       },
     };
+  }
+
+  serialize(sn: SerializedNode) {
+    sn.nodeType = "Initialize";
+    const valueCont: ClassicPreset.InputControl<"text", string> = this.controls
+      .value as ClassicPreset.InputControl<"text", string>;
+    sn.inputs = [
+      {
+        type: "text",
+        value: valueCont
+          ? valueCont.value ?? "vec3f(0, 0, 0)"
+          : "vec3f(0, 0, 0)",
+        key: "value",
+      },
+    ];
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    const valueCont: ClassicPreset.InputControl<"text", string> = this.controls
+      .value as ClassicPreset.InputControl<"text", string>;
+    if (valueCont && sn.inputs) {
+      for (let info of sn.inputs) {
+        if (info.type === "text" && info.key === "value")
+          valueCont.setValue(info.value);
+      }
+    }
+    super.deserialize(sn);
   }
 }
