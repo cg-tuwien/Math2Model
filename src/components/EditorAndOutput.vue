@@ -2,25 +2,12 @@
 import CodeEditor, { type KeyedCode } from "@/components/CodeEditor.vue";
 import IconFolderMultipleOutline from "~icons/mdi/folder-multiple-outline";
 import IconFileTreeOutline from "~icons/mdi/file-tree-outline";
-import {
-  ref,
-  shallowRef,
-  watch,
-  watchEffect,
-  onUnmounted,
-  computed,
-  h,
-  type Ref,
-  reactive,
-  type WatchStopHandle,
-} from "vue";
+import { ref, watchEffect, computed, h } from "vue";
 import { useDebounceFn, watchImmediate } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import {
   ReactiveFilesystem,
-  asyncComputed,
   makeFilePath,
-  type AsyncComputed,
   type FilePath,
 } from "@/filesystem/reactive-files";
 import { showError, showFileError } from "@/notification";
@@ -39,7 +26,6 @@ import {
 import type { WgpuEngine } from "@/engine/wgpu-engine";
 import HeartSphereCode from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
 import DefaultShaderCode from "@/../parametric-renderer-core/shaders/DefaultParametric.wgsl?raw";
-import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import type { ObjectUpdate } from "./input/object-update";
 import WebGpu from "@/components/WebGpu.vue";
 import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
@@ -55,12 +41,16 @@ const props = defineProps<{
 const store = useStore();
 
 // The underlying data
-const sceneFile = asyncComputed<string | null>(
-  async () => await props.fs.readTextFile(SceneFileName),
-  (error) => {
-    showFileError("Could not read scene file", SceneFileName, { error });
+const sceneFile = ref<string | null>(null);
+
+props.fs.watchFromStart((change) => {
+  if (change.key === SceneFileName) {
+    // Thread safety: Ordered reads are guaranteed by readTextFile.
+    props.fs.readTextFile(change.key)?.then((v) => {
+      sceneFile.value = v;
+    });
   }
-);
+});
 
 const scene = useVirtualScene();
 watchEffect(() => {
@@ -91,48 +81,36 @@ watchEffect(() => {
 
 {
   // Watch for shader file changes
-  let shaderFiles = new Map<FilePath, AsyncComputed<string>>();
-  watchEffect(() => {
-    let newFiles = new Map<FilePath, AsyncComputed<string>>();
-
-    for (let [key, _] of props.fs.files.value) {
-      if (!key.endsWith(".wgsl")) continue;
-      let oldFile = shaderFiles.get(key) ?? null;
-      if (oldFile) {
-        newFiles.set(key, oldFile);
-        shaderFiles.delete(key);
-      } else {
+  let shaderFiles = new Map<FilePath, Promise<string>>();
+  const readShaderAsync = (file: FilePath) => {
+    const promise = props.fs.readTextFile(file);
+    if (promise === null) return;
+    shaderFiles.set(file, promise);
+    promise.then((code) => {
+      if (shaderFiles.get(file) === promise) {
         props.engine.updateShader({
-          id: key,
-          label: key,
-          code: DefaultShaderCode,
+          id: file,
+          label: file,
+          code,
         });
-
-        const value = asyncComputed(
-          async () => {
-            const code = await props.fs.readTextFile(key);
-            if (code !== null) {
-              props.engine.updateShader({
-                id: key,
-                label: key,
-                code,
-              });
-            }
-            return code;
-          },
-          (error) => {
-            showError("Error reading shader file", { error });
-          }
-        );
-        newFiles.set(key, value);
       }
+    });
+  };
+  props.fs.watchFromStart((change) => {
+    if (!change.key.endsWith(".wgsl")) return;
+    if (change.type === "insert") {
+      props.engine.updateShader({
+        id: change.key,
+        label: change.key,
+        code: DefaultShaderCode,
+      });
+      readShaderAsync(change.key);
+    } else if (change.type === "update") {
+      readShaderAsync(change.key);
+    } else if (change.type === "remove") {
+      shaderFiles.delete(change.key);
+      props.engine.removeShader(change.key);
     }
-    for (let [key, value] of shaderFiles) {
-      value.stop();
-      props.engine.removeShader(key);
-    }
-
-    shaderFiles = newFiles;
   });
 }
 
@@ -159,25 +137,6 @@ watchEffect(() => {
     return model;
   });
   props.engine.updateModels(models);
-});
-
-const shadersDropdown = computed<SelectMixedOption[]>(() => {
-  return [...props.fs.files.value.keys()]
-    .filter((fileName) => fileName.endsWith(".wgsl"))
-    .toSorted()
-    .map(
-      (fileName): SelectMixedOption => ({
-        label: fileName.substring(
-          0,
-          fileName.valueOf().length - ".wgsl".length
-        ),
-        value: fileName,
-      })
-    )
-    .concat({
-      label: "New Shader...",
-      value: undefined,
-    });
 });
 
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
@@ -400,10 +359,7 @@ function removeModel(ids: string[]) {
           <div v-else-if="tabs.selectedTab.value === 'sceneview'">
             <SceneHierarchy
               :models="scene.state.value.models"
-              :scene="scene.api.value"
-              :files="props.fs"
-              :scene-path="SceneFileName"
-              :shaders="shadersDropdown"
+              :fs="props.fs"
               @update="(keys, update) => updateModels(keys, update)"
               @addModel="
                 (modelName, shaderName) => addModel(modelName, shaderName)

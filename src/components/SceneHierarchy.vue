@@ -11,7 +11,11 @@ import VectorInput from "@/components/input/VectorInput.vue";
 import EulerInput from "@/components/input/EulerInput.vue";
 import { showError } from "@/notification";
 import { commonModelState } from "@/scenes/aggregrate-model-state";
-import { type FilePath, makeFilePath } from "@/filesystem/reactive-files";
+import {
+  type FilePath,
+  makeFilePath,
+  ReactiveFilesystem,
+} from "@/filesystem/reactive-files";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import {
   NodeTreeHelper,
@@ -23,24 +27,16 @@ import {
 } from "./node-tree/NodeTreeHelper";
 import { ObjectUpdate, type ObjectPathPart } from "./input/object-update";
 
-const emit = defineEmits({
-  update(ids: string[], update: ObjectUpdate) {
-    return true;
-  },
-  addModel(modelName: string, shaderName: string) {
-    return true;
-  },
-  removeModel(ids: string[]) {
-    return true;
-  },
-  select(vertex: FilePath) {
-    return true;
-  },
-});
-
 const props = defineProps<{
   models: DeepReadonly<VirtualModelState>[];
-  shaders: SelectMixedOption[];
+  fs: ReactiveFilesystem;
+}>();
+
+const emit = defineEmits<{
+  update: [ids: string[], update: ObjectUpdate];
+  addModel: [modelName: string, shaderName: string];
+  removeModel: [ids: string[]];
+  select: [vertex: FilePath];
 }>();
 
 const pattern = ref("");
@@ -164,9 +160,37 @@ function eulerAnglesUpdate(value: ObjectUpdate<number>) {
   );
 }
 
+const fileNames = ref(new Set<FilePath>());
+props.fs.watchFromStart((change) => {
+  if (!change.key.endsWith(".wgsl")) return;
+  if (change.type === "insert") {
+    fileNames.value.add(change.key);
+  } else if (change.type === "remove") {
+    fileNames.value.delete(change.key);
+  }
+});
+
+const shadersDropdown = computed<SelectMixedOption[]>(() => {
+  return [...fileNames.value]
+    .toSorted()
+    .map(
+      (fileName): SelectMixedOption => ({
+        label: fileName.substring(
+          0,
+          fileName.valueOf().length - ".wgsl".length
+        ),
+        value: fileName,
+      })
+    )
+    .concat({
+      label: "New Shader...",
+      value: undefined,
+    });
+});
+
 function startAddModel() {
-  if (props.shaders.length > 0) {
-    const filePath = props.shaders[0].value as FilePath;
+  if (shadersDropdown.value.length > 0) {
+    const filePath = shadersDropdown.value[0].value as FilePath;
     toAddModel.value = ["New Model", filePath ?? makeFilePath("new-shader")];
   } else {
     toAddModel.value = ["New Model", makeFilePath("new-shader")];
@@ -292,9 +316,11 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
           <n-text>Parametric Function</n-text>
           <n-select
             placeholder="Select a shader for the model"
-            :options="props.shaders"
+            :options="shadersDropdown"
             :value="currentModel.code"
-            @update="(v) => change('code', new ObjectUpdate([], () => v + ''))"
+            @update="
+              (v: string) => change('code', new ObjectUpdate([], () => v + ''))
+            "
           ></n-select>
           <n-text>Material</n-text>
           <n-text>Color</n-text>
@@ -339,7 +365,7 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
         <n-text>Shader</n-text>
         <n-select
           placeholder="Select a shader for the model"
-          :options="props.shaders"
+          :options="shadersDropdown"
           v-model:value="toAddModel[1]"
         ></n-select>
         <n-input

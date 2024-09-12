@@ -1,15 +1,5 @@
-import { showError } from "@/notification";
-import { computedAsync } from "@vueuse/core";
-import {
-  reactive,
-  computed,
-  type Ref,
-  type MaybeRefOrGetter,
-  toValue,
-  shallowRef,
-  watchEffect,
-  type WatchStopHandle,
-} from "vue";
+import { FineMap, type MapChange } from "@/fine-collections";
+import { type WatchStopHandle, type WatchOptions } from "vue";
 
 export interface ReadonlyFiles {
   listFiles(): FilePath[];
@@ -38,46 +28,33 @@ export class FileMetadata {
   }
 }
 
-export type AsyncComputed<T> = Readonly<
-  Ref<T | null> & { stop: WatchStopHandle }
->;
-
-// Basically https://github.com/vueuse/vueuse/blob/e71eb1e9818be73e179915c5efda4f37b8a460c9/packages/core/computedAsync/index.ts#L47
-// but it can be stopped
-export function asyncComputed<T>(
-  fn: () => Promise<T>,
-  onError: (error: any) => void
-): AsyncComputed<T> {
-  const result = shallowRef<T | null>(null);
-  let counter = 0;
-  let stop = watchEffect(async () => {
-    counter += 1;
-    const expectedCounter = counter;
-    fn().then(
-      (value) => {
-        if (counter === expectedCounter) {
-          result.value = value;
-        }
-      },
-      (error) => {
-        onError(error);
-      }
-    );
-  });
-  (result as any).stop = stop;
-  return result as any as AsyncComputed<T>;
-}
-
 export class ReactiveFilesystem implements WritableFiles {
-  private _files: Map<FilePath, FileMetadata> = reactive(new Map());
+  private _files: FineMap<FilePath, FileMetadata> = new FineMap();
   private taskQueue: Promise<void> = Promise.resolve();
-  private _filesReadonly = computed(
-    () => this._files as ReadonlyMap<FilePath, FileMetadata>
-  );
+
   private constructor(public readonly name: FilePath) {}
 
-  get files() {
-    return this._filesReadonly;
+  /**
+   * Watches all changes to the files in the filesystem.
+   */
+  watch(
+    callback: (change: MapChange<FilePath, FileMetadata>) => void,
+    options: WatchOptions<boolean> = {}
+  ): WatchStopHandle {
+    return this._files.watch(callback, options);
+  }
+
+  /**
+   * Starts from an empty filesystem and watches all changes to the files in the filesystem.
+   */
+  watchFromStart(
+    callback: (change: MapChange<FilePath, FileMetadata>) => void,
+    options: WatchOptions<boolean> = {}
+  ): WatchStopHandle {
+    for (const [key, value] of this._files.entries()) {
+      callback({ type: "insert", key, value });
+    }
+    return this._files.watch(callback, options);
   }
 
   static async create(name: FilePath): Promise<ReactiveFilesystem> {
@@ -184,7 +161,8 @@ export class ReactiveFilesystem implements WritableFiles {
   }
 
   /**
-   * Synchronously accesses the file metadata. Thus, is will be tracked in a reactive context.
+   * Guarantees ordering of reads and writes.
+   * If multiple reads are requested, they will resolve in the order they were requested.
    */
   readTextFile(name: FilePath): Promise<string> | null {
     if (!this._files.has(name)) return null;

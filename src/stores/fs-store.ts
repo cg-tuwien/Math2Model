@@ -1,6 +1,5 @@
-import { computed, readonly, ref } from "vue";
+import { computed, ref } from "vue";
 import { acceptHMRUpdate, defineStore } from "pinia";
-import { useDark } from "@vueuse/core";
 import {
   makeFilePath,
   type ReactiveFilesystem,
@@ -92,7 +91,7 @@ export const useFsStore = defineStore("fs-store", () => {
 
   function hasProject(): Promise<boolean> {
     return filesystemCommands.add((sceneFiles) =>
-      Promise.resolve(sceneFiles.files.value.has(SceneFileName))
+      Promise.resolve(sceneFiles.hasFile(SceneFileName))
     );
   }
 

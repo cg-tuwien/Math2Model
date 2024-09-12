@@ -10,14 +10,13 @@ use crate::{
 };
 
 use super::{wgpu_context::WgpuContext, ShaderId, MAX_PATCH_COUNT, PATCH_SIZES};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use glam::{Mat4, Vec3, Vec4};
-use slotmap::{DefaultKey, SlotMap};
 
 pub struct ShaderArena {
-    shader_keys: HashMap<ShaderId, DefaultKey>,
-    shaders: SlotMap<DefaultKey, ShaderPipelines>,
+    shader_keys: HashMap<ShaderId, Arc<ShaderPipelines>>,
+    missing_shader: Arc<ShaderPipelines>,
 }
 
 pub struct ShaderPipelines {
@@ -27,67 +26,47 @@ pub struct ShaderPipelines {
     pub render: wgpu::RenderPipeline,
 }
 
-impl ShaderArena {
-    pub fn new() -> Self {
-        Self {
-            shader_keys: HashMap::new(),
-            shaders: SlotMap::new(),
-        }
-    }
-
-    pub fn get_shader(&self, key: DefaultKey) -> &ShaderPipelines {
-        &self.shaders[key]
-    }
-
-    pub fn get_shader_key(&self, key: &ShaderId) -> Option<DefaultKey> {
-        self.shader_keys.get(key).copied()
-    }
-
-    /// Gets a shader key if it exists, otherwise creates a new shader key with an empty shader.
-    pub fn get_or_create_shader_key(
-        &mut self,
-        key: &ShaderId,
-        context: &WgpuContext,
-    ) -> DefaultKey {
-        self.get_shader_key(key)
-            .unwrap_or_else(|| self.set_shader(key.clone(), "Missing shader", "", context))
-    }
-
-    pub fn set_shader(
-        &mut self,
-        key: ShaderId,
-        label: &str,
-        code: &str,
-        context: &WgpuContext,
-    ) -> DefaultKey {
-        use std::collections::hash_map::Entry;
+impl ShaderPipelines {
+    pub fn new(label: &str, code: &str, context: &WgpuContext) -> Self {
         let compute_patches = create_compute_patches_pipeline(label, &context.device, code);
         let render = create_render_pipeline(label, context, code);
 
-        match self.shader_keys.entry(key) {
-            Entry::Occupied(v) => {
-                let key = *v.get();
-                *self.shaders.get_mut(key).unwrap() = ShaderPipelines {
-                    compute_patches,
-                    render,
-                };
-                key
-            }
-            Entry::Vacant(v) => {
-                let key = self.shaders.insert(ShaderPipelines {
-                    compute_patches,
-                    render,
-                });
-                v.insert(key);
-                key
-            }
+        Self {
+            compute_patches,
+            render,
+        }
+    }
+}
+
+const MISSING_SHADER: &'static str = include_str!("../../../shaders/DefaultParametric.wgsl");
+
+impl ShaderArena {
+    pub fn new(context: &WgpuContext) -> Self {
+        Self {
+            shader_keys: HashMap::new(),
+            missing_shader: Arc::new(ShaderPipelines::new(
+                "Missing Shader",
+                MISSING_SHADER,
+                context,
+            )),
         }
     }
 
+    pub fn get_shader(&self, key: &ShaderId) -> Option<Arc<ShaderPipelines>> {
+        self.shader_keys.get(key).cloned()
+    }
+
+    pub fn get_missing_shader(&self) -> Arc<ShaderPipelines> {
+        self.missing_shader.clone()
+    }
+
+    pub fn add_shader(&mut self, key: ShaderId, label: &str, code: &str, context: &WgpuContext) {
+        let pipeline = ShaderPipelines::new(label, code, context);
+        self.shader_keys.insert(key, Arc::new(pipeline));
+    }
+
     pub fn remove_shader(&mut self, key: &ShaderId) {
-        if let Some(key) = self.shader_keys.remove(key) {
-            self.shaders.remove(key);
-        }
+        self.shader_keys.remove(key);
     }
 }
 
@@ -329,7 +308,7 @@ pub struct VirtualModel {
     pub copy_patches: CopyPatchesStep,
     pub render_step: RenderStep,
 
-    pub shaders_key: DefaultKey,
+    pub shader_key: ShaderId,
     pub transform: Transform,
     pub material_info: MaterialInfo,
 }
@@ -378,7 +357,7 @@ impl VirtualModel {
     pub fn new(
         context: &WgpuContext,
         meshes: &[Mesh],
-        shaders_key: DefaultKey,
+        shader_key: ShaderId,
     ) -> anyhow::Result<Self> {
         let compute_patches_step = ComputePatchesStep::new(&context.device)?;
         let copy_patches_step =
@@ -389,7 +368,7 @@ impl VirtualModel {
             compute_patches: compute_patches_step,
             copy_patches: copy_patches_step,
             render_step,
-            shaders_key,
+            shader_key,
             transform: Transform::default(),
             material_info: MaterialInfo::default(),
         })

@@ -165,7 +165,7 @@ impl CpuApplication {
         self.shaders.insert(shader_id.clone(), info);
         if let Some(gpu) = &mut self.gpu {
             let shader_info = self.shaders.get(&shader_id).unwrap();
-            gpu.shader_arena.set_shader(
+            gpu.shader_arena.add_shader(
                 shader_id,
                 &shader_info.label,
                 &shader_info.code,
@@ -298,7 +298,7 @@ impl GpuApplication {
             .collect::<Vec<_>>();
         assert!(meshes.len() == PATCH_SIZES.len());
 
-        let shader_arena = virtual_model::ShaderArena::new();
+        let shader_arena = virtual_model::ShaderArena::new(&context);
         let virtual_models = vec![];
 
         let render_buffer_reset = compute_patches::RenderBuffer {
@@ -510,7 +510,11 @@ impl GpuApplication {
                 .scope("Render", &mut command_encoder, &self.context.device);
 
         for model in self.virtual_models.iter() {
-            let shaders = self.shader_arena.get_shader(model.shaders_key);
+            let shaders = self
+                .shader_arena
+                .get_shader(&model.shader_key)
+                .unwrap_or_else(|| self.shader_arena.get_missing_shader());
+
             // Each round, we do a ping-pong and pong-ping
             // 2*4 rounds is enough to subdivide a 4k screen into 16x16 pixel patches
             let double_number_of_rounds = 4;
@@ -620,7 +624,10 @@ impl GpuApplication {
             },
         );
         for model in self.virtual_models.iter() {
-            let shaders = self.shader_arena.get_shader(model.shaders_key);
+            let shaders = self
+                .shader_arena
+                .get_shader(&model.shader_key)
+                .unwrap_or_else(|| self.shader_arena.get_missing_shader());
             {
                 render_pass.set_pipeline(&shaders.render);
                 let indirect_draw_offsets = [
@@ -679,7 +686,7 @@ impl GpuApplication {
 }
 
 fn update_virtual_models(
-    shader_arena: &mut virtual_model::ShaderArena,
+    _shader_arena: &mut virtual_model::ShaderArena,
     virtual_models: &mut Vec<VirtualModel>,
     models: &[ModelInfo],
     context: &WgpuContext,
@@ -689,19 +696,14 @@ fn update_virtual_models(
     for (virtual_model, model) in virtual_models.iter_mut().zip(models.iter()) {
         virtual_model.transform = model.transform.clone();
         virtual_model.material_info = model.material_info.clone();
-        virtual_model.shaders_key =
-            shader_arena.get_or_create_shader_key(&model.shader_id, context);
+        virtual_model.shader_key = model.shader_id.clone();
     }
     // Resize virtual models
     if virtual_models.len() > models.len() {
         virtual_models.truncate(models.len());
     } else if virtual_models.len() < models.len() {
         for model in models.iter().skip(virtual_models.len()) {
-            let mut virtual_model = VirtualModel::new(
-                context,
-                meshes,
-                shader_arena.get_or_create_shader_key(&model.shader_id, context),
-            )?;
+            let mut virtual_model = VirtualModel::new(context, meshes, model.shader_id.clone())?;
             virtual_model.transform = model.transform.clone();
             virtual_model.material_info = model.material_info.clone();
             virtual_models.push(virtual_model);
