@@ -7,7 +7,7 @@ export class DropdownControl extends ClassicPreset.Control {
     public selected?: string,
     public placeholder?: string,
     public label?: string,
-    public change?: (select: string) => void,
+    public change?: (select: string, label: string) => void,
   ) {
     super();
     if (!this.selected || this.selected === "")
@@ -15,7 +15,7 @@ export class DropdownControl extends ClassicPreset.Control {
     if (!this.placeholder) this.placeholder = "Please select one";
     if (!this.label) this.label = "";
     if (!this.change)
-      this.change = (s) => {
+      this.change = (s, l) => {
         return;
       };
   }

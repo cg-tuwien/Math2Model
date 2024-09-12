@@ -45,8 +45,8 @@ function applyLogic(
 export class BlockNode extends VPNode {}
 
 export class LogicScopeNode extends BlockNode {
-  private varOutNode?: VariableOutNode;
-  private varInNode?: VariableInNode;
+  private varOutNode: VariableOutNode = new VariableOutNode(0, "");
+  private varInNode: VariableInNode = new VariableInNode("");
   constructor(
     name: string,
     private update?: (node: ClassicPreset.Node) => void,
@@ -65,6 +65,9 @@ export class LogicScopeNode extends BlockNode {
       "value",
       new ClassicPreset.Output(reteSocket, "Outside Variable Result"),
     );
+
+    this.varOutNode.parent = this.id;
+    this.varInNode.parent = this.id;
   }
 
   data(input: { context: NodeReturn[]; reference: NodeReturn[] }): {
@@ -80,28 +83,31 @@ export class LogicScopeNode extends BlockNode {
     };
     if (!context) return result;
 
-    if (reference && this.addNode && !this.varOutNode && !this.varInNode) {
-      this.varOutNode = new VariableOutNode(
-        reference[0].value,
-        "",
-        reference[0].refId,
-      );
-      this.varInNode = new VariableInNode(reference[0].refId ?? "");
-
-      this.varOutNode.parent = this.id;
-      this.varInNode.parent = this.id;
+    if (
+      reference &&
+      this.addNode &&
+      this.varOutNode.ref === "" &&
+      this.varInNode.ref === ""
+    ) {
+      this.varOutNode.ref = reference[0].refId;
+      this.varOutNode.value = reference[0].value;
+      this.varInNode.ref = reference[0].refId ?? "";
 
       this.addNode(this.varOutNode);
       this.addNode(this.varInNode);
     }
 
     if (!reference) {
-      if (this.varOutNode && this.varInNode && this.removeNode) {
+      if (
+        this.varOutNode.ref !== "" &&
+        this.varInNode.ref !== "" &&
+        this.removeNode
+      ) {
         this.removeNode(this.varOutNode);
         this.removeNode(this.varInNode);
       }
-      this.varOutNode = undefined;
-      this.varInNode = undefined;
+      this.varOutNode.ref = "";
+      this.varInNode.ref = "";
       result.value.code = "}";
       return result;
     }

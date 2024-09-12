@@ -112,6 +112,22 @@ const arrange = new AutoArrangePlugin<Schemes>();
 
 let shouldUpdate = true;
 
+async function newFunctionNode(area: AreaPlugin<Schemes, AreaExtra>) {
+  shouldUpdate = false;
+  const cfn = new CustomFunctionNode(
+    (n) => area.update("node", n.id),
+    (n) => editor.addNode(n),
+    (n) => editor.removeNode(n.id),
+    (nA, kA, nB, kB) =>
+      editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB)),
+  );
+  await editor.addNode(cfn);
+  cfn.functionScope.retNode.parent = cfn.functionScope.id;
+  await editor.addNode(cfn.functionScope.retNode);
+  shouldUpdate = true;
+  return new NothingNode();
+}
+
 async function newConditionNode(
   scope1: string,
   scope2: string,
@@ -268,20 +284,11 @@ async function createEditor() {
       [
         "Custom",
         [
+          ["New Function", () => newFunctionNode(area)],
           [
-            "New Function",
-            () =>
-              new CustomFunctionNode(
-                (n) => area.update("node", n.id),
-                (n) => editor.addNode(n),
-                (n) => editor.removeNode(n.id),
-                (nA, kA, nB, kB) =>
-                  editor.addConnection(
-                    new ClassicPreset.Connection(nA, kA, nB, kB),
-                  ),
-              ),
+            "Call Custom Function",
+            () => new CallCustomFunctionNode((n) => area.update("node", n.id)),
           ],
-          ["Call Custom Function", () => new CallCustomFunctionNode()],
         ],
       ],
     ]),
@@ -437,7 +444,7 @@ async function getNodesCode(
       const scopeIncomers = graph.incomers(content.id).nodes();
       let incomersCode = "";
       if (scopeIncomers.length > 0) {
-        incomersCode += await orderedCode(scopeIncomers, visited);
+        incomersCode += await orderedCode(scopeIncomers, visited, indent);
       }
       fullCode += incomersCode;
     }
@@ -448,7 +455,7 @@ async function getNodesCode(
         .getNodes()
         .filter((n) => n.parent === content.id);
       if (scopeChildren.length > 0) {
-        trueCode += await getScopeCode(scopeChildren, visited);
+        trueCode += await getScopeCode(scopeChildren, visited, indent);
       }
 
       fullCode +=
@@ -467,7 +474,7 @@ async function getNodesCode(
         .getNodes()
         .filter((n) => n.parent === content.id);
       if (scopeChildren.length > 0) {
-        falseCode += await getScopeCode(scopeChildren, visited);
+        falseCode += await getScopeCode(scopeChildren, visited, indent);
       }
 
       fullCode +=
@@ -475,7 +482,7 @@ async function getNodesCode(
         nodeData.false.code +
         "\n" +
         falseCode +
-        (await getNodesCode(content, visited, graph));
+        (await getNodesCode(content, visited, graph, indent));
     }
   } else if (node instanceof CustomFunctionNode) {
     let scopeCode = "";
@@ -488,23 +495,28 @@ async function getNodesCode(
         .getNodes()
         .filter((n) => n.parent === content.id);
       if (scopeChildren.length > 0) {
-        scopeCode += await getScopeCode(scopeChildren, visited);
+        scopeCode += await getScopeCode(scopeChildren, visited, indent);
       }
 
       fullCode +=
         scopeCode + (await getNodesCode(content, visited, graph, indent));
     }
   } else {
-    fullCode += indent + nodeData.value.code + "\n";
+    if (nodeData.value.code !== "")
+      fullCode += indent + nodeData.value.code + "\n";
   }
 
   return fullCode;
 }
 
-async function getScopeCode(scopeChildren: Nodes[], visited: string[]) {
+async function getScopeCode(
+  scopeChildren: Nodes[],
+  visited: string[],
+  prevIndent: string,
+) {
   if (scopeChildren.length <= 0) return;
 
-  return orderedCode(scopeChildren, visited, "\t\t");
+  return orderedCode(scopeChildren, visited, prevIndent + "\t");
 }
 
 async function logCode() {
@@ -552,7 +564,10 @@ async function orderedCode(
       continue;
     }
     const incomers = graph.incomers(node.id).nodes();
-    if (incomers.some((inc) => !visited.includes(inc.id))) {
+    if (
+      incomers.some((inc) => !visited.includes(inc.id)) ||
+      (node instanceof ReturnNode && nodeQueue.length > 0)
+    ) {
       nodeQueue.push(node);
       continue;
     }

@@ -123,9 +123,9 @@ export class ReturnNode extends VPNode {
 
 export class VariableOutNode extends VPNode {
   constructor(
-    private value: any,
+    public value: any,
     private code: any,
-    private ref?: string,
+    public ref?: string,
   ) {
     super(ref ?? "Variable");
 
@@ -144,7 +144,7 @@ export class VariableOutNode extends VPNode {
 }
 
 export class VariableInNode extends VPNode {
-  constructor(private ref: string) {
+  constructor(public ref: string) {
     super(ref);
 
     this.addInput("value", new ClassicPreset.Input(reteSocket, "set"));

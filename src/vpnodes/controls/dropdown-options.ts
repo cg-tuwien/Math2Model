@@ -14,7 +14,15 @@ export const customFunctions: { label: string; value: CustomFunctionNode }[] =
 
 const listeners: ((change: { label: string; value: string }[]) => void)[] = [];
 
+export function hasCustomFunction(func: CustomFunctionNode) {
+  for (let f of customFunctions) {
+    if (f.label === func.label) return true;
+  }
+  return false;
+}
+
 export function addCustomFunction(func: CustomFunctionNode) {
+  if (hasCustomFunction(func)) return;
   customFunctions.push({
     label: func.label,
     value: func,
@@ -44,6 +52,10 @@ export function getCustomFunctionOptions() {
   return customFunctions.map((f) => {
     return { label: f.label, value: f.label };
   });
+}
+
+export function notify() {
+  listeners.forEach((fn) => fn(getCustomFunctionOptions()));
 }
 
 export function subscribe(
