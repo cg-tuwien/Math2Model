@@ -78,6 +78,8 @@ const openFile = useOpenFile(
 
 const canvasContainer = ref<HTMLDivElement | null>(null);
 
+const graphRef = ref();
+
 // Attach the canvas to the DOM
 watchEffect(() => {
   canvasContainer.value?.appendChild(props.canvas);
@@ -158,6 +160,21 @@ const shadersDropdown = computed<SelectMixedOption[]>(() => {
       label: "New Shader...",
       value: undefined,
     });
+});
+
+const graphsDropdown = computed<SelectMixedOption[]>(() => {
+  return [...props.fs.files.value.keys()]
+    .toSorted()
+    .filter((fileName) => fileName.endsWith(".graph"))
+    .map(
+      (fileName): SelectMixedOption => ({
+        label: fileName.substring(
+          0,
+          fileName.valueOf().length - ".graph".length,
+        ),
+        value: fileName,
+      }),
+    );
 });
 
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
@@ -337,6 +354,20 @@ function removeModel(ids: string[]) {
 
   saveScene();
 }
+
+function replaceOrAddGraph(filePath: FilePath, add: boolean) {
+  console.log(`replaceOrAddGraph(${filePath}, ${add});`);
+  props.fs
+    .readTextFile(filePath)
+    ?.then((content) =>
+      graphRef.value.replaceOrAddDeserialize(
+        filePath.replace(".graph", ""),
+        content,
+        add,
+      ),
+    )
+    .catch((reason) => showError("Could not load graph " + filePath, reason));
+}
 </script>
 
 <template>
@@ -419,13 +450,15 @@ function removeModel(ids: string[]) {
           </CodeEditor>
           <CodeGraph
             v-if="props.visual"
-            style="width: 500px; height: 1000px"
+            :graphs="graphsDropdown"
             @update="openFile.setNewCode($event)"
             @save="
               (fileName, content) => {
                 props.fs.writeTextFile(fileName, content);
               }
             "
+            @load="(fileName, add) => replaceOrAddGraph(fileName, add)"
+            ref="graphRef"
           ></CodeGraph>
         </div>
       </template>

@@ -56,12 +56,22 @@ import {
 import { graphFromJSON, SerializedGraph } from "@/vpnodes/serialization/graph";
 import { SerializedNode, toSerializedNode } from "@/vpnodes/serialization/node";
 import { type FilePath, makeFilePath } from "@/filesystem/reactive-files";
+import type { VirtualModelState } from "@/scenes/scene-state";
+import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 
 const emit = defineEmits<{
   update: [code: () => string];
   save: [fileName: FilePath, content: string];
-  load: [fileName: () => FilePath];
+  load: [fileName: FilePath, add: boolean];
 }>();
+
+const props = defineProps<{
+  graphs: SelectMixedOption[];
+}>();
+
+defineExpose({
+  replaceOrAddDeserialize,
+});
 
 const container = ref<HTMLElement | null>(null);
 
@@ -118,8 +128,10 @@ const arrange = new AutoArrangePlugin<Schemes>();
 
 let shouldUpdate = true;
 
-let saving: boolean;
-let saveName = "";
+let saving = ref<boolean>(false);
+let loading = ref<boolean>(false);
+let saveName = ref<string>("new-graph");
+let loadName = ref<string>("no file selected");
 
 async function newFunctionNode(area: AreaPlugin<Schemes, AreaExtra>) {
   shouldUpdate = false;
@@ -554,26 +566,46 @@ async function serialize() {
     });
   }
 
-  emit("save", makeFilePath("graph.graph"), sg.toJSON());
+  emit("save", makeFilePath(`${saveName.value}.graph`), sg.toJSON());
 }
 
-async function deserialize(json: string) {
-  //await emptyGraph();
-  await editor.clear();
+async function replaceOrAddDeserialize(
+  name: string,
+  json: string,
+  add: boolean,
+) {
+  console.log(`replaceOrAddDeserialize(${name}, ${json}, ${add});`);
+  if (!add) {
+    await editor.clear();
+    await deserialize(json);
+  } else {
+    shouldUpdate = false;
+    const func = new CustomFunctionNode(
+      (n) => area.update("node", n.id),
+      (n) => editor.addNode(n),
+      (n) => editor.removeNode(n.id),
+      (nA, kA, nB, kB) =>
+        editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB)),
+    );
+    func.nameControl.setValue(name);
+    func.label = name;
+    await editor.addNode(func);
+    shouldUpdate = true;
+    await deserialize(json, func.functionScope.id);
+  }
+}
+
+async function deserialize(json: string, parent?: string) {
   shouldUpdate = false;
-  // editor.use(area);
-  // editor.use(engine);
   const sg = graphFromJSON(json);
 
   for (let snObj of sg.graph) {
     const sn = toSerializedNode(snObj);
     const node = serializedNodeToNode(sn);
     node.deserialize(sn);
+    node.parent = parent;
     await editor.addNode(node);
-    console.log("added " + node.id);
   }
-
-  console.log(engine.cache);
 
   for (let snObj of sg.graph) {
     const sn = toSerializedNode(snObj);
@@ -593,7 +625,6 @@ async function deserialize(json: string) {
 
   shouldUpdate = true;
   await arrange.layout();
-  console.log(engine.cache);
 }
 
 function serializedNodeToNode(sn: SerializedNode): Nodes {
@@ -655,18 +686,19 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
 </script>
 
 <template>
-  <n-modal :show="saving" :mask-closable="false">
+  <n-modal :show="saving || loading" :mask-closable="false">
     <n-card
       class="w-full sm:w-1/2 lg:w-1/3"
       title="Save Graph"
       closable
       @close="saving = false"
       v-on:pointerdown.stop=""
+      v-if="saving"
     >
       Please enter a file name to save the graph to.
       <template #action>
         <div class="flex justify-around">
-          <n-input :value="saveName"></n-input>
+          <n-input v-model:value="saveName"></n-input>
         </div>
         <div class="flex justify-around">
           <n-button
@@ -689,22 +721,63 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
         </div>
       </template>
     </n-card>
+    <n-card
+      class="w-full sm:w-1/2 lg:w-1/3"
+      title="Load Graph"
+      closable
+      @close="loading = false"
+      v-on:pointerdown.stop=""
+      v-if="loading"
+    >
+      <template #header-extra>
+        <n-p>Please select the graph file to load.</n-p>
+      </template>
+      <template #action>
+        <n-flex vertical>
+          <n-select v-model:value="loadName" :options="props.graphs"></n-select>
+          <div class="flex justify-around">
+            <n-button
+              type="primary"
+              @click="
+                emit('load', makeFilePath(loadName), false);
+                loading = false;
+              "
+              v-on:pointerdown.stop=""
+            >
+              Replace Graph
+            </n-button>
+            <n-button
+              type="primary"
+              @click="
+                emit('load', makeFilePath(loadName), true);
+                loading = false;
+              "
+              v-on:pointerdown.stop=""
+            >
+              Add to Graph
+            </n-button>
+          </div>
+        </n-flex>
+      </template>
+      <template #footer>
+        <n-text type="info" strong
+          >Note that adding the graph to this graph will create a Custom
+          Function Node containing the loaded graph. <br />Replacing the graph
+          will delete all nodes currently contained within this graph.</n-text
+        >
+      </template>
+    </n-card>
   </n-modal>
   <n-flex vertical style="width: 70%">
     <div class="rete" ref="container" style="width: 100%; height: 71%"></div>
     <n-flex
+      ><n-button @click="saving = true" v-on:pointerdown.stop="">Save </n-button
       ><n-button
         @click="
-          saving = true;
-          console.log(saving);
-        "
-        v-on:pointerdown.stop=""
-        >Save </n-button
-      ><n-button
-        @click="
-          deserialize(
-            `{&quot;graph&quot;:[{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;ffec57f1db36b382&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;input2&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:{&quot;0&quot;:1,&quot;1&quot;:1}}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;c813ab16c5471e3c&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var PI = 3.14159265359;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:3.14159265359}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;0ecbb9b9a229ce19&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var HALF_PI = 3.14159265359 / 2.0;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;HALF_PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:1.570796326795}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;4a065e8821ad82e0&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var TWO_PI = 3.14159265359 * 2.0;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;TWO_PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:6.28318530718}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;4e2cf9be57e0e973&quot;,&quot;inputs&quot;:[{&quot;key&quot;:&quot;def&quot;,&quot;value&quot;:&quot;vec3f(input2.x, 0, input2.y)&quot;,&quot;type&quot;:&quot;text&quot;}],&quot;nodeType&quot;:&quot;Return&quot;}]}`,
-          )
+          //deserialize(
+          //  `{&quot;graph&quot;:[{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;ffec57f1db36b382&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;input2&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:{&quot;0&quot;:1,&quot;1&quot;:1}}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;c813ab16c5471e3c&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var PI = 3.14159265359;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:3.14159265359}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;0ecbb9b9a229ce19&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var HALF_PI = 3.14159265359 / 2.0;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;HALF_PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:1.570796326795}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;4a065e8821ad82e0&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var TWO_PI = 3.14159265359 * 2.0;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;TWO_PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:6.28318530718}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;4e2cf9be57e0e973&quot;,&quot;inputs&quot;:[{&quot;key&quot;:&quot;def&quot;,&quot;value&quot;:&quot;vec3f(input2.x, 0, input2.y)&quot;,&quot;type&quot;:&quot;text&quot;}],&quot;nodeType&quot;:&quot;Return&quot;}]}`,
+          //);
+          loading = true
         "
         v-on:pointerdown.stop=""
         >Load</n-button
