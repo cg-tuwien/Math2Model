@@ -1,8 +1,5 @@
 import init, {
-  init_engine,
-  remove_shader,
-  update_models,
-  update_shader,
+  WasmApplication,
   type WasmModelInfo,
   type WasmShaderInfo,
 } from "../../parametric-renderer-core/pkg";
@@ -10,18 +7,19 @@ import init, {
 await init();
 
 export class WgpuEngine {
-  private constructor(private engine: void) {}
+  private constructor(private engine: WasmApplication) {}
   static async createEngine(canvasElement: HTMLCanvasElement) {
-    const engine = init_engine(canvasElement);
+    const engine = new WasmApplication();
+    await engine.run(canvasElement);
     return new WgpuEngine(engine);
   }
   updateModels(js_models: WasmModelInfo[]) {
-    update_models(js_models);
+    this.engine.update_models(js_models);
   }
   updateShader(shader_info: WasmShaderInfo) {
-    update_shader(shader_info);
+    this.engine.update_shader(shader_info);
   }
   removeShader(id: string) {
-    remove_shader(id);
+    this.engine.remove_shader(id);
   }
 }

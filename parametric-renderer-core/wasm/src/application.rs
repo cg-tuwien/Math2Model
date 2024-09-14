@@ -1,30 +1,29 @@
 use glam::{UVec2, Vec3};
 use renderer_core::{
-    application::{
-        CpuApplication, GpuApplication, ModelInfo, ShaderId, ShaderInfo, WindowOrFallback,
-    },
     camera::camera_controller::{self, CameraController},
+    game::{GameRes, ModelInfo, ShaderId, ShaderInfo, WindowOrFallback},
     input::{InputHandler, WindowInputs, WinitAppHelper},
 };
-use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tracing::{error, info, warn};
-use tsify_next::Tsify;
-use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::{prelude::wasm_bindgen, JsError};
 use web_sys::HtmlCanvasElement;
-use winit::{
-    application::ApplicationHandler, dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window,
+use winit::{application::ApplicationHandler, dpi::PhysicalSize, window::Window};
+
+use crate::wasm_abi::{
+    WasmCompilationResult, WasmCompilationResults, WasmModelInfo, WasmShaderInfo,
 };
-pub struct Application {
-    window: Option<Arc<Window>>,
-    app: CpuApplication,
-    /** For wasm32 */
-    _canvas: HtmlCanvasElement,
+
+#[wasm_bindgen]
+pub struct WasmApplication {
+    app: Arc<Mutex<GameRes>>,
 }
 
-impl Application {
-    pub fn new(canvas: HtmlCanvasElement) -> anyhow::Result<Self> {
-        let mut app = CpuApplication::new()?;
+#[wasm_bindgen]
+impl WasmApplication {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Result<WasmApplication, JsError> {
+        let mut app = GameRes::new(); //.map_err(|e| JsError::from(&*e))?;
         app.camera_controller = CameraController::new(
             camera_controller::GeneralController {
                 position: Vec3::new(0.0, 0.0, 4.0),
@@ -34,166 +33,120 @@ impl Application {
             app.camera_controller.settings,
             camera_controller::ChosenKind::Orbitcam,
         );
-
         Ok(Self {
+            app: Arc::new(Mutex::new(app)),
+        })
+    }
+
+    pub async fn run(&self, canvas: HtmlCanvasElement) -> Result<(), JsError> {
+        let event_loop = winit::event_loop::EventLoop::builder().build()?;
+        let application = Application::new(canvas, self.app.clone());
+        #[cfg(target_arch = "wasm32")]
+        {
+            use winit::platform::web::EventLoopExtWebSys;
+            event_loop.spawn_app(WinitAppHelper::new(application));
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            event_loop.run_app(&mut WinitAppHelper::new(application))?;
+        }
+        Ok(())
+    }
+
+    pub fn update_models(&self, js_models: Vec<WasmModelInfo>) {
+        let models = js_models
+            .into_iter()
+            .map(|v| ModelInfo {
+                transform: v.transform.into(),
+                material_info: v.material_info.into(),
+                shader_id: ShaderId(v.shader_id),
+            })
+            .collect();
+        let mut app = self.app.lock().unwrap();
+        app.update_models(models);
+    }
+
+    pub async fn update_shader(&self, shader_info: WasmShaderInfo) -> WasmCompilationResults {
+        let shader_id = ShaderId(shader_info.id);
+        let info = ShaderInfo {
+            label: shader_info.label,
+            code: shader_info.code,
+        };
+        {
+            self.app.lock().unwrap().set_shader(shader_id.clone(), info);
+        }
+
+        // OWO Am I not holding a mutex lock for way too long here?
+        let compilation_results =
+            { self.app.lock().unwrap().get_compilation_messages(shader_id) }.await;
+        let results = compilation_results
+            .into_iter()
+            .map(|(shader_id, messages)| WasmCompilationResult {
+                shader_id: shader_id.0,
+                messages: messages.into_iter().map(Into::into).collect(),
+            })
+            .collect();
+        WasmCompilationResults { results }
+    }
+
+    pub fn remove_shader(&self, id: String) {
+        self.app.lock().unwrap().remove_shader(&ShaderId(id));
+    }
+}
+
+/// For Winit
+pub struct Application {
+    window: Option<Arc<Window>>,
+    app: Arc<Mutex<GameRes>>,
+    /** For wasm32 */
+    _canvas: HtmlCanvasElement,
+}
+
+impl Application {
+    pub fn new(canvas: HtmlCanvasElement, app: Arc<Mutex<GameRes>>) -> Self {
+        Self {
             window: None,
             app,
             _canvas: canvas,
-        })
+        }
     }
 
     fn create_surface(&mut self, window: Window) {
         let window = Arc::new(window);
         self.window = Some(window.clone());
 
-        let gpu_builder = self.app.start_create_gpu(WindowOrFallback::Window(window));
+        let gpu_builder = {
+            self.app
+                .lock()
+                .unwrap()
+                .start_create_gpu(WindowOrFallback::Window(window))
+        };
 
+        let app = self.app.clone();
         let task = async move {
             let gpu_application = gpu_builder.create_surface().await.unwrap();
-            APP_COMMANDS.with(|commands| {
-                if let Some(proxy) = &*commands.lock().unwrap() {
-                    let _ = proxy.send_event(AppCommand::CreateGpu(gpu_application));
-                }
-            });
+            app.lock().unwrap().set_gpu(gpu_application);
         };
         wasm_bindgen_futures::spawn_local(task);
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        self.app.resize(UVec2::new(new_size.width, new_size.height));
+        self.app
+            .lock()
+            .unwrap()
+            .resize(UVec2::new(new_size.width, new_size.height));
     }
 
     pub fn update(&mut self, inputs: &WindowInputs) {
-        self.app.update(inputs)
+        self.app.lock().unwrap().update(inputs)
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        self.app.render()
+        self.app.lock().unwrap().render()
     }
 }
 
-pub enum AppCommand {
-    UpdateModels(Vec<ModelInfo>),
-    UpdateShader {
-        shader_id: ShaderId,
-        info: Option<ShaderInfo>,
-    },
-    CreateGpu(GpuApplication),
-}
-thread_local! {
-    static APP_COMMANDS: Mutex<Option<EventLoopProxy<AppCommand>>> = Mutex::new(None);
-}
-
-#[derive(Tsify, Serialize, Deserialize)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
-pub struct WasmModelInfo {
-    pub transform: WasmTransform,
-    pub material_info: WasmMaterialInfo,
-    pub shader_id: String,
-}
-
-#[derive(Tsify, Serialize, Deserialize)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
-pub struct WasmTransform {
-    pub position: [f32; 3],
-    pub rotation: [f32; 3],
-    pub scale: f32,
-}
-
-#[derive(Tsify, Serialize, Deserialize)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
-pub struct WasmMaterialInfo {
-    pub color: [f32; 3],
-    pub emissive: [f32; 3],
-    pub roughness: f32,
-    pub metallic: f32,
-}
-
-#[derive(Tsify, Serialize, Deserialize)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
-pub struct WasmShaderInfo {
-    pub id: String,
-    pub label: String,
-    pub code: String,
-}
-
-#[wasm_bindgen]
-pub fn update_shader(shader_info: WasmShaderInfo) {
-    APP_COMMANDS.with(|commands| {
-        if let Some(proxy) = &*commands.lock().unwrap() {
-            let _ = proxy.send_event(AppCommand::UpdateShader {
-                shader_id: ShaderId(shader_info.id),
-                info: Some(ShaderInfo {
-                    label: shader_info.label,
-                    code: shader_info.code,
-                }),
-            });
-        }
-    });
-}
-
-#[wasm_bindgen]
-pub fn remove_shader(id: String) {
-    APP_COMMANDS.with(|commands| {
-        if let Some(proxy) = &*commands.lock().unwrap() {
-            let _ = proxy.send_event(AppCommand::UpdateShader {
-                shader_id: ShaderId(id),
-                info: None,
-            });
-        }
-    });
-}
-
-#[wasm_bindgen]
-pub fn update_models(js_models: Vec<WasmModelInfo>) {
-    APP_COMMANDS.with(|commands| {
-        if let Some(proxy) = &*commands.lock().unwrap() {
-            let models = js_models
-                .into_iter()
-                .map(|v| ModelInfo {
-                    transform: renderer_core::transform::Transform {
-                        position: v.transform.position.into(),
-                        rotation: glam::Quat::from_euler(
-                            glam::EulerRot::XYZ,
-                            v.transform.rotation[0],
-                            v.transform.rotation[1],
-                            v.transform.rotation[2],
-                        ),
-                        scale: v.transform.scale,
-                    },
-                    material_info: renderer_core::application::MaterialInfo {
-                        color: v.material_info.color.into(),
-                        emissive: v.material_info.emissive.into(),
-                        roughness: v.material_info.roughness,
-                        metallic: v.material_info.metallic,
-                    },
-                    shader_id: ShaderId(v.shader_id),
-                })
-                .collect();
-            let _ = proxy.send_event(AppCommand::UpdateModels(models));
-        }
-    });
-}
-
-pub async fn run(canvas: HtmlCanvasElement) -> anyhow::Result<()> {
-    let event_loop = winit::event_loop::EventLoop::<AppCommand>::with_user_event().build()?;
-    APP_COMMANDS.with(|commands| {
-        *commands.lock().unwrap() = Some(event_loop.create_proxy());
-    });
-    let application = Application::new(canvas)?;
-    #[cfg(target_arch = "wasm32")]
-    {
-        use winit::platform::web::EventLoopExtWebSys;
-        event_loop.spawn_app(WinitAppHelper::new(application));
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        event_loop.run_app(&mut WinitAppHelper::new(application))?;
-    }
-    Ok(())
-}
-
-impl ApplicationHandler<AppCommand> for Application {
+impl ApplicationHandler<()> for Application {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         if let Some(window) = &self.window {
             window.request_redraw();
@@ -212,32 +165,6 @@ impl ApplicationHandler<AppCommand> for Application {
         // And pass that to create_surface
         // Then, create_surface no longer needs the APP_COMMANDS thread_local!
         self.create_surface(window);
-    }
-
-    fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: AppCommand) {
-        match event {
-            AppCommand::UpdateModels(models) => {
-                self.app.update_models(models);
-            }
-            AppCommand::CreateGpu(gpu_application) => {
-                self.app.set_gpu(gpu_application);
-                if let Some(window) = &self.window {
-                    window.request_redraw();
-                }
-            }
-            AppCommand::UpdateShader {
-                shader_id,
-                info: Some(info),
-            } => {
-                self.app.set_shader(shader_id, info);
-            }
-            AppCommand::UpdateShader {
-                shader_id,
-                info: None,
-            } => {
-                self.app.remove_shader(&shader_id);
-            }
-        }
     }
 
     fn window_event(
@@ -277,7 +204,7 @@ impl InputHandler for Application {
             Ok(_) => (),
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 warn!("Lost or outdated surface");
-                if let Some(gpu) = &mut self.app.gpu {
+                if let Some(gpu) = &mut self.app.lock().unwrap().gpu {
                     let _ = gpu.resize(gpu.size());
                 }
             }

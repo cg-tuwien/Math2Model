@@ -1,8 +1,10 @@
+use bevy_ecs::component::Component;
 use glam::{Vec2, Vec3};
 use wgpu::util::DeviceExt;
 
 use crate::shaders::shader;
 
+#[derive(Component)]
 pub struct Mesh {
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,

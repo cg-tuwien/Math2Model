@@ -8,7 +8,7 @@ build = "build.rs"
 bench = false
 
 [dependencies]
-anyhow = "1.0.86"
+anyhow = "1.0"
 bytemuck = { workspace = true }
 encase = { workspace = true }
 glam = { workspace = true }
@@ -16,10 +16,10 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 web-time = "1.1.0"
 wgpu = { workspace = true }
-wgpu-profiler = "0.18.0"
+wgpu-profiler = "0.18.1"
 # wgsl-parser = "0.5.0"
 winit = { workspace = true }
-slotmap = "1.0.7"
+bevy_ecs = { workspace = true }
 
 [dev-dependencies]
 criterion = "0.5.1"

@@ -2,17 +2,18 @@
 
 use crate::{
     buffer::TypedBuffer,
-    camera::Camera,
+    game::{MaterialInfo, ShaderId},
     mesh::Mesh,
     shaders::{compute_patches, copy_patches, shader},
     texture::Texture,
     transform::Transform,
 };
 
-use super::{wgpu_context::WgpuContext, ShaderId, MAX_PATCH_COUNT, PATCH_SIZES};
+use super::{wgpu_context::WgpuContext, MAX_PATCH_COUNT, PATCH_SIZES};
 use std::{collections::HashMap, sync::Arc};
 
 use glam::{Mat4, Vec3, Vec4};
+use wgpu::ShaderModule;
 
 pub struct ShaderArena {
     shader_keys: HashMap<ShaderId, Arc<ShaderPipelines>>,
@@ -24,17 +25,26 @@ pub struct ShaderPipelines {
     pub compute_patches: wgpu::ComputePipeline,
     /// Pipeline per model, for different parametric functions.
     pub render: wgpu::RenderPipeline,
+    pub shaders: [ShaderModule; 2],
 }
 
 impl ShaderPipelines {
     pub fn new(label: &str, code: &str, context: &WgpuContext) -> Self {
-        let compute_patches = create_compute_patches_pipeline(label, &context.device, code);
-        let render = create_render_pipeline(label, context, code);
+        let (compute_patches, shader_a) =
+            create_compute_patches_pipeline(label, &context.device, code);
+        let (render, shader_b) = create_render_pipeline(label, context, code);
 
         Self {
             compute_patches,
             render,
+            shaders: [shader_a, shader_b],
         }
+    }
+
+    pub async fn get_compilation_info(&self) -> Vec<wgpu::CompilationMessage> {
+        let mut messages = self.shaders[0].get_compilation_info().await.messages;
+        messages.extend(self.shaders[1].get_compilation_info().await.messages);
+        messages
     }
 }
 
@@ -49,6 +59,13 @@ impl ShaderArena {
                 MISSING_SHADER,
                 context,
             )),
+        }
+    }
+
+    pub async fn get_compilation_info(&self, key: &ShaderId) -> Vec<wgpu::CompilationMessage> {
+        match self.shader_keys.get(key) {
+            Some(shader) => shader.get_compilation_info().await,
+            None => vec![],
         }
     }
 
@@ -313,13 +330,6 @@ pub struct VirtualModel {
     pub material_info: MaterialInfo,
 }
 
-#[derive(Debug, Clone)]
-pub struct MaterialInfo {
-    pub color: Vec3,
-    pub emissive: Vec3,
-    pub roughness: f32,
-    pub metallic: f32,
-}
 impl MaterialInfo {
     pub fn to_shader(&self) -> shader::Material {
         shader::Material {
@@ -378,77 +388,87 @@ impl VirtualModel {
         self.transform.to_matrix()
     }
 
-    pub fn get_model_view_projection(&self, camera: &Camera) -> Mat4 {
-        camera.projection_matrix() * camera.view_matrix() * self.transform.to_matrix()
+    pub fn get_model_view_projection(&self, camera: &shader::Camera) -> Mat4 {
+        camera.projection * camera.view * self.transform.to_matrix()
     }
 }
 
-fn create_render_pipeline(label: &str, context: &WgpuContext, code: &str) -> wgpu::RenderPipeline {
+fn create_render_pipeline(
+    label: &str,
+    context: &WgpuContext,
+    code: &str,
+) -> (wgpu::RenderPipeline, ShaderModule) {
     let device = &context.device;
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some(&format!("Render Shader {}", label)),
         source: wgpu::ShaderSource::Wgsl(replace_evaluate_image_code(shader::SOURCE, code).into()),
     });
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some(&format!("Render Pipeline {}", label)),
-        layout: Some(&shader::create_pipeline_layout(device)),
-        vertex: shader::vertex_state(
-            &shader,
-            &shader::vs_main_entry(wgpu::VertexStepMode::Vertex),
-        ),
-        fragment: Some(wgpu::FragmentState {
-            module: &shader,
-            entry_point: shader::ENTRY_FS_MAIN,
-            targets: &[Some(wgpu::ColorTargetState {
-                format: context.view_format,
-                blend: Some(wgpu::BlendState::REPLACE),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-            compilation_options: Default::default(),
+    (
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some(&format!("Render Pipeline {}", label)),
+            layout: Some(&shader::create_pipeline_layout(device)),
+            vertex: shader::vertex_state(
+                &shader,
+                &shader::vs_main_entry(wgpu::VertexStepMode::Vertex),
+            ),
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: shader::ENTRY_FS_MAIN,
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: context.view_format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+                polygon_mode: wgpu::PolygonMode::Fill, // Wireframe mode can be toggled here on the desktop backend
+                // Requires Features::DEPTH_CLIP_CONTROL
+                unclipped_depth: false,
+                // Requires Features::CONSERVATIVE_RASTERIZATION
+                conservative: false,
+            },
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Greater,
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: Default::default(),
+            multiview: None,
+            cache: Default::default(),
         }),
-        primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::TriangleList,
-            strip_index_format: None,
-            front_face: wgpu::FrontFace::Ccw,
-            cull_mode: None,
-            // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
-            polygon_mode: wgpu::PolygonMode::Fill, // Wireframe mode can be toggled here on the desktop backend
-            // Requires Features::DEPTH_CLIP_CONTROL
-            unclipped_depth: false,
-            // Requires Features::CONSERVATIVE_RASTERIZATION
-            conservative: false,
-        },
-        depth_stencil: Some(wgpu::DepthStencilState {
-            format: Texture::DEPTH_FORMAT,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::Greater,
-            stencil: Default::default(),
-            bias: Default::default(),
-        }),
-        multisample: Default::default(),
-        multiview: None,
-        cache: Default::default(),
-    })
+        shader,
+    )
 }
 
 fn create_compute_patches_pipeline(
     label: &str,
     device: &wgpu::Device,
     code: &str,
-) -> wgpu::ComputePipeline {
+) -> (wgpu::ComputePipeline, ShaderModule) {
     let source = replace_evaluate_image_code(compute_patches::SOURCE, code);
-
-    device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-        label: Some(&format!("Compute Patches {}", label)),
-        layout: Some(&compute_patches::create_pipeline_layout(device)),
-        module: &device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: None,
-            source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(source.as_ref())),
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: None,
+        source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(source.as_ref())),
+    });
+    (
+        device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some(&format!("Compute Patches {}", label)),
+            layout: Some(&compute_patches::create_pipeline_layout(device)),
+            module: &shader,
+            entry_point: compute_patches::ENTRY_MAIN,
+            compilation_options: Default::default(),
+            cache: Default::default(),
         }),
-        entry_point: compute_patches::ENTRY_MAIN,
-        compilation_options: Default::default(),
-        cache: Default::default(),
-    })
+        shader,
+    )
 }
 
 fn replace_evaluate_image_code<'a>(source: &'a str, sample_object_code: &str) -> String {

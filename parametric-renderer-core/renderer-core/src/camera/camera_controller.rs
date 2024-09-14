@@ -1,6 +1,6 @@
 use glam::{Quat, Vec3};
 
-use crate::{application::CursorCapture, input::WindowInputs};
+use crate::{input::WindowInputs, renderer::CursorCapture};
 
 use super::{freecam_controller::FreecamController, orbitcam_controller::OrbitcamController};
 
