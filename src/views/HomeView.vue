@@ -35,7 +35,6 @@ WgpuEngine.createEngine(canvasElement).then((v) => {
     :fs="sceneFiles"
     :canvas="canvasElement"
     :engine="engine"
-    :visual="true"
     :gpuDevice="gpuDevice"
   ></EditorAndOutput>
   <span v-else>Loading...</span>

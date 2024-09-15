@@ -6,7 +6,7 @@ import {
   type VueArea2D,
 } from "rete-vue-plugin";
 import { NodeEditor, ClassicPreset, type GetSchemes } from "rete";
-import { type DeepReadonly, onMounted, ref } from "vue";
+import { type DeepReadonly, onMounted, ref, watch } from "vue";
 import { AreaExtensions } from "rete-area-plugin";
 import {
   BidirectFlow,
@@ -38,7 +38,7 @@ import {
   LogicScopeNode,
 } from "@/vpnodes/basic/logic";
 import type { Structures } from "rete-structures/_types/types";
-import { get } from "@vueuse/core";
+import { get, watchImmediate } from "@vueuse/core";
 import {
   AutoArrangePlugin,
   Presets as ArrangePresets,
@@ -55,23 +55,30 @@ import {
 } from "@/vpnodes/basic/functions";
 import { graphFromJSON, SerializedGraph } from "@/vpnodes/serialization/graph";
 import { SerializedNode, toSerializedNode } from "@/vpnodes/serialization/node";
-import { type FilePath, makeFilePath } from "@/filesystem/reactive-files";
+import {
+  type FilePath,
+  makeFilePath,
+  type ReactiveFilesystem,
+} from "@/filesystem/reactive-files";
 import type { VirtualModelState } from "@/scenes/scene-state";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
+import { showError } from "@/notification";
 
 const emit = defineEmits<{
-  update: [code: () => string];
+  update: [content: string];
   save: [fileName: FilePath, content: string];
-  load: [fileName: FilePath, add: boolean];
 }>();
+
+export interface KeyedGraph {
+  readonly id: string;
+  readonly code: string;
+}
 
 const props = defineProps<{
+  fs: ReactiveFilesystem;
   graphs: SelectMixedOption[];
+  keyedGraph: DeepReadonly<KeyedGraph> | null;
 }>();
-
-defineExpose({
-  replaceOrAddDeserialize,
-});
 
 const container = ref<HTMLElement | null>(null);
 
@@ -133,6 +140,16 @@ let loading = ref<boolean>(false);
 let saveName = ref<string>("new-graph");
 let loadName = ref<string>("no file selected");
 
+watchImmediate(
+  () => props.keyedGraph?.id,
+  async () => {
+    let code = props.keyedGraph?.code ?? "";
+    if (code === "") return;
+    await editor.clear();
+    await deserialize(code);
+  }
+);
+
 async function newFunctionNode(area: AreaPlugin<Schemes, AreaExtra>) {
   shouldUpdate = false;
   const cfn = new CustomFunctionNode(
@@ -140,7 +157,7 @@ async function newFunctionNode(area: AreaPlugin<Schemes, AreaExtra>) {
     (n) => editor.addNode(n),
     (n) => editor.removeNode(n.id),
     (nA, kA, nB, kB) =>
-      editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB)),
+      editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB))
   );
   await editor.addNode(cfn);
   cfn.functionScope.retNode.parent = cfn.functionScope.id;
@@ -153,20 +170,20 @@ async function newConditionNode(
   scope1: string,
   scope2: string,
   area: AreaPlugin<Schemes, AreaExtra>,
-  operator: "==" | "!=" | ">" | "<" | ">=" | "<=",
+  operator: "==" | "!=" | ">" | "<" | ">=" | "<="
 ): Promise<Nodes> {
   shouldUpdate = false;
   const sc1 = new LogicScopeNode(
     scope1,
     (n) => area.update("node", n.id),
     (n) => editor.addNode(n),
-    (n) => editor.removeNode(n.id),
+    (n) => editor.removeNode(n.id)
   );
   const sc2 = new LogicScopeNode(
     scope2,
     (n) => area.update("node", n.id),
     (n) => editor.addNode(n),
-    (n) => editor.removeNode(n.id),
+    (n) => editor.removeNode(n.id)
   );
 
   await editor.addNode(sc1);
@@ -195,23 +212,23 @@ const startNode = new VariableOutNode(vec2.create(1, 1), "", "input2");
 const piNode = new VariableOutNode(
   3.14159265359,
   "var PI = 3.14159265359;",
-  "PI",
+  "PI"
 );
 const halfPiNode = new VariableOutNode(
   3.14159265359 / 2,
   "var HALF_PI = 3.14159265359 / 2.0;",
-  "HALF_PI",
+  "HALF_PI"
 );
 const twoPiNode = new VariableOutNode(
   3.14159265359 * 2,
   "var TWO_PI = 3.14159265359 * 2.0;",
-  "TWO_PI",
+  "TWO_PI"
 );
 
 let area: AreaPlugin<Schemes, AreaExtra>;
 async function createEditor() {
   area = new AreaPlugin<Schemes, AreaExtra>(
-    container.value ?? new HTMLElement(),
+    container.value ?? new HTMLElement()
   );
   AreaExtensions.selectableNodes(area, AreaExtensions.selector(), {
     accumulating: AreaExtensions.accumulateOnCtrl(),
@@ -340,7 +357,7 @@ async function createEditor() {
           }
         },
       },
-    }),
+    })
   );
   render.addPreset(VuePresets.contextMenu.setup());
   scopes.addPreset(ScopesPresets.classic.setup());
@@ -379,7 +396,7 @@ async function createEditor() {
         .getNodes()
         .filter(
           (n) =>
-            !(n instanceof LogicScopeNode || n instanceof FunctionScopeNode),
+            !(n instanceof LogicScopeNode || n instanceof FunctionScopeNode)
         )
         .forEach((n) => n.updateSize(area));
       logCode();
@@ -393,7 +410,7 @@ async function getNodesCode(
   node: Nodes,
   visited: string[],
   graph: Structures<Nodes, Conns>,
-  indent: string = "",
+  indent: string = ""
 ) {
   console.log(node.id);
   const nodeData = await engine.fetch(node.id);
@@ -481,7 +498,7 @@ async function getNodesCode(
 async function getScopeCode(
   scopeChildren: Nodes[],
   visited: string[],
-  prevIndent: string,
+  prevIndent: string
 ) {
   if (scopeChildren.length <= 0) return;
 
@@ -510,13 +527,13 @@ async function logCode() {
   // fullCode += (await getNodesCode(endNode, [], graph, "\t")) + "}";
   fullCode += "\n}";
   console.log(fullCode);
-  emit("update", () => fullCode);
+  emit("update", fullCode);
 }
 
 async function orderedCode(
   allNodes: Nodes[],
   visited: string[],
-  indent: string = "",
+  indent: string = ""
 ) {
   if (allNodes.length <= 0) return "";
   const graph = structures(editor);
@@ -572,7 +589,7 @@ async function serialize() {
 async function replaceOrAddDeserialize(
   name: string,
   json: string,
-  add: boolean,
+  add: boolean
 ) {
   console.log(`replaceOrAddDeserialize(${name}, ${json}, ${add});`);
   if (!add) {
@@ -585,7 +602,7 @@ async function replaceOrAddDeserialize(
       (n) => editor.addNode(n),
       (n) => editor.removeNode(n.id),
       (nA, kA, nB, kB) =>
-        editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB)),
+        editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB))
     );
     func.nameControl.setValue(name);
     func.label = name;
@@ -616,8 +633,8 @@ async function deserialize(json: string, parent?: string) {
             editor.getNodes().filter((n) => n.id === input.value)[0],
             input.keyFrom,
             editor.getNodes().filter((n) => n.id === sn.uuid)[0],
-            input.keyTo,
-          ),
+            input.keyTo
+          )
         );
       }
     }
@@ -683,17 +700,26 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
   node.parent = sn.parent;
   return node;
 }
+
+function replaceOrAddGraph(filePath: FilePath, add: boolean) {
+  console.log(`replaceOrAddGraph(${filePath}, ${add});`);
+  props.fs
+    .readTextFile(filePath)
+    ?.then((content) =>
+      replaceOrAddDeserialize(filePath.replace(".graph", ""), content, add)
+    )
+    .catch((reason) => showError("Could not load graph " + filePath, reason));
+}
 </script>
 
 <template>
-  <n-modal :show="saving || loading" :mask-closable="false">
+  <n-modal :show="saving" :mask-closable="false">
     <n-card
       class="w-full sm:w-1/2 lg:w-1/3"
       title="Save Graph"
       closable
       @close="saving = false"
       v-on:pointerdown.stop=""
-      v-if="saving"
     >
       Please enter a file name to save the graph to.
       <template #action>
@@ -721,13 +747,14 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
         </div>
       </template>
     </n-card>
+  </n-modal>
+  <n-modal :show="loading" :mask-closable="false">
     <n-card
       class="w-full sm:w-1/2 lg:w-1/3"
       title="Load Graph"
       closable
       @close="loading = false"
       v-on:pointerdown.stop=""
-      v-if="loading"
     >
       <template #header-extra>
         <n-p>Please select the graph file to load.</n-p>
@@ -739,7 +766,7 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
             <n-button
               type="primary"
               @click="
-                emit('load', makeFilePath(loadName), false);
+                replaceOrAddGraph(makeFilePath(loadName), false);
                 loading = false;
               "
               v-on:pointerdown.stop=""
@@ -749,7 +776,7 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
             <n-button
               type="primary"
               @click="
-                emit('load', makeFilePath(loadName), true);
+                replaceOrAddGraph(makeFilePath(loadName), true);
                 loading = false;
               "
               v-on:pointerdown.stop=""
@@ -769,10 +796,10 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
     </n-card>
   </n-modal>
   <n-flex vertical style="width: 70%">
-    <div class="rete" ref="container" style="width: 100%; height: 71%"></div>
-    <n-flex
-      ><n-button @click="saving = true" v-on:pointerdown.stop="">Save </n-button
-      ><n-button
+    <div class="rete flex-1" ref="container"></div>
+    <n-flex>
+      <n-button @click="saving = true" v-on:pointerdown.stop="">Save </n-button>
+      <n-button
         @click="
           //deserialize(
           //  `{&quot;graph&quot;:[{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;ffec57f1db36b382&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;input2&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:{&quot;0&quot;:1,&quot;1&quot;:1}}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;c813ab16c5471e3c&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var PI = 3.14159265359;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:3.14159265359}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;0ecbb9b9a229ce19&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var HALF_PI = 3.14159265359 / 2.0;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;HALF_PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:1.570796326795}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;4a065e8821ad82e0&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var TWO_PI = 3.14159265359 * 2.0;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;TWO_PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:6.28318530718}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;4e2cf9be57e0e973&quot;,&quot;inputs&quot;:[{&quot;key&quot;:&quot;def&quot;,&quot;value&quot;:&quot;vec3f(input2.x, 0, input2.y)&quot;,&quot;type&quot;:&quot;text&quot;}],&quot;nodeType&quot;:&quot;Return&quot;}]}`,
@@ -780,10 +807,9 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
           loading = true
         "
         v-on:pointerdown.stop=""
-        >Load</n-button
       >
+        Load
+      </n-button>
     </n-flex>
   </n-flex>
 </template>
-
-<style scoped></style>

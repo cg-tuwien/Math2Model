@@ -1,3 +1,4 @@
+import { showError } from "@/notification";
 import type { SerializedNode } from "@/vpnodes/serialization/node";
 
 export class SerializedGraph {
@@ -24,5 +25,9 @@ export class SerializedGraph {
 }
 
 export function graphFromJSON(json: string) {
-  return JSON.parse(json);
+  try {
+    return JSON.parse(json);
+  } catch (e) {
+    showError("Failed to parse JSON: " + json, e);
+  }
 }
