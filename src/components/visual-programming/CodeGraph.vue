@@ -38,7 +38,7 @@ import {
   LogicScopeNode,
 } from "@/vpnodes/basic/logic";
 import type { Structures } from "rete-structures/_types/types";
-import { get, watchImmediate } from "@vueuse/core";
+import { get, useThrottleFn, watchImmediate } from "@vueuse/core";
 import {
   AutoArrangePlugin,
   Presets as ArrangePresets,
@@ -66,7 +66,7 @@ import { showError } from "@/notification";
 
 const emit = defineEmits<{
   update: [content: string];
-  save: [fileName: FilePath, content: string];
+  save: [content: string];
 }>();
 
 export interface KeyedGraph {
@@ -135,18 +135,19 @@ const arrange = new AutoArrangePlugin<Schemes>();
 
 let shouldUpdate = true;
 
-let saving = ref<boolean>(false);
 let loading = ref<boolean>(false);
-let saveName = ref<string>("new-graph");
 let loadName = ref<string>("no file selected");
 
-watchImmediate(
+watch(
   () => props.keyedGraph?.id,
-  async () => {
+  async (id) => {
+    console.log("watch keyedGraph.id", { id });
+    shouldUpdate = false;
     let code = props.keyedGraph?.code ?? "";
     if (code === "") return;
     await editor.clear();
     await deserialize(code);
+    shouldUpdate = true;
   }
 );
 
@@ -369,11 +370,16 @@ async function createEditor() {
   area.use(scopes);
   area.use(arrange);
 
-  await editor.addNode(startNode);
-  await editor.addNode(piNode);
-  await editor.addNode(halfPiNode);
-  await editor.addNode(twoPiNode);
-  await editor.addNode(endNode);
+  if (props.keyedGraph !== null && props.keyedGraph.code !== "") {
+    console.log("loading graph", props.keyedGraph.id);
+    await deserialize(props.keyedGraph.code);
+  } else {
+    await editor.addNode(startNode);
+    await editor.addNode(piNode);
+    await editor.addNode(halfPiNode);
+    await editor.addNode(twoPiNode);
+    await editor.addNode(endNode);
+  }
   //await editor.addConnection(
   //  new ClassicPreset.Connection(startNode, "out", endNode, "returnIn"),
   //);
@@ -399,12 +405,20 @@ async function createEditor() {
             !(n instanceof LogicScopeNode || n instanceof FunctionScopeNode)
         )
         .forEach((n) => n.updateSize(area));
-      logCode();
+
+      saveGraphThrottled();
     }
 
     return context;
   });
+
+  await logCode();
 }
+
+async function saveGraph() {
+  await Promise.all([serialize(), logCode()]);
+}
+const saveGraphThrottled = useThrottleFn(saveGraph, 500, true, false);
 
 async function getNodesCode(
   node: Nodes,
@@ -583,7 +597,7 @@ async function serialize() {
     });
   }
 
-  emit("save", makeFilePath(`${saveName.value}.graph`), sg.toJSON());
+  emit("save", sg.toJSON());
 }
 
 async function replaceOrAddDeserialize(
@@ -713,41 +727,6 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
 </script>
 
 <template>
-  <n-modal :show="saving" :mask-closable="false">
-    <n-card
-      class="w-full sm:w-1/2 lg:w-1/3"
-      title="Save Graph"
-      closable
-      @close="saving = false"
-      v-on:pointerdown.stop=""
-    >
-      Please enter a file name to save the graph to.
-      <template #action>
-        <div class="flex justify-around">
-          <n-input v-model:value="saveName"></n-input>
-        </div>
-        <div class="flex justify-around">
-          <n-button
-            type="primary"
-            @click="
-              serialize();
-              saving = false;
-            "
-            v-on:pointerdown.stop=""
-          >
-            Save
-          </n-button>
-          <n-button
-            type="warning"
-            @click="saving = false"
-            v-on:pointerdown.stop=""
-          >
-            Cancel
-          </n-button>
-        </div>
-      </template>
-    </n-card>
-  </n-modal>
   <n-modal :show="loading" :mask-closable="false">
     <n-card
       class="w-full sm:w-1/2 lg:w-1/3"
@@ -798,7 +777,6 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
   <n-flex vertical style="width: 70%">
     <div class="rete flex-1" ref="container"></div>
     <n-flex>
-      <n-button @click="saving = true" v-on:pointerdown.stop="">Save </n-button>
       <n-button
         @click="
           //deserialize(

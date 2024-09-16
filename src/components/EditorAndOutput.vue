@@ -472,7 +472,11 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
               }
             "
             @save="
-              (fileName, content) => props.fs.writeTextFile(fileName, content)
+              (content) => {
+                if (openFile.path.value !== null) {
+                  props.fs.writeTextFile(openFile.path.value, content);
+                }
+              }
             "
             ref="graphRef"
           ></CodeGraph>
