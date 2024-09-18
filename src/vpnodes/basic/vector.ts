@@ -187,6 +187,14 @@ export class VectorNode extends VPNode {
           this.label = "Vector" + info.value.toString();
         }
       }
+      if (this.n <= 3) {
+        this.removeControl("w");
+        this.removeInput("w");
+      }
+      if (this.n == 2) {
+        this.removeControl("z");
+        this.removeInput("z");
+      }
     }
 
     super.deserialize(sn);

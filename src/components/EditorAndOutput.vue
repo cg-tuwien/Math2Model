@@ -38,6 +38,8 @@ import {
 } from "@/filesystem/scene-file";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
 import HeartSphere from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
+import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
+import BasicGraphShader from "@/../parametric-renderer-core/graphs/BasicGraphShader.graph.wgsl?raw";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import type { ObjectUpdate } from "./input/object-update";
 import CodeGraph from "@/components/visual-programming/CodeGraph.vue";
@@ -72,7 +74,7 @@ watchEffect(() => {
 const openFile = useOpenFile(
   // Open the first .wgsl file if it exists
   props.fs.listFiles().find((v) => v.endsWith(".wgsl")) ?? null,
-  props.fs
+  props.fs,
 );
 
 const canvasContainer = ref<HTMLDivElement | null>(null);
@@ -85,7 +87,7 @@ watchEffect(() => {
 {
   // TODO: Make the Rust side pull files instead of this
   const referencedFiles = shallowRef(
-    new Map<FilePath, Readonly<Ref<string | null>>>()
+    new Map<FilePath, Readonly<Ref<string | null>>>(),
   );
   watchImmediate(
     () => scene.state.value.models,
@@ -106,7 +108,7 @@ watchEffect(() => {
       }
 
       referencedFiles.value = newReferencedFiles;
-    }
+    },
   );
 
   watchEffect(() => {
@@ -148,14 +150,18 @@ const shadersDropdown = computed<SelectMixedOption[]>(() => {
       (fileName): SelectMixedOption => ({
         label: fileName.substring(
           0,
-          fileName.valueOf().length - ".wgsl".length
+          fileName.valueOf().length - ".wgsl".length,
         ),
         value: fileName,
-      })
+      }),
     )
     .concat({
       label: "New Shader...",
-      value: undefined,
+      value: "wgsl",
+    })
+    .concat({
+      label: "New Graph...",
+      value: "graph",
     });
 });
 
@@ -167,10 +173,10 @@ const graphsDropdown = computed<SelectMixedOption[]>(() => {
       (fileName): SelectMixedOption => ({
         label: fileName.substring(
           0,
-          fileName.valueOf().length - ".graph".length
+          fileName.valueOf().length - ".graph".length,
         ),
         value: fileName,
-      })
+      }),
     );
 });
 
@@ -244,6 +250,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
       openFile(newName);
     }
   }
+
   function deleteFiles(files: Set<FilePath>) {
     files.forEach((file) => {
       fs.deleteFile(file);
@@ -320,7 +327,7 @@ function saveScene() {
   if (sceneContent === null) {
     showError(
       "Could not serialize scene",
-      new Error("Could not serialize scene")
+      new Error("Could not serialize scene"),
     );
   } else {
     props.fs.writeTextFile(SceneFileName, sceneContent);
@@ -336,10 +343,18 @@ function updateModels(ids: string[], update: ObjectUpdate<any>) {
 
 function addModel(name: string, shaderName: string) {
   if (shaderName) {
-    const vertexSource = makeFilePath(shaderName);
+    let vertexSource = makeFilePath(shaderName);
 
     if (!props.fs.hasFile(vertexSource)) {
-      props.fs.writeTextFile(vertexSource, HeartSphere);
+      if (vertexSource.endsWith(".wgsl"))
+        props.fs.writeTextFile(vertexSource, HeartSphere);
+      else if (vertexSource.endsWith(".graph")) {
+        props.fs.writeTextFile(vertexSource, BasicGraph);
+        vertexSource = makeFilePath(
+          vertexSource.replace(".graph", ".graph.wgsl"),
+        );
+        props.fs.writeTextFile(vertexSource, BasicGraphShader);
+      }
     }
 
     const newModel: VirtualModelState = {
@@ -443,44 +458,62 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
         </div>
       </template>
       <template #2>
-        <div class="flex h-full w-full">
-          <div
-            ref="canvasContainer"
-            class="self-stretch overflow-hidden flex-1"
-          >
-            <div v-if="sceneFile == null">Missing scene.json</div>
-          </div>
-          <CodeEditor
-            v-if="openFile.editorType.value === 'shader'"
-            class="self-stretch overflow-hidden flex-1"
-            :keyed-code="openFile.code.value"
-            :is-readonly="openFile.isReadonly.value"
-            :is-dark="store.isDark"
-            @update="openFile.setNewCode($event)"
-          >
-          </CodeEditor>
-          <CodeGraph
-            v-if="openFile.editorType.value === 'graph'"
-            :fs="props.fs"
-            :keyedGraph="openFile.code.value"
-            :graphs="graphsDropdown"
-            @update="
-              (content) => {
-                if (openFile.path.value !== null) {
-                  saveGraphWgsl(openFile.path.value, content);
-                }
-              }
-            "
-            @save="
-              (content) => {
-                if (openFile.path.value !== null) {
-                  props.fs.writeTextFile(openFile.path.value, content);
-                }
-              }
-            "
-            ref="graphRef"
-          ></CodeGraph>
-        </div>
+        <n-split
+          direction="horizontal"
+          style="height: 80vh"
+          :max="0.75"
+          :min="0.15"
+          :default-size="0.75"
+        >
+          <template #1>
+            <div class="flex h-full w-full">
+              <div
+                ref="canvasContainer"
+                class="self-stretch overflow-hidden flex-1"
+              >
+                <div v-if="sceneFile == null">Missing scene.json</div>
+              </div>
+            </div>
+          </template>
+          <template #2>
+            <div class="flex h-full w-full">
+              <CodeEditor
+                v-if="openFile.editorType.value === 'shader'"
+                class="self-stretch overflow-hidden flex-1"
+                :keyed-code="openFile.code.value"
+                :is-readonly="openFile.isReadonly.value"
+                :is-dark="store.isDark"
+                @update="openFile.setNewCode($event)"
+              >
+              </CodeEditor>
+              <CodeGraph
+                v-if="openFile.editorType.value === 'graph'"
+                :fs="props.fs"
+                :keyedGraph="openFile.code.value"
+                :graphs="graphsDropdown"
+                @update="
+                  (content) => {
+                    if (openFile.path.value !== null) {
+                      saveGraphWgsl(openFile.path.value, content);
+                    } else {
+                      console.error('Invalid state!');
+                    }
+                  }
+                "
+                @save="
+                  (content) => {
+                    if (openFile.path.value !== null) {
+                      props.fs.writeTextFile(openFile.path.value, content);
+                    } else {
+                      console.error('Invalid state!');
+                    }
+                  }
+                "
+                ref="graphRef"
+              ></CodeGraph>
+            </div>
+          </template>
+        </n-split>
       </template>
     </n-split>
   </main>

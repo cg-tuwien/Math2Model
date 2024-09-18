@@ -89,7 +89,9 @@ export class VPNode extends ClassicPreset.Node {
     return sn;
   }
 
-  deserialize(sn: SerializedNode) {}
+  deserialize(sn: SerializedNode) {
+    this.updateSize();
+  }
 }
 
 export class NodeReturn {

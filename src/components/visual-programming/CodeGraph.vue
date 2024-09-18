@@ -63,6 +63,7 @@ import {
 import type { VirtualModelState } from "@/scenes/scene-state";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import { showError } from "@/notification";
+import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
 
 const emit = defineEmits<{
   update: [content: string];
@@ -144,11 +145,10 @@ watch(
     console.log("watch keyedGraph.id", { id });
     shouldUpdate = false;
     let code = props.keyedGraph?.code ?? "";
-    if (code === "") return;
     await editor.clear();
     await deserialize(code);
     shouldUpdate = true;
-  }
+  },
 );
 
 async function newFunctionNode(area: AreaPlugin<Schemes, AreaExtra>) {
@@ -158,7 +158,7 @@ async function newFunctionNode(area: AreaPlugin<Schemes, AreaExtra>) {
     (n) => editor.addNode(n),
     (n) => editor.removeNode(n.id),
     (nA, kA, nB, kB) =>
-      editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB))
+      editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB)),
   );
   await editor.addNode(cfn);
   cfn.functionScope.retNode.parent = cfn.functionScope.id;
@@ -171,20 +171,20 @@ async function newConditionNode(
   scope1: string,
   scope2: string,
   area: AreaPlugin<Schemes, AreaExtra>,
-  operator: "==" | "!=" | ">" | "<" | ">=" | "<="
+  operator: "==" | "!=" | ">" | "<" | ">=" | "<=",
 ): Promise<Nodes> {
   shouldUpdate = false;
   const sc1 = new LogicScopeNode(
     scope1,
     (n) => area.update("node", n.id),
     (n) => editor.addNode(n),
-    (n) => editor.removeNode(n.id)
+    (n) => editor.removeNode(n.id),
   );
   const sc2 = new LogicScopeNode(
     scope2,
     (n) => area.update("node", n.id),
     (n) => editor.addNode(n),
-    (n) => editor.removeNode(n.id)
+    (n) => editor.removeNode(n.id),
   );
 
   await editor.addNode(sc1);
@@ -213,23 +213,28 @@ const startNode = new VariableOutNode(vec2.create(1, 1), "", "input2");
 const piNode = new VariableOutNode(
   3.14159265359,
   "var PI = 3.14159265359;",
-  "PI"
+  "PI",
 );
 const halfPiNode = new VariableOutNode(
   3.14159265359 / 2,
   "var HALF_PI = 3.14159265359 / 2.0;",
-  "HALF_PI"
+  "HALF_PI",
 );
 const twoPiNode = new VariableOutNode(
   3.14159265359 * 2,
   "var TWO_PI = 3.14159265359 * 2.0;",
-  "TWO_PI"
+  "TWO_PI",
 );
+
+async function rearrange() {
+  await arrange.layout();
+  return new NothingNode();
+}
 
 let area: AreaPlugin<Schemes, AreaExtra>;
 async function createEditor() {
   area = new AreaPlugin<Schemes, AreaExtra>(
-    container.value ?? new HTMLElement()
+    container.value ?? new HTMLElement(),
   );
   AreaExtensions.selectableNodes(area, AreaExtensions.selector(), {
     accumulating: AreaExtensions.accumulateOnCtrl(),
@@ -240,13 +245,7 @@ async function createEditor() {
 
   const contextMenu = new ContextMenuPlugin<Schemes>({
     items: ContextMenuPresets.classic.setup([
-      [
-        "Rearrange",
-        () => {
-          arrange.layout();
-          return new NothingNode();
-        },
-      ],
+      ["Rearrange", () => rearrange()],
       ["Initialize", () => new InitializeNode()],
       [
         "Math",
@@ -358,7 +357,7 @@ async function createEditor() {
           }
         },
       },
-    })
+    }),
   );
   render.addPreset(VuePresets.contextMenu.setup());
   scopes.addPreset(ScopesPresets.classic.setup());
@@ -370,22 +369,15 @@ async function createEditor() {
   area.use(scopes);
   area.use(arrange);
 
-  if (props.keyedGraph !== null && props.keyedGraph.code !== "") {
-    console.log("loading graph", props.keyedGraph.id);
-    await deserialize(props.keyedGraph.code);
-  } else {
-    await editor.addNode(startNode);
-    await editor.addNode(piNode);
-    await editor.addNode(halfPiNode);
-    await editor.addNode(twoPiNode);
-    await editor.addNode(endNode);
-  }
+  console.log("loading graph", props.keyedGraph?.id);
+  await deserialize(props.keyedGraph?.code ?? "");
   //await editor.addConnection(
   //  new ClassicPreset.Connection(startNode, "out", endNode, "returnIn"),
   //);
   await arrange.layout();
 
   editor.addPipe((context) => {
+    console.log("should update", context.type, shouldUpdate);
     if (
       [
         "connectioncreated",
@@ -402,7 +394,7 @@ async function createEditor() {
         .getNodes()
         .filter(
           (n) =>
-            !(n instanceof LogicScopeNode || n instanceof FunctionScopeNode)
+            !(n instanceof LogicScopeNode || n instanceof FunctionScopeNode),
         )
         .forEach((n) => n.updateSize(area));
 
@@ -424,9 +416,8 @@ async function getNodesCode(
   node: Nodes,
   visited: string[],
   graph: Structures<Nodes, Conns>,
-  indent: string = ""
+  indent: string = "",
 ) {
-  console.log(node.id);
   const nodeData = await engine.fetch(node.id);
   let fullCode = "";
   if (node instanceof SeparateNode) {
@@ -512,7 +503,7 @@ async function getNodesCode(
 async function getScopeCode(
   scopeChildren: Nodes[],
   visited: string[],
-  prevIndent: string
+  prevIndent: string,
 ) {
   if (scopeChildren.length <= 0) return;
 
@@ -528,7 +519,6 @@ async function logCode() {
   const customFunctionNodes = graph
     .nodes()
     .filter((n) => n instanceof CustomFunctionNode);
-  console.log(allNodes.map((n) => n.id));
 
   if (allNodes.length <= 0) return;
 
@@ -547,7 +537,7 @@ async function logCode() {
 async function orderedCode(
   allNodes: Nodes[],
   visited: string[],
-  indent: string = ""
+  indent: string = "",
 ) {
   if (allNodes.length <= 0) return "";
   const graph = structures(editor);
@@ -557,7 +547,6 @@ async function orderedCode(
   while (nodeQueue.length > 0) {
     const node = nodeQueue.shift();
     if (!node) break;
-    console.log(node.id);
     if (visited.includes(node.id)) continue;
     if (node instanceof NothingNode) {
       await editor.removeNode(node.id);
@@ -603,9 +592,8 @@ async function serialize() {
 async function replaceOrAddDeserialize(
   name: string,
   json: string,
-  add: boolean
+  add: boolean,
 ) {
-  console.log(`replaceOrAddDeserialize(${name}, ${json}, ${add});`);
   if (!add) {
     await editor.clear();
     await deserialize(json);
@@ -616,7 +604,7 @@ async function replaceOrAddDeserialize(
       (n) => editor.addNode(n),
       (n) => editor.removeNode(n.id),
       (nA, kA, nB, kB) =>
-        editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB))
+        editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB)),
     );
     func.nameControl.setValue(name);
     func.label = name;
@@ -628,6 +616,10 @@ async function replaceOrAddDeserialize(
 
 async function deserialize(json: string, parent?: string) {
   shouldUpdate = false;
+  if (json === "") {
+    json = BasicGraph;
+    emit("save", json);
+  }
   const sg = graphFromJSON(json);
 
   for (let snObj of sg.graph) {
@@ -647,15 +639,15 @@ async function deserialize(json: string, parent?: string) {
             editor.getNodes().filter((n) => n.id === input.value)[0],
             input.keyFrom,
             editor.getNodes().filter((n) => n.id === sn.uuid)[0],
-            input.keyTo
-          )
+            input.keyTo,
+          ),
         );
       }
     }
   }
 
   shouldUpdate = true;
-  await arrange.layout();
+  rearrange().then((n) => editor.addNode(n));
 }
 
 function serializedNodeToNode(sn: SerializedNode): Nodes {
@@ -716,11 +708,10 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
 }
 
 function replaceOrAddGraph(filePath: FilePath, add: boolean) {
-  console.log(`replaceOrAddGraph(${filePath}, ${add});`);
   props.fs
     .readTextFile(filePath)
     ?.then((content) =>
-      replaceOrAddDeserialize(filePath.replace(".graph", ""), content, add)
+      replaceOrAddDeserialize(filePath.replace(".graph", ""), content, add),
     )
     .catch((reason) => showError("Could not load graph " + filePath, reason));
 }
