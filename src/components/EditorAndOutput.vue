@@ -47,7 +47,6 @@ import WebGpu from "@/components/WebGpu.vue";
 const props = defineProps<{
   fs: ReactiveFilesystem;
   canvas: HTMLCanvasElement;
-  visual: boolean;
   engine: WgpuEngine;
   gpuDevice: GPUDevice;
 }>();
@@ -73,12 +72,10 @@ watchEffect(() => {
 const openFile = useOpenFile(
   // Open the first .wgsl file if it exists
   props.fs.listFiles().find((v) => v.endsWith(".wgsl")) ?? null,
-  props.fs,
+  props.fs
 );
 
 const canvasContainer = ref<HTMLDivElement | null>(null);
-
-const graphRef = ref();
 
 // Attach the canvas to the DOM
 watchEffect(() => {
@@ -88,7 +85,7 @@ watchEffect(() => {
 {
   // TODO: Make the Rust side pull files instead of this
   const referencedFiles = shallowRef(
-    new Map<FilePath, Readonly<Ref<string | null>>>(),
+    new Map<FilePath, Readonly<Ref<string | null>>>()
   );
   watchImmediate(
     () => scene.state.value.models,
@@ -109,7 +106,7 @@ watchEffect(() => {
       }
 
       referencedFiles.value = newReferencedFiles;
-    },
+    }
   );
 
   watchEffect(() => {
@@ -151,10 +148,10 @@ const shadersDropdown = computed<SelectMixedOption[]>(() => {
       (fileName): SelectMixedOption => ({
         label: fileName.substring(
           0,
-          fileName.valueOf().length - ".wgsl".length,
+          fileName.valueOf().length - ".wgsl".length
         ),
         value: fileName,
-      }),
+      })
     )
     .concat({
       label: "New Shader...",
@@ -170,16 +167,19 @@ const graphsDropdown = computed<SelectMixedOption[]>(() => {
       (fileName): SelectMixedOption => ({
         label: fileName.substring(
           0,
-          fileName.valueOf().length - ".graph".length,
+          fileName.valueOf().length - ".graph".length
         ),
         value: fileName,
-      }),
+      })
     );
 });
+
+type EditorType = "shader" | "graph";
 
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
   const openedFileName = ref<FilePath | null>(startFile);
   const keyedCode = ref<KeyedCode | null>(null);
+  const editorType = ref<EditorType>("shader");
 
   watchImmediate(openedFileName, (fileName) => {
     if (fileName === null) {
@@ -193,6 +193,14 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
       code: "",
       name: fileName,
     };
+
+    if (fileName.endsWith(".wgsl")) {
+      editorType.value = "shader";
+    } else if (fileName.endsWith(".graph")) {
+      editorType.value = "graph";
+    } else {
+      editorType.value = "shader";
+    }
 
     // And now asynchronously load the file
     let file = fs.readTextFile(fileName);
@@ -211,6 +219,13 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
         name: fileName,
       };
     });
+  });
+
+  const isReadonly = computed(() => {
+    if (keyedCode.value === null) {
+      return true;
+    }
+    return keyedCode.value.name.endsWith(".graph.wgsl");
   });
 
   function openFile(v: FilePath) {
@@ -254,6 +269,9 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
   }, 500);
 
   return {
+    path: computed(() => openedFileName.value),
+    editorType: computed(() => editorType.value),
+    isReadonly,
     code: computed(() => keyedCode.value),
     openFile,
     addFiles,
@@ -302,7 +320,7 @@ function saveScene() {
   if (sceneContent === null) {
     showError(
       "Could not serialize scene",
-      new Error("Could not serialize scene"),
+      new Error("Could not serialize scene")
     );
   } else {
     props.fs.writeTextFile(SceneFileName, sceneContent);
@@ -355,18 +373,10 @@ function removeModel(ids: string[]) {
   saveScene();
 }
 
-function replaceOrAddGraph(filePath: FilePath, add: boolean) {
-  console.log(`replaceOrAddGraph(${filePath}, ${add});`);
-  props.fs
-    .readTextFile(filePath)
-    ?.then((content) =>
-      graphRef.value.replaceOrAddDeserialize(
-        filePath.replace(".graph", ""),
-        content,
-        add,
-      ),
-    )
-    .catch((reason) => showError("Could not load graph " + filePath, reason));
+function saveGraphWgsl(filePath: FilePath, content: string) {
+  // Extension should be ".graph.wgsl"
+  filePath = makeFilePath(filePath.replace(".graph", ".graph.wgsl"));
+  props.fs.writeTextFile(filePath, content);
 }
 </script>
 
@@ -441,23 +451,33 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
             <div v-if="sceneFile == null">Missing scene.json</div>
           </div>
           <CodeEditor
-            v-if="!props.visual"
+            v-if="openFile.editorType.value === 'shader'"
             class="self-stretch overflow-hidden flex-1"
             :keyed-code="openFile.code.value"
+            :is-readonly="openFile.isReadonly.value"
             :is-dark="store.isDark"
             @update="openFile.setNewCode($event)"
           >
           </CodeEditor>
           <CodeGraph
-            v-if="props.visual"
+            v-if="openFile.editorType.value === 'graph'"
+            :fs="props.fs"
+            :keyedGraph="openFile.code.value"
             :graphs="graphsDropdown"
-            @update="openFile.setNewCode($event)"
-            @save="
-              (fileName, content) => {
-                props.fs.writeTextFile(fileName, content);
+            @update="
+              (content) => {
+                if (openFile.path.value !== null) {
+                  saveGraphWgsl(openFile.path.value, content);
+                }
               }
             "
-            @load="(fileName, add) => replaceOrAddGraph(fileName, add)"
+            @save="
+              (content) => {
+                if (openFile.path.value !== null) {
+                  props.fs.writeTextFile(openFile.path.value, content);
+                }
+              }
+            "
             ref="graphRef"
           ></CodeGraph>
         </div>

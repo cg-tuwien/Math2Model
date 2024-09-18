@@ -16,6 +16,7 @@ export interface KeyedCode {
 const props = defineProps<{
   keyedCode: DeepReadonly<KeyedCode> | null;
   isDark: boolean;
+  isReadonly: boolean;
 }>();
 const emit = defineEmits<{ update: [code: () => string] }>();
 
@@ -39,7 +40,7 @@ watch(
   }
 );
 
-const isReadonly = computed(() => props.keyedCode === null);
+const isReadonly = computed(() => props.keyedCode === null || props.isReadonly);
 watch(isReadonly, (v) => {
   editor.value?.updateOptions({ readOnly: v });
 });
