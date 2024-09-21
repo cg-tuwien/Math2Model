@@ -1,6 +1,6 @@
 use glam::{Quat, Vec3};
 
-use crate::{application::CursorCapture, input::WindowInputs};
+use crate::{input::WindowInputs, renderer::CursorCapture};
 
 use super::{freecam_controller::FreecamController, orbitcam_controller::OrbitcamController};
 
@@ -48,6 +48,7 @@ pub struct GeneralController {
     pub distance_to_center: f32,
 }
 
+#[derive(Debug, Clone)]
 pub struct GeneralControllerSettings {
     pub fly_speed: f32,
     pub pan_speed: f32,

@@ -1,204 +1,22 @@
-mod frame_counter;
+pub mod frame_counter;
 mod scene;
 mod virtual_model;
 mod wgpu_context;
-mod window_or_fallback;
 
-use frame_counter::{FrameCounter, FrameTime, Seconds};
-use glam::{UVec2, Vec2, Vec3};
+use frame_counter::FrameCounter;
+use glam::UVec2;
 use scene::SceneData;
-pub use virtual_model::MaterialInfo;
 use virtual_model::VirtualModel;
-use web_time::Instant;
 use wgpu_context::WgpuContext;
-pub use window_or_fallback::WindowOrFallback;
 
 use crate::{
     buffer::TypedBuffer,
-    camera::{
-        camera_controller::{
-            CameraController, ChosenKind, GeneralController, GeneralControllerSettings,
-        },
-        Camera, CameraSettings,
-    },
-    input::WindowInputs,
+    game::{GameRes, ModelInfo},
     mesh::Mesh,
     shaders::{compute_patches, copy_patches, shader},
     texture::Texture,
-    transform::Transform,
+    window_or_fallback::WindowOrFallback,
 };
-
-#[derive(Debug, Clone, Default)]
-pub struct ProfilerSettings {
-    pub gpu: bool,
-}
-
-#[derive(Debug, Clone)]
-pub struct ModelInfo {
-    pub transform: Transform,
-    pub material_info: MaterialInfo,
-    pub label: String, // TODO: Make this a label for the shader only!
-    pub evaluate_image_code: String,
-}
-
-pub struct CpuApplication {
-    pub gpu: Option<GpuApplication>,
-    pub camera_controller: CameraController,
-    models: Vec<ModelInfo>,
-    last_update_instant: Option<Instant>,
-    frame_counter: FrameCounter,
-    camera: Camera,
-    mouse: Vec2,
-    mouse_held: bool,
-    profiler_settings: ProfilerSettings,
-}
-
-impl CpuApplication {
-    pub fn new() -> anyhow::Result<Self> {
-        let camera = Camera::new(UVec2::new(1, 1), CameraSettings::default());
-        let camera_controller = CameraController::new(
-            GeneralController {
-                position: Vec3::new(0.0, 0.0, 4.0),
-                orientation: glam::Quat::IDENTITY,
-                distance_to_center: 4.0,
-            },
-            GeneralControllerSettings {
-                fly_speed: 5.0,
-                pan_speed: 1.0,
-                rotation_sensitivity: 0.01,
-            },
-            ChosenKind::Freecam,
-        );
-
-        Ok(Self {
-            gpu: None,
-            camera,
-            camera_controller,
-            models: vec![],
-            last_update_instant: None,
-            frame_counter: FrameCounter::new(),
-            mouse: Vec2::ZERO,
-            mouse_held: false,
-            profiler_settings: ProfilerSettings::default(),
-        })
-    }
-
-    pub fn get_profiling(&self) -> ProfilerSettings {
-        self.profiler_settings.clone()
-    }
-
-    pub fn set_profiling(&mut self, new_settings: ProfilerSettings) {
-        self.profiler_settings = new_settings;
-        if let Some(gpu) = &mut self.gpu {
-            gpu.context.set_profiling(self.profiler_settings.gpu);
-        }
-    }
-
-    pub async fn create_surface(&mut self, window: WindowOrFallback) -> anyhow::Result<()> {
-        if self.gpu.is_some() {
-            return Ok(());
-        }
-        let gpu = self.start_create_gpu(window).create_surface().await?;
-        self.set_gpu(gpu);
-        Ok(())
-    }
-
-    pub fn start_create_gpu(&mut self, window: WindowOrFallback) -> GpuApplicationBuilder {
-        self.camera.update_size(window.size());
-
-        GpuApplicationBuilder {
-            camera: self.camera.clone(),
-            profiler_settings: self.profiler_settings.clone(),
-            window,
-        }
-    }
-
-    pub fn set_gpu(&mut self, gpu_application: GpuApplication) {
-        let size = gpu_application.context.size();
-        self.gpu = Some(gpu_application);
-        self.set_profiling(self.profiler_settings.clone());
-        self.resize(size);
-        let models = std::mem::take(&mut self.models);
-        self.update_models(models);
-    }
-
-    pub fn resize(&mut self, new_size: UVec2) {
-        if let Some(gpu) = &mut self.gpu {
-            let new_size = gpu.resize(new_size);
-            if let Some(new_size) = new_size {
-                self.camera.update_size(new_size);
-            }
-        }
-    }
-
-    pub fn update_models(&mut self, models: Vec<ModelInfo>) {
-        self.models = models;
-        if let Some(gpu) = &mut self.gpu {
-            update_virtual_models(
-                &mut gpu.shader_arena,
-                &mut gpu.virtual_models,
-                &self.models,
-                &gpu.context,
-                &gpu.meshes,
-            )
-            .unwrap();
-        }
-    }
-
-    pub fn update(&mut self, inputs: &WindowInputs) {
-        let now = Instant::now();
-        if let Some(last_update_instant) = self.last_update_instant {
-            let delta = Seconds((now - last_update_instant).as_secs_f32());
-            let cursor_capture = self.camera_controller.update(inputs, delta.0);
-            if let Some(gpu) = &mut self.gpu {
-                gpu.update_cursor_capture(cursor_capture, inputs);
-            }
-        }
-        self.last_update_instant = Some(now);
-        self.camera.update_camera(&self.camera_controller);
-        self.mouse = Vec2::new(
-            inputs.mouse.position.x as f32,
-            inputs.mouse.position.y as f32,
-        );
-        self.mouse_held = inputs.mouse.pressed(winit::event::MouseButton::Left);
-    }
-
-    fn render_data(&self, frame_time: &FrameTime) -> RenderData<'_> {
-        RenderData {
-            camera: &self.camera,
-            time_data: shader::Time {
-                elapsed: frame_time.elapsed.0,
-                delta: frame_time.delta.0,
-                frame: frame_time.frame as u32,
-            },
-            mouse_data: shader::Mouse {
-                pos: self.mouse,
-                buttons: if self.mouse_held { 1 } else { 0 },
-            },
-        }
-    }
-
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let frame_time = self.frame_counter.new_frame();
-        if let Some(mut gpu) = self.gpu.take() {
-            let result = gpu.render(self.render_data(&frame_time));
-            self.gpu = Some(gpu);
-            result
-        } else {
-            Ok(())
-        }
-    }
-
-    pub fn get_profiling_data(&mut self) -> Option<Vec<wgpu_profiler::GpuTimerQueryResult>> {
-        assert!(self.gpu.is_some());
-        assert!(self.profiler_settings.gpu);
-        self.gpu.as_mut().and_then(|gpu| {
-            gpu.context
-                .profiler
-                .process_finished_frame(gpu.context.queue.get_timestamp_period())
-        })
-    }
-}
 
 struct RenderStep {
     bind_group_0: shader::bind_groups::BindGroup0,
@@ -210,15 +28,21 @@ struct CopyPatchesStep {
     pipeline: wgpu::ComputePipeline,
 }
 
+#[must_use]
 pub struct GpuApplicationBuilder {
-    pub camera: Camera,
-    pub profiler_settings: ProfilerSettings,
-    pub window: WindowOrFallback,
+    pub context: WgpuContext,
 }
 
 impl GpuApplicationBuilder {
-    pub async fn create_surface(self) -> anyhow::Result<GpuApplication> {
-        GpuApplication::new(self.window, &self.camera, &self.profiler_settings).await
+    #[must_use]
+    pub async fn new(window: WindowOrFallback) -> anyhow::Result<Self> {
+        let context = WgpuContext::new(window).await?;
+        Ok(Self { context })
+    }
+
+    #[must_use]
+    pub fn build(self) -> anyhow::Result<GpuApplication> {
+        GpuApplication::new(self.context)
     }
 }
 
@@ -238,22 +62,17 @@ pub struct GpuApplication {
     meshes: Vec<Mesh>,
     threshold_factor: f32, // TODO: Make this adjustable
     cursor_capture: WindowCursorCapture,
+    frame_counter: FrameCounter,
 }
 
 const PATCH_SIZES: [u32; 5] = [2, 4, 8, 16, 32];
 const MAX_PATCH_COUNT: u32 = 100_000;
 
 impl GpuApplication {
-    pub async fn new(
-        window: WindowOrFallback,
-        camera: &Camera,
-        profiler_settings: &ProfilerSettings,
-    ) -> anyhow::Result<Self> {
-        let mut context = WgpuContext::new(window).await?;
-        context.set_profiling(profiler_settings.gpu);
+    pub fn new(context: WgpuContext) -> anyhow::Result<Self> {
         let device = &context.device;
 
-        let scene_data = SceneData::new(device, camera)?;
+        let scene_data = SceneData::new(device)?;
 
         // Some arbitrary splits (size/2 - 1 == one quad per four pixels)
         let meshes = [0, 1, 3, 7, 15]
@@ -262,7 +81,7 @@ impl GpuApplication {
             .collect::<Vec<_>>();
         assert!(meshes.len() == PATCH_SIZES.len());
 
-        let shader_arena = virtual_model::ShaderArena::new();
+        let shader_arena = virtual_model::ShaderArena::new(&context);
         let virtual_models = vec![];
 
         let render_buffer_reset = compute_patches::RenderBuffer {
@@ -351,22 +170,53 @@ impl GpuApplication {
             virtual_models,
             threshold_factor,
             cursor_capture: WindowCursorCapture::Free,
+            frame_counter: FrameCounter::new(),
         })
     }
 
-    #[must_use]
-    pub fn resize(&mut self, new_size: UVec2) -> Option<UVec2> {
+    pub fn resize(&mut self, new_size: UVec2) {
         let new_size = new_size.max(UVec2::new(1, 1));
         if new_size == self.context.size() {
-            return None;
+            return;
         }
         self.context.resize(new_size);
         self.depth_texture =
             Texture::create_depth_texture(&self.context.device, new_size, "Depth Texture");
-        Some(new_size)
     }
 
-    pub fn render(&mut self, render_data: RenderData) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self, game: &GameRes) -> Result<(), wgpu::SurfaceError> {
+        // 1. Read from game
+        let frame_time = self.frame_counter.new_frame();
+        let render_data = RenderData {
+            size: self.context.size(),
+            camera: game.camera.to_shader(self.context.size()),
+            time_data: shader::Time {
+                elapsed: frame_time.elapsed.0,
+                delta: frame_time.delta.0,
+                frame: frame_time.frame as u32,
+            },
+            mouse_data: shader::Mouse {
+                pos: game.mouse,
+                buttons: if game.mouse_held { 1 } else { 0 },
+            },
+        };
+
+        self.update_cursor_capture(game.cursor_capture);
+
+        self.context.set_profiling(game.profiler_settings.gpu);
+
+        update_virtual_models(
+            &mut self.shader_arena,
+            &mut self.virtual_models,
+            &game.models,
+            &self.context,
+            &self.meshes,
+        )
+        .unwrap();
+
+        update_shaders(&mut self.shader_arena, &game.shaders, &self.context);
+
+        // 2. Render
         match &self.context.surface {
             wgpu_context::SurfaceOrFallback::Surface { surface, .. } => {
                 // TODO: Handle all cases properly https://github.com/gfx-rs/wgpu/blob/a0c185a28c232ee2ab63f72d6fd3a63a3f787309/examples/src/framework.rs#L216
@@ -412,7 +262,7 @@ impl GpuApplication {
                 .write_buffer(
                     queue,
                     &compute_patches::InputBuffer {
-                        model_view_projection: model.get_model_view_projection(render_data.camera),
+                        model_view_projection: model.get_model_view_projection(&render_data.camera),
                         threshold_factor: self.threshold_factor,
                     },
                 )
@@ -474,7 +324,11 @@ impl GpuApplication {
                 .scope("Render", &mut command_encoder, &self.context.device);
 
         for model in self.virtual_models.iter() {
-            let shaders = self.shader_arena.get_shader(model.shaders_key);
+            let shaders = self
+                .shader_arena
+                .get_shader(&model.shader_key)
+                .unwrap_or_else(|| self.shader_arena.get_missing_shader());
+
             // Each round, we do a ping-pong and pong-ping
             // 2*4 rounds is enough to subdivide a 4k screen into 16x16 pixel patches
             let double_number_of_rounds = 4;
@@ -584,7 +438,10 @@ impl GpuApplication {
             },
         );
         for model in self.virtual_models.iter() {
-            let shaders = self.shader_arena.get_shader(model.shaders_key);
+            let shaders = self
+                .shader_arena
+                .get_shader(&model.shader_key)
+                .unwrap_or_else(|| self.shader_arena.get_missing_shader());
             {
                 render_pass.set_pipeline(&shaders.render);
                 let indirect_draw_offsets = [
@@ -642,8 +499,34 @@ impl GpuApplication {
     }
 }
 
-fn update_virtual_models(
+fn update_shaders(
     shader_arena: &mut virtual_model::ShaderArena,
+    shaders: &std::collections::HashMap<crate::game::ShaderId, crate::game::ShaderInfo>,
+    context: &WgpuContext,
+) {
+    for (shader_id, shader_info) in shaders.iter() {
+        if shader_arena.get_shader(&shader_id).is_none() {
+            shader_arena.add_shader(
+                shader_id.clone(),
+                &shader_info.label,
+                &shader_info.code,
+                &context,
+            );
+        }
+    }
+    // TODO: Delete shaders that are not in the list
+}
+
+impl GpuApplication {
+    pub fn get_profiling_data(&mut self) -> Option<Vec<wgpu_profiler::GpuTimerQueryResult>> {
+        self.context
+            .profiler
+            .process_finished_frame(self.context.queue.get_timestamp_period())
+    }
+}
+
+fn update_virtual_models(
+    _shader_arena: &mut virtual_model::ShaderArena,
     virtual_models: &mut Vec<VirtualModel>,
     models: &[ModelInfo],
     context: &WgpuContext,
@@ -653,40 +536,27 @@ fn update_virtual_models(
     for (virtual_model, model) in virtual_models.iter_mut().zip(models.iter()) {
         virtual_model.transform = model.transform.clone();
         virtual_model.material_info = model.material_info.clone();
-        virtual_model.shaders_key = shader_arena.get_or_create_shader(
-            &model.label,
-            context,
-            model.evaluate_image_code.as_str(),
-        );
+        virtual_model.shader_key = model.shader_id.clone();
     }
     // Resize virtual models
     if virtual_models.len() > models.len() {
         virtual_models.truncate(models.len());
     } else if virtual_models.len() < models.len() {
         for model in models.iter().skip(virtual_models.len()) {
-            let mut virtual_model = VirtualModel::new(
-                context,
-                meshes,
-                shader_arena.get_or_create_shader(
-                    &model.label,
-                    context,
-                    model.evaluate_image_code.as_str(),
-                ),
-            )?;
+            let mut virtual_model = VirtualModel::new(context, meshes, model.shader_id.clone())?;
             virtual_model.transform = model.transform.clone();
             virtual_model.material_info = model.material_info.clone();
             virtual_models.push(virtual_model);
         }
     }
-
-    // Clean up unused shaders
-    shader_arena.retain(virtual_models.iter().map(|model| model.shaders_key));
     Ok(())
 }
-pub struct RenderData<'a> {
-    camera: &'a Camera,
-    time_data: shader::Time,
-    mouse_data: shader::Mouse,
+
+pub struct RenderData {
+    pub size: UVec2,
+    pub camera: shader::Camera,
+    pub time_data: shader::Time,
+    pub mouse_data: shader::Mouse,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -696,19 +566,19 @@ pub enum CursorCapture {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum WindowCursorCapture {
+pub enum WindowCursorCapture {
     Free,
     LockedAndHidden(winit::dpi::PhysicalPosition<f64>),
 }
 
 impl GpuApplication {
-    pub fn update_cursor_capture(&mut self, cursor_capture: CursorCapture, inputs: &WindowInputs) {
+    pub fn update_cursor_capture(&mut self, cursor_capture: WindowCursorCapture) {
         let window = match &self.context.surface {
             wgpu_context::SurfaceOrFallback::Surface { window, .. } => window,
             wgpu_context::SurfaceOrFallback::Fallback { .. } => return,
         };
         match (self.cursor_capture, cursor_capture) {
-            (WindowCursorCapture::LockedAndHidden(position), CursorCapture::Free) => {
+            (WindowCursorCapture::LockedAndHidden(position), WindowCursorCapture::Free) => {
                 window
                     .set_cursor_grab(winit::window::CursorGrabMode::None)
                     .unwrap();
@@ -716,10 +586,14 @@ impl GpuApplication {
                 let _ = window.set_cursor_position(position);
                 self.cursor_capture = WindowCursorCapture::Free;
             }
-            (WindowCursorCapture::Free, CursorCapture::Free) => {}
-            (WindowCursorCapture::LockedAndHidden(_), CursorCapture::LockedAndHidden) => {}
-            (WindowCursorCapture::Free, CursorCapture::LockedAndHidden) => {
-                let cursor_position = inputs.mouse.position;
+            (WindowCursorCapture::Free, WindowCursorCapture::Free) => {}
+            (
+                WindowCursorCapture::LockedAndHidden(_),
+                WindowCursorCapture::LockedAndHidden(position),
+            ) => {
+                self.cursor_capture = WindowCursorCapture::LockedAndHidden(position);
+            }
+            (WindowCursorCapture::Free, WindowCursorCapture::LockedAndHidden(cursor_position)) => {
                 window
                     .set_cursor_grab(winit::window::CursorGrabMode::Confined)
                     .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))

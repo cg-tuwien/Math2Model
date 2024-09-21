@@ -7,8 +7,10 @@ import IconSun from "~icons/mdi/white-balance-sunny";
 import IconGithub from "~icons/mdi/github";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { homepage, version } from "@/../package.json";
+import { useFsStore } from "@/stores/fs-store";
 
 const store = useStore();
+const fsStore = useFsStore();
 
 const examplesModule = () => import("@/scenes/example-scenes");
 
@@ -47,15 +49,15 @@ async function handleFile(key: FileDropdownOption["key"]) {
   if (key === "open") {
     inputFileElement.value?.click();
   } else if (key === "save-as") {
-    await store.exportToZip();
+    await fsStore.exportToZip();
   } else if (key === "examples") {
     // Do nothing
   } else if (key === "example-scene") {
     const module = await examplesModule();
-    store.importInMemoryProject(module.createDefaultProject().files);
+    fsStore.importInMemoryProject(module.createDefaultProject().files);
   } else if (key === "heart-sphere-scene") {
     const module = await examplesModule();
-    store.importInMemoryProject(module.createHeartSphereProject().files);
+    fsStore.importInMemoryProject(module.createHeartSphereProject().files);
   } else {
     assertUnreachable(key);
   }
@@ -117,7 +119,7 @@ function handleHelp(key: HelpDropdownOption["key"]) {
 }
 
 async function openFiles(inputFiles: FileList) {
-  store.importFilesOrProject(inputFiles);
+  fsStore.importFilesOrProject(inputFiles);
 }
 </script>
 

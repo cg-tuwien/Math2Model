@@ -2,23 +2,12 @@
 import CodeEditor, { type KeyedCode } from "@/components/CodeEditor.vue";
 import IconFolderMultipleOutline from "~icons/mdi/folder-multiple-outline";
 import IconFileTreeOutline from "~icons/mdi/file-tree-outline";
-import {
-  ref,
-  shallowRef,
-  watch,
-  watchEffect,
-  onUnmounted,
-  computed,
-  h,
-  type Ref,
-  reactive,
-} from "vue";
+import { ref, watchEffect, computed, h } from "vue";
 import { useDebounceFn, watchImmediate } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import {
   ReactiveFilesystem,
   makeFilePath,
-  useTextFile,
   type FilePath,
 } from "@/filesystem/reactive-files";
 import { showError, showFileError } from "@/notification";
@@ -35,10 +24,11 @@ import {
   serializeScene,
 } from "@/filesystem/scene-file";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
-import HeartSphere from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
-import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
+import HeartSphereCode from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
+import DefaultShaderCode from "@/../parametric-renderer-core/shaders/DefaultParametric.wgsl?raw";
 import type { ObjectUpdate } from "./input/object-update";
 import WebGpu from "@/components/WebGpu.vue";
+import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -51,7 +41,17 @@ const props = defineProps<{
 const store = useStore();
 
 // The underlying data
-const sceneFile = useTextFile(SceneFileName, props.fs);
+const sceneFile = ref<string | null>(null);
+
+props.fs.watchFromStart((change) => {
+  if (change.key === SceneFileName) {
+    // Thread safety: Ordered reads are guaranteed by readTextFile.
+    props.fs.readTextFile(change.key)?.then((v) => {
+      sceneFile.value = v;
+    });
+  }
+});
+
 const scene = useVirtualScene();
 watchEffect(() => {
   if (sceneFile.value === null) {
@@ -80,80 +80,63 @@ watchEffect(() => {
 });
 
 {
-  // TODO: Make the Rust side pull files instead of this
-  const referencedFiles = shallowRef(
-    new Map<FilePath, Readonly<Ref<string | null>>>()
-  );
-  watchImmediate(
-    () => scene.state.value.models,
-    (models) => {
-      const newReferencedFiles = new Map<
-        FilePath,
-        Readonly<Ref<string | null>>
-      >();
-      for (let model of models) {
-        const fileName = model.code;
-        if (newReferencedFiles.has(fileName)) {
-          continue;
-        }
-        const fileReference =
-          referencedFiles.value.get(fileName) ??
-          useTextFile(fileName, props.fs);
-        newReferencedFiles.set(fileName, fileReference);
+  // Watch for shader file changes
+  let shaderFiles = new Map<FilePath, Promise<string>>();
+  const readShaderAsync = (file: FilePath) => {
+    const promise = props.fs.readTextFile(file);
+    if (promise === null) return;
+    shaderFiles.set(file, promise);
+    promise.then((code) => {
+      if (shaderFiles.get(file) === promise) {
+        props.engine.updateShader({
+          id: file,
+          label: file,
+          code,
+        });
       }
-
-      referencedFiles.value = newReferencedFiles;
-    }
-  );
-
-  watchEffect(() => {
-    let models = scene.state.value.models.map((v) => {
-      let code =
-        referencedFiles.value.get(v.code)?.value ??
-        `fn sampleObject(input: vec2f) -> vec3f { return vec3(input, 0.0); }`;
-
-      let model = {
-        transform: {
-          position: [v.position.x, v.position.y, v.position.z],
-          rotation: [v.rotation.x, v.rotation.y, v.rotation.z],
-          scale: v.scale,
-        },
-        material_info: {
-          color: [v.material.color.x, v.material.color.y, v.material.color.z],
-          emissive: [
-            v.material.emissive.x,
-            v.material.emissive.y,
-            v.material.emissive.z,
-          ],
-          roughness: v.material.roughness,
-          metallic: v.material.metallic,
-        },
-        label: v.code,
-        evaluate_image_code: code,
-      };
-      return model;
     });
-    props.engine.updateModels(models);
+  };
+  props.fs.watchFromStart((change) => {
+    if (!change.key.endsWith(".wgsl")) return;
+    if (change.type === "insert") {
+      props.engine.updateShader({
+        id: change.key,
+        label: change.key,
+        code: DefaultShaderCode,
+      });
+      readShaderAsync(change.key);
+    } else if (change.type === "update") {
+      readShaderAsync(change.key);
+    } else if (change.type === "remove") {
+      shaderFiles.delete(change.key);
+      props.engine.removeShader(change.key);
+    }
   });
 }
 
-const shadersDropdown = computed<SelectMixedOption[]>(() => {
-  return [...props.fs.files.value.keys()]
-    .toSorted()
-    .filter((fileName) => fileName.endsWith(".wgsl"))
-    .map(
-      (fileName): SelectMixedOption => ({
-        label: fileName.substring(
-          0,
-          fileName.valueOf().length - ".wgsl".length
-        ),
-        value: fileName,
-      })
-    )
-    .concat({
-      label: "New Shader...",
-      value: undefined,
-    });
+watchEffect(() => {
+  let models = scene.state.value.models.map((v) => {
+    let model: WasmModelInfo = {
+      transform: {
+        position: [v.position.x, v.position.y, v.position.z],
+        rotation: [v.rotation.x, v.rotation.y, v.rotation.z],
+        scale: v.scale,
+      },
+      material_info: {
+        color: [v.material.color.x, v.material.color.y, v.material.color.z],
+        emissive: [
+          v.material.emissive.x,
+          v.material.emissive.y,
+          v.material.emissive.z,
+        ],
+        roughness: v.material.roughness,
+        metallic: v.material.metallic,
+      },
+      shader_id: v.code,
+    };
+    return model;
+  });
+  props.engine.updateModels(models);
 });
 
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
@@ -297,7 +280,7 @@ function addModel(name: string, shaderName: string) {
     const vertexSource = makeFilePath(shaderName);
 
     if (!props.fs.hasFile(vertexSource)) {
-      props.fs.writeTextFile(vertexSource, HeartSphere);
+      props.fs.writeTextFile(vertexSource, HeartSphereCode);
     }
 
     const newModel: VirtualModelState = {
@@ -376,10 +359,7 @@ function removeModel(ids: string[]) {
           <div v-else-if="tabs.selectedTab.value === 'sceneview'">
             <SceneHierarchy
               :models="scene.state.value.models"
-              :scene="scene.api.value"
-              :files="props.fs"
-              :scene-path="SceneFileName"
-              :shaders="shadersDropdown"
+              :fs="props.fs"
               @update="(keys, update) => updateModels(keys, update)"
               @addModel="
                 (modelName, shaderName) => addModel(modelName, shaderName)

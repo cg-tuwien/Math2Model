@@ -14,6 +14,7 @@ pub struct WgpuContext {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub profiler: GpuProfiler,
+    is_profiling_enabled: bool,
     size: UVec2,
     pub view_format: wgpu::TextureFormat,
 }
@@ -126,6 +127,7 @@ impl WgpuContext {
 
         #[cfg(not(feature = "tracy"))]
         let profiler = GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler");
+        let is_profiling_enabled = false;
 
         Ok(WgpuContext {
             instance,
@@ -134,12 +136,17 @@ impl WgpuContext {
             device,
             queue,
             profiler,
+            is_profiling_enabled,
             size,
             view_format,
         })
     }
 
     pub fn set_profiling(&mut self, enabled: bool) {
+        if self.is_profiling_enabled == enabled {
+            return;
+        }
+        self.is_profiling_enabled = enabled;
         self.profiler
             .change_settings(GpuProfilerSettings {
                 enable_timer_queries: enabled,

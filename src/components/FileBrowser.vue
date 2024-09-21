@@ -57,8 +57,17 @@ const data = ref<TreeNode>({
   label: "Root",
   children: [],
 });
+const dumbFiles = ref(new Set<FilePath>());
+props.fs.watchFromStart((change) => {
+  if (change.type === "insert") {
+    dumbFiles.value.add(change.key);
+  } else if (change.type === "remove") {
+    dumbFiles.value.delete(change.key);
+  }
+});
+
 watch(
-  props.fs.files,
+  dumbFiles,
   (fileNames) => {
     const oldDataMap = new Map(
       (data.value.children ?? []).map((node) => [node.key, node])

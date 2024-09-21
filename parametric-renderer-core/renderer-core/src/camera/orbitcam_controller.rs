@@ -1,7 +1,7 @@
 use glam::{Quat, Vec2, Vec3};
 use winit::event::MouseButton;
 
-use crate::{application::CursorCapture, input::WindowInputs};
+use crate::{input::WindowInputs, renderer::CursorCapture};
 
 use super::{
     angle::Angle,

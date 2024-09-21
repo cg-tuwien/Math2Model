@@ -25,37 +25,22 @@ pub struct Camera {
     pub orientation: Quat,
     pub settings: CameraSettings,
 
-    size: UVec2,
     view: Mat4,
-    proj: Mat4,
 }
 
 impl Camera {
-    pub fn new(size: UVec2, settings: CameraSettings) -> Self {
+    pub fn new(settings: CameraSettings) -> Self {
         let position = Vec3::ZERO;
         let orientation = Quat::IDENTITY;
-
-        let aspect_ratio = size.x as f32 / size.y as f32;
-        let proj = Mat4::perspective_infinite_reverse_rh(
-            settings.fov.radians,
-            aspect_ratio,
-            settings.z_near,
-        );
 
         let view = calculate_view(position, orientation);
 
         Self {
-            size,
             position,
             orientation,
             settings,
-            proj,
             view,
         }
-    }
-
-    pub fn size(&self) -> UVec2 {
-        self.size
     }
 
     /// Positions the camera
@@ -63,8 +48,14 @@ impl Camera {
         self.view
     }
 
-    pub fn projection_matrix(&self) -> Mat4 {
-        self.proj
+    pub fn projection_matrix(&self, size: UVec2) -> Mat4 {
+        let aspect_ratio = size.x as f32 / size.y as f32;
+
+        Mat4::perspective_infinite_reverse_rh(
+            self.settings.fov.radians,
+            aspect_ratio,
+            self.settings.z_near,
+        )
     }
 
     pub fn update_camera(&mut self, controller: &impl IsCameraController) {
@@ -72,13 +63,6 @@ impl Camera {
         self.orientation = controller.orientation();
 
         self.view = calculate_view(self.position, self.orientation);
-    }
-
-    pub fn update_size(&mut self, size: UVec2) {
-        let aspect_ratio = size.x as f32 / size.y as f32;
-        // See https://docs.rs/glam/0.27.0/src/glam/f32/sse2/mat4.rs.html#969-982
-        self.proj.as_mut()[0] = self.proj.as_mut()[5] / aspect_ratio;
-        self.size = size;
     }
 
     /// in world-space

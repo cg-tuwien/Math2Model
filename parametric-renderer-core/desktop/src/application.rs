@@ -3,10 +3,12 @@ use std::sync::Arc;
 use glam::{UVec2, Vec3};
 use pollster::FutureExt;
 use renderer_core::{
-    application::{CpuApplication, MaterialInfo, ModelInfo, ProfilerSettings, WindowOrFallback},
     camera::camera_controller::{self, CameraController, IsCameraController},
+    game::{GameRes, MaterialInfo, ModelInfo, ShaderId, ShaderInfo},
     input::{InputHandler, WindowInputs, WinitAppHelper},
+    renderer::{GpuApplication, GpuApplicationBuilder},
     transform::Transform,
+    window_or_fallback::WindowOrFallback,
 };
 use tracing::{error, info, warn};
 use winit::{application::ApplicationHandler, dpi::PhysicalSize, window::Window};
@@ -14,8 +16,9 @@ use winit::{application::ApplicationHandler, dpi::PhysicalSize, window::Window};
 use crate::config::{CacheFile, CachedCamera, CachedChosenController};
 
 pub struct Application {
-    app: CpuApplication,
+    app: GameRes,
     window: Option<Arc<Window>>,
+    renderer: Option<GpuApplication>,
     cache_file: CacheFile,
 }
 
@@ -43,10 +46,17 @@ impl Application {
     pub fn new() -> anyhow::Result<Self> {
         let cache_file = CacheFile::from_file(Application::CACHE_FILE).unwrap_or_default();
 
-        let mut app = CpuApplication::new()?;
-        app.set_profiling(ProfilerSettings { gpu: true });
+        let mut app = GameRes::new();
+        app.profiler_settings.gpu = true;
+        let shader_id = ShaderId("HeartSphere.wgsl".into());
+        app.set_shader(
+            shader_id.clone(),
+            ShaderInfo {
+                label: "HeartSphere".into(),
+                code: Application::DEFAULT_SHADER_CODE.into(),
+            },
+        );
         app.update_models(vec![ModelInfo {
-            label: "Default Model".to_owned(),
             transform: Transform {
                 position: Vec3::new(0.0, 0.0, 0.0),
                 ..Default::default()
@@ -57,7 +67,7 @@ impl Application {
                 roughness: 0.7,
                 metallic: 0.1,
             },
-            evaluate_image_code: Application::DEFAULT_SHADER_CODE.to_owned(),
+            shader_id,
         }]);
 
         if let Some(CachedCamera {
@@ -85,19 +95,24 @@ impl Application {
             window: None,
             app,
             cache_file,
+            renderer: None,
         })
     }
 
     fn create_surface(&mut self, window: Arc<Window>) {
-        self.app
-            .create_surface(WindowOrFallback::Window(window.clone()))
+        let renderer = GpuApplicationBuilder::new(WindowOrFallback::Window(window.clone()))
             .block_on()
+            .unwrap()
+            .build()
             .unwrap();
+        self.renderer = Some(renderer);
         window.request_redraw();
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        self.app.resize(UVec2::new(new_size.width, new_size.height));
+        if let Some(renderer) = &mut self.renderer {
+            renderer.resize(UVec2::new(new_size.width, new_size.height));
+        }
     }
 
     pub fn update(&mut self, inputs: &WindowInputs) {
@@ -105,12 +120,17 @@ impl Application {
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        self.app.render()
+        if let Some(renderer) = &mut self.renderer {
+            renderer.render(&self.app)
+        } else {
+            Ok(())
+        }
     }
 }
 
 pub async fn run() -> anyhow::Result<()> {
     let event_loop = winit::event_loop::EventLoop::new()?;
+    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
     let application = Application::new()?;
     event_loop.run_app(&mut WinitAppHelper::new(application))?;
     Ok(())
@@ -167,7 +187,7 @@ impl InputHandler for Application {
             .keyboard
             .just_pressed_physical(winit::keyboard::KeyCode::KeyP)
         {
-            match self.app.get_profiling_data() {
+            match self.renderer.as_mut().and_then(|v| v.get_profiling_data()) {
                 Some(data) => {
                     let file_name = format!(
                         "profile-{}.json",
@@ -198,7 +218,7 @@ impl InputHandler for Application {
             Ok(_) => (),
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 // TODO: Window closing and opening is borked
-                if let Some(gpu) = &mut self.app.gpu {
+                if let Some(gpu) = &mut self.renderer {
                     let _ = gpu.resize(gpu.size());
                 }
             }
