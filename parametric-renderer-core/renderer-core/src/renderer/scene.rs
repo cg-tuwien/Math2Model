@@ -1,5 +1,5 @@
 use crate::{buffer::TypedBuffer, camera::Camera, shaders::shader};
-use glam::{UVec2, Vec2, Vec4};
+use glam::{Mat4, UVec2, Vec2, Vec4};
 
 use super::RenderData;
 
@@ -12,7 +12,7 @@ pub struct SceneData {
 }
 
 impl SceneData {
-    pub fn new(device: &wgpu::Device, camera: &Camera) -> anyhow::Result<Self> {
+    pub fn new(device: &wgpu::Device) -> anyhow::Result<Self> {
         Ok(Self {
             time_buffer: TypedBuffer::new_uniform(
                 device,
@@ -45,7 +45,11 @@ impl SceneData {
             camera_buffer: TypedBuffer::new_uniform(
                 device,
                 "Camera Buffer",
-                &camera.to_shader(UVec2::ONE),
+                &shader::Camera {
+                    view: Mat4::IDENTITY,
+                    projection: Mat4::IDENTITY,
+                    world_position: Vec4::ZERO,
+                },
                 wgpu::BufferUsages::COPY_DST,
             )?,
             light_buffer: TypedBuffer::new_storage(

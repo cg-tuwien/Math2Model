@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use bevy_ecs::component::Component;
 use glam::{Vec2, Vec3};
 use web_time::Instant;
 
@@ -21,7 +20,7 @@ pub struct ProfilerSettings {
     pub gpu: bool,
 }
 
-#[derive(Component, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct ModelInfo {
     pub transform: Transform,
     pub material_info: MaterialInfo,
@@ -39,7 +38,7 @@ pub struct MaterialInfo {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct ShaderId(pub String);
 
-#[derive(Component, Clone)]
+#[derive(Clone)]
 pub struct ShaderInfo {
     pub label: String,
     pub code: String,

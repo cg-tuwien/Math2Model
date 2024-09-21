@@ -103,7 +103,7 @@ impl Application {
         let renderer = GpuApplicationBuilder::new(WindowOrFallback::Window(window.clone()))
             .block_on()
             .unwrap()
-            .build(&self.app.camera)
+            .build()
             .unwrap();
         self.renderer = Some(renderer);
         window.request_redraw();
@@ -130,6 +130,7 @@ impl Application {
 
 pub async fn run() -> anyhow::Result<()> {
     let event_loop = winit::event_loop::EventLoop::new()?;
+    event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
     let application = Application::new()?;
     event_loop.run_app(&mut WinitAppHelper::new(application))?;
     Ok(())

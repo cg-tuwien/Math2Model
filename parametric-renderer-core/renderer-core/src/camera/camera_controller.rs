@@ -48,6 +48,7 @@ pub struct GeneralController {
     pub distance_to_center: f32,
 }
 
+#[derive(Debug, Clone)]
 pub struct GeneralControllerSettings {
     pub fly_speed: f32,
     pub pan_speed: f32,

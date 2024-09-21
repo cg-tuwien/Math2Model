@@ -11,7 +11,6 @@ use wgpu_context::WgpuContext;
 
 use crate::{
     buffer::TypedBuffer,
-    camera::Camera,
     game::{GameRes, ModelInfo},
     mesh::Mesh,
     shaders::{compute_patches, copy_patches, shader},
@@ -42,8 +41,8 @@ impl GpuApplicationBuilder {
     }
 
     #[must_use]
-    pub fn build(self, camera: &Camera) -> anyhow::Result<GpuApplication> {
-        GpuApplication::new(self.context, camera)
+    pub fn build(self) -> anyhow::Result<GpuApplication> {
+        GpuApplication::new(self.context)
     }
 }
 
@@ -70,10 +69,10 @@ const PATCH_SIZES: [u32; 5] = [2, 4, 8, 16, 32];
 const MAX_PATCH_COUNT: u32 = 100_000;
 
 impl GpuApplication {
-    pub fn new(context: WgpuContext, camera: &Camera) -> anyhow::Result<Self> {
+    pub fn new(context: WgpuContext) -> anyhow::Result<Self> {
         let device = &context.device;
 
-        let scene_data = SceneData::new(device, camera)?;
+        let scene_data = SceneData::new(device)?;
 
         // Some arbitrary splits (size/2 - 1 == one quad per four pixels)
         let meshes = [0, 1, 3, 7, 15]

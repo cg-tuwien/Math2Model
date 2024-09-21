@@ -19,7 +19,6 @@ wgpu = { workspace = true }
 wgpu-profiler = "0.18.1"
 # wgsl-parser = "0.5.0"
 winit = { workspace = true }
-bevy_ecs = { workspace = true }
 
 [dev-dependencies]
 criterion = "0.5.1"
