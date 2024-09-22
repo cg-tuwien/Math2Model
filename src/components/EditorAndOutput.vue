@@ -74,7 +74,7 @@ watchEffect(() => {
 const openFile = useOpenFile(
   // Open the first .wgsl file if it exists
   props.fs.listFiles().find((v) => v.endsWith(".wgsl")) ?? null,
-  props.fs
+  props.fs,
 );
 
 const canvasContainer = ref<HTMLDivElement | null>(null);
@@ -87,7 +87,7 @@ watchEffect(() => {
 {
   // TODO: Make the Rust side pull files instead of this
   const referencedFiles = shallowRef(
-    new Map<FilePath, Readonly<Ref<string | null>>>()
+    new Map<FilePath, Readonly<Ref<string | null>>>(),
   );
   watchImmediate(
     () => scene.state.value.models,
@@ -108,7 +108,7 @@ watchEffect(() => {
       }
 
       referencedFiles.value = newReferencedFiles;
-    }
+    },
   );
 
   watchEffect(() => {
@@ -153,7 +153,7 @@ const shadersDropdown = computed<SelectMixedOption[]>(() => {
       (fileName): SelectMixedOption => ({
         label: fileName,
         value: fileName,
-      })
+      }),
     )
     .concat({
       label: "New Shader...",
@@ -469,7 +469,6 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
       <template #2>
         <n-split
           direction="horizontal"
-          style="height: 80vh"
           :max="0.75"
           :min="0.15"
           :default-size="0.5"

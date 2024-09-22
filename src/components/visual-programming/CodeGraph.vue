@@ -579,7 +579,7 @@ async function logCode() {
   let visited: string[] = [];
   let fullCode =
     (await orderedCode(customFunctionNodes, visited)) +
-    "\n\nfn evaluateImage(input2: vec2f) -> vec3f {\n" +
+    "\n\nfn sampleObject(input2: vec2f) -> vec3f {\n" +
     (await orderedCode(allNodes, visited, "\t"));
 
   // fullCode += (await getNodesCode(endNode, [], graph, "\t")) + "}";
