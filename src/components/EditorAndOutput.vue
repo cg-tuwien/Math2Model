@@ -8,10 +8,12 @@ import {
   watch,
   watchEffect,
   onUnmounted,
+  onMounted,
   computed,
   h,
   type Ref,
   reactive,
+  defineComponent,
 } from "vue";
 import { useDebounceFn, watchImmediate } from "@vueuse/core";
 import { useStore } from "@/stores/store";
@@ -36,8 +38,11 @@ import {
 } from "@/filesystem/scene-file";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
 import HeartSphere from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
+import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
+import BasicGraphShader from "@/../parametric-renderer-core/graphs/BasicGraphShader.graph.wgsl?raw";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import type { ObjectUpdate } from "./input/object-update";
+import CodeGraph from "@/components/visual-programming/CodeGraph.vue";
 import WebGpu from "@/components/WebGpu.vue";
 
 // Unchanging props! No need to watch them.
@@ -138,27 +143,62 @@ watchEffect(() => {
 }
 
 const shadersDropdown = computed<SelectMixedOption[]>(() => {
-  return [...props.fs.files.value.keys()]
+  const shadersSeperator: SelectMixedOption[] = [
+    { label: "Shaders", value: "", disabled: true },
+  ];
+  const shaderList: SelectMixedOption[] = [...props.fs.files.value.keys()]
     .toSorted()
     .filter((fileName) => fileName.endsWith(".wgsl"))
     .map(
       (fileName): SelectMixedOption => ({
-        label: fileName.substring(
-          0,
-          fileName.valueOf().length - ".wgsl".length
-        ),
+        label: fileName,
         value: fileName,
       })
     )
     .concat({
       label: "New Shader...",
-      value: undefined,
+      value: "wgsl",
     });
+  const graphsSeperator: SelectMixedOption[] = [
+    { label: "Graphs", value: "", disabled: true },
+  ];
+  const graphList: SelectMixedOption[] = [...props.fs.files.value.keys()]
+    .toSorted()
+    .filter((fileName) => fileName.endsWith(".graph"))
+    .map(
+      (fileName): SelectMixedOption => ({ label: fileName, value: fileName }),
+    )
+    .concat({
+      label: "New Graph...",
+      value: "graph",
+    });
+
+  return shadersSeperator.concat(
+    shaderList.concat(graphsSeperator.concat(graphList)),
+  );
 });
+
+const graphsDropdown = computed<SelectMixedOption[]>(() => {
+  return [...props.fs.files.value.keys()]
+    .toSorted()
+    .filter((fileName) => fileName.endsWith(".graph"))
+    .map(
+      (fileName): SelectMixedOption => ({
+        label: fileName.substring(
+          0,
+          fileName.valueOf().length - ".graph".length,
+        ),
+        value: fileName,
+      }),
+    );
+});
+
+type EditorType = "shader" | "graph";
 
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
   const openedFileName = ref<FilePath | null>(startFile);
   const keyedCode = ref<KeyedCode | null>(null);
+  const editorType = ref<EditorType>("shader");
 
   watchImmediate(openedFileName, (fileName) => {
     if (fileName === null) {
@@ -172,6 +212,14 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
       code: "",
       name: fileName,
     };
+
+    if (fileName.endsWith(".wgsl")) {
+      editorType.value = "shader";
+    } else if (fileName.endsWith(".graph")) {
+      editorType.value = "graph";
+    } else {
+      editorType.value = "shader";
+    }
 
     // And now asynchronously load the file
     let file = fs.readTextFile(fileName);
@@ -192,6 +240,13 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
     });
   });
 
+  const isReadonly = computed(() => {
+    if (keyedCode.value === null) {
+      return true;
+    }
+    return keyedCode.value.name.endsWith(".graph.wgsl");
+  });
+
   function openFile(v: FilePath) {
     openedFileName.value = v;
   }
@@ -208,6 +263,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
       openFile(newName);
     }
   }
+
   function deleteFiles(files: Set<FilePath>) {
     files.forEach((file) => {
       fs.deleteFile(file);
@@ -233,6 +289,9 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
   }, 500);
 
   return {
+    path: computed(() => openedFileName.value),
+    editorType: computed(() => editorType.value),
+    isReadonly,
     code: computed(() => keyedCode.value),
     openFile,
     addFiles,
@@ -294,10 +353,18 @@ function updateModels(ids: string[], update: ObjectUpdate<any>) {
 
 function addModel(name: string, shaderName: string) {
   if (shaderName) {
-    const vertexSource = makeFilePath(shaderName);
+    let vertexSource = makeFilePath(shaderName);
 
     if (!props.fs.hasFile(vertexSource)) {
-      props.fs.writeTextFile(vertexSource, HeartSphere);
+      if (vertexSource.endsWith(".wgsl"))
+        props.fs.writeTextFile(vertexSource, HeartSphere);
+      else if (vertexSource.endsWith(".graph")) {
+        props.fs.writeTextFile(vertexSource, BasicGraph);
+        vertexSource = makeFilePath(
+          vertexSource.replace(".graph", ".graph.wgsl"),
+        );
+        props.fs.writeTextFile(vertexSource, BasicGraphShader);
+      }
     }
 
     const newModel: VirtualModelState = {
@@ -329,6 +396,12 @@ function removeModel(ids: string[]) {
   }
 
   saveScene();
+}
+
+function saveGraphWgsl(filePath: FilePath, content: string) {
+  // Extension should be ".graph.wgsl"
+  filePath = makeFilePath(filePath.replace(".graph", ".graph.wgsl"));
+  props.fs.writeTextFile(filePath, content);
 }
 </script>
 
@@ -394,22 +467,63 @@ function removeModel(ids: string[]) {
         </div>
       </template>
       <template #2>
-        <div class="flex h-full w-full">
-          <WebGpu :gpuDevice="props.gpuDevice"></WebGpu>
-          <div
-            ref="canvasContainer"
-            class="self-stretch overflow-hidden flex-1"
-          >
-            <div v-if="sceneFile == null">Missing scene.json</div>
-          </div>
-          <CodeEditor
-            class="self-stretch overflow-hidden flex-1"
-            :keyed-code="openFile.code.value"
-            :is-dark="store.isDark"
-            @update="openFile.setNewCode($event)"
-          >
-          </CodeEditor>
-        </div>
+        <n-split
+          direction="horizontal"
+          style="height: 80vh"
+          :max="0.75"
+          :min="0.15"
+          :default-size="0.5"
+        >
+          <template #1>
+            <div class="flex h-full w-full">
+              <div
+                ref="canvasContainer"
+                class="self-stretch overflow-hidden flex-1"
+              >
+                <div v-if="sceneFile == null">Missing scene.json</div>
+              </div>
+            </div>
+          </template>
+          <template #2>
+            <div class="flex h-full w-full">
+              <CodeEditor
+                v-if="openFile.editorType.value === 'shader'"
+                class="self-stretch overflow-hidden flex-1"
+                :keyed-code="openFile.code.value"
+                :is-readonly="openFile.isReadonly.value"
+                :is-dark="store.isDark"
+                @update="openFile.setNewCode($event)"
+              >
+              </CodeEditor>
+              <CodeGraph
+                v-if="openFile.editorType.value === 'graph'"
+                class="self-stretch overflow-hidden flex-1"
+                :fs="props.fs"
+                :keyedGraph="openFile.code.value"
+                :graphs="graphsDropdown"
+                @update="
+                  (content) => {
+                    if (openFile.path.value !== null) {
+                      saveGraphWgsl(openFile.path.value, content);
+                    } else {
+                      console.error('Invalid state!');
+                    }
+                  }
+                "
+                @save="
+                  (content) => {
+                    if (openFile.path.value !== null) {
+                      props.fs.writeTextFile(openFile.path.value, content);
+                    } else {
+                      console.error('Invalid state!');
+                    }
+                  }
+                "
+                ref="graphRef"
+              ></CodeGraph>
+            </div>
+          </template>
+        </n-split>
       </template>
     </n-split>
   </main>

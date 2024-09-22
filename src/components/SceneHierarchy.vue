@@ -61,7 +61,7 @@ const data = ref<TreeNode>({
 });
 watchEffect(() => {
   const oldChildrenMap = new Map(
-    data.value.children?.map((node) => [node.key, node])
+    data.value.children?.map((node) => [node.key, node]),
   );
   data.value.children = props.models.map(
     (model): TreeNode => ({
@@ -99,6 +99,7 @@ const selectedKeys = computed(() => {
 let currentModel = ref<DeepReadonly<VirtualModelState> | null>(null);
 let toAddModel = ref<[string, FilePath] | null>(null);
 let customShader = ref<string | null>(null);
+let customGraph = ref<string | null>(null);
 
 watchEffect(() => {
   const keys = selectedKeys.value;
@@ -187,23 +188,28 @@ function addModel() {
     return;
   }
 
-  if (toAddModel.value[1] == undefined) {
-    if (!customShader) {
+  if (toAddModel.value[1] === "wgsl" || toAddModel.value[1] === "graph") {
+    if (!customShader || !customGraph) {
       showError("Invalid State!");
       return;
     }
-    if (customShader.value === null) {
+    if (customGraph.value === null && customShader.value === null) {
       showError(
         "Please enter a name for the new shader or select an existing shader."
       );
       return;
     }
-    toAddModel.value[1] = makeFilePath(customShader.value + ".wgsl");
+    if (customGraph.value !== null) {
+      toAddModel.value[1] = makeFilePath(customGraph.value + ".graph");
+    } else {
+      toAddModel.value[1] = makeFilePath(customShader.value + ".wgsl");
+    }
   }
 
   emit("addModel", toAddModel.value[0], toAddModel.value[1]);
   toAddModel.value = null;
   customShader.value = null;
+  customGraph.value = null;
 }
 
 function removeModel() {
@@ -341,12 +347,21 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
           placeholder="Select a shader for the model"
           :options="props.shaders"
           v-model:value="toAddModel[1]"
+          v-on:update-value="(v) => console.log(v)"
         ></n-select>
         <n-input
-          v-if="toAddModel[1] === 'NEW...'"
+          v-if="toAddModel[1] === 'wgsl'"
           v-model:value="customShader"
           type="text"
           placeholder="Please input a name for the new Shader"
+          clearable
+        >
+        </n-input>
+        <n-input
+          v-if="toAddModel[1] === 'graph'"
+          v-model:value="customGraph"
+          type="text"
+          placeholder="Please input a name for the new Graph"
           clearable
         >
         </n-input>
