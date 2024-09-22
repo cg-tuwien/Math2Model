@@ -250,7 +250,7 @@ export class FunctionCallNode extends VPNode {
       );
     }
 
-    for (let i = 1; i < (numParams ?? 1) + 1; i++) {
+    for (let i = 1; i < (numParams ?? 0) + 1; i++) {
       this.addInput(
         "param" + i.toString(),
         new ClassicPreset.Input(reteSocket, "Param " + i.toString()),
@@ -328,6 +328,15 @@ export class FunctionCallNode extends VPNode {
           } else {
             this.numParams = undefined;
           }
+        }
+      }
+
+      for (let i = 1; i < (this.numParams ?? 0) + 1; i++) {
+        if (!this.hasInput("param" + i.toString())) {
+          this.addInput(
+            "param" + i.toString(),
+            new ClassicPreset.Input(reteSocket, "Param " + i.toString()),
+          );
         }
       }
     }

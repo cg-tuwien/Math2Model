@@ -29,6 +29,7 @@
     "rete-context-menu-plugin": "^2.0.3",
     "rete-dock-plugin": "^2.0.2",
     "rete-engine": "^2.0.1",
+    "rete-history-plugin": "^2.0.2",
     "rete-react-plugin": "^2.0.5",
     "rete-render-utils": "^2.0.2",
     "rete-scopes-plugin": "^2.1.0",

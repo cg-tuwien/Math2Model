@@ -223,7 +223,6 @@ export class SeparateNode extends VPNode {
 
   data(inputs: { vector?: NodeReturn[] }): { x: NodeReturn; y: NodeReturn } {
     const vector = inputs.vector;
-    console.log(vector ? vector[0].value : "Hello");
 
     let result = {
       x: {
@@ -256,7 +255,6 @@ export class SeparateNode extends VPNode {
 
         if (this.update) {
           this.update(this);
-          console.log("Updated Node, added output for z");
         }
       }
     } else {
@@ -273,7 +271,6 @@ export class SeparateNode extends VPNode {
 
         if (this.update) {
           this.update(this);
-          console.log("Updated Node, added output for w");
         }
       }
     } else {

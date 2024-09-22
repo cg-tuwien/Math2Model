@@ -8,10 +8,11 @@ export class SerializedNode {
   extraNumberInformation?: ExtraNumberInformation[];
 
   getTextOrNumberInput(key: string) {
+    // console.log("Searching for", key, "in", JSON.stringify(this.inputs));
     for (let input of this.inputs) {
       if (
-        input.type === "number" ||
-        (input.type === "text" && input.key === key)
+        (input.type === "number" || input.type === "text") &&
+        input.key === key
       )
         return input;
     }

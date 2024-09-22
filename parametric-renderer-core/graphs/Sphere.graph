@@ -1,0 +1,483 @@
+{
+  "graph": [
+    {
+      "size": [
+        180,
+        160
+      ],
+      "uuid": "bd243f126f9587d4",
+      "inputs": [],
+      "nodeType": "VariableOut",
+      "extraStringInformation": [
+        {
+          "key": "code",
+          "value": ""
+        },
+        {
+          "key": "ref",
+          "value": "input2"
+        }
+      ],
+      "extraNumberInformation": [
+        {
+          "key": "value",
+          "value": {
+            "0": 1,
+            "1": 1
+          }
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        160
+      ],
+      "uuid": "162a3201ec9dedbb",
+      "inputs": [],
+      "nodeType": "VariableOut",
+      "extraStringInformation": [
+        {
+          "key": "code",
+          "value": "var PI = 3.14159265359;"
+        },
+        {
+          "key": "ref",
+          "value": "PI"
+        }
+      ],
+      "extraNumberInformation": [
+        {
+          "key": "value",
+          "value": 3.14159265359
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        160
+      ],
+      "uuid": "e80ce47e316c53e4",
+      "inputs": [],
+      "nodeType": "VariableOut",
+      "extraStringInformation": [
+        {
+          "key": "code",
+          "value": "var HALF_PI = 3.14159265359 / 2.0;"
+        },
+        {
+          "key": "ref",
+          "value": "HALF_PI"
+        }
+      ],
+      "extraNumberInformation": [
+        {
+          "key": "value",
+          "value": 1.570796326795
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        160
+      ],
+      "uuid": "2add6d18e1495bda",
+      "inputs": [],
+      "nodeType": "VariableOut",
+      "extraStringInformation": [
+        {
+          "key": "code",
+          "value": "var TWO_PI = 3.14159265359 * 2.0;"
+        },
+        {
+          "key": "ref",
+          "value": "TWO_PI"
+        }
+      ],
+      "extraNumberInformation": [
+        {
+          "key": "value",
+          "value": 6.28318530718
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        160
+      ],
+      "uuid": "f670e1f5a44e742f",
+      "inputs": [
+        {
+          "key": "def",
+          "value": "vec3f(input2.x, 0, input2.y)",
+          "type": "text"
+        },
+        {
+          "type": "node",
+          "value": "8c69094a7e420b58",
+          "keyFrom": "value",
+          "keyTo": "returnIn"
+        }
+      ],
+      "nodeType": "Return"
+    },
+    {
+      "size": [
+        180,
+        200
+      ],
+      "uuid": "ef97bcdab10fc7b2",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "bd243f126f9587d4",
+          "keyFrom": "value",
+          "keyTo": "vector"
+        }
+      ],
+      "nodeType": "Separate"
+    },
+    {
+      "size": [
+        180,
+        230
+      ],
+      "uuid": "2c047762cec47c16",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "ef97bcdab10fc7b2",
+          "keyFrom": "x",
+          "keyTo": "left"
+        },
+        {
+          "type": "node",
+          "value": "162a3201ec9dedbb",
+          "keyFrom": "value",
+          "keyTo": "right"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        230
+      ],
+      "uuid": "105e3c4eb9958ba2",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "ef97bcdab10fc7b2",
+          "keyFrom": "y",
+          "keyTo": "left"
+        },
+        {
+          "type": "node",
+          "value": "2add6d18e1495bda",
+          "keyFrom": "value",
+          "keyTo": "right"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        180
+      ],
+      "uuid": "6b1ddf71ead6988e",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "2c047762cec47c16",
+          "keyFrom": "value",
+          "keyTo": "param1"
+        }
+      ],
+      "nodeType": "FunctionCall",
+      "extraStringInformation": [
+        {
+          "key": "function",
+          "value": "sin"
+        }
+      ],
+      "extraNumberInformation": [
+        {
+          "key": "nParams",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        180
+      ],
+      "uuid": "f7d131bb9b297704",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "105e3c4eb9958ba2",
+          "keyFrom": "value",
+          "keyTo": "param1"
+        }
+      ],
+      "nodeType": "FunctionCall",
+      "extraStringInformation": [
+        {
+          "key": "function",
+          "value": "sin"
+        }
+      ],
+      "extraNumberInformation": [
+        {
+          "key": "nParams",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        180
+      ],
+      "uuid": "a5d3eda109b8c778",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "2c047762cec47c16",
+          "keyFrom": "value",
+          "keyTo": "param1"
+        }
+      ],
+      "nodeType": "FunctionCall",
+      "extraStringInformation": [
+        {
+          "key": "function",
+          "value": "cos"
+        }
+      ],
+      "extraNumberInformation": [
+        {
+          "key": "nParams",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        180
+      ],
+      "uuid": "9b66f19ece35c9cf",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "105e3c4eb9958ba2",
+          "keyFrom": "value",
+          "keyTo": "param1"
+        }
+      ],
+      "nodeType": "FunctionCall",
+      "extraStringInformation": [
+        {
+          "key": "function",
+          "value": "cos"
+        }
+      ],
+      "extraNumberInformation": [
+        {
+          "key": "nParams",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        230
+      ],
+      "uuid": "aa9e2acd6422d8ca",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "6b1ddf71ead6988e",
+          "keyFrom": "value",
+          "keyTo": "left"
+        },
+        {
+          "type": "node",
+          "value": "9b66f19ece35c9cf",
+          "keyFrom": "value",
+          "keyTo": "right"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        230
+      ],
+      "uuid": "67ac899d26786309",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "6b1ddf71ead6988e",
+          "keyFrom": "value",
+          "keyTo": "left"
+        },
+        {
+          "type": "node",
+          "value": "f7d131bb9b297704",
+          "keyFrom": "value",
+          "keyTo": "right"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        260
+      ],
+      "uuid": "6b4fe6b0c4e00025",
+      "inputs": [
+        {
+          "type": "number",
+          "value": 3,
+          "key": "right"
+        },
+        {
+          "type": "node",
+          "value": "aa9e2acd6422d8ca",
+          "keyFrom": "value",
+          "keyTo": "left"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        260
+      ],
+      "uuid": "a275a50e51624221",
+      "inputs": [
+        {
+          "type": "number",
+          "value": 3,
+          "key": "right"
+        },
+        {
+          "type": "node",
+          "value": "67ac899d26786309",
+          "keyFrom": "value",
+          "keyTo": "left"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        260
+      ],
+      "uuid": "a4bc00692d1bdff6",
+      "inputs": [
+        {
+          "type": "number",
+          "value": 3,
+          "key": "right"
+        },
+        {
+          "type": "node",
+          "value": "a5d3eda109b8c778",
+          "keyFrom": "value",
+          "keyTo": "left"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        220
+      ],
+      "uuid": "8c69094a7e420b58",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "6b4fe6b0c4e00025",
+          "keyFrom": "value",
+          "keyTo": "x"
+        },
+        {
+          "type": "node",
+          "value": "a275a50e51624221",
+          "keyFrom": "value",
+          "keyTo": "y"
+        },
+        {
+          "type": "node",
+          "value": "a4bc00692d1bdff6",
+          "keyFrom": "value",
+          "keyTo": "z"
+        }
+      ],
+      "nodeType": "Vector",
+      "extraNumberInformation": [
+        {
+          "key": "n",
+          "value": 3
+        }
+      ]
+    }
+  ]
+}

@@ -143,26 +143,39 @@ watchEffect(() => {
 }
 
 const shadersDropdown = computed<SelectMixedOption[]>(() => {
-  return [...props.fs.files.value.keys()]
+  const shadersSeperator: SelectMixedOption[] = [
+    { label: "Shaders", value: "", disabled: true },
+  ];
+  const shaderList: SelectMixedOption[] = [...props.fs.files.value.keys()]
     .toSorted()
     .filter((fileName) => fileName.endsWith(".wgsl"))
     .map(
       (fileName): SelectMixedOption => ({
-        label: fileName.substring(
-          0,
-          fileName.valueOf().length - ".wgsl".length,
-        ),
+        label: fileName,
         value: fileName,
       }),
     )
     .concat({
       label: "New Shader...",
       value: "wgsl",
-    })
+    });
+  const graphsSeperator: SelectMixedOption[] = [
+    { label: "Graphs", value: "", disabled: true },
+  ];
+  const graphList: SelectMixedOption[] = [...props.fs.files.value.keys()]
+    .toSorted()
+    .filter((fileName) => fileName.endsWith(".graph"))
+    .map(
+      (fileName): SelectMixedOption => ({ label: fileName, value: fileName }),
+    )
     .concat({
       label: "New Graph...",
       value: "graph",
     });
+
+  return shadersSeperator.concat(
+    shaderList.concat(graphsSeperator.concat(graphList)),
+  );
 });
 
 const graphsDropdown = computed<SelectMixedOption[]>(() => {
@@ -463,7 +476,7 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
           style="height: 80vh"
           :max="0.75"
           :min="0.15"
-          :default-size="0.75"
+          :default-size="0.5"
         >
           <template #1>
             <div class="flex h-full w-full">
@@ -488,6 +501,7 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
               </CodeEditor>
               <CodeGraph
                 v-if="openFile.editorType.value === 'graph'"
+                class="self-stretch overflow-hidden flex-1"
                 :fs="props.fs"
                 :keyedGraph="openFile.code.value"
                 :graphs="graphsDropdown"

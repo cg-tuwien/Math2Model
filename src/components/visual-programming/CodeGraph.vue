@@ -52,6 +52,7 @@ import {
   CallCustomFunctionNode,
   CustomFunctionNode,
   FunctionScopeNode,
+  typeToValueCode,
 } from "@/vpnodes/basic/functions";
 import { graphFromJSON, SerializedGraph } from "@/vpnodes/serialization/graph";
 import { SerializedNode, toSerializedNode } from "@/vpnodes/serialization/node";
@@ -64,6 +65,15 @@ import type { VirtualModelState } from "@/scenes/scene-state";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import { showError } from "@/notification";
 import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
+import Heart from "@/../parametric-renderer-core/graphs/Heart.graph?raw";
+import Sphere from "@/../parametric-renderer-core/graphs/Sphere.graph?raw";
+import HeartSphere from "@/../parametric-renderer-core/graphs/HeartSphere.graph?raw";
+import {
+  HistoryPlugin,
+  type HistoryActions,
+  Presets as HistoryPresets,
+  HistoryExtensions,
+} from "rete-history-plugin";
 
 const emit = defineEmits<{
   update: [content: string];
@@ -232,6 +242,8 @@ async function rearrange() {
 }
 
 let area: AreaPlugin<Schemes, AreaExtra>;
+const scopes = new ScopesPlugin<Schemes>();
+const history = new HistoryPlugin<Schemes, HistoryActions<Schemes>>();
 async function createEditor() {
   area = new AreaPlugin<Schemes, AreaExtra>(
     container.value ?? new HTMLElement(),
@@ -321,6 +333,32 @@ async function createEditor() {
         ],
       ],
       [
+        "Templates",
+        [
+          [
+            "Heart",
+            () => {
+              addTemplate("Heart", Heart);
+              return new NothingNode();
+            },
+          ],
+          [
+            "HeartSphere",
+            () => {
+              addTemplate("HeartSphere", HeartSphere);
+              return new NothingNode();
+            },
+          ],
+          [
+            "Sphere",
+            () => {
+              addTemplate("Sphere", Sphere);
+              return new NothingNode();
+            },
+          ],
+        ],
+      ],
+      [
         "Custom",
         [
           ["New Function", () => newFunctionNode(area)],
@@ -333,9 +371,24 @@ async function createEditor() {
     ]),
   });
 
-  const scopes = new ScopesPlugin<Schemes>();
-
   arrange.addPreset(ArrangePresets.classic.setup());
+  history.addPreset(HistoryPresets.classic.setup());
+
+  // HistoryExtensions.keyboard(history);
+
+  document.addEventListener("keydown", (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+
+    switch (e.code) {
+      case "KeyY":
+        void history.undo();
+        break;
+      case "KeyZ":
+        void history.redo();
+        break;
+      default:
+    }
+  });
 
   area.use(contextMenu);
 
@@ -368,8 +421,9 @@ async function createEditor() {
   area.use(render);
   area.use(scopes);
   area.use(arrange);
+  area.use(history);
 
-  console.log("loading graph", props.keyedGraph?.id);
+  //console.log("loading graph", props.keyedGraph?.id);
   await deserialize(props.keyedGraph?.code ?? "");
   //await editor.addConnection(
   //  new ClassicPreset.Connection(startNode, "out", endNode, "returnIn"),
@@ -377,7 +431,7 @@ async function createEditor() {
   await arrange.layout();
 
   editor.addPipe((context) => {
-    console.log("should update", context.type, shouldUpdate);
+    //console.log("should update", context.type, shouldUpdate);
     if (
       [
         "connectioncreated",
@@ -605,11 +659,18 @@ async function replaceOrAddDeserialize(
       (n) => editor.removeNode(n.id),
       (nA, kA, nB, kB) =>
         editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB)),
+      true,
     );
+    func.nControl.setValue(1);
+    func.paramControls[0].cont.selected = "vec2f";
+    func.setParamName(0, "input2");
+    func.retControl.selected = "vec3f";
     func.nameControl.setValue(name);
     func.label = name;
+
     await editor.addNode(func);
     shouldUpdate = true;
+    await editor.addNode(new NothingNode());
     await deserialize(json, func.functionScope.id);
   }
 }
@@ -621,24 +682,44 @@ async function deserialize(json: string, parent?: string) {
     emit("save", json);
   }
   const sg = graphFromJSON(json);
+  const idMap = new Map<string, string>();
+  const nodes = new Map<string, Nodes>();
 
   for (let snObj of sg.graph) {
     const sn = toSerializedNode(snObj);
-    const node = serializedNodeToNode(sn);
+    const node = serializedNodeToNode(sn, idMap);
+    nodes.set(sn.uuid, node);
     node.deserialize(sn);
-    node.parent = parent;
     await editor.addNode(node);
   }
 
   for (let snObj of sg.graph) {
     const sn = toSerializedNode(snObj);
+    const node = nodes.get(sn.uuid);
+    if (
+      node &&
+      !node.parent &&
+      !sn.parent &&
+      sn.nodeType !== "CustomFunction" &&
+      sn.nodeType !== "FunctionScope"
+    ) {
+      node.parent = parent;
+      scopes
+        .update(parent ?? node.id)
+        .catch((reason) => showError("Could not update parent", reason));
+    } else if (node && !node.parent && sn.parent) {
+      node.parent = idMap.get(sn.parent);
+      scopes
+        .update(node.parent ?? node.id)
+        .catch((reason) => showError("Could not update parent", reason));
+    }
     for (let input of sn.inputs) {
       if (input.type === "node") {
         await editor.addConnection(
           new ClassicPreset.Connection(
-            editor.getNodes().filter((n) => n.id === input.value)[0],
+            editor.getNodes().filter((n) => n.id === idMap.get(input.value))[0],
             input.keyFrom,
-            editor.getNodes().filter((n) => n.id === sn.uuid)[0],
+            editor.getNodes().filter((n) => n.id === idMap.get(sn.uuid))[0],
             input.keyTo,
           ),
         );
@@ -646,11 +727,22 @@ async function deserialize(json: string, parent?: string) {
     }
   }
 
+  rearrange()
+    .then((n) =>
+      editor
+        .addNode(n)
+        .catch((reason) =>
+          showError("Could not add nothing node after rearrange", reason),
+        ),
+    )
+    .catch((reason) => showError("Could not reach end", reason));
   shouldUpdate = true;
-  rearrange().then((n) => editor.addNode(n));
 }
 
-function serializedNodeToNode(sn: SerializedNode): Nodes {
+function serializedNodeToNode(
+  sn: SerializedNode,
+  idMap: Map<string, string>,
+): Nodes {
   let node: Nodes;
   switch (sn.nodeType) {
     case "Number":
@@ -700,10 +792,10 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
       break;
   }
 
-  node.id = sn.uuid;
+  idMap.set(sn.uuid, node.id);
   node.width = sn.size[0];
   node.height = sn.size[1];
-  node.parent = sn.parent;
+  //node.parent = sn.parent;
   return node;
 }
 
@@ -714,6 +806,10 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
       replaceOrAddDeserialize(filePath.replace(".graph", ""), content, add),
     )
     .catch((reason) => showError("Could not load graph " + filePath, reason));
+}
+
+function addTemplate(name: string, json: string) {
+  replaceOrAddDeserialize(name, json, true);
 }
 </script>
 
@@ -765,7 +861,7 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
       </template>
     </n-card>
   </n-modal>
-  <n-flex vertical style="width: 70%">
+  <n-flex vertical style="width: 100%">
     <div class="rete flex-1" ref="container"></div>
     <n-flex>
       <n-button

@@ -96,6 +96,7 @@ export class CustomFunctionNode extends VPNode {
       nodeB: Nodes,
       keyB: string,
     ) => void,
+    private addNodeSelf?: boolean,
   ) {
     super("Custom Function");
     this.label = "func" + idToVariableName(this.id);
@@ -114,6 +115,7 @@ export class CustomFunctionNode extends VPNode {
         value = Math.min(9, value);
         value = Math.max(0, value);
         this.nControl.value = value;
+        removeCustomFunction(this);
 
         for (let i = 0; i < 9; i++) {
           if (i < value) {
@@ -133,6 +135,7 @@ export class CustomFunctionNode extends VPNode {
         }
 
         if (this.update) this.update(this);
+        addCustomFunction(this);
         this.extraHeightControls = 2.5 * value;
         this.updateSize();
         notify();
@@ -156,7 +159,7 @@ export class CustomFunctionNode extends VPNode {
 
     this.addOutput("value", new ClassicPreset.Output(reteSocket, "Scope"));
 
-    if (this.addNode && this.addConnection) {
+    if (this.addNodeSelf && this.addNode && this.addConnection) {
       this.functionScope = new FunctionScopeNode("Function Scope", this.update);
       this.addNode(this.functionScope);
       this.addConnection(this, "value", this.functionScope, "context");
@@ -185,11 +188,20 @@ export class CustomFunctionNode extends VPNode {
         ),
       });
 
-      const paramNode = new VariableOutNode(0, "", "arg" + i.toString());
+      const paramNode = new VariableOutNode(0, "", this.paramControls[i].key);
       this.functionScope.paramNodes.push(paramNode);
     }
 
     addCustomFunction(this);
+  }
+
+  setParamName(i: number, name: string): void {
+    if (i >= 0 && i < this.functionScope.paramNodes.length) {
+      this.functionScope.paramNodes[i].ref = name;
+      this.paramControls[i].cont.label = name + " type";
+      this.paramControls[i].key = name;
+      if (this.update) this.update(this);
+    }
   }
 
   data(): { value: NodeReturn } {
@@ -222,11 +234,22 @@ export class CustomFunctionNode extends VPNode {
       { key: "ret", value: this.retControl.selected ?? "i32", type: "text" },
     ];
 
+    sn.extraStringInformation = [];
     for (let i = 0; i < 9; i++) {
+      //console.log(
+      //  "Serializing arg",
+      //  i,
+      //  "selected",
+      //  this.paramControls[i].cont.selected,
+      //);
       sn.inputs.push({
         key: "arg" + i.toString(),
         value: this.paramControls[i].cont.selected ?? "i32",
         type: "text",
+      });
+      sn.extraStringInformation.push({
+        key: "arg" + i.toString(),
+        value: this.paramControls[i].key,
       });
     }
 
@@ -236,11 +259,13 @@ export class CustomFunctionNode extends VPNode {
   deserialize(sn: SerializedNode) {
     for (let info of sn.inputs) {
       if (info.type === "text" && info.key === "name") {
+        removeCustomFunction(this);
         this.nameControl.value = info.value;
         this.label = info.value;
+        addCustomFunction(this);
       }
       if (info.type === "number" && info.key === "n")
-        this.nControl.value = info.value;
+        this.nControl.setValue(info.value);
       if (info.type === "text" && info.key === "ret")
         this.retControl.selected = info.value;
     }
@@ -248,6 +273,13 @@ export class CustomFunctionNode extends VPNode {
     for (let i = 0; i < 9; i++) {
       const inp = sn.getTextOrNumberInput(this.paramControls[i].key);
       this.paramControls[i].cont.selected = inp ? inp.value.toString() : "i32";
+
+      if (sn.extraStringInformation) {
+        for (let info of sn.extraStringInformation) {
+          if (info.key === this.paramControls[i].key)
+            this.setParamName(i, info.value);
+        }
+      }
     }
 
     super.deserialize(sn);

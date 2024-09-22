@@ -126,9 +126,6 @@ export class MathOpNode extends VPNode {
   }): { value: NodeReturn } {
     const { left, right } = inputs;
 
-    console.log(left);
-    console.log(right);
-
     let leftValue = this.leftControl.value ?? 0.0;
     let leftId = "";
     if (left) {
@@ -163,9 +160,6 @@ export class MathOpNode extends VPNode {
         this.addControl("right", this.rightControl);
     }
 
-    console.log(leftValue);
-    console.log(rightValue);
-
     const value = applyOperator(leftValue, rightValue, this.operator);
     const code =
       nodeToVariableDeclaration(this) +
@@ -174,7 +168,6 @@ export class MathOpNode extends VPNode {
       ` ${this.operator} ` +
       (rightId === "" ? rightValue.toString() : rightId) +
       ";";
-    console.log(value);
 
     const control: ClassicPreset.InputControl<"number", number> | undefined =
       this.controls?.result as ClassicPreset.InputControl<"number", number>;
