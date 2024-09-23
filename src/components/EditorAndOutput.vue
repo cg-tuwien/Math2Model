@@ -143,9 +143,6 @@ watchEffect(() => {
 }
 
 const shadersDropdown = computed<SelectMixedOption[]>(() => {
-  const shadersSeperator: SelectMixedOption[] = [
-    { label: "Shaders", value: "", disabled: true },
-  ];
   const shaderList: SelectMixedOption[] = [...props.fs.files.value.keys()]
     .toSorted()
     .filter((fileName) => fileName.endsWith(".wgsl"))
@@ -159,9 +156,6 @@ const shadersDropdown = computed<SelectMixedOption[]>(() => {
       label: "New Shader...",
       value: "wgsl",
     });
-  const graphsSeperator: SelectMixedOption[] = [
-    { label: "Graphs", value: "", disabled: true },
-  ];
   const graphList: SelectMixedOption[] = [...props.fs.files.value.keys()]
     .toSorted()
     .filter((fileName) => fileName.endsWith(".graph"))
@@ -173,9 +167,7 @@ const shadersDropdown = computed<SelectMixedOption[]>(() => {
       value: "graph",
     });
 
-  return shadersSeperator.concat(
-    shaderList.concat(graphsSeperator.concat(graphList)),
-  );
+  return shaderList.concat(graphList);
 });
 
 const graphsDropdown = computed<SelectMixedOption[]>(() => {
