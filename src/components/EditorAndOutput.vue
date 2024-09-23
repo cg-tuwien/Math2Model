@@ -470,8 +470,9 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
               <div
                 ref="canvasContainer"
                 class="self-stretch overflow-hidden flex-1"
+                style="height: 99%"
               >
-                <div v-if="sceneFile == null">Missing scene.json</div>
+                <!--<div v-if="sceneFile == null">Missing scene.json</div> TODO: Include again (wait this is not the actual repository, I just realized) -->
               </div>
             </div>
           </template>
