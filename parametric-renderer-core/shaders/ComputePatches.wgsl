@@ -104,7 +104,7 @@ fn assert(condition: bool) {
 //// END OF AUTOGEN
 
 ////#include "./EvaluateImage.wgsl"
-//// AUTOGEN 026c5fd0ec94098b53d2549d4f92f2c2ffb569eb1f84c0d3e800e02ecebbaa63
+//// AUTOGEN 2fd7df289ae79f5d2892f5f6c7f22bf2ed3dee5b33db53f6ab639e0f9f3cd0e6
 struct Time {
   elapsed: f32,
   delta: f32,

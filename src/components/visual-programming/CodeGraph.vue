@@ -862,7 +862,7 @@ function addTemplate(name: string, json: string) {
     </n-card>
   </n-modal>
   <n-flex vertical style="width: 100%">
-    <div class="rete flex-1" ref="container"></div>
+    <div class="rete flex-1" ref="container" style="height: 5%"></div>
     <n-flex>
       <n-button
         @click="

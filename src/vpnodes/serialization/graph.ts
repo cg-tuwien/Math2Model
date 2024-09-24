@@ -27,7 +27,7 @@ export class SerializedGraph {
 export function graphFromJSON(json: string) {
   try {
     return JSON.parse(json);
-  } catch (e) {
+  } catch (e: any) {
     showError("Failed to parse JSON: " + json, e);
   }
 }
