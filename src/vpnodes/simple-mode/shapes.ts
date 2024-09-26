@@ -1,0 +1,93 @@
+import Heart from "@/../parametric-renderer-core/graphs/Heart.graph.wgsl?raw";
+import Sphere from "@/../parametric-renderer-core/graphs/Sphere.graph.wgsl?raw";
+import Plane from "@/../parametric-renderer-core/graphs/BasicGraphShader.graph.wgsl?raw";
+import {
+  idToVariableName,
+  NodeReturn,
+  nodeToVariableDeclaration,
+  reteSocket,
+  VPNode,
+} from "@/vpnodes/basic/nodes";
+import { ClassicPreset } from "rete";
+import { vec2, vec3 } from "webgpu-matrix";
+import { typeToValue } from "@/vpnodes/basic/functions";
+import { type SerializedNode } from "@/vpnodes/serialization/node";
+
+export class ShapeNode extends VPNode {
+  constructor(
+    protected name: string,
+    protected code: string,
+  ) {
+    super(name);
+
+    this.addInput(
+      "param",
+      new ClassicPreset.Input(reteSocket, "input[u, v]/vec2f"),
+    );
+    this.addOutput(
+      "value",
+      new ClassicPreset.Output(reteSocket, "output[x, y, z]/vec3f"),
+    );
+  }
+
+  data(inputs: { param: NodeReturn[] }): {
+    function: NodeReturn;
+    value: NodeReturn;
+  } {
+    const { param } = inputs;
+    return {
+      function: {
+        value: 0,
+        code: this.code,
+      },
+      value: {
+        value: vec3.zero(),
+        code: `${nodeToVariableDeclaration(this)} = ${this.name}(${param ? (param[0].refId ?? param[0].value) : "vec2f(0.0, 0.0)"});`,
+        refId: idToVariableName(this.id),
+      },
+    };
+  }
+
+  serialize(sn: SerializedNode): SerializedNode {
+    sn.nodeType = "Shape";
+    sn.extraStringInformation = [{ key: "name", value: this.name }];
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    super.deserialize(sn);
+    if (sn.extraStringInformation) {
+      for (let info of sn.extraStringInformation) {
+        if (info.key == "name") {
+          this.name = info.value;
+          this.label = this.name;
+          this.code = nameToCode(info.value);
+        }
+      }
+    }
+  }
+}
+
+export function newHeartShape() {
+  return new ShapeNode("Heart", Heart);
+}
+
+export function newSphereShape() {
+  return new ShapeNode("Sphere", Sphere);
+}
+
+export function newPlaneShape() {
+  return new ShapeNode("Plane", Plane);
+}
+
+function nameToCode(name: "Heart" | "Sphere" | "Plane") {
+  switch (name) {
+    case "Heart":
+      return Heart;
+    case "Sphere":
+      return Sphere;
+    case "Plane":
+      return Plane;
+  }
+  return "";
+}

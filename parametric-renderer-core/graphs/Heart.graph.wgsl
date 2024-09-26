@@ -1,6 +1,4 @@
-
-
-fn evaluateImage(input2: vec2f) -> vec3f {
+fn Heart(input2: vec2f) -> vec3f {
 	var PI = 3.14159265359;
 	var HALF_PI = 3.14159265359 / 2.0;
 	var TWO_PI = 3.14159265359 * 2.0;
@@ -34,5 +32,4 @@ fn evaluateImage(input2: vec2f) -> vec3f {
 	var ref_74ab3 = ref_72cdf * 0.2;
 	var ref_ff707 = vec3f(ref_f46b6, ref_0df37, ref_74ab3);
 	return ref_ff707;
-
 }

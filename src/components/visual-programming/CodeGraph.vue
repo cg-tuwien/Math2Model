@@ -68,12 +68,22 @@ import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?ra
 import Heart from "@/../parametric-renderer-core/graphs/Heart.graph?raw";
 import Sphere from "@/../parametric-renderer-core/graphs/Sphere.graph?raw";
 import HeartSphere from "@/../parametric-renderer-core/graphs/HeartSphere.graph?raw";
+import BasicGraphWGSL from "@/../parametric-renderer-core/graphs/BasicGraphShader.graph.wgsl?raw";
+import HeartWGSL from "@/../parametric-renderer-core/graphs/Heart.graph.wgsl?raw";
+import SphereWGSL from "@/../parametric-renderer-core/graphs/Sphere.graph.wgsl?raw";
+import PlaneWGSL from "@/../parametric-renderer-core/graphs/Plane.graph.wgsl?raw";
 import {
   HistoryPlugin,
   type HistoryActions,
   Presets as HistoryPresets,
   HistoryExtensions,
 } from "rete-history-plugin";
+import {
+  newHeartShape,
+  newPlaneShape,
+  newSphereShape,
+  ShapeNode,
+} from "@/vpnodes/simple-mode/shapes";
 
 const emit = defineEmits<{
   update: [content: string];
@@ -115,7 +125,8 @@ export type Nodes =
   | NothingNode
   | CustomFunctionNode
   | CallCustomFunctionNode
-  | FunctionScopeNode;
+  | FunctionScopeNode
+  | ShapeNode;
 
 class Connection<
   A extends Nodes,
@@ -335,27 +346,9 @@ async function createEditor() {
       [
         "Templates",
         [
-          [
-            "Heart",
-            () => {
-              addTemplate("Heart", Heart);
-              return new NothingNode();
-            },
-          ],
-          [
-            "HeartSphere",
-            () => {
-              addTemplate("HeartSphere", HeartSphere);
-              return new NothingNode();
-            },
-          ],
-          [
-            "Sphere",
-            () => {
-              addTemplate("Sphere", Sphere);
-              return new NothingNode();
-            },
-          ],
+          ["Heart", () => newHeartShape()],
+          ["Plane", () => newPlaneShape()],
+          ["Sphere", () => newSphereShape()],
         ],
       ],
       [
@@ -579,7 +572,13 @@ async function logCode() {
   let visited: string[] = [];
   let fullCode =
     (await orderedCode(customFunctionNodes, visited)) +
-    "\n\nfn evaluateImage(input2: vec2f) -> vec3f {\n" +
+    "\n" +
+    HeartWGSL +
+    "\n" +
+    SphereWGSL +
+    "\n" +
+    PlaneWGSL +
+    "\n\nfn sampleObject(input2: vec2f) -> vec3f {\n" +
     (await orderedCode(allNodes, visited, "\t"));
 
   // fullCode += (await getNodesCode(endNode, [], graph, "\t")) + "}";
@@ -725,18 +724,12 @@ async function deserialize(json: string, parent?: string) {
         );
       }
     }
+    node?.updateSize(area);
   }
 
-  rearrange()
-    .then((n) =>
-      editor
-        .addNode(n)
-        .catch((reason) =>
-          showError("Could not add nothing node after rearrange", reason),
-        ),
-    )
-    .catch((reason) => showError("Could not reach end", reason));
   shouldUpdate = true;
+  await rearrange();
+  await editor.addNode(new NothingNode());
 }
 
 function serializedNodeToNode(
@@ -789,6 +782,9 @@ function serializedNodeToNode(
       break;
     case "Condition":
       node = new ConditionNode("", "==");
+      break;
+    case "Shape":
+      node = new ShapeNode("", "");
       break;
   }
 
@@ -862,7 +858,7 @@ function addTemplate(name: string, json: string) {
     </n-card>
   </n-modal>
   <n-flex vertical style="width: 100%">
-    <div class="rete flex-1" ref="container"></div>
+    <div class="rete flex-1" ref="container" style="height: 5%"></div>
     <n-flex>
       <n-button
         @click="

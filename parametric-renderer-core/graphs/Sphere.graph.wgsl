@@ -1,6 +1,4 @@
-
-
-fn evaluateImage(input2: vec2f) -> vec3f {
+fn Sphere(input2: vec2f) -> vec3f {
 	var PI = 3.14159265359;
 	var HALF_PI = 3.14159265359 / 2.0;
 	var TWO_PI = 3.14159265359 * 2.0;
@@ -19,5 +17,4 @@ fn evaluateImage(input2: vec2f) -> vec3f {
 	var ref_a4bc0 = ref_a5d3e * 3;
 	var ref_8c690 = vec3f(ref_6b4fe, ref_a275a, ref_a4bc0);
 	return ref_8c690;
-
 }
