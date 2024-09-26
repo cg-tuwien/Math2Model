@@ -66,7 +66,7 @@ fn main() {
     let mut renderer = GpuApplicationBuilder::new(WindowOrFallback::Window(window))
         .block_on()
         .unwrap()
-        .build(&app.camera)
+        .build()
         .unwrap();
 
     let mut group = c.benchmark_group("render");
@@ -202,7 +202,6 @@ impl ValueFormatter for WgpuTimerFormatter {
         "ms"
     }
 
-    /// TODO!
     fn scale_throughputs(
         &self,
         _typical_value: f64,
