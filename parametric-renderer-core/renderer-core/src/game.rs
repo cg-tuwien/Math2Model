@@ -54,6 +54,7 @@ pub struct GameRes {
     pub mouse_held: bool,
     pub cursor_capture: WindowCursorCapture,
     pub profiler_settings: ProfilerSettings,
+    pub lod_stage: Option<Box<dyn Fn() + 'static>>,
 }
 
 impl GameRes {
@@ -83,6 +84,7 @@ impl GameRes {
             mouse_held: false,
             cursor_capture: WindowCursorCapture::Free,
             profiler_settings: ProfilerSettings::default(),
+            lod_stage: None,
         }
     }
 

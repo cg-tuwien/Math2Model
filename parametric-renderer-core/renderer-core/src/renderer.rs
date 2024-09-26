@@ -505,14 +505,12 @@ fn update_shaders(
     context: &WgpuContext,
 ) {
     for (shader_id, shader_info) in shaders.iter() {
-        if shader_arena.get_shader(&shader_id).is_none() {
-            shader_arena.add_shader(
-                shader_id.clone(),
-                &shader_info.label,
-                &shader_info.code,
-                &context,
-            );
-        }
+        shader_arena.add_shader(
+            shader_id.clone(),
+            &shader_info.label,
+            &shader_info.code,
+            &context,
+        );
     }
     // TODO: Delete shaders that are not in the list
 }
@@ -542,8 +540,13 @@ fn update_virtual_models(
     if virtual_models.len() > models.len() {
         virtual_models.truncate(models.len());
     } else if virtual_models.len() < models.len() {
-        for model in models.iter().skip(virtual_models.len()) {
-            let mut virtual_model = VirtualModel::new(context, meshes, model.shader_id.clone())?;
+        for (index, model) in models.iter().enumerate().skip(virtual_models.len()) {
+            let mut virtual_model = VirtualModel::new(
+                context,
+                meshes,
+                model.shader_id.clone(),
+                &format!("ID{index}"),
+            )?;
             virtual_model.transform = model.transform.clone();
             virtual_model.material_info = model.material_info.clone();
             virtual_models.push(virtual_model);

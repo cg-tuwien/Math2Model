@@ -28,6 +28,39 @@ pub struct ShaderPipelines {
     pub shaders: [ShaderModule; 2],
 }
 
+/// Required, because comemo::memoize requires Send and Sync for the return type.
+/// SAFETY: On desktop platforms, they implement Send and Sync.
+/// On WASM, there is only one thread.
+unsafe impl Send for ShaderPipelines {}
+unsafe impl Sync for ShaderPipelines {}
+
+struct IgnoreInput<T>(T);
+impl<T> std::ops::Deref for IgnoreInput<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl<T> From<T> for IgnoreInput<T> {
+    fn from(inner: T) -> Self {
+        IgnoreInput(inner)
+    }
+}
+impl<T> std::hash::Hash for IgnoreInput<T> {
+    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {
+        // Purposefully empty hash
+    }
+}
+
+#[comemo::memoize]
+fn make_shader_pipeline(
+    label: &str,
+    code: &str,
+    context: IgnoreInput<&WgpuContext>,
+) -> Arc<ShaderPipelines> {
+    Arc::new(ShaderPipelines::new(label, code, &context.0))
+}
+
 impl ShaderPipelines {
     pub fn new(label: &str, code: &str, context: &WgpuContext) -> Self {
         let (compute_patches, shader_a) =
@@ -62,6 +95,8 @@ impl ShaderArena {
         }
     }
 
+    // TODO: Shader compilation should have a side effect whereby the shader is added to a list of
+    // shaders that must be checked for compilation errors. This list should be checked every frame.
     pub async fn get_compilation_info(&self, key: &ShaderId) -> Vec<wgpu::CompilationMessage> {
         match self.shader_keys.get(key) {
             Some(shader) => shader.get_compilation_info().await,
@@ -78,10 +113,12 @@ impl ShaderArena {
     }
 
     pub fn add_shader(&mut self, key: ShaderId, label: &str, code: &str, context: &WgpuContext) {
-        let pipeline = ShaderPipelines::new(label, code, context);
-        self.shader_keys.insert(key, Arc::new(pipeline));
+        let pipeline = make_shader_pipeline(label, code, IgnoreInput(context));
+        self.shader_keys.insert(key, pipeline);
     }
 
+    // TODO: Call this
+    // TODO: Call "comemo::evict" every once in a while to free up memory
     pub fn remove_shader(&mut self, key: &ShaderId) {
         self.shader_keys.remove(key);
     }
@@ -98,10 +135,10 @@ pub struct ComputePatchesStep {
 }
 
 impl ComputePatchesStep {
-    pub fn new(device: &wgpu::Device) -> anyhow::Result<Self> {
+    pub fn new(device: &wgpu::Device, id: &str) -> anyhow::Result<Self> {
         let input_buffer = TypedBuffer::new_uniform(
             device,
-            "Input Buffer",
+            &format!("{id} Compute Patches Input Buffer"),
             &compute_patches::InputBuffer {
                 model_view_projection: Mat4::IDENTITY,
                 threshold_factor: 1.0,
@@ -117,14 +154,14 @@ impl ComputePatchesStep {
         let patches_buffer = [
             TypedBuffer::new_storage_with_runtime_array(
                 device,
-                "Patches Buffer 0",
+                &format!("{id} Patches Buffer 0"),
                 &patches_buffer_empty,
                 MAX_PATCH_COUNT as u64,
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
             )?,
             TypedBuffer::new_storage_with_runtime_array(
                 device,
-                "Patches Buffer 1",
+                &format!("{id} Patches Buffer 1"),
                 &patches_buffer_empty,
                 MAX_PATCH_COUNT as u64,
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
@@ -138,10 +175,10 @@ impl ComputePatchesStep {
         };
         let render_buffer = PATCH_SIZES
             .iter()
-            .map(|_| {
+            .map(|size| {
                 TypedBuffer::new_storage_with_runtime_array(
                     device,
-                    "Render Buffer",
+                    &format!("{id} Render Buffer {size}"),
                     &render_buffer_initial,
                     MAX_PATCH_COUNT as u64,
                     wgpu::BufferUsages::COPY_DST,
@@ -153,13 +190,13 @@ impl ComputePatchesStep {
         let indirect_compute_buffer = [
             TypedBuffer::new_storage(
                 device,
-                "Indirect Compute Dispatch Buffer 0",
+                &format!("{id} Indirect Compute Dispatch Buffer 0"),
                 &indirect_compute_empty,
                 wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
             )?,
             TypedBuffer::new_storage(
                 device,
-                "Indirect Compute Dispatch Buffer 1",
+                &format!("{id} Indirect Compute Dispatch Buffer 1"),
                 &indirect_compute_empty,
                 wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
             )?,
@@ -167,7 +204,7 @@ impl ComputePatchesStep {
 
         let force_render_uniform = TypedBuffer::new_uniform(
             device,
-            "Force Render Uniform",
+            &format!("{id} Force Render Uniform"),
             &compute_patches::ForceRenderFlag { flag: 0 },
             wgpu::BufferUsages::COPY_DST,
         )?;
@@ -226,6 +263,7 @@ impl CopyPatchesStep {
         device: &wgpu::Device,
         compute_patches: &ComputePatchesStep,
         meshes: &[crate::mesh::Mesh],
+        id: &str,
     ) -> anyhow::Result<Self> {
         let indirect_draw_data = meshes
             .iter()
@@ -240,7 +278,7 @@ impl CopyPatchesStep {
 
         let indirect_draw_buffers = TypedBuffer::new_storage(
             device,
-            "Indirect Draw Buffers",
+            &format!("{id} Indirect Draw Buffers"),
             &copy_patches::DrawIndexedBuffers {
                 indirect_draw_2: indirect_draw_data[0],
                 indirect_draw_4: indirect_draw_data[1],
@@ -368,10 +406,11 @@ impl VirtualModel {
         context: &WgpuContext,
         meshes: &[Mesh],
         shader_key: ShaderId,
+        id: &str,
     ) -> anyhow::Result<Self> {
-        let compute_patches_step = ComputePatchesStep::new(&context.device)?;
+        let compute_patches_step = ComputePatchesStep::new(&context.device, id)?;
         let copy_patches_step =
-            CopyPatchesStep::new(&context.device, &compute_patches_step, meshes)?;
+            CopyPatchesStep::new(&context.device, &compute_patches_step, meshes, id)?;
         let render_step = RenderStep::new(context, &compute_patches_step)?;
 
         Ok(Self {
