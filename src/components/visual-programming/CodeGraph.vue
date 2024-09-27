@@ -40,6 +40,7 @@ import {
 import type { Structures } from "rete-structures/_types/types";
 import { get, useThrottleFn, watchImmediate } from "@vueuse/core";
 import {
+  ArrangeAppliers,
   AutoArrangePlugin,
   Presets as ArrangePresets,
 } from "rete-auto-arrange-plugin";
@@ -84,6 +85,8 @@ import {
   newSphereShape,
   ShapeNode,
 } from "@/vpnodes/simple-mode/shapes";
+import NodesDock from "@/components/visual-programming/NodesDock.vue";
+import type { UINode } from "@/vpnodes/ui/uinode";
 
 const emit = defineEmits<{
   update: [content: string];
@@ -100,6 +103,39 @@ const props = defineProps<{
   graphs: SelectMixedOption[];
   keyedGraph: DeepReadonly<KeyedGraph> | null;
 }>();
+
+const uiNodes: UINode[] = [
+  {
+    name: "Heart",
+    prefix: "SHAPE",
+    image: "/src/assets/nodes/heart.png",
+    create: () => {
+      const n = newHeartShape();
+      addNode(n);
+      return n;
+    },
+  },
+  {
+    name: "Sphere",
+    prefix: "SHAPE",
+    image: "/src/assets/nodes/sphere.png",
+    create: () => {
+      const n = newSphereShape();
+      addNode(n);
+      return n;
+    },
+  },
+  {
+    name: "Plane",
+    prefix: "SHAPE",
+    image: "/src/assets/nodes/plane.png",
+    create: () => {
+      const n = newPlaneShape();
+      addNode(n);
+      return n;
+    },
+  },
+];
 
 const container = ref<HTMLElement | null>(null);
 
@@ -221,12 +257,23 @@ async function newConditionNode(
     .addConnection(new ClassicPreset.Connection(c, "false", sc2, "context"))
     .catch((e) => console.log(e));
 
-  await arrange.layout();
+  await arrange.layout({ applier });
 
   shouldUpdate = true;
 
   return new NothingNode();
 }
+
+async function addNode(node: Nodes) {
+  await editor.addNode(node);
+}
+
+async function addNodeAtMousePosition(node: Nodes, x: number, y: number) {
+  console.log("Adding", node, "at", x, ",", y);
+  await editor.addNode(node);
+  void area.translate(node.id, { x: x, y: y });
+}
+
 type AreaExtra = VueArea2D<Schemes> | ContextMenuExtra;
 
 const endNode = new ReturnNode("vec3f(input2.x, 0, input2.y)", "Output Vertex");
@@ -248,13 +295,20 @@ const twoPiNode = new VariableOutNode(
 );
 
 async function rearrange() {
-  await arrange.layout();
+  await arrange.layout({ applier });
   return new NothingNode();
 }
 
 let area: AreaPlugin<Schemes, AreaExtra>;
 const scopes = new ScopesPlugin<Schemes>();
 const history = new HistoryPlugin<Schemes, HistoryActions<Schemes>>();
+const applier = new ArrangeAppliers.TransitionApplier<Schemes, AreaExtra>({
+  duration: 100,
+  timingFunction: (t) => t,
+  async onTick() {
+    // called on every frame update
+  },
+});
 async function createEditor() {
   area = new AreaPlugin<Schemes, AreaExtra>(
     container.value ?? new HTMLElement(),
@@ -421,7 +475,7 @@ async function createEditor() {
   //await editor.addConnection(
   //  new ClassicPreset.Connection(startNode, "out", endNode, "returnIn"),
   //);
-  await arrange.layout();
+  await arrange.layout({ applier });
 
   editor.addPipe((context) => {
     //console.log("should update", context.type, shouldUpdate);
@@ -858,7 +912,49 @@ function addTemplate(name: string, json: string) {
     </n-card>
   </n-modal>
   <n-flex vertical style="width: 100%">
-    <div class="rete flex-1" ref="container" style="height: 5%"></div>
+    <n-flex style="height: 100%">
+      <NodesDock :display-nodes="uiNodes" style="width: 25%"></NodesDock>
+      <div
+        class="rete flex-1"
+        ref="container"
+        v-on:dragover="
+          (ev) => {
+            ev.preventDefault();
+            ev.dataTransfer.dropEffect = 'copy';
+          }
+        "
+        v-on:drop="
+          (ev) => {
+            ev.preventDefault();
+            const node = JSON.parse(
+              ev.dataTransfer.getData('text/plain'),
+            ) as UINode;
+            let toCreate: Nodes | null = null;
+            if (node.prefix === 'SHAPE') {
+              switch (node.name) {
+                case 'Heart':
+                  toCreate = newHeartShape();
+                  break;
+                case 'Sphere':
+                  toCreate = newSphereShape();
+                  break;
+                case 'Plane':
+                  toCreate = newPlaneShape();
+                  break;
+              }
+            }
+            if (toCreate) {
+              area.area.setPointerFrom(ev);
+              addNodeAtMousePosition(
+                toCreate,
+                area.area.pointer.x,
+                area.area.pointer.y,
+              );
+            }
+          }
+        "
+      ></div>
+    </n-flex>
     <n-flex>
       <n-button
         @click="
