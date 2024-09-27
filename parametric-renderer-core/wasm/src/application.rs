@@ -9,7 +9,7 @@ use renderer_core::{
 };
 use std::sync::{Arc, Mutex};
 use tracing::{error, info, warn};
-use wasm_bindgen::{prelude::wasm_bindgen, JsError};
+use wasm_bindgen::{prelude::wasm_bindgen, JsError, JsValue};
 use web_sys::HtmlCanvasElement;
 use winit::{
     application::ApplicationHandler, dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window,
@@ -125,10 +125,14 @@ impl WasmApplication {
     }
 
     pub async fn set_lod_stage(&self, stage: Option<web_sys::js_sys::Function>) {
-        let wrapped = stage.map(|stage| -> Box<dyn Fn() + 'static> {
-            Box::new(move || {
+        let wrapped = stage.map(|stage| -> Box<dyn Fn(&ShaderId, u32) + 'static> {
+            Box::new(move |shader_id: &ShaderId, buffer_id: u32| {
                 let this = wasm_bindgen::JsValue::NULL;
-                match stage.call0(&this) {
+                match stage.call2(
+                    &this,
+                    &JsValue::from_str(&shader_id.0),
+                    &JsValue::from_f64(buffer_id as f64),
+                ) {
                     Ok(_) => (),
                     Err(e) => error!("Error calling LOD stage: {:?}", e),
                 }

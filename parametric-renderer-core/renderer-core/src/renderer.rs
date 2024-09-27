@@ -221,7 +221,8 @@ impl GpuApplication {
             wgpu_context::SurfaceOrFallback::Surface { surface, .. } => {
                 // TODO: Handle all cases properly https://github.com/gfx-rs/wgpu/blob/a0c185a28c232ee2ab63f72d6fd3a63a3f787309/examples/src/framework.rs#L216
                 let output = surface.get_current_texture()?;
-                let mut command_encoder = self.render_commands(&output.texture, render_data)?;
+                let mut command_encoder =
+                    self.render_commands(&output.texture, render_data, &game.lod_stage)?;
                 self.context.profiler.resolve_queries(&mut command_encoder);
                 self.context
                     .queue
@@ -229,7 +230,8 @@ impl GpuApplication {
                 output.present();
             }
             wgpu_context::SurfaceOrFallback::Fallback { texture } => {
-                let mut command_encoder = self.render_commands(texture, render_data)?;
+                let mut command_encoder =
+                    self.render_commands(texture, render_data, &game.lod_stage)?;
                 self.context.profiler.resolve_queries(&mut command_encoder);
                 self.context
                     .queue
@@ -245,6 +247,7 @@ impl GpuApplication {
         &self,
         surface_texture: &wgpu::Texture,
         render_data: RenderData,
+        lod_stage: &Option<Box<dyn Fn(&crate::game::ShaderId, u32)>>,
     ) -> Result<wgpu::CommandEncoder, wgpu::SurfaceError> {
         let queue = &self.context.queue;
         let view = surface_texture.create_view(&wgpu::TextureViewDescriptor {
@@ -323,75 +326,15 @@ impl GpuApplication {
                 .profiler
                 .scope("Render", &mut command_encoder, &self.context.device);
 
-        for model in self.virtual_models.iter() {
+        for (index, model) in self.virtual_models.iter().enumerate() {
             let shaders = self
                 .shader_arena
                 .get_shader(&model.shader_key)
                 .unwrap_or_else(|| self.shader_arena.get_missing_shader());
-
-            // Each round, we do a ping-pong and pong-ping
-            // 2*4 rounds is enough to subdivide a 4k screen into 16x16 pixel patches
-            let double_number_of_rounds = 4;
-            for i in 0..double_number_of_rounds {
-                let is_last_round = i == double_number_of_rounds - 1;
-                // TODO: Should I create many compute passes, or just one?
-                {
-                    model.compute_patches.patches_buffer[1]
-                        .copy_all_from(&self.patches_buffer_reset, &mut commands);
-                    model.compute_patches.indirect_compute_buffer[1]
-                        .copy_all_from(&self.indirect_compute_buffer_reset, &mut commands);
-
-                    let mut compute_pass = commands.scoped_compute_pass(
-                        format!("Compute Patches From-To {i}"),
-                        &self.context.device,
-                    );
-                    compute_pass.set_pipeline(&shaders.compute_patches);
-                    compute_patches::set_bind_groups(
-                        &mut compute_pass.recorder,
-                        &self.compute_patches.bind_group_0,
-                        &model.compute_patches.bind_group_1,
-                        &model.compute_patches.bind_group_2[0],
-                    );
-                    compute_pass.dispatch_workgroups_indirect(
-                        &model.compute_patches.indirect_compute_buffer[0],
-                        0,
-                    );
-                }
-                if is_last_round {
-                    // Set to true
-                    model
-                        .compute_patches
-                        .force_render_uniform
-                        .copy_all_from(&self.force_render_values[1], &mut commands);
-                }
-                {
-                    model.compute_patches.patches_buffer[0]
-                        .copy_all_from(&self.patches_buffer_reset, &mut commands);
-                    model.compute_patches.indirect_compute_buffer[0]
-                        .copy_all_from(&self.indirect_compute_buffer_reset, &mut commands);
-
-                    let mut compute_pass = commands.scoped_compute_pass(
-                        format!("Compute Patches To-From {i}"),
-                        &self.context.device,
-                    );
-                    compute_pass.set_pipeline(&shaders.compute_patches);
-                    compute_patches::set_bind_groups(
-                        &mut compute_pass.recorder,
-                        &self.compute_patches.bind_group_0,
-                        &model.compute_patches.bind_group_1,
-                        &model.compute_patches.bind_group_2[1],
-                    );
-                    compute_pass.dispatch_workgroups_indirect(
-                        &model.compute_patches.indirect_compute_buffer[1],
-                        0,
-                    );
-                }
-                if is_last_round {
-                    // Set to false
-                    model
-                        .compute_patches
-                        .force_render_uniform
-                        .copy_all_from(&self.force_render_values[0], &mut commands);
+            match lod_stage {
+                Some(lod_stage) => lod_stage(&model.shader_key, index as u32),
+                None => {
+                    self.do_lod_stage(model, &mut commands, &shaders);
                 }
             }
 
@@ -484,6 +427,79 @@ impl GpuApplication {
         std::mem::drop(commands);
 
         Ok(command_encoder)
+    }
+
+    fn do_lod_stage(
+        &self,
+        model: &VirtualModel,
+        commands: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
+        shaders: &virtual_model::ShaderPipelines,
+    ) {
+        // Each round, we do a ping-pong and pong-ping
+        // 2*4 rounds is enough to subdivide a 4k screen into 16x16 pixel patches
+        let double_number_of_rounds = 4;
+        for i in 0..double_number_of_rounds {
+            let is_last_round = i == double_number_of_rounds - 1;
+            // TODO: Should I create many compute passes, or just one?
+            {
+                model.compute_patches.patches_buffer[1]
+                    .copy_all_from(&self.patches_buffer_reset, commands);
+                model.compute_patches.indirect_compute_buffer[1]
+                    .copy_all_from(&self.indirect_compute_buffer_reset, commands);
+
+                let mut compute_pass = commands.scoped_compute_pass(
+                    format!("Compute Patches From-To {i}"),
+                    &self.context.device,
+                );
+                compute_pass.set_pipeline(&shaders.compute_patches);
+                compute_patches::set_bind_groups(
+                    &mut compute_pass.recorder,
+                    &self.compute_patches.bind_group_0,
+                    &model.compute_patches.bind_group_1,
+                    &model.compute_patches.bind_group_2[0],
+                );
+                compute_pass.dispatch_workgroups_indirect(
+                    &model.compute_patches.indirect_compute_buffer[0],
+                    0,
+                );
+            }
+            if is_last_round {
+                // Set to true
+                model
+                    .compute_patches
+                    .force_render_uniform
+                    .copy_all_from(&self.force_render_values[1], commands);
+            }
+            {
+                model.compute_patches.patches_buffer[0]
+                    .copy_all_from(&self.patches_buffer_reset, commands);
+                model.compute_patches.indirect_compute_buffer[0]
+                    .copy_all_from(&self.indirect_compute_buffer_reset, commands);
+
+                let mut compute_pass = commands.scoped_compute_pass(
+                    format!("Compute Patches To-From {i}"),
+                    &self.context.device,
+                );
+                compute_pass.set_pipeline(&shaders.compute_patches);
+                compute_patches::set_bind_groups(
+                    &mut compute_pass.recorder,
+                    &self.compute_patches.bind_group_0,
+                    &model.compute_patches.bind_group_1,
+                    &model.compute_patches.bind_group_2[1],
+                );
+                compute_pass.dispatch_workgroups_indirect(
+                    &model.compute_patches.indirect_compute_buffer[1],
+                    0,
+                );
+            }
+            if is_last_round {
+                // Set to false
+                model
+                    .compute_patches
+                    .force_render_uniform
+                    .copy_all_from(&self.force_render_values[0], commands);
+            }
+        }
     }
 
     pub fn size(&self) -> UVec2 {
