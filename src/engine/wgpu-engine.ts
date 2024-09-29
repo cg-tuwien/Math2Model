@@ -1,3 +1,4 @@
+import { getBuffers, renderEncoder, type LodStageBuffers } from "@/webgpu-hook";
 import init, {
   WasmApplication,
   type WasmModelInfo,
@@ -21,5 +22,26 @@ export class WgpuEngine {
   }
   removeShader(id: string) {
     this.engine.remove_shader(id);
+  }
+  setLodStage(
+    callback:
+      | null
+      | ((
+          shaderPath: string,
+          buffers: LodStageBuffers,
+          commandEncoder: GPUCommandEncoder
+        ) => void)
+  ) {
+    if (callback === null) {
+      this.engine.set_lod_stage();
+    } else {
+      this.engine.set_lod_stage((shaderPath: string, buffersIndex: number) => {
+        if (renderEncoder === null) {
+          console.error("renderEncoder is null");
+        } else {
+          callback(shaderPath, getBuffers(+buffersIndex), renderEncoder);
+        }
+      });
+    }
   }
 }

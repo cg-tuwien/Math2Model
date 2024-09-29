@@ -41,7 +41,7 @@ impl GpuApplicationBuilder {
     }
 
     #[must_use]
-    pub fn build(self) -> anyhow::Result<GpuApplication> {
+    pub fn build(self) -> GpuApplication {
         GpuApplication::new(self.context)
     }
 }
@@ -69,10 +69,10 @@ const PATCH_SIZES: [u32; 5] = [2, 4, 8, 16, 32];
 const MAX_PATCH_COUNT: u32 = 100_000;
 
 impl GpuApplication {
-    pub fn new(context: WgpuContext) -> anyhow::Result<Self> {
+    pub fn new(context: WgpuContext) -> Self {
         let device = &context.device;
 
-        let scene_data = SceneData::new(device)?;
+        let scene_data = SceneData::new(device);
 
         // Some arbitrary splits (size/2 - 1 == one quad per four pixels)
         let meshes = [0, 1, 3, 7, 15]
@@ -108,14 +108,14 @@ impl GpuApplication {
             },
             1,
             wgpu::BufferUsages::COPY_SRC,
-        )?;
+        );
 
         let indirect_compute_buffer_reset = TypedBuffer::new_storage(
             device,
             "Indirect Compute Dispatch Buffer Reset",
             &compute_patches::DispatchIndirectArgs { x: 0, y: 1, z: 1 },
             wgpu::BufferUsages::COPY_SRC,
-        )?;
+        );
 
         let force_render_values = [
             TypedBuffer::new_uniform(
@@ -123,13 +123,13 @@ impl GpuApplication {
                 "Disable Force Render",
                 &compute_patches::ForceRenderFlag { flag: 0 },
                 wgpu::BufferUsages::COPY_SRC,
-            )?,
+            ),
             TypedBuffer::new_uniform(
                 device,
                 "Enable Force Render",
                 &compute_patches::ForceRenderFlag { flag: 1 },
                 wgpu::BufferUsages::COPY_SRC,
-            )?,
+            ),
         ];
 
         let compute_patches = ComputePatchesStep {
@@ -154,7 +154,7 @@ impl GpuApplication {
             }),
         };
 
-        Ok(Self {
+        Self {
             context,
             indirect_compute_buffer_reset,
             render_step,
@@ -171,7 +171,7 @@ impl GpuApplication {
             threshold_factor,
             cursor_capture: WindowCursorCapture::Free,
             frame_counter: FrameCounter::new(),
-        })
+        }
     }
 
     pub fn resize(&mut self, new_size: UVec2) {
@@ -211,8 +211,7 @@ impl GpuApplication {
             &game.models,
             &self.context,
             &self.meshes,
-        )
-        .unwrap();
+        );
 
         update_shaders(&mut self.shader_arena, &game.shaders, &self.context);
 
@@ -259,59 +258,44 @@ impl GpuApplication {
 
         // Write the buffers for each model
         for model in self.virtual_models.iter() {
-            model
-                .compute_patches
-                .input_buffer
-                .write_buffer(
-                    queue,
-                    &compute_patches::InputBuffer {
-                        model_view_projection: model.get_model_view_projection(&render_data.camera),
-                        threshold_factor: self.threshold_factor,
-                    },
-                )
-                .unwrap();
-            model.compute_patches.patches_buffer[0]
-                .write_buffer(
-                    queue,
-                    &compute_patches::Patches {
-                        patches_length: 1,
-                        patches_capacity: MAX_PATCH_COUNT,
-                        patches: vec![compute_patches::EncodedPatch {
-                            // Just the leading 1 bit
-                            u: 1,
-                            v: 1,
-                        }],
-                    },
-                )
-                .unwrap();
-            model.compute_patches.indirect_compute_buffer[0]
-                .write_buffer(
-                    queue,
-                    &compute_patches::DispatchIndirectArgs { x: 1, y: 1, z: 1 },
-                )
-                .unwrap();
+            model.compute_patches.input_buffer.write_buffer(
+                queue,
+                &compute_patches::InputBuffer {
+                    model_view_projection: model.get_model_view_projection(&render_data.camera),
+                    threshold_factor: self.threshold_factor,
+                },
+            );
+            model.compute_patches.patches_buffer[0].write_buffer(
+                queue,
+                &compute_patches::Patches {
+                    patches_length: 1,
+                    patches_capacity: MAX_PATCH_COUNT,
+                    patches: vec![compute_patches::EncodedPatch {
+                        // Just the leading 1 bit
+                        u: 1,
+                        v: 1,
+                    }],
+                },
+            );
+            model.compute_patches.indirect_compute_buffer[0].write_buffer(
+                queue,
+                &compute_patches::DispatchIndirectArgs { x: 1, y: 1, z: 1 },
+            );
 
             for render_buffer in model.compute_patches.render_buffer.iter() {
-                render_buffer
-                    .write_buffer(queue, &self.render_buffer_reset)
-                    .unwrap();
+                render_buffer.write_buffer(queue, &self.render_buffer_reset);
             }
 
-            model
-                .render_step
-                .model_buffer
-                .write_buffer(
-                    queue,
-                    &shader::Model {
-                        model_similarity: model.get_model_matrix(),
-                    },
-                )
-                .unwrap();
+            model.render_step.model_buffer.write_buffer(
+                queue,
+                &shader::Model {
+                    model_similarity: model.get_model_matrix(),
+                },
+            );
             model
                 .render_step
                 .material_buffer
-                .write_buffer(queue, &model.material_info.to_shader())
-                .unwrap();
+                .write_buffer(queue, &model.material_info.to_shader());
         }
 
         let mut command_encoder =
@@ -545,7 +529,7 @@ fn update_virtual_models(
     models: &[ModelInfo],
     context: &WgpuContext,
     meshes: &[Mesh],
-) -> anyhow::Result<()> {
+) {
     // Update existing models
     for (virtual_model, model) in virtual_models.iter_mut().zip(models.iter()) {
         virtual_model.transform = model.transform.clone();
@@ -562,13 +546,12 @@ fn update_virtual_models(
                 meshes,
                 model.shader_id.clone(),
                 &format!("ID{index}"),
-            )?;
+            );
             virtual_model.transform = model.transform.clone();
             virtual_model.material_info = model.material_info.clone();
             virtual_models.push(virtual_model);
         }
     }
-    Ok(())
 }
 
 pub struct RenderData {

@@ -375,7 +375,11 @@ function removeModel(ids: string[]) {
       </template>
       <template #2>
         <div class="flex h-full w-full">
-          <WebGpu :gpuDevice="props.gpuDevice"></WebGpu>
+          <WebGpu
+            :gpuDevice="props.gpuDevice"
+            :engine="props.engine"
+            :fs="props.fs"
+          ></WebGpu>
           <div
             ref="canvasContainer"
             class="self-stretch overflow-hidden flex-1"

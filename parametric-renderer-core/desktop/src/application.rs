@@ -103,8 +103,7 @@ impl Application {
         let renderer = GpuApplicationBuilder::new(WindowOrFallback::Window(window.clone()))
             .block_on()
             .unwrap()
-            .build()
-            .unwrap();
+            .build();
         self.renderer = Some(renderer);
         window.request_redraw();
     }

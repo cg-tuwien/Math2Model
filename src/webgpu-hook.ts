@@ -28,6 +28,10 @@ function makeRelevantBuffers<
   return { buffers, lookupBuffer };
 }
 
+export type LodStageBuffers = {
+  [Key in keyof typeof buffers]: GPUBuffer;
+};
+
 const { buffers, lookupBuffer } = makeRelevantBuffers({
   time: "Time Buffer",
   screen: "Screen Buffer",
@@ -45,8 +49,22 @@ const { buffers, lookupBuffer } = makeRelevantBuffers({
   forceRender: "Force Render Uniform",
 });
 
-export const wgpuBuffers = buffers;
-console.log(wgpuBuffers);
+export function getBuffers(buffersId: number): LodStageBuffers {
+  function getBuffer(key: keyof typeof buffers): GPUBuffer {
+    const buffer = buffers[key];
+    if (Array.isArray(buffer)) {
+      return buffer[buffersId];
+    } else {
+      assert(buffer !== null);
+      return buffer;
+    }
+  }
+  return Object.fromEntries(
+    Object.entries(buffers).map(([key, _]) => [key, getBuffer(key as any)])
+  ) as any;
+}
+
+export let renderEncoder: GPUCommandEncoder | null = null;
 
 if (globalThis.navigator.gpu !== undefined) {
   hookFunction(globalThis.navigator.gpu, "requestAdapter", async (fn, args) => {
@@ -78,6 +96,13 @@ if (globalThis.navigator.gpu !== undefined) {
             }
           }
           return buffer;
+        });
+        hookFunction(device, "createCommandEncoder", (fn, args) => {
+          const commandEncoder = fn(...args);
+          if (args[0]?.label === "Render Encoder") {
+            renderEncoder = commandEncoder;
+          }
+          return commandEncoder;
         });
         gpuDevicePromise.resolve(device);
         if (!hasDevice) {

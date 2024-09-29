@@ -135,7 +135,7 @@ pub struct ComputePatchesStep {
 }
 
 impl ComputePatchesStep {
-    pub fn new(device: &wgpu::Device, id: &str) -> anyhow::Result<Self> {
+    pub fn new(device: &wgpu::Device, id: &str) -> Self {
         let input_buffer = TypedBuffer::new_uniform(
             device,
             &format!("{id} Compute Patches Input Buffer"),
@@ -144,7 +144,7 @@ impl ComputePatchesStep {
                 threshold_factor: 1.0,
             },
             wgpu::BufferUsages::COPY_DST,
-        )?;
+        );
 
         let patches_buffer_empty = compute_patches::Patches {
             patches_length: 0,
@@ -158,14 +158,14 @@ impl ComputePatchesStep {
                 &patches_buffer_empty,
                 MAX_PATCH_COUNT as u64,
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
-            )?,
+            ),
             TypedBuffer::new_storage_with_runtime_array(
                 device,
                 &format!("{id} Patches Buffer 1"),
                 &patches_buffer_empty,
                 MAX_PATCH_COUNT as u64,
                 wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
-            )?,
+            ),
         ];
 
         let render_buffer_initial = compute_patches::RenderBuffer {
@@ -184,7 +184,7 @@ impl ComputePatchesStep {
                     wgpu::BufferUsages::COPY_DST,
                 )
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Vec<_>>();
 
         let indirect_compute_empty = compute_patches::DispatchIndirectArgs { x: 0, y: 0, z: 0 };
         let indirect_compute_buffer = [
@@ -193,13 +193,13 @@ impl ComputePatchesStep {
                 &format!("{id} Indirect Compute Dispatch Buffer 0"),
                 &indirect_compute_empty,
                 wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
-            )?,
+            ),
             TypedBuffer::new_storage(
                 device,
                 &format!("{id} Indirect Compute Dispatch Buffer 1"),
                 &indirect_compute_empty,
                 wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
-            )?,
+            ),
         ];
 
         let force_render_uniform = TypedBuffer::new_uniform(
@@ -207,7 +207,7 @@ impl ComputePatchesStep {
             &format!("{id} Force Render Uniform"),
             &compute_patches::ForceRenderFlag { flag: 0 },
             wgpu::BufferUsages::COPY_DST,
-        )?;
+        );
 
         let bind_group_1 = compute_patches::bind_groups::BindGroup1::from_bindings(
             device,
@@ -241,7 +241,7 @@ impl ComputePatchesStep {
             ),
         ];
 
-        Ok(Self {
+        Self {
             input_buffer,
             patches_buffer,
             render_buffer,
@@ -249,7 +249,7 @@ impl ComputePatchesStep {
             bind_group_1,
             bind_group_2,
             force_render_uniform,
-        })
+        }
     }
 }
 
@@ -264,7 +264,7 @@ impl CopyPatchesStep {
         compute_patches: &ComputePatchesStep,
         meshes: &[crate::mesh::Mesh],
         id: &str,
-    ) -> anyhow::Result<Self> {
+    ) -> Self {
         let indirect_draw_data = meshes
             .iter()
             .map(|mesh| copy_patches::DrawIndexedIndirectArgs {
@@ -287,7 +287,7 @@ impl CopyPatchesStep {
                 indirect_draw_32: indirect_draw_data[4],
             },
             wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_SRC,
-        )?;
+        );
 
         let bind_group_0 = copy_patches::bind_groups::BindGroup0::from_bindings(
             device,
@@ -301,10 +301,10 @@ impl CopyPatchesStep {
             },
         );
 
-        Ok(Self {
+        Self {
             bind_group_0,
             indirect_draw_buffers,
-        })
+        }
     }
 }
 
@@ -315,10 +315,7 @@ pub struct RenderStep {
 }
 
 impl RenderStep {
-    pub fn new(
-        context: &WgpuContext,
-        compute_patches: &ComputePatchesStep,
-    ) -> anyhow::Result<Self> {
+    pub fn new(context: &WgpuContext, compute_patches: &ComputePatchesStep) -> Self {
         let model_buffer = TypedBuffer::new_uniform(
             &context.device,
             "Model Buffer",
@@ -326,14 +323,14 @@ impl RenderStep {
                 model_similarity: Mat4::IDENTITY,
             },
             wgpu::BufferUsages::COPY_DST,
-        )?;
+        );
 
         let material_buffer = TypedBuffer::new_uniform(
             &context.device,
             "Material Buffer",
             &MaterialInfo::missing().to_shader(),
             wgpu::BufferUsages::COPY_DST,
-        )?;
+        );
 
         let bind_group_1 = compute_patches
             .render_buffer
@@ -350,11 +347,11 @@ impl RenderStep {
             })
             .collect();
 
-        Ok(Self {
+        Self {
             model_buffer,
             material_buffer,
             bind_group_1,
-        })
+        }
     }
 }
 
@@ -402,25 +399,20 @@ impl Default for MaterialInfo {
 }
 
 impl VirtualModel {
-    pub fn new(
-        context: &WgpuContext,
-        meshes: &[Mesh],
-        shader_key: ShaderId,
-        id: &str,
-    ) -> anyhow::Result<Self> {
-        let compute_patches_step = ComputePatchesStep::new(&context.device, id)?;
+    pub fn new(context: &WgpuContext, meshes: &[Mesh], shader_key: ShaderId, id: &str) -> Self {
+        let compute_patches_step = ComputePatchesStep::new(&context.device, id);
         let copy_patches_step =
-            CopyPatchesStep::new(&context.device, &compute_patches_step, meshes, id)?;
-        let render_step = RenderStep::new(context, &compute_patches_step)?;
+            CopyPatchesStep::new(&context.device, &compute_patches_step, meshes, id);
+        let render_step = RenderStep::new(context, &compute_patches_step);
 
-        Ok(Self {
+        Self {
             compute_patches: compute_patches_step,
             copy_patches: copy_patches_step,
             render_step,
             shader_key,
             transform: Transform::default(),
             material_info: MaterialInfo::default(),
-        })
+        }
     }
 
     pub fn get_model_matrix(&self) -> Mat4 {

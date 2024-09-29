@@ -12,8 +12,8 @@ pub struct SceneData {
 }
 
 impl SceneData {
-    pub fn new(device: &wgpu::Device) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(device: &wgpu::Device) -> Self {
+        Self {
             time_buffer: TypedBuffer::new_uniform(
                 device,
                 "Time Buffer",
@@ -23,7 +23,7 @@ impl SceneData {
                     frame: 0,
                 },
                 wgpu::BufferUsages::COPY_DST,
-            )?,
+            ),
             screen_buffer: TypedBuffer::new_uniform(
                 device,
                 "Screen Buffer",
@@ -32,7 +32,7 @@ impl SceneData {
                     inv_resolution: Vec2::ONE,
                 },
                 wgpu::BufferUsages::COPY_DST,
-            )?,
+            ),
             mouse_buffer: TypedBuffer::new_uniform(
                 device,
                 "Mouse Buffer",
@@ -41,7 +41,7 @@ impl SceneData {
                     buttons: 0,
                 },
                 wgpu::BufferUsages::COPY_DST,
-            )?,
+            ),
             camera_buffer: TypedBuffer::new_uniform(
                 device,
                 "Camera Buffer",
@@ -51,7 +51,7 @@ impl SceneData {
                     world_position: Vec4::ZERO,
                 },
                 wgpu::BufferUsages::COPY_DST,
-            )?,
+            ),
             light_buffer: TypedBuffer::new_storage(
                 device,
                 "Light Buffer",
@@ -64,8 +64,8 @@ impl SceneData {
                     }],
                 },
                 wgpu::BufferUsages::COPY_DST,
-            )?,
-        })
+            ),
+        }
     }
 
     pub fn as_bind_group_0(&self, device: &wgpu::Device) -> shader::bind_groups::BindGroup0 {
@@ -82,25 +82,18 @@ impl SceneData {
     }
 
     pub fn write_buffers(&self, render_data: &RenderData, queue: &wgpu::Queue) {
-        self.time_buffer
-            .write_buffer(queue, &render_data.time_data)
-            .unwrap();
+        self.time_buffer.write_buffer(queue, &render_data.time_data);
         let size = render_data.size;
-        self.screen_buffer
-            .write_buffer(
-                queue,
-                &shader::Screen {
-                    resolution: size,
-                    inv_resolution: Vec2::new(1.0 / (size.x as f32), 1.0 / (size.y as f32)),
-                },
-            )
-            .unwrap();
+        self.screen_buffer.write_buffer(
+            queue,
+            &shader::Screen {
+                resolution: size,
+                inv_resolution: Vec2::new(1.0 / (size.x as f32), 1.0 / (size.y as f32)),
+            },
+        );
         self.mouse_buffer
-            .write_buffer(queue, &render_data.mouse_data)
-            .unwrap();
-        self.camera_buffer
-            .write_buffer(queue, &render_data.camera)
-            .unwrap();
+            .write_buffer(queue, &render_data.mouse_data);
+        self.camera_buffer.write_buffer(queue, &render_data.camera);
     }
 }
 
