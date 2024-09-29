@@ -183,7 +183,7 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
   let patch_bottom_right = patch_bottom_right_child(quad_encoded);
   let patch_bottom_left = patch_bottom_left_child(quad_encoded);
 
-  if (force_render.flag != 0u) {
+  if (force_render.flag == 1u) {
     /* No splits, render the patch
     +---+---+
     |       |

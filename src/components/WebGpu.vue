@@ -8,7 +8,7 @@ import {
   type ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
 import type { LodStageBuffers } from "@/webgpu-hook";
-import { ref } from "vue";
+import { onUnmounted, ref } from "vue";
 import { mat4, vec3 } from "webgpu-matrix";
 import LodStageWgsl from "./lod_stage.wgsl?raw";
 
@@ -331,7 +331,7 @@ async function main() {
       }),
     ];
 
-    const doubleNumberOfRounds = 2;
+    const doubleNumberOfRounds = 1;
     for (let i = 0; i < doubleNumberOfRounds; i++) {
       const isLastRound = i === doubleNumberOfRounds - 1;
       // Ping
@@ -384,11 +384,11 @@ async function main() {
         indirectComputeBufferReset.size
       );
 
-      let computePassPong = commandEncoder.beginComputePass();
-      computePassPing.setPipeline(pipeline);
-      computePassPing.setBindGroup(0, bindGroup0);
-      computePassPing.setBindGroup(1, bindGroup1);
-      computePassPing.setBindGroup(2, bindGroups2[1]);
+      let computePassPong = commandEncoder.beginComputePass({ label: "Pong" });
+      computePassPong.setPipeline(pipeline);
+      computePassPong.setBindGroup(0, bindGroup0);
+      computePassPong.setBindGroup(1, bindGroup1);
+      computePassPong.setBindGroup(2, bindGroups2[1]);
       computePassPong.dispatchWorkgroupsIndirect(buffers.indirectDispatch1, 0);
       computePassPong.end();
 
