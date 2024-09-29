@@ -242,6 +242,7 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
       patches_to_buffer.patches[write_index + 2] = patch_bottom_right;
       patches_to_buffer.patches[write_index + 3] = patch_bottom_left;
     }
+  }
 }
 
 /// Gets a bitflag for the frustum sides of a point in clip space. 6 bits are used, 1 for each side.

@@ -179,7 +179,7 @@ impl Application {
         let gpu_builder = GpuApplicationBuilder::new(WindowOrFallback::Window(window));
 
         let task = async move {
-            let renderer = gpu_builder.await.unwrap().build().unwrap();
+            let renderer = gpu_builder.await.unwrap().build();
             let _ = run_on_main(|app| app.renderer = Some(renderer)).await;
         };
         wasm_bindgen_futures::spawn_local(task);

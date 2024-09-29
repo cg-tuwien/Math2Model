@@ -2,7 +2,11 @@
 // Taken from https://webgpu.github.io/webgpu-samples/?sample=rotatingCube#main.ts
 // TODO: Either add attribution, or remove this file.
 import type { WgpuEngine } from "@/engine/wgpu-engine";
-import type { FilePath, ReactiveFilesystem } from "@/filesystem/reactive-files";
+import {
+  makeFilePath,
+  type FilePath,
+  type ReactiveFilesystem,
+} from "@/filesystem/reactive-files";
 import type { LodStageBuffers } from "@/webgpu-hook";
 import { ref } from "vue";
 import { mat4, vec3 } from "webgpu-matrix";
@@ -15,26 +19,15 @@ const props = defineProps<{
   fs: ReactiveFilesystem;
 }>();
 
-const compiledShaders = ref<Map<FilePath, GPUShaderModule>>(new Map());
-async function makeShader(fs: ReactiveFilesystem, key: FilePath) {
-  // Race condition free, because the fs resolves read requests in order
-  let code = await fs.readTextFile(key);
-  if (code === null) {
-    code = LodStageWgsl; // Fallback to the default shader
-  } else {
-    code = LodStageWgsl.replace(
-      /\/\/\/\/ START sampleObject([^]+?)\/\/\/\/ END sampleObject/,
-      code
-    );
-  }
-  const shader = props.gpuDevice.createShaderModule({
-    code,
-  });
-  shader.getCompilationInfo().then((info) => {
-    console.log("Shader compilation resulted in ", info);
-  });
-  return shader;
-}
+const compiledShaders = ref<
+  Map<
+    FilePath,
+    {
+      shader: GPUShaderModule;
+      pipeline: GPUComputePipeline;
+    }
+  >
+>(new Map());
 
 function concatArrayBuffers(views: ArrayBufferView[]): Uint8Array {
   let length = 0;
@@ -69,6 +62,139 @@ function createBufferWith(
 async function main() {
   const _adapter = await navigator.gpu.requestAdapter(); // Wait for Rust backend to be in business
   const device = props.gpuDevice;
+
+  const layout0 = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "uniform",
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "uniform",
+        },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "uniform",
+        },
+      },
+    ],
+  });
+  const layout1 = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "uniform",
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage",
+        },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage",
+        },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage",
+        },
+      },
+      {
+        binding: 4,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage",
+        },
+      },
+      {
+        binding: 5,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage",
+        },
+      },
+    ],
+  });
+  const layout2 = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage",
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "read-only-storage",
+        },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage",
+        },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "uniform",
+        },
+      },
+    ],
+  });
+  const pipelineLayout = device.createPipelineLayout({
+    bindGroupLayouts: [layout0, layout1, layout2],
+  });
+  async function makeShader(fs: ReactiveFilesystem, key: FilePath) {
+    // Race condition free, because the fs resolves read requests in order
+    let code = await fs.readTextFile(key);
+    if (code === null) {
+      code = LodStageWgsl; // Fallback to the default shader
+    } else {
+      code = LodStageWgsl.replace(
+        /\/\/\/\/ START sampleObject([^]+?)\/\/\/\/ END sampleObject/,
+        code
+      );
+    }
+    const shader = props.gpuDevice.createShaderModule({
+      code,
+    });
+    shader.getCompilationInfo().then((info) => {
+      console.log("Shader compilation resulted in ", info);
+    });
+    const pipeline = props.gpuDevice.createComputePipeline({
+      layout: pipelineLayout,
+      compute: {
+        module: shader,
+        entryPoint: "main",
+      },
+    });
+    return { shader, pipeline };
+  }
   props.fs.watchFromStart((change) => {
     if (!change.key.endsWith(".wgsl")) return;
     if (change.type === "insert" || change.type === "update") {
@@ -105,7 +231,107 @@ async function main() {
     buffers: LodStageBuffers,
     commandEncoder: GPUCommandEncoder
   ) {
-    const doubleNumberOfRounds = 4;
+    const compiledShader = compiledShaders.value.get(makeFilePath(shaderPath));
+    if (!compiledShader) {
+      console.error("Shader not found: ", shaderPath);
+      return;
+    }
+    const pipeline = compiledShader.pipeline;
+
+    // We inefficiently recreate the bind groups every time.
+    const bindGroup0 = device.createBindGroup({
+      layout: layout0,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: buffers.time },
+        },
+        {
+          binding: 1,
+          resource: { buffer: buffers.screen },
+        },
+        {
+          binding: 2,
+          resource: { buffer: buffers.mouse },
+        },
+      ],
+    });
+
+    const bindGroup1 = device.createBindGroup({
+      layout: layout1,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: buffers.computePatchesInput },
+        },
+        {
+          binding: 1,
+          resource: { buffer: buffers.finalPatches2 },
+        },
+        {
+          binding: 2,
+          resource: { buffer: buffers.finalPatches4 },
+        },
+        {
+          binding: 3,
+          resource: { buffer: buffers.finalPatches8 },
+        },
+        {
+          binding: 4,
+          resource: { buffer: buffers.finalPatches16 },
+        },
+        {
+          binding: 5,
+          resource: { buffer: buffers.finalPatches32 },
+        },
+      ],
+    });
+    const bindGroups2 = [
+      device.createBindGroup({
+        layout: layout2,
+        entries: [
+          {
+            binding: 0,
+            resource: { buffer: buffers.indirectDispatch1 },
+          },
+          {
+            binding: 1,
+            resource: { buffer: buffers.patches0 },
+          },
+          {
+            binding: 2,
+            resource: { buffer: buffers.patches1 },
+          },
+          {
+            binding: 3,
+            resource: { buffer: buffers.forceRender },
+          },
+        ],
+      }),
+      device.createBindGroup({
+        layout: layout2,
+        entries: [
+          {
+            binding: 0,
+            resource: { buffer: buffers.indirectDispatch0 },
+          },
+          {
+            binding: 1,
+            resource: { buffer: buffers.patches1 },
+          },
+          {
+            binding: 2,
+            resource: { buffer: buffers.patches0 },
+          },
+          {
+            binding: 3,
+            resource: { buffer: buffers.forceRender },
+          },
+        ],
+      }),
+    ];
+
+    const doubleNumberOfRounds = 2;
     for (let i = 0; i < doubleNumberOfRounds; i++) {
       const isLastRound = i === doubleNumberOfRounds - 1;
       // Ping
@@ -125,8 +351,10 @@ async function main() {
       );
 
       let computePassPing = commandEncoder.beginComputePass();
-      // TODO: Pipeline
-      // computePass.setBindGroup(0, TODO:)
+      computePassPing.setPipeline(pipeline);
+      computePassPing.setBindGroup(0, bindGroup0);
+      computePassPing.setBindGroup(1, bindGroup1);
+      computePassPing.setBindGroup(2, bindGroups2[0]);
       computePassPing.dispatchWorkgroupsIndirect(buffers.indirectDispatch0, 0);
       computePassPing.end();
 
@@ -157,8 +385,10 @@ async function main() {
       );
 
       let computePassPong = commandEncoder.beginComputePass();
-      // TODO: Pipeline
-      // computePass.setBindGroup(0, TODO:)
+      computePassPing.setPipeline(pipeline);
+      computePassPing.setBindGroup(0, bindGroup0);
+      computePassPing.setBindGroup(1, bindGroup1);
+      computePassPing.setBindGroup(2, bindGroups2[1]);
       computePassPong.dispatchWorkgroupsIndirect(buffers.indirectDispatch1, 0);
       computePassPong.end();
 
