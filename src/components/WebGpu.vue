@@ -206,8 +206,38 @@ async function main() {
     }
   });
 
+  const patchesBufferDebug = createBufferWith(
+    // Fill however many slots you want to debug print
+    concatArrayBuffers([new Uint32Array([0, 0, 0, 0, 0, 0, 0, 0])]),
+    GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+  );
+  let hasDebugInfo = false;
+  const debugPrintBuffer = (
+    buffer: GPUBuffer,
+    commandEncoder: GPUCommandEncoder
+  ) => {
+    if (!hasDebugInfo) {
+      hasDebugInfo = true;
+      const size = Math.min(patchesBufferDebug.size, buffer.size);
+      commandEncoder.copyBufferToBuffer(buffer, 0, patchesBufferDebug, 0, size);
+      // Need to wait until *after* submit has happened to be able to call mapAsync
+      setTimeout(() => {
+        patchesBufferDebug.mapAsync(GPUMapMode.READ, 0, size).then(() => {
+          const arrayBuffer = patchesBufferDebug
+            .getMappedRange(0, size)
+            .slice(0);
+          const uint32Array = new Uint32Array(arrayBuffer);
+          console.log("patchesBufferDebug", uint32Array);
+          patchesBufferDebug.unmap();
+          hasDebugInfo = false;
+        });
+      }, 0);
+    }
+  };
+
+  const MAX_PATCHES = 10_000;
   const patchesBufferReset = createBufferWith(
-    concatArrayBuffers([new Uint32Array([0, 0])]),
+    concatArrayBuffers([new Uint32Array([0, MAX_PATCHES])]),
     GPUBufferUsage.COPY_SRC
   );
 
@@ -357,6 +387,8 @@ async function main() {
       computePassPing.setBindGroup(2, bindGroups2[0]);
       computePassPing.dispatchWorkgroupsIndirect(buffers.indirectDispatch0, 0);
       computePassPing.end();
+
+      // debugPrintBuffer(buffers.patches1, commandEncoder);
 
       // Pong
       if (isLastRound) {
