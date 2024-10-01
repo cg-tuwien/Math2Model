@@ -125,8 +125,8 @@ impl WasmApplication {
     }
 
     pub async fn set_lod_stage(&self, stage: Option<web_sys::js_sys::Function>) {
-        let wrapped = stage.map(|stage| -> Box<dyn Fn(&ShaderId, u32) + 'static> {
-            Box::new(move |shader_id: &ShaderId, buffer_id: u32| {
+        let wrapped = stage.map(|stage| -> Arc<dyn Fn(&ShaderId, u32) + 'static> {
+            Arc::new(move |shader_id: &ShaderId, buffer_id: u32| {
                 let this = wasm_bindgen::JsValue::NULL;
                 match stage.call2(
                     &this,
@@ -267,10 +267,8 @@ impl InputHandler for Application {
         match self.render() {
             Ok(_) => (),
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                warn!("Lost or outdated surface");
-                if let Some(gpu) = &mut self.renderer {
-                    let _ = gpu.resize(gpu.size());
-                }
+                info!("Lost or outdated surface");
+                // Nothing to do, surface will be recreated
             }
             Err(wgpu::SurfaceError::OutOfMemory) => {
                 error!("Out of memory");

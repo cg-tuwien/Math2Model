@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use glam::{Vec2, Vec3};
 use web_time::Instant;
@@ -54,7 +54,7 @@ pub struct GameRes {
     pub mouse_held: bool,
     pub cursor_capture: WindowCursorCapture,
     pub profiler_settings: ProfilerSettings,
-    pub lod_stage: Option<Box<dyn Fn(&ShaderId, u32) + 'static>>,
+    pub lod_stage: Option<Arc<dyn Fn(&ShaderId, u32) + 'static>>,
 }
 
 impl GameRes {

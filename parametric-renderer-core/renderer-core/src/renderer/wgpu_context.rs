@@ -155,10 +155,12 @@ impl WgpuContext {
             .unwrap();
     }
 
-    pub fn resize(&mut self, new_size: UVec2) {
+    /// Tries to resize the swapchain to the new size.
+    /// Returns the actual size of the swapchain if it was resized.
+    pub fn try_resize(&mut self, new_size: UVec2) -> Option<UVec2> {
         let new_size = new_size.max(UVec2::new(1, 1));
         if new_size == self.size {
-            return;
+            return None;
         }
         self.size = new_size;
         match &mut self.surface {
@@ -168,9 +170,24 @@ impl WgpuContext {
                 config.width = new_size.x;
                 config.height = new_size.y;
                 surface.configure(&self.device, config);
+                Some(new_size)
             }
             SurfaceOrFallback::Fallback { texture } => {
                 *texture = Self::create_fallback_texture(&self.device, new_size, self.view_format);
+                Some(new_size)
+            }
+        }
+    }
+
+    pub fn recreate_swapchain(&self) {
+        match &self.surface {
+            SurfaceOrFallback::Surface {
+                surface, config, ..
+            } => {
+                surface.configure(&self.device, config);
+            }
+            SurfaceOrFallback::Fallback { .. } => {
+                // No-op
             }
         }
     }
@@ -198,6 +215,50 @@ impl WgpuContext {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             view_formats: &[],
         })
+    }
+
+    pub fn surface_texture(&self) -> Result<SurfaceTexture, wgpu::SurfaceError> {
+        match &self.surface {
+            SurfaceOrFallback::Surface { surface, .. } => {
+                surface.get_current_texture().map(|surface_texture| {
+                    let view = self.create_view(&surface_texture.texture);
+                    SurfaceTexture::Surface(surface_texture, view)
+                })
+            }
+            SurfaceOrFallback::Fallback { texture } => {
+                Ok(SurfaceTexture::Fallback(self.create_view(&texture)))
+            }
+        }
+    }
+
+    fn create_view(&self, texture: &wgpu::Texture) -> wgpu::TextureView {
+        texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(self.view_format),
+            ..Default::default()
+        })
+    }
+}
+
+pub enum SurfaceTexture {
+    Surface(wgpu::SurfaceTexture, wgpu::TextureView),
+    Fallback(wgpu::TextureView),
+}
+
+impl SurfaceTexture {
+    pub fn texture_view(&self) -> &wgpu::TextureView {
+        match self {
+            SurfaceTexture::Surface(_, view) => &view,
+            SurfaceTexture::Fallback(view) => &view,
+        }
+    }
+
+    pub fn present(self) {
+        match self {
+            SurfaceTexture::Surface(surface_texture, _) => {
+                surface_texture.present();
+            }
+            SurfaceTexture::Fallback(_) => {}
+        }
     }
 }
 

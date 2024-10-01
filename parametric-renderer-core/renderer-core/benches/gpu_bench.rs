@@ -66,8 +66,7 @@ fn main() {
     let mut renderer = GpuApplicationBuilder::new(WindowOrFallback::Window(window))
         .block_on()
         .unwrap()
-        .build()
-        .unwrap();
+        .build();
 
     let mut group = c.benchmark_group("render");
     // group.throughput(throughput);

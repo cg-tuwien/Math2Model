@@ -5,6 +5,10 @@ mod wgpu_context;
 
 use frame_counter::FrameCounter;
 use glam::UVec2;
+use leptos_reactive::{
+    create_effect, create_runtime, create_signal, store_value, Effect, ReadSignal, SignalGet,
+    SignalGetUntracked, SignalSet, SignalUpdate, SignalWith, StoredValue, WriteSignal,
+};
 use scene::SceneData;
 use virtual_model::VirtualModel;
 use wgpu_context::WgpuContext;
@@ -47,11 +51,28 @@ impl GpuApplicationBuilder {
 }
 
 pub struct GpuApplication {
-    context: WgpuContext,
-    depth_texture: Texture,
-    scene_data: SceneData,
-    shader_arena: virtual_model::ShaderArena,
-    virtual_models: Vec<VirtualModel>,
+    context: StoredValue<WgpuContext>,
+    runtime: leptos_reactive::RuntimeId,
+    _render_tree: Effect<()>,
+    set_render_data: WriteSignal<RenderData>,
+    set_desired_size: WriteSignal<UVec2>,
+    set_force_wait: WriteSignal<bool>,
+    render_result: ReadSignal<Result<(), wgpu::SurfaceError>>,
+    cursor_capture: WindowCursorCapture,
+
+    // TODO: Refactor
+    shader_arena: StoredValue<virtual_model::ShaderArena>,
+    virtual_models: StoredValue<Vec<VirtualModel>>,
+}
+#[derive(Clone)]
+pub struct RenderData {
+    pub camera: crate::camera::Camera,
+    pub mouse_pos: glam::Vec2,
+    pub mouse_held: bool,
+    pub lod_stage: Option<std::sync::Arc<dyn Fn(&crate::game::ShaderId, u32) + 'static>>,
+}
+struct GpuApplicationLeftovers {
+    // Leftovers
     compute_patches: ComputePatchesStep,
     copy_patches: CopyPatchesStep,
     render_step: RenderStep,
@@ -59,38 +80,20 @@ pub struct GpuApplication {
     force_render_values: [TypedBuffer<compute_patches::ForceRenderFlag>; 2],
     render_buffer_reset: compute_patches::RenderBuffer,
     indirect_compute_buffer_reset: TypedBuffer<compute_patches::DispatchIndirectArgs>,
-    meshes: Vec<Mesh>,
     threshold_factor: f32, // TODO: Make this adjustable
-    cursor_capture: WindowCursorCapture,
-    frame_counter: FrameCounter,
+    scene_data: SceneData,
 }
 
-const PATCH_SIZES: [u32; 5] = [2, 4, 8, 16, 32];
-const MAX_PATCH_COUNT: u32 = 100_000;
-
-impl GpuApplication {
-    pub fn new(context: WgpuContext) -> Self {
+impl GpuApplicationLeftovers {
+    pub fn new(context: &WgpuContext) -> Self {
         let device = &context.device;
-
         let scene_data = SceneData::new(device);
-
-        // Some arbitrary splits (size/2 - 1 == one quad per four pixels)
-        let meshes = [0, 1, 3, 7, 15]
-            .iter()
-            .map(|&size| Mesh::new_tesselated_quad(device, size))
-            .collect::<Vec<_>>();
-        assert!(meshes.len() == PATCH_SIZES.len());
-
-        let shader_arena = virtual_model::ShaderArena::new(&context);
-        let virtual_models = vec![];
 
         let render_buffer_reset = compute_patches::RenderBuffer {
             patches_length: 0,
             patches_capacity: MAX_PATCH_COUNT,
             patches: vec![],
         };
-
-        let depth_texture = Texture::create_depth_texture(device, context.size(), "Depth Texture");
 
         let render_step = RenderStep {
             bind_group_0: scene_data.as_bind_group_0(device),
@@ -153,9 +156,8 @@ impl GpuApplication {
                 cache: Default::default(),
             }),
         };
-
         Self {
-            context,
+            scene_data,
             indirect_compute_buffer_reset,
             render_step,
             compute_patches,
@@ -163,105 +165,32 @@ impl GpuApplication {
             patches_buffer_reset,
             render_buffer_reset,
             force_render_values,
-            depth_texture,
-            scene_data,
-            meshes,
-            shader_arena,
-            virtual_models,
             threshold_factor,
-            cursor_capture: WindowCursorCapture::Free,
-            frame_counter: FrameCounter::new(),
         }
-    }
-
-    pub fn resize(&mut self, new_size: UVec2) {
-        let new_size = new_size.max(UVec2::new(1, 1));
-        if new_size == self.context.size() {
-            return;
-        }
-        self.context.resize(new_size);
-        self.depth_texture =
-            Texture::create_depth_texture(&self.context.device, new_size, "Depth Texture");
-    }
-
-    pub fn render(&mut self, game: &GameRes) -> Result<(), wgpu::SurfaceError> {
-        // 1. Read from game
-        let frame_time = self.frame_counter.new_frame();
-        let render_data = RenderData {
-            size: self.context.size(),
-            camera: game.camera.to_shader(self.context.size()),
-            time_data: shader::Time {
-                elapsed: frame_time.elapsed.0,
-                delta: frame_time.delta.0,
-                frame: frame_time.frame as u32,
-            },
-            mouse_data: shader::Mouse {
-                pos: game.mouse,
-                buttons: if game.mouse_held { 1 } else { 0 },
-            },
-        };
-
-        self.update_cursor_capture(game.cursor_capture);
-
-        self.context.set_profiling(game.profiler_settings.gpu);
-
-        update_virtual_models(
-            &mut self.shader_arena,
-            &mut self.virtual_models,
-            &game.models,
-            &self.context,
-            &self.meshes,
-        );
-
-        update_shaders(&mut self.shader_arena, &game.shaders, &self.context);
-
-        // 2. Render
-        match &self.context.surface {
-            wgpu_context::SurfaceOrFallback::Surface { surface, .. } => {
-                // TODO: Handle all cases properly https://github.com/gfx-rs/wgpu/blob/a0c185a28c232ee2ab63f72d6fd3a63a3f787309/examples/src/framework.rs#L216
-                let output = surface.get_current_texture()?;
-                let mut command_encoder =
-                    self.render_commands(&output.texture, render_data, &game.lod_stage)?;
-                self.context.profiler.resolve_queries(&mut command_encoder);
-                self.context
-                    .queue
-                    .submit(std::iter::once(command_encoder.finish()));
-                output.present();
-            }
-            wgpu_context::SurfaceOrFallback::Fallback { texture } => {
-                let mut command_encoder =
-                    self.render_commands(texture, render_data, &game.lod_stage)?;
-                self.context.profiler.resolve_queries(&mut command_encoder);
-                self.context
-                    .queue
-                    .submit(std::iter::once(command_encoder.finish()));
-            }
-        };
-
-        self.context.profiler.end_frame().unwrap();
-        Ok(())
     }
 
     pub fn render_commands(
         &self,
-        surface_texture: &wgpu::Texture,
+        context: &WgpuContext,
+        view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView,
         render_data: RenderData,
-        lod_stage: &Option<Box<dyn Fn(&crate::game::ShaderId, u32)>>,
-    ) -> Result<wgpu::CommandEncoder, wgpu::SurfaceError> {
-        let queue = &self.context.queue;
-        let view = surface_texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(self.context.view_format),
-            ..Default::default()
-        });
-
-        self.scene_data.write_buffers(&render_data, queue);
+        frame_time: &frame_counter::FrameTime,
+        meshes: &[Mesh],
+        shader_arena: &virtual_model::ShaderArena,
+        virtual_models: &[VirtualModel],
+    ) -> wgpu::CommandEncoder {
+        let queue = &context.queue;
+        self.scene_data
+            .write_buffers(context.size(), &render_data, frame_time, queue);
 
         // Write the buffers for each model
-        for model in self.virtual_models.iter() {
+        for model in virtual_models.iter() {
             model.compute_patches.input_buffer.write_buffer(
                 queue,
                 &compute_patches::InputBuffer {
-                    model_view_projection: model.get_model_view_projection(&render_data.camera),
+                    model_view_projection: model
+                        .get_model_view_projection(context.size(), &render_data.camera),
                     threshold_factor: self.threshold_factor,
                 },
             );
@@ -299,32 +228,30 @@ impl GpuApplication {
         }
 
         let mut command_encoder =
-            self.context
+            context
                 .device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("Render Encoder"),
                 });
         // Profiling
-        let mut commands =
-            self.context
-                .profiler
-                .scope("Render", &mut command_encoder, &self.context.device);
+        let mut commands = context
+            .profiler
+            .scope("Render", &mut command_encoder, &context.device);
 
-        for (index, model) in self.virtual_models.iter().enumerate() {
-            let shaders = self
-                .shader_arena
+        for (index, model) in virtual_models.iter().enumerate() {
+            let shaders = shader_arena
                 .get_shader(&model.shader_key)
-                .unwrap_or_else(|| self.shader_arena.get_missing_shader());
-            match lod_stage {
+                .unwrap_or_else(|| shader_arena.get_missing_shader());
+            match render_data.lod_stage.as_ref() {
                 Some(lod_stage) => lod_stage(&model.shader_key, index as u32),
                 None => {
-                    self.do_lod_stage(model, &mut commands, &shaders);
+                    self.do_lod_stage(context, model, &mut commands, &shaders);
                 }
             }
 
             {
                 let mut compute_pass =
-                    commands.scoped_compute_pass("Copy Patch Sizes Pass", &self.context.device);
+                    commands.scoped_compute_pass("Copy Patch Sizes Pass", &context.device);
                 compute_pass.set_pipeline(&self.copy_patches.pipeline);
                 copy_patches::set_bind_groups(
                     &mut compute_pass.recorder,
@@ -336,7 +263,7 @@ impl GpuApplication {
 
         let mut render_pass = commands.scoped_render_pass(
             "Render Pass",
-            &self.context.device,
+            &context.device,
             wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -353,7 +280,7 @@ impl GpuApplication {
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_texture.view,
+                    view: &depth_view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(0.0), // Reverse Z checklist https://iolite-engine.com/blog_posts/reverse_z_cheatsheet
                         store: wgpu::StoreOp::Store,
@@ -364,11 +291,10 @@ impl GpuApplication {
                 occlusion_query_set: None,
             },
         );
-        for model in self.virtual_models.iter() {
-            let shaders = self
-                .shader_arena
+        for model in virtual_models.iter() {
+            let shaders = shader_arena
                 .get_shader(&model.shader_key)
-                .unwrap_or_else(|| self.shader_arena.get_missing_shader());
+                .unwrap_or_else(|| shader_arena.get_missing_shader());
             {
                 render_pass.set_pipeline(&shaders.render);
                 let indirect_draw_offsets = [
@@ -387,7 +313,7 @@ impl GpuApplication {
                     .render_step
                     .bind_group_1
                     .iter()
-                    .zip(self.meshes.iter())
+                    .zip(meshes.iter())
                     .zip(indirect_draw_offsets)
                 {
                     shader::set_bind_groups(
@@ -410,11 +336,12 @@ impl GpuApplication {
         std::mem::drop(render_pass);
         std::mem::drop(commands);
 
-        Ok(command_encoder)
+        command_encoder
     }
 
     fn do_lod_stage(
         &self,
+        context: &WgpuContext,
         model: &VirtualModel,
         commands: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
         shaders: &virtual_model::ShaderPipelines,
@@ -431,10 +358,8 @@ impl GpuApplication {
                 model.compute_patches.indirect_compute_buffer[1]
                     .copy_all_from(&self.indirect_compute_buffer_reset, commands);
 
-                let mut compute_pass = commands.scoped_compute_pass(
-                    format!("Compute Patches From-To {i}"),
-                    &self.context.device,
-                );
+                let mut compute_pass = commands
+                    .scoped_compute_pass(format!("Compute Patches From-To {i}"), &context.device);
                 compute_pass.set_pipeline(&shaders.compute_patches);
                 compute_patches::set_bind_groups(
                     &mut compute_pass.recorder,
@@ -460,10 +385,8 @@ impl GpuApplication {
                 model.compute_patches.indirect_compute_buffer[0]
                     .copy_all_from(&self.indirect_compute_buffer_reset, commands);
 
-                let mut compute_pass = commands.scoped_compute_pass(
-                    format!("Compute Patches To-From {i}"),
-                    &self.context.device,
-                );
+                let mut compute_pass = commands
+                    .scoped_compute_pass(format!("Compute Patches To-From {i}"), &context.device);
                 compute_pass.set_pipeline(&shaders.compute_patches);
                 compute_patches::set_bind_groups(
                     &mut compute_pass.recorder,
@@ -485,18 +408,206 @@ impl GpuApplication {
             }
         }
     }
+}
 
-    pub fn size(&self) -> UVec2 {
-        self.context.size()
+impl Drop for GpuApplication {
+    fn drop(&mut self) {
+        self.runtime.dispose();
+    }
+}
+
+const PATCH_SIZES: [u32; 5] = [2, 4, 8, 16, 32];
+const MAX_PATCH_COUNT: u32 = 100_000;
+
+impl GpuApplication {
+    pub fn new(context: WgpuContext) -> Self {
+        let runtime = create_runtime();
+        let context = store_value(context);
+        let (desired_size, set_desired_size) = create_signal(UVec2::new(1, 1));
+        let (force_wait, set_force_wait) = create_signal(false);
+        let (render_result, set_render_result) = create_signal(Ok(()));
+
+        let (render_data, set_render_data) = create_signal(RenderData {
+            camera: crate::camera::Camera::new(crate::camera::CameraSettings::default()),
+            mouse_pos: glam::Vec2::ZERO,
+            mouse_held: false,
+            lod_stage: None,
+        });
+        create_signal(context.with_value(|context| SceneData::new(&context.device)));
+
+        let shader_arena =
+            store_value(context.with_value(|context| virtual_model::ShaderArena::new(context)));
+        let virtual_models = store_value(vec![]);
+
+        let render_tree = create_effect(move |_| {
+            render(
+                context,
+                desired_size,
+                force_wait,
+                render_data,
+                set_render_result,
+                shader_arena,
+                virtual_models,
+            );
+            println!("Created render effect");
+        });
+
+        Self {
+            context,
+            runtime,
+            _render_tree: render_tree,
+
+            set_render_data,
+            set_desired_size,
+            set_force_wait,
+            render_result,
+            cursor_capture: WindowCursorCapture::Free,
+
+            shader_arena,
+            virtual_models,
+        }
     }
 
-    pub fn device(&self) -> &wgpu::Device {
-        &self.context.device
+    pub fn render(&mut self, game: &GameRes) -> Result<(), wgpu::SurfaceError> {
+        self.cursor_capture = self.update_cursor_capture(game.cursor_capture);
+
+        self.context.update_value(|context| {
+            context.set_profiling(game.profiler_settings.gpu);
+        });
+
+        self.context.with_value(|context| {
+            self.virtual_models.update_value(|virtual_models| {
+                update_virtual_models(virtual_models, &game.models, &context)
+            });
+
+            self.shader_arena
+                .update_value(|shader_arena| update_shaders(shader_arena, &game.shaders, &context));
+        });
+        // This triggers the reactivity!
+        self.set_render_data.update(|render_data| {
+            *render_data = RenderData {
+                camera: game.camera.clone(),
+                mouse_pos: game.mouse,
+                mouse_held: game.mouse_held,
+                lod_stage: game.lod_stage.clone(),
+            };
+        });
+
+        self.render_result.get_untracked()
+    }
+
+    pub fn resize(&self, new_size: UVec2) {
+        self.set_desired_size.set(new_size);
     }
 
     pub fn force_wait(&self) {
-        self.context.instance.poll_all(true);
+        self.set_force_wait.set(true);
     }
+}
+
+/// Render component.
+/// We're using Leptos :)
+fn render(
+    context: StoredValue<WgpuContext>,
+    desired_size: ReadSignal<UVec2>,
+    force_wait: ReadSignal<bool>,
+    render_data: ReadSignal<RenderData>,
+    set_render_result: WriteSignal<Result<(), wgpu::SurfaceError>>,
+    shader_arena: StoredValue<virtual_model::ShaderArena>,
+    virtual_models: StoredValue<Vec<VirtualModel>>,
+) -> Effect<()> {
+    // size/2 - 1 == one quad per four pixels
+    let meshes = context.with_value(|context| {
+        PATCH_SIZES
+            .iter()
+            .map(|size| *size / 2 - 1)
+            .map(|size| Mesh::new_tesselated_quad(&context.device, size))
+            .collect::<Vec<_>>()
+    });
+
+    let (leftovers, _) =
+        create_signal(context.with_value(|context| GpuApplicationLeftovers::new(&context)));
+
+    let frame_counter = store_value(FrameCounter::new());
+    let new_frame_time = move || {
+        frame_counter
+            .try_update_value(|counter| counter.new_frame())
+            .expect("Frame counter has been dropped?")
+    };
+
+    let depth_texture = store_value(context.with_value(|context| {
+        Texture::create_depth_texture(&context.device, context.size(), "Depth Texture")
+    }));
+
+    // A reactive effect that reruns whenever any of its signals change
+    create_effect(move |_| {
+        // Get the value from a signal
+        let desired_size = desired_size.get();
+
+        // Do the resizing. The whole ".update_value(|context| ...)" stuff is because of a Leptos API quirk.
+        context.update_value(|context| {
+            if let Some(new_size) = context.try_resize(desired_size) {
+                depth_texture.set_value(Texture::create_depth_texture(
+                    &context.device,
+                    new_size,
+                    "Depth Texture",
+                ));
+            }
+        });
+    });
+
+    create_effect(move |_| {
+        println!("Rendering");
+        let frame_time = new_frame_time();
+        // 2. Render
+        context.update_value(|context| {
+            let surface_texture = match context.surface_texture() {
+                Ok(v) => v,
+                Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                    // Roughly based on https://github.com/gfx-rs/wgpu/blob/a0c185a28c232ee2ab63f72d6fd3a63a3f787309/examples/src/framework.rs#L216
+                    context.recreate_swapchain();
+                    return;
+                }
+                Err(v) => {
+                    set_render_result.set(Err(v));
+                    return;
+                }
+            };
+
+            let mut command_encoder = leftovers.with(|leftovers| {
+                depth_texture.with_value(|depth_texture| {
+                    shader_arena.with_value(|shader_arena| {
+                        virtual_models.with_value(|virtual_models| {
+                            leftovers.render_commands(
+                                context,
+                                &surface_texture.texture_view(),
+                                &depth_texture.view,
+                                render_data.with(|v| v.clone()),
+                                &frame_time,
+                                meshes.as_slice(),
+                                shader_arena,
+                                virtual_models,
+                            )
+                        })
+                    })
+                })
+            });
+            context.profiler.resolve_queries(&mut command_encoder);
+            context
+                .queue
+                .submit(std::iter::once(command_encoder.finish()));
+
+            surface_texture.present();
+        });
+
+        context.update_value(|context| context.profiler.end_frame().unwrap());
+
+        if force_wait.get() {
+            context.with_value(|context| context.instance.poll_all(true));
+        }
+
+        set_render_result.set(Ok(()));
+    })
 }
 
 fn update_shaders(
@@ -518,18 +629,27 @@ fn update_shaders(
 impl GpuApplication {
     pub fn get_profiling_data(&mut self) -> Option<Vec<wgpu_profiler::GpuTimerQueryResult>> {
         self.context
-            .profiler
-            .process_finished_frame(self.context.queue.get_timestamp_period())
+            .try_update_value(|context| {
+                context
+                    .profiler
+                    .process_finished_frame(context.queue.get_timestamp_period())
+            })
+            .flatten()
     }
 }
 
 fn update_virtual_models(
-    _shader_arena: &mut virtual_model::ShaderArena,
     virtual_models: &mut Vec<VirtualModel>,
     models: &[ModelInfo],
     context: &WgpuContext,
-    meshes: &[Mesh],
 ) {
+    // TODO: Don't recreate the meshes every frame only to read the number of indices
+    let meshes = PATCH_SIZES
+        .iter()
+        .map(|size| *size / 2 - 1)
+        .map(|size| Mesh::new_tesselated_quad(&context.device, size))
+        .collect::<Vec<_>>();
+
     // Update existing models
     for (virtual_model, model) in virtual_models.iter_mut().zip(models.iter()) {
         virtual_model.transform = model.transform.clone();
@@ -543,7 +663,7 @@ fn update_virtual_models(
         for (index, model) in models.iter().enumerate().skip(virtual_models.len()) {
             let mut virtual_model = VirtualModel::new(
                 context,
-                meshes,
+                &meshes,
                 model.shader_id.clone(),
                 &format!("ID{index}"),
             );
@@ -552,13 +672,6 @@ fn update_virtual_models(
             virtual_models.push(virtual_model);
         }
     }
-}
-
-pub struct RenderData {
-    pub size: UVec2,
-    pub camera: shader::Camera,
-    pub time_data: shader::Time,
-    pub mouse_data: shader::Mouse,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -574,10 +687,17 @@ pub enum WindowCursorCapture {
 }
 
 impl GpuApplication {
-    pub fn update_cursor_capture(&mut self, cursor_capture: WindowCursorCapture) {
-        let window = match &self.context.surface {
-            wgpu_context::SurfaceOrFallback::Surface { window, .. } => window,
-            wgpu_context::SurfaceOrFallback::Fallback { .. } => return,
+    pub fn update_cursor_capture(
+        &self,
+        cursor_capture: WindowCursorCapture,
+    ) -> WindowCursorCapture {
+        let window_result = self.context.with_value(|context| match &context.surface {
+            wgpu_context::SurfaceOrFallback::Surface { window, .. } => Result::Ok(window.clone()),
+            wgpu_context::SurfaceOrFallback::Fallback { .. } => Result::Err(self.cursor_capture),
+        });
+        let window = match window_result {
+            Ok(window) => window,
+            Err(v) => return v,
         };
         match (self.cursor_capture, cursor_capture) {
             (WindowCursorCapture::LockedAndHidden(position), WindowCursorCapture::Free) => {
@@ -586,22 +706,20 @@ impl GpuApplication {
                     .unwrap();
                 window.set_cursor_visible(true);
                 let _ = window.set_cursor_position(position);
-                self.cursor_capture = WindowCursorCapture::Free;
+                WindowCursorCapture::Free
             }
-            (WindowCursorCapture::Free, WindowCursorCapture::Free) => {}
+            (WindowCursorCapture::Free, WindowCursorCapture::Free) => WindowCursorCapture::Free,
             (
                 WindowCursorCapture::LockedAndHidden(_),
                 WindowCursorCapture::LockedAndHidden(position),
-            ) => {
-                self.cursor_capture = WindowCursorCapture::LockedAndHidden(position);
-            }
+            ) => WindowCursorCapture::LockedAndHidden(position),
             (WindowCursorCapture::Free, WindowCursorCapture::LockedAndHidden(cursor_position)) => {
                 window
                     .set_cursor_grab(winit::window::CursorGrabMode::Confined)
                     .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))
                     .unwrap();
                 window.set_cursor_visible(false);
-                self.cursor_capture = WindowCursorCapture::LockedAndHidden(cursor_position);
+                WindowCursorCapture::LockedAndHidden(cursor_position)
             }
         }
     }

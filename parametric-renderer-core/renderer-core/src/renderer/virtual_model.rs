@@ -419,8 +419,12 @@ impl VirtualModel {
         self.transform.to_matrix()
     }
 
-    pub fn get_model_view_projection(&self, camera: &shader::Camera) -> Mat4 {
-        camera.projection * camera.view * self.transform.to_matrix()
+    pub fn get_model_view_projection(
+        &self,
+        size: glam::UVec2,
+        camera: &crate::camera::Camera,
+    ) -> Mat4 {
+        camera.projection_matrix(size) * camera.view_matrix() * self.transform.to_matrix()
     }
 }
 

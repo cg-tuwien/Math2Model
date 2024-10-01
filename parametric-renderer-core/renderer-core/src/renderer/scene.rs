@@ -1,7 +1,7 @@
 use crate::{buffer::TypedBuffer, camera::Camera, shaders::shader};
 use glam::{Mat4, UVec2, Vec2, Vec4};
 
-use super::RenderData;
+use super::{frame_counter::FrameTime, RenderData};
 
 pub struct SceneData {
     pub time_buffer: TypedBuffer<shader::Time>,
@@ -81,9 +81,21 @@ impl SceneData {
         )
     }
 
-    pub fn write_buffers(&self, render_data: &RenderData, queue: &wgpu::Queue) {
-        self.time_buffer.write_buffer(queue, &render_data.time_data);
-        let size = render_data.size;
+    pub fn write_buffers(
+        &self,
+        size: UVec2,
+        render_data: &RenderData,
+        frame_time: &FrameTime,
+        queue: &wgpu::Queue,
+    ) {
+        self.time_buffer.write_buffer(
+            queue,
+            &shader::Time {
+                elapsed: frame_time.elapsed.0,
+                delta: frame_time.delta.0,
+                frame: frame_time.frame as u32,
+            },
+        );
         self.screen_buffer.write_buffer(
             queue,
             &shader::Screen {
@@ -91,9 +103,15 @@ impl SceneData {
                 inv_resolution: Vec2::new(1.0 / (size.x as f32), 1.0 / (size.y as f32)),
             },
         );
-        self.mouse_buffer
-            .write_buffer(queue, &render_data.mouse_data);
-        self.camera_buffer.write_buffer(queue, &render_data.camera);
+        self.mouse_buffer.write_buffer(
+            queue,
+            &shader::Mouse {
+                pos: render_data.mouse_pos,
+                buttons: if render_data.mouse_held { 1 } else { 0 },
+            },
+        );
+        self.camera_buffer
+            .write_buffer(queue, &render_data.camera.to_shader(size));
     }
 }
 

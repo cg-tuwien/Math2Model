@@ -216,10 +216,8 @@ impl InputHandler for Application {
         match self.render() {
             Ok(_) => (),
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                // TODO: Window closing and opening is borked
-                if let Some(gpu) = &mut self.renderer {
-                    let _ = gpu.resize(gpu.size());
-                }
+                // Nothing to do, surface will be recreated
+                // TODO: Test window closing and opening
             }
             Err(wgpu::SurfaceError::OutOfMemory) => {
                 error!("Out of memory");
