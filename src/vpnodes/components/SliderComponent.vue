@@ -18,7 +18,8 @@ const props = defineProps<{
     v-on:pointerdown.stop=""
     tooltip
   ></n-slider>
-  <!--<n-input-number
+  <n-input-number
+    v-if="props.data.showInput"
     v-model:value="props.data.value"
     :step="props.data.step"
     :min="props.data.min"
@@ -26,7 +27,7 @@ const props = defineProps<{
     v-on:change="(v) => props.data.change(v)"
     v-on:pointerdown.stop=""
   >
-  </n-input-number>-->
+  </n-input-number>
 </template>
 
 <style scoped></style>

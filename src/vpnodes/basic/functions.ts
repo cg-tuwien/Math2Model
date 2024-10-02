@@ -437,3 +437,15 @@ export function typeToValue(type: string) {
       return undefined;
   }
 }
+
+export function valueToType(value: number | vec2 | vec3 | vec4): string {
+  if (value instanceof vec2) {
+    return "vec2f";
+  } else if (value instanceof vec3) {
+    return "vec3f";
+  } else if (value instanceof vec4) {
+    return "vec4f";
+  } else {
+    return "f32";
+  }
+}
