@@ -9,8 +9,8 @@ const props = defineProps<{
 <template>
   <n-flex
     ><n-image :alt="uiNode.name" width="50px" :src="uiNode.image"></n-image>
-    {{ uiNode.prefix }} <br />
-    parametric {{ uiNode.name }}</n-flex
+    {{ uiNode.type }} <br />
+    {{ uiNode.prefix }} {{ uiNode.name }}</n-flex
   >
 </template>
 

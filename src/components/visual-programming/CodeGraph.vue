@@ -73,6 +73,7 @@ import BasicGraphWGSL from "@/../parametric-renderer-core/graphs/BasicGraphShade
 import HeartWGSL from "@/../parametric-renderer-core/graphs/Heart.graph.wgsl?raw";
 import SphereWGSL from "@/../parametric-renderer-core/graphs/Sphere.graph.wgsl?raw";
 import PlaneWGSL from "@/../parametric-renderer-core/graphs/Plane.graph.wgsl?raw";
+import CylinderWGSL from "@/../parametric-renderer-core/graphs/Cylinder.graph.wgsl?raw";
 import {
   HistoryPlugin,
   type HistoryActions,
@@ -80,6 +81,7 @@ import {
   HistoryExtensions,
 } from "rete-history-plugin";
 import {
+  CombineNode,
   newHeartShape,
   newPlaneShape,
   newSphereShape,
@@ -87,6 +89,8 @@ import {
 } from "@/vpnodes/simple-mode/shapes";
 import NodesDock from "@/components/visual-programming/NodesDock.vue";
 import type { UINode } from "@/vpnodes/ui/uinode";
+import { SliderControl } from "@/vpnodes/controls/slider";
+import SliderComponent from "@/vpnodes/components/SliderComponent.vue";
 
 const emit = defineEmits<{
   update: [content: string];
@@ -107,7 +111,8 @@ const props = defineProps<{
 const uiNodes: UINode[] = [
   {
     name: "Heart",
-    prefix: "SHAPE",
+    type: "SHAPE",
+    prefix: "parametric",
     image: "/src/assets/nodes/heart.png",
     create: () => {
       const n = newHeartShape();
@@ -117,7 +122,8 @@ const uiNodes: UINode[] = [
   },
   {
     name: "Sphere",
-    prefix: "SHAPE",
+    type: "SHAPE",
+    prefix: "parametric",
     image: "/src/assets/nodes/sphere.png",
     create: () => {
       const n = newSphereShape();
@@ -127,10 +133,25 @@ const uiNodes: UINode[] = [
   },
   {
     name: "Plane",
-    prefix: "SHAPE",
+    type: "SHAPE",
+    prefix: "parametric",
     image: "/src/assets/nodes/plane.png",
     create: () => {
       const n = newPlaneShape();
+      addNode(n);
+      return n;
+    },
+  },
+  {
+    name: "Combine",
+    type: "APPLY",
+    prefix: "",
+    image: "/src/assets/nodes/combine.png",
+    create: () => {
+      const n = new CombineNode(
+        (id: string) => area.update("node", id),
+        (c) => area.update("control", c.id),
+      );
       addNode(n);
       return n;
     },
@@ -451,6 +472,9 @@ async function createEditor() {
         control(data) {
           if (data.payload instanceof DropdownControl) {
             return DropdownComponent;
+          }
+          if (data.payload instanceof SliderControl) {
+            return SliderComponent;
           }
           if (data.payload instanceof ClassicPreset.InputControl) {
             return VuePresets.classic.Control;
@@ -840,6 +864,17 @@ function serializedNodeToNode(
     case "Shape":
       node = new ShapeNode("", "");
       break;
+    case "Combine":
+      node = new CombineNode(
+        (id) => {
+          area.update("node", id);
+          editor.addNode(new NothingNode());
+        },
+        (c) => {
+          area.update("control", c.id);
+        },
+      );
+      break;
   }
 
   idMap.set(sn.uuid, node.id);
@@ -930,7 +965,7 @@ function addTemplate(name: string, json: string) {
               ev.dataTransfer.getData('text/plain'),
             ) as UINode;
             let toCreate: Nodes | null = null;
-            if (node.prefix === 'SHAPE') {
+            if (node.type === 'SHAPE') {
               switch (node.name) {
                 case 'Heart':
                   toCreate = newHeartShape();
@@ -940,6 +975,20 @@ function addTemplate(name: string, json: string) {
                   break;
                 case 'Plane':
                   toCreate = newPlaneShape();
+                  break;
+              }
+            } else if (node.type === 'APPLY') {
+              switch (node.name) {
+                case 'Combine':
+                  toCreate = new CombineNode(
+                    (id) => {
+                      area.update('node', id);
+                      editor.addNode(new NothingNode());
+                    },
+                    (c) => {
+                      area.update('control', c.id);
+                    },
+                  );
                   break;
               }
             }
