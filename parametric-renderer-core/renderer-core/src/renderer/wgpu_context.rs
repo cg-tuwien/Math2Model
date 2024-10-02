@@ -35,7 +35,8 @@ impl WgpuContext {
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
-                compatible_surface: surface.as_ref(),
+                // Setting this is only needed for a fallback adapter. Which we don't want.
+                compatible_surface: None,
                 force_fallback_adapter: false,
             })
             .await

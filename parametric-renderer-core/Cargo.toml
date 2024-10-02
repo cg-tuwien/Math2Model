@@ -16,3 +16,4 @@ bytemuck = { version = "1.18.0", features = ["derive"] }
 nanoserde = "0.1.37"
 comemo = "0.4"
 leptos_reactive = "0.6.15"
+indexmap = "2.6.0"

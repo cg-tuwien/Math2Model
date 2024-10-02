@@ -13,6 +13,7 @@ bytemuck = { workspace = true }
 comemo = { workspace = true }
 encase = { workspace = true }
 glam = { workspace = true }
+indexmap = { workspace = true }
 leptos_reactive = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
