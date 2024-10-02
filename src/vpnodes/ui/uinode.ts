@@ -6,5 +6,6 @@ export interface UINode {
   type: "SHAPE" | "APPLY" | "MANIPULATE";
   prefix: string;
   image: string;
-  create: () => Nodes;
+  get: () => Nodes;
+  create: (uiNode: UINode) => void;
 }

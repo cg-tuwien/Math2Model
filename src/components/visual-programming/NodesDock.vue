@@ -4,9 +4,11 @@ import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import type { DeepReadonly } from "vue";
 import type { UINode } from "@/vpnodes/ui/uinode";
 import SingleNodeDisplay from "@/components/visual-programming/SingleNodeDisplay.vue";
+import { NodeEditor } from "rete";
 
 const props = defineProps<{
   displayNodes: UINode[];
+  editor: NodeEditor;
 }>();
 </script>
 
@@ -15,7 +17,7 @@ const props = defineProps<{
     <template #header> Shapes </template>
     <n-list-item
       v-for="node of displayNodes"
-      :onclick="node.create"
+      :onclick="() => node.create(node)"
       draggable="true"
       v-on:dragstart="
         (ev) => {

@@ -1,15 +1,13 @@
 <script setup lang="ts">
-import { type Area, AreaPlugin } from "rete-area-plugin";
+import { AreaExtensions, AreaPlugin } from "rete-area-plugin";
 import {
-  VuePlugin,
   Presets as VuePresets,
   type VueArea2D,
+  VuePlugin,
 } from "rete-vue-plugin";
-import { NodeEditor, ClassicPreset, type GetSchemes } from "rete";
+import { ClassicPreset, type GetSchemes, NodeEditor } from "rete";
 import { type DeepReadonly, onMounted, ref, watch } from "vue";
-import { AreaExtensions } from "rete-area-plugin";
 import {
-  BidirectFlow,
   ConnectionPlugin,
   Presets as ConnectionPresets,
 } from "rete-connection-plugin";
@@ -19,26 +17,19 @@ import {
   Presets as ContextMenuPresets,
 } from "rete-context-menu-plugin";
 import {
-  reteSocket as socket,
-  VPNode,
-  ReturnNode,
-  VariableOutNode,
   FunctionCallNode,
   InitializeNode,
-  VariableInNode,
   NothingNode,
+  ReturnNode,
+  VariableInNode,
+  VariableOutNode,
 } from "@/vpnodes/basic/nodes";
 import { DataflowEngine } from "rete-engine";
 import { structures } from "rete-structures";
-import { root } from "postcss";
-import { ScopesPlugin, Presets as ScopesPresets } from "rete-scopes-plugin";
-import {
-  BlockNode,
-  ConditionNode,
-  LogicScopeNode,
-} from "@/vpnodes/basic/logic";
+import { Presets as ScopesPresets, ScopesPlugin } from "rete-scopes-plugin";
+import { ConditionNode, LogicScopeNode } from "@/vpnodes/basic/logic";
 import type { Structures } from "rete-structures/_types/types";
-import { get, useThrottleFn, watchImmediate } from "@vueuse/core";
+import { useThrottleFn } from "@vueuse/core";
 import {
   ArrangeAppliers,
   AutoArrangePlugin,
@@ -53,7 +44,6 @@ import {
   CallCustomFunctionNode,
   CustomFunctionNode,
   FunctionScopeNode,
-  typeToValueCode,
 } from "@/vpnodes/basic/functions";
 import { graphFromJSON, SerializedGraph } from "@/vpnodes/serialization/graph";
 import { SerializedNode, toSerializedNode } from "@/vpnodes/serialization/node";
@@ -62,23 +52,18 @@ import {
   makeFilePath,
   type ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
-import type { VirtualModelState } from "@/scenes/scene-state";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import { showError } from "@/notification";
 import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
 import Heart from "@/../parametric-renderer-core/graphs/Heart.graph?raw";
 import Sphere from "@/../parametric-renderer-core/graphs/Sphere.graph?raw";
-import HeartSphere from "@/../parametric-renderer-core/graphs/HeartSphere.graph?raw";
-import BasicGraphWGSL from "@/../parametric-renderer-core/graphs/BasicGraphShader.graph.wgsl?raw";
 import HeartWGSL from "@/../parametric-renderer-core/graphs/Heart.graph.wgsl?raw";
 import SphereWGSL from "@/../parametric-renderer-core/graphs/Sphere.graph.wgsl?raw";
 import PlaneWGSL from "@/../parametric-renderer-core/graphs/Plane.graph.wgsl?raw";
-import CylinderWGSL from "@/../parametric-renderer-core/graphs/Cylinder.graph.wgsl?raw";
 import {
-  HistoryPlugin,
   type HistoryActions,
+  HistoryPlugin,
   Presets as HistoryPresets,
-  HistoryExtensions,
 } from "rete-history-plugin";
 import {
   CombineNode,
@@ -108,55 +93,74 @@ const props = defineProps<{
   keyedGraph: DeepReadonly<KeyedGraph> | null;
 }>();
 
-const uiNodes: UINode[] = [
-  {
-    name: "Heart",
-    type: "SHAPE",
-    prefix: "parametric",
-    image: "/src/assets/nodes/heart.png",
-    create: () => {
-      const n = newHeartShape();
-      addNode(n);
-      return n;
+function createUINode(uiNode: UINode) {
+  addNode(uiNode.get());
+}
+
+const uiNodes: Map<string, UINode> = new Map([
+  [
+    "Heart",
+    {
+      name: "Heart",
+      type: "SHAPE",
+      prefix: "parametric",
+      image: "/src/assets/nodes/heart.png",
+      get: () => {
+        //addNode(n);
+        return newHeartShape();
+      },
+      create: createUINode,
     },
-  },
-  {
-    name: "Sphere",
-    type: "SHAPE",
-    prefix: "parametric",
-    image: "/src/assets/nodes/sphere.png",
-    create: () => {
-      const n = newSphereShape();
-      addNode(n);
-      return n;
+  ],
+  [
+    "Sphere",
+    {
+      name: "Sphere",
+      type: "SHAPE",
+      prefix: "parametric",
+      image: "/src/assets/nodes/sphere.png",
+      get: () => {
+        //addNode(n);
+        return newSphereShape();
+      },
+      create: createUINode,
     },
-  },
-  {
-    name: "Plane",
-    type: "SHAPE",
-    prefix: "parametric",
-    image: "/src/assets/nodes/plane.png",
-    create: () => {
-      const n = newPlaneShape();
-      addNode(n);
-      return n;
+  ],
+  [
+    "Plane",
+    {
+      name: "Plane",
+      type: "SHAPE",
+      prefix: "parametric",
+      image: "/src/assets/nodes/plane.png",
+      get: () => {
+        //addNode(n);
+        return newPlaneShape();
+      },
+      create: createUINode,
     },
-  },
-  {
-    name: "Combine",
-    type: "APPLY",
-    prefix: "",
-    image: "/src/assets/nodes/combine.png",
-    create: () => {
-      const n = new CombineNode(
-        (id: string) => area.update("node", id),
-        (c) => area.update("control", c.id),
-      );
-      addNode(n);
-      return n;
+  ],
+  [
+    "Combine",
+    {
+      name: "Combine",
+      type: "APPLY",
+      prefix: "",
+      image: "/src/assets/nodes/combine.png",
+      get: () => {
+        //addNode(n);
+        return new CombineNode(
+          (id: string) => {
+            area.update("node", id);
+            editor.addNode(new NothingNode());
+          },
+          (c) => area.update("control", c.id),
+        );
+      },
+      create: createUINode,
     },
-  },
-];
+  ],
+]);
 
 const container = ref<HTMLElement | null>(null);
 
@@ -948,7 +952,11 @@ function addTemplate(name: string, json: string) {
   </n-modal>
   <n-flex vertical style="width: 100%">
     <n-flex style="height: 100%">
-      <NodesDock :display-nodes="uiNodes" style="width: 25%"></NodesDock>
+      <NodesDock
+        :display-nodes="uiNodes.values()"
+        :editor="editor"
+        style="width: 25%"
+      ></NodesDock>
       <div
         class="rete flex-1"
         ref="container"
@@ -965,7 +973,12 @@ function addTemplate(name: string, json: string) {
               ev.dataTransfer.getData('text/plain'),
             ) as UINode;
             let toCreate: Nodes | null = null;
-            if (node.type === 'SHAPE') {
+            if (uiNodes.has(node.name)) {
+              toCreate = uiNodes.get(node.name).get();
+              //area.area.setPointerFrom(ev);
+              //void area.translate(toCreate.id, area.area.pointer);
+              //return;
+            } else if (node.type === 'SHAPE') {
               switch (node.name) {
                 case 'Heart':
                   toCreate = newHeartShape();
