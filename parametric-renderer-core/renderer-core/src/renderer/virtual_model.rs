@@ -357,12 +357,9 @@ impl RenderStep {
 }
 
 pub struct VirtualModel {
-    pub id: String,
     pub compute_patches: ComputePatchesStep,
     pub copy_patches: CopyPatchesStep,
     pub render_step: RenderStep,
-
-    pub shader_key: ShaderId,
 }
 
 impl MaterialInfo {
@@ -399,7 +396,7 @@ impl Default for MaterialInfo {
 }
 
 impl VirtualModel {
-    pub fn new(context: &WgpuContext, meshes: &[Mesh], shader_key: ShaderId, id: &str) -> Self {
+    pub fn new(context: &WgpuContext, meshes: &[Mesh], id: &str) -> Self {
         let compute_patches_step = ComputePatchesStep::new(&context.device, id);
         let copy_patches_step = CopyPatchesStep::new(
             &context.device,
@@ -410,11 +407,9 @@ impl VirtualModel {
         let render_step = RenderStep::new(context, &compute_patches_step.render_buffer);
 
         Self {
-            id: id.to_string(),
             compute_patches: compute_patches_step,
             copy_patches: copy_patches_step,
             render_step,
-            shader_key,
         }
     }
 }

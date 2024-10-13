@@ -429,12 +429,7 @@ fn model_component(
             let context = context.read_value();
             let meshes = render_stage.meshes.read_value();
             let model = model.read();
-            VirtualModel::new(
-                &context,
-                &meshes,
-                model.shader_id.clone(),
-                &format!("ID{}", model.id),
-            )
+            VirtualModel::new(&context, &meshes, &format!("ID{}", model.id))
         }
     });
 
@@ -444,6 +439,7 @@ fn model_component(
     let lod_stage_component = context.with_value(|context| {
         lod_stage_component(
             context,
+            model.clone(),
             virtual_model,
             compute_patches,
             copy_patches_pipeline,
@@ -543,6 +539,7 @@ fn write_buffers_component(
 fn lod_stage_component(
     // TODO: Refactor to take a StoredValue<Context>
     context: &WgpuContext,
+    model: ArcReadSignal<ModelInfo>,
     virtual_model: Memo<VirtualModel>,
     compute_patches: StoredValue<ComputePatchesStep>,
     copy_patches_pipeline: StoredValue<wgpu::ComputePipeline>,
@@ -588,13 +585,13 @@ fn lod_stage_component(
           frame_data: &FrameData,
           commands: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>,
           shader_arena: &virtual_model::ShaderArena| {
-        let model = virtual_model.read();
+        let virtual_model = virtual_model.read();
 
         let shaders = shader_arena
-            .get_shader(&model.shader_key)
+            .get_shader(&model.read().shader_id)
             .unwrap_or_else(|| shader_arena.get_missing_shader());
         if let Some(overriden_lod_stage) = frame_data.lod_stage.as_ref() {
-            (overriden_lod_stage)(&model.shader_key, &model.id);
+            (overriden_lod_stage)(&model.read().shader_id, &model.read().id);
         } else {
             // Each round, we do a ping-pong and pong-ping
             // 2*4 rounds is enough to subdivide a 4k screen into 16x16 pixel patches
@@ -603,9 +600,9 @@ fn lod_stage_component(
                 let is_last_round = i == double_number_of_rounds - 1;
                 // TODO: Should I create many compute passes, or just one?
                 {
-                    model.compute_patches.patches_buffer[1]
+                    virtual_model.compute_patches.patches_buffer[1]
                         .copy_all_from(&patches_buffer_reset, commands);
-                    model.compute_patches.indirect_compute_buffer[1]
+                    virtual_model.compute_patches.indirect_compute_buffer[1]
                         .copy_all_from(&indirect_compute_buffer_reset, commands);
 
                     let mut compute_pass = commands.scoped_compute_pass(
@@ -616,25 +613,25 @@ fn lod_stage_component(
                     compute_patches::set_bind_groups(
                         &mut compute_pass.recorder,
                         &compute_patches.read_value().bind_group_0,
-                        &model.compute_patches.bind_group_1,
-                        &model.compute_patches.bind_group_2[0],
+                        &virtual_model.compute_patches.bind_group_1,
+                        &virtual_model.compute_patches.bind_group_2[0],
                     );
                     compute_pass.dispatch_workgroups_indirect(
-                        &model.compute_patches.indirect_compute_buffer[0],
+                        &virtual_model.compute_patches.indirect_compute_buffer[0],
                         0,
                     );
                 }
                 if is_last_round {
                     // Set to true
-                    model
+                    virtual_model
                         .compute_patches
                         .force_render_uniform
                         .copy_all_from(&force_render_true, commands);
                 }
                 {
-                    model.compute_patches.patches_buffer[0]
+                    virtual_model.compute_patches.patches_buffer[0]
                         .copy_all_from(&patches_buffer_reset, commands);
-                    model.compute_patches.indirect_compute_buffer[0]
+                    virtual_model.compute_patches.indirect_compute_buffer[0]
                         .copy_all_from(&indirect_compute_buffer_reset, commands);
 
                     let mut compute_pass = commands.scoped_compute_pass(
@@ -646,17 +643,17 @@ fn lod_stage_component(
                         &mut compute_pass.recorder,
                         // Maybe refactor so that parent components set bind groups, and children just assume that they're set?
                         &compute_patches.read_value().bind_group_0,
-                        &model.compute_patches.bind_group_1,
-                        &model.compute_patches.bind_group_2[1],
+                        &virtual_model.compute_patches.bind_group_1,
+                        &virtual_model.compute_patches.bind_group_2[1],
                     );
                     compute_pass.dispatch_workgroups_indirect(
-                        &model.compute_patches.indirect_compute_buffer[1],
+                        &virtual_model.compute_patches.indirect_compute_buffer[1],
                         0,
                     );
                 }
                 if is_last_round {
                     // Set to false
-                    model
+                    virtual_model
                         .compute_patches
                         .force_render_uniform
                         .copy_all_from(&force_render_false, commands);
@@ -669,7 +666,7 @@ fn lod_stage_component(
             compute_pass.set_pipeline(&copy_patches_pipeline.read_value());
             copy_patches::set_bind_groups(
                 &mut compute_pass.recorder,
-                &model.copy_patches.bind_group_0,
+                &virtual_model.copy_patches.bind_group_0,
             );
             compute_pass.dispatch_workgroups(1, 1, 1);
         }
@@ -704,7 +701,7 @@ fn render_model_component(
           shader_arena: &virtual_model::ShaderArena| {
         let virtual_model = virtual_model.read();
         let shaders = shader_arena
-            .get_shader(&virtual_model.shader_key)
+            .get_shader(&model.read().shader_id)
             .unwrap_or_else(|| shader_arena.get_missing_shader());
         render_pass.set_pipeline(&shaders.render);
 
