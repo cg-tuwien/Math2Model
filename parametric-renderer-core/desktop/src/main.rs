@@ -8,5 +8,7 @@ fn main() -> anyhow::Result<()> {
     let subscriber = tracing_subscriber::FmtSubscriber::new();
     tracing::subscriber::set_global_default(subscriber)?;
 
-    pollster::block_on(run())
+    any_spawner::Executor::init_futures_executor().expect("Futures executor failed to init");
+
+    run()
 }

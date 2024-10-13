@@ -76,7 +76,7 @@ if (globalThis.navigator.gpu !== undefined) {
           const descriptor = args[0];
           const buffer = fn(...args);
           if (descriptor.label !== undefined) {
-            const IdRegex = /ID(\d+) (.+)/;
+            const IdRegex = /ID(\d+) (.+)/; // TODO: Fix this, now that we're using UUIDs
             const match = descriptor.label.match(IdRegex);
             if (match) {
               const id = parseInt(match[1], 10);

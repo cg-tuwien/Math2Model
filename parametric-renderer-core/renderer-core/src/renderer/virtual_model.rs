@@ -6,7 +6,6 @@ use crate::{
     mesh::Mesh,
     shaders::{compute_patches, copy_patches, shader},
     texture::Texture,
-    transform::Transform,
 };
 
 use super::{wgpu_context::WgpuContext, MAX_PATCH_COUNT, PATCH_SIZES};
@@ -261,7 +260,7 @@ pub struct CopyPatchesStep {
 impl CopyPatchesStep {
     pub fn new(
         device: &wgpu::Device,
-        compute_patches: &ComputePatchesStep,
+        render_buffer: &[TypedBuffer<compute_patches::RenderBuffer>],
         meshes: &[crate::mesh::Mesh],
         id: &str,
     ) -> Self {
@@ -292,11 +291,11 @@ impl CopyPatchesStep {
         let bind_group_0 = copy_patches::bind_groups::BindGroup0::from_bindings(
             device,
             copy_patches::bind_groups::BindGroupLayout0 {
-                render_buffer_2: compute_patches.render_buffer[0].as_entire_buffer_binding(),
-                render_buffer_4: compute_patches.render_buffer[1].as_entire_buffer_binding(),
-                render_buffer_8: compute_patches.render_buffer[2].as_entire_buffer_binding(),
-                render_buffer_16: compute_patches.render_buffer[3].as_entire_buffer_binding(),
-                render_buffer_32: compute_patches.render_buffer[4].as_entire_buffer_binding(),
+                render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
+                render_buffer_4: render_buffer[1].as_entire_buffer_binding(),
+                render_buffer_8: render_buffer[2].as_entire_buffer_binding(),
+                render_buffer_16: render_buffer[3].as_entire_buffer_binding(),
+                render_buffer_32: render_buffer[4].as_entire_buffer_binding(),
                 indirect_draw: indirect_draw_buffers.as_entire_buffer_binding(),
             },
         );
@@ -315,7 +314,10 @@ pub struct RenderStep {
 }
 
 impl RenderStep {
-    pub fn new(context: &WgpuContext, compute_patches: &ComputePatchesStep) -> Self {
+    pub fn new(
+        context: &WgpuContext,
+        render_buffer: &[TypedBuffer<compute_patches::RenderBuffer>],
+    ) -> Self {
         let model_buffer = TypedBuffer::new_uniform(
             &context.device,
             "Model Buffer",
@@ -332,8 +334,7 @@ impl RenderStep {
             wgpu::BufferUsages::COPY_DST,
         );
 
-        let bind_group_1 = compute_patches
-            .render_buffer
+        let bind_group_1 = render_buffer
             .iter()
             .map(|render| {
                 shader::bind_groups::BindGroup1::from_bindings(
@@ -356,13 +357,12 @@ impl RenderStep {
 }
 
 pub struct VirtualModel {
+    pub id: String,
     pub compute_patches: ComputePatchesStep,
     pub copy_patches: CopyPatchesStep,
     pub render_step: RenderStep,
 
     pub shader_key: ShaderId,
-    pub transform: Transform,
-    pub material_info: MaterialInfo,
 }
 
 impl MaterialInfo {
@@ -401,30 +401,21 @@ impl Default for MaterialInfo {
 impl VirtualModel {
     pub fn new(context: &WgpuContext, meshes: &[Mesh], shader_key: ShaderId, id: &str) -> Self {
         let compute_patches_step = ComputePatchesStep::new(&context.device, id);
-        let copy_patches_step =
-            CopyPatchesStep::new(&context.device, &compute_patches_step, meshes, id);
-        let render_step = RenderStep::new(context, &compute_patches_step);
+        let copy_patches_step = CopyPatchesStep::new(
+            &context.device,
+            &compute_patches_step.render_buffer,
+            meshes,
+            id,
+        );
+        let render_step = RenderStep::new(context, &compute_patches_step.render_buffer);
 
         Self {
+            id: id.to_string(),
             compute_patches: compute_patches_step,
             copy_patches: copy_patches_step,
             render_step,
             shader_key,
-            transform: Transform::default(),
-            material_info: MaterialInfo::default(),
         }
-    }
-
-    pub fn get_model_matrix(&self) -> Mat4 {
-        self.transform.to_matrix()
-    }
-
-    pub fn get_model_view_projection(
-        &self,
-        size: glam::UVec2,
-        camera: &crate::camera::Camera,
-    ) -> Mat4 {
-        camera.projection_matrix(size) * camera.view_matrix() * self.transform.to_matrix()
     }
 }
 

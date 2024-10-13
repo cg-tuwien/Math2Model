@@ -6,6 +6,7 @@ use tsify_next::Tsify;
 #[derive(Tsify, Serialize, Deserialize)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmModelInfo {
+    pub id: String,
     pub transform: WasmTransform,
     pub material_info: WasmMaterialInfo,
     pub shader_id: String,

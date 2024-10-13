@@ -36,6 +36,7 @@ fn main() {
     );
 
     app.update_models(vec![renderer_core::game::ModelInfo {
+        id: "0659dcb1-6229-46bd-a306-6ceebfcf2e42".into(),
         transform: renderer_core::transform::Transform {
             position: Vec3::new(0.0, 0.0, 0.0),
             ..Default::default()

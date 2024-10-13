@@ -21,6 +21,9 @@ pub fn run() {
         .with(fmt_layer)
         .with(perf_layer)
         .init();
+
+    any_spawner::Executor::init_wasm_bindgen()
+        .expect("Futures executor for reactive graph failed to init");
 }
 
 struct GlobalFilter;

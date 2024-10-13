@@ -20,14 +20,15 @@ pub struct ProfilerSettings {
     pub gpu: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ModelInfo {
+    pub id: String,
     pub transform: Transform,
     pub material_info: MaterialInfo,
     pub shader_id: ShaderId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MaterialInfo {
     pub color: Vec3,
     pub emissive: Vec3,
@@ -54,7 +55,7 @@ pub struct GameRes {
     pub mouse_held: bool,
     pub cursor_capture: WindowCursorCapture,
     pub profiler_settings: ProfilerSettings,
-    pub lod_stage: Option<Arc<dyn Fn(&ShaderId, u32) + 'static>>,
+    pub lod_stage: Option<Arc<dyn Fn(&ShaderId, &str) + 'static>>,
 }
 
 impl GameRes {

@@ -1,3 +1,4 @@
+pub mod application;
 pub mod buffer;
 pub mod camera;
 pub mod game;

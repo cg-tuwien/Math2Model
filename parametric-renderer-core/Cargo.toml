@@ -1,19 +1,24 @@
 [workspace]
-resolver = "2"
 members = ["copy-includes", "desktop", "renderer-core", "wasm"]
+resolver = "2"
 
 [workspace.dependencies]
+bytemuck = { version = "1.18.0", features = ["derive"] }
+comemo = "0.4"
+encase = { version = "0.10.0", features = ["glam"] }
+glam = { version = "0.29.0", features = ["bytemuck"] }
+indexmap = "2.6.0"
+nanoserde = "0.1.37"
+reactive_graph = { git = "https://github.com/stefnotch/leptos", branch = "fixed", version = "0.1.0-gamma", features = [
+  "effects",
+] }
+thiserror = "1.0"
+tracing = { version = "0.1.40" }
 wgpu = { version = "22.1.0", default-features = false, features = [
   "webgpu",
   "wgsl",
 ] }
 winit = { version = "0.30.5" }
-tracing = { version = "0.1.40" }
-thiserror = "1.0"
-glam = { version = "0.29.0", features = ["bytemuck"] }
-encase = { version = "0.10.0", features = ["glam"] }
-bytemuck = { version = "1.18.0", features = ["derive"] }
-nanoserde = "0.1.37"
-comemo = "0.4"
-leptos_reactive = "0.6.15"
-indexmap = "2.6.0"
+
+[patch.crates-io]
+any_spawner = { git = "https://github.com/stefnotch/leptos", branch = "fixed" }

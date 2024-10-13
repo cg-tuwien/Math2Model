@@ -13,8 +13,6 @@ pub struct WgpuContext {
     pub _adapter: wgpu::Adapter,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    pub profiler: GpuProfiler,
-    is_profiling_enabled: bool,
     size: UVec2,
     pub view_format: wgpu::TextureFormat,
 }
@@ -103,57 +101,15 @@ impl WgpuContext {
             },
         };
 
-        let gpu_profiler_settings = GpuProfilerSettings {
-            enable_timer_queries: false, // Disabled by default
-            ..GpuProfilerSettings::default()
-        };
-
-        #[cfg(feature = "tracy")]
-        let profiler = GpuProfiler::new_with_tracy_client(
-            gpu_profiler_settings.clone(),
-            adapter.get_info().backend,
-            &device,
-            &queue,
-        )
-        .unwrap_or_else(|e| match e {
-            wgpu_profiler::CreationError::TracyClientNotRunning
-            | wgpu_profiler::CreationError::TracyGpuContextCreationError(_) => {
-                warn!("Failed to connect to Tracy. Continuing without Tracy integration.");
-                GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler")
-            }
-            _ => {
-                panic!("Failed to create profiler: {}", e);
-            }
-        });
-
-        #[cfg(not(feature = "tracy"))]
-        let profiler = GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler");
-        let is_profiling_enabled = false;
-
         Ok(WgpuContext {
             instance,
             surface: surface_or_fallback,
             _adapter: adapter,
             device,
             queue,
-            profiler,
-            is_profiling_enabled,
             size,
             view_format,
         })
-    }
-
-    pub fn set_profiling(&mut self, enabled: bool) {
-        if self.is_profiling_enabled == enabled {
-            return;
-        }
-        self.is_profiling_enabled = enabled;
-        self.profiler
-            .change_settings(GpuProfilerSettings {
-                enable_timer_queries: enabled,
-                ..GpuProfilerSettings::default()
-            })
-            .unwrap();
     }
 
     /// Tries to resize the swapchain to the new size.
@@ -272,4 +228,33 @@ pub enum SurfaceOrFallback {
     Fallback {
         texture: wgpu::Texture,
     },
+}
+
+pub fn create_profiler(_context: &WgpuContext) -> GpuProfiler {
+    let gpu_profiler_settings = GpuProfilerSettings {
+        enable_timer_queries: false, // Disabled by default
+        ..GpuProfilerSettings::default()
+    };
+
+    #[cfg(feature = "tracy")]
+    let profiler = GpuProfiler::new_with_tracy_client(
+        gpu_profiler_settings.clone(),
+        _context._adapter.get_info().backend,
+        &_context.device,
+        &_context.queue,
+    )
+    .unwrap_or_else(|e| match e {
+        wgpu_profiler::CreationError::TracyClientNotRunning
+        | wgpu_profiler::CreationError::TracyGpuContextCreationError(_) => {
+            tracing::warn!("Failed to connect to Tracy. Continuing without Tracy integration.");
+            GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler")
+        }
+        _ => {
+            panic!("Failed to create profiler: {}", e);
+        }
+    });
+
+    #[cfg(not(feature = "tracy"))]
+    let profiler = GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler");
+    profiler
 }

@@ -1,7 +1,7 @@
 use crate::{buffer::TypedBuffer, camera::Camera, shaders::shader};
 use glam::{Mat4, UVec2, Vec2, Vec4};
 
-use super::{frame_counter::FrameTime, RenderData};
+use super::{frame_counter::FrameTime, FrameData};
 
 pub struct SceneData {
     pub time_buffer: TypedBuffer<shader::Time>,
@@ -84,7 +84,7 @@ impl SceneData {
     pub fn write_buffers(
         &self,
         size: UVec2,
-        render_data: &RenderData,
+        render_data: &FrameData,
         frame_time: &FrameTime,
         queue: &wgpu::Queue,
     ) {

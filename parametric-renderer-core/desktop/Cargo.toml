@@ -6,9 +6,9 @@ default-run = "desktop"
 
 [dependencies]
 anyhow = "1.0"
+any_spawner = { version = "0.1.1", features = ["futures-executor"] }
 glam = { workspace = true }
 nanoserde = { workspace = true }
-pollster = "0.3"
 renderer-core = { path = "../renderer-core" }
 thiserror = { workspace = true }
 tracing = { workspace = true }

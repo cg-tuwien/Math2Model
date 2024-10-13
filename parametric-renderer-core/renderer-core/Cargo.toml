@@ -8,19 +8,24 @@ build = "build.rs"
 bench = false
 
 [dependencies]
+# wgsl-parser = "0.5.0"
 anyhow = "1.0"
+any_spawner = { version = "0.1.1" }
 bytemuck = { workspace = true }
 comemo = { workspace = true }
 encase = { workspace = true }
 glam = { workspace = true }
 indexmap = { workspace = true }
-leptos_reactive = { workspace = true }
+pinky-swear = "6.2.0"
+reactive_graph = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 web-time = "1.1.0"
+web-sys = { version = "0.3.70", optional = true, features = [
+    "HtmlCanvasElement",
+] }
 wgpu = { workspace = true }
 wgpu-profiler = "0.18.2"
-# wgsl-parser = "0.5.0"
 winit = { workspace = true }
 
 [dev-dependencies]
@@ -35,4 +40,6 @@ harness = false
 wgsl_to_wgpu = "0.10.1"
 
 [features]
+default = []
 tracy = ["wgpu-profiler/tracy"]
+wasm-bindgen = ["web-sys"]

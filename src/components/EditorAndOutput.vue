@@ -117,6 +117,7 @@ watchEffect(() => {
 watchEffect(() => {
   let models = scene.state.value.models.map((v) => {
     let model: WasmModelInfo = {
+      id: v.id,
       transform: {
         position: [v.position.x, v.position.y, v.position.z],
         rotation: [v.rotation.x, v.rotation.y, v.rotation.z],
