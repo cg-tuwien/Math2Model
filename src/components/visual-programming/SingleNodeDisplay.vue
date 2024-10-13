@@ -7,16 +7,13 @@ const props = defineProps<{
 </script>
 
 <template>
-  <n-flex
-    ><n-image
-      :alt="uiNode.name"
-      width="50px"
-      :src="uiNode.image"
-      preview-disabled
-    ></n-image>
-    {{ uiNode.type }} <br />
-    {{ uiNode.prefix }} {{ uiNode.name }}</n-flex
-  >
+  <n-flex>
+    <n-icon :component="uiNode.image" size="48px"></n-icon>
+    <div>
+      {{ uiNode.type }} <br />
+      {{ uiNode.prefix }} {{ uiNode.name }}
+    </div>
+  </n-flex>
 </template>
 
 <style scoped></style>

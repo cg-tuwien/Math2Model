@@ -1,14 +1,14 @@
-use std::sync::{Arc, Mutex};
-
-use glamour::{Point3, Vector2};
+use glam::{UVec2, Vec3};
 use renderer_core::{
     application::{CpuApplication, GpuApplication, ModelInfo, WindowOrFallback},
     camera::camera_controller::{self, CameraController},
     input::{InputHandler, WindowInputs, WinitAppHelper},
 };
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 use tracing::{error, info, warn};
-use wasm_bindgen::{prelude::wasm_bindgen, JsValue};
+use tsify_next::Tsify;
+use wasm_bindgen::prelude::wasm_bindgen;
 use web_sys::HtmlCanvasElement;
 use winit::{
     application::ApplicationHandler, dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window,
@@ -27,7 +27,7 @@ impl Application {
         let mut app = CpuApplication::new()?;
         app.camera_controller = CameraController::new(
             camera_controller::GeneralController {
-                position: Point3::new(0.0, 0.0, 4.0),
+                position: Vec3::new(0.0, 0.0, 4.0),
                 orientation: glam::Quat::IDENTITY,
                 distance_to_center: 4.0,
             },
@@ -38,12 +38,12 @@ impl Application {
         app.update_models(vec![ModelInfo {
             label: "Default Model".to_owned(),
             transform: renderer_core::transform::Transform {
-                position: glamour::Point3::new(0.0, 1.0, 0.0),
+                position: Vec3::new(0.0, 1.0, 0.0),
                 ..Default::default()
             },
             material_info: renderer_core::application::MaterialInfo {
-                color: glamour::Vector3::new(0.6, 1.0, 1.0),
-                emissive: glamour::Vector3::new(0.0, 0.0, 0.0),
+                color: Vec3::new(0.6, 1.0, 1.0),
+                emissive: Vec3::new(0.0, 0.0, 0.0),
                 roughness: 0.7,
                 metallic: 0.1,
             },
@@ -74,8 +74,7 @@ impl Application {
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        self.app
-            .resize(Vector2::new(new_size.width, new_size.height));
+        self.app.resize(UVec2::new(new_size.width, new_size.height));
     }
 
     pub fn update(&mut self, inputs: &WindowInputs) {
@@ -95,21 +94,25 @@ thread_local! {
     static APP_COMMANDS: Mutex<Option<EventLoopProxy<AppCommand>>> = Mutex::new(None);
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Tsify, Serialize, Deserialize)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmModelInfo {
     pub label: String,
     pub transform: WasmTransform,
     pub material_info: WasmMaterialInfo,
     pub evaluate_image_code: String,
 }
-#[derive(Serialize, Deserialize)]
+
+#[derive(Tsify, Serialize, Deserialize)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmTransform {
     pub position: [f32; 3],
     pub rotation: [f32; 3],
     pub scale: f32,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Tsify, Serialize, Deserialize)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmMaterialInfo {
     pub color: [f32; 3],
     pub emissive: [f32; 3],
@@ -118,10 +121,9 @@ pub struct WasmMaterialInfo {
 }
 
 #[wasm_bindgen]
-pub fn update_models(js_models: JsValue) {
+pub fn update_models(js_models: Vec<WasmModelInfo>) {
     APP_COMMANDS.with(|commands| {
         if let Some(proxy) = &*commands.lock().unwrap() {
-            let js_models: Vec<WasmModelInfo> = serde_wasm_bindgen::from_value(js_models).unwrap();
             let models = js_models
                 .into_iter()
                 .map(|v| ModelInfo {

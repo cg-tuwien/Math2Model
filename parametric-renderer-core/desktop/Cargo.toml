@@ -5,9 +5,8 @@ edition = "2021"
 default-run = "desktop"
 
 [dependencies]
-anyhow = "1.0"
+anyhow = "1.0.86"
 glam = { workspace = true }
-glamour = { workspace = true }
 nanoserde = { workspace = true }
 pollster = "0.3"
 renderer-core = { path = "../renderer-core" }
@@ -19,7 +18,7 @@ tracing-subscriber = { version = "0.3.18", default-features = false, features = 
   "std",
 ] }
 wgpu = { workspace = true }
-wgpu-profiler = "0.17.0"
+wgpu-profiler = "0.18.0"
 winit = { workspace = true }
 
 [features]

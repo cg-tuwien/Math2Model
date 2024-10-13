@@ -104,7 +104,7 @@ fn assert(condition: bool) {
 //// END OF AUTOGEN
 
 ////#include "./EvaluateImage.wgsl"
-//// AUTOGEN 026c5fd0ec94098b53d2549d4f92f2c2ffb569eb1f84c0d3e800e02ecebbaa63
+//// AUTOGEN 2fd7df289ae79f5d2892f5f6c7f22bf2ed3dee5b33db53f6ab639e0f9f3cd0e6
 struct Time {
   elapsed: f32,
   delta: f32,
@@ -126,9 +126,9 @@ fn mouse_held(button: u32) -> bool {
 @group(0) @binding(1) var<uniform> screen : Screen;
 @group(0) @binding(2) var<uniform> mouse : Mouse;
 
-//// START evaluateImage
-fn evaluateImage(input2: vec2f) -> vec3f { return vec3(input2, 0.0); }
-//// END evaluateImage
+//// START sampleObject
+fn sampleObject(input: vec2f) -> vec3f { return vec3(input, 0.0); }
+//// END sampleObject
 //// END OF AUTOGEN
 
 
@@ -525,7 +525,7 @@ fn vs_main(
 ) -> VertexOutput {
     let quad = patch_decode(render_buffer.patches[in.instance_index]);
     let quad_point = mix(quad.min, quad.max, in.uv);
-    let pos = evaluateImage(quad_point);
+    let pos = sampleObject(quad_point);
     let world_pos = model.model_similarity * vec4<f32>(pos, 1.0);
 
 

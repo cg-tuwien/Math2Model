@@ -1,7 +1,5 @@
 // This is the simplest design, where each virtual model has its own set of resources.
 
-use glamour::{Matrix4, ToRaw, Vector3, Vector4};
-
 use crate::{
     buffer::TypedBuffer,
     camera::Camera,
@@ -14,6 +12,7 @@ use crate::{
 use super::{wgpu_context::WgpuContext, MAX_PATCH_COUNT, PATCH_SIZES};
 use std::collections::HashMap;
 
+use glam::{Mat4, Vec3, Vec4};
 use slotmap::{DefaultKey, SlotMap};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -93,7 +92,7 @@ impl ComputePatchesStep {
             device,
             "Input Buffer",
             &compute_patches::InputBuffer {
-                model_view_projection: Matrix4::<f32>::IDENTITY.to_raw(),
+                model_view_projection: Mat4::IDENTITY,
                 threshold_factor: 1.0,
             },
             wgpu::BufferUsages::COPY_DST,
@@ -275,7 +274,7 @@ impl RenderStep {
             &context.device,
             "Model Buffer",
             &shader::Model {
-                model_similarity: Matrix4::<f32>::IDENTITY.to_raw(),
+                model_similarity: Mat4::IDENTITY,
             },
             wgpu::BufferUsages::COPY_DST,
         )?;
@@ -322,35 +321,28 @@ pub struct VirtualModel {
 
 #[derive(Debug, Clone)]
 pub struct MaterialInfo {
-    pub color: Vector3<f32>,
-    pub emissive: Vector3<f32>,
+    pub color: Vec3,
+    pub emissive: Vec3,
     pub roughness: f32,
     pub metallic: f32,
 }
 impl MaterialInfo {
     pub fn to_shader(&self) -> shader::Material {
         shader::Material {
-            color_roughness: Vector4::<f32>::new(
-                self.color.x,
-                self.color.y,
-                self.color.z,
-                self.roughness,
-            )
-            .to_raw(),
-            emissive_metallic: Vector4::<f32>::new(
+            color_roughness: Vec4::new(self.color.x, self.color.y, self.color.z, self.roughness),
+            emissive_metallic: Vec4::new(
                 self.emissive.x,
                 self.emissive.y,
                 self.emissive.z,
                 self.metallic,
-            )
-            .to_raw(),
+            ),
         }
     }
 
     fn missing() -> Self {
         Self {
-            color: Vector3::new(1.0, 0.0, 1.0),
-            emissive: Vector3::new(1.0, 0.0, 1.0),
+            color: Vec3::new(1.0, 0.0, 1.0),
+            emissive: Vec3::new(1.0, 0.0, 1.0),
             roughness: 0.7,
             metallic: 0.0,
         }
@@ -359,8 +351,8 @@ impl MaterialInfo {
 impl Default for MaterialInfo {
     fn default() -> Self {
         Self {
-            color: Vector3::new(0.0, 0.0, 0.0),
-            emissive: Vector3::new(0.0, 0.0, 0.0),
+            color: Vec3::new(0.0, 0.0, 0.0),
+            emissive: Vec3::new(0.0, 0.0, 0.0),
             roughness: 0.0,
             metallic: 0.0,
         }
@@ -388,11 +380,11 @@ impl VirtualModel {
         })
     }
 
-    pub fn get_model_matrix(&self) -> Matrix4<f32> {
+    pub fn get_model_matrix(&self) -> Mat4 {
         self.transform.to_matrix()
     }
 
-    pub fn get_model_view_projection(&self, camera: &Camera) -> Matrix4<f32> {
+    pub fn get_model_view_projection(&self, camera: &Camera) -> Mat4 {
         camera.projection_matrix() * camera.view_matrix() * self.transform.to_matrix()
     }
 }
@@ -449,6 +441,7 @@ fn create_render_pipeline(
         }),
         multisample: Default::default(),
         multiview: None,
+        cache: Default::default(),
     })
 }
 
@@ -469,6 +462,7 @@ fn create_compute_patches_pipeline(
         }),
         entry_point: compute_patches::ENTRY_MAIN,
         compilation_options: Default::default(),
+        cache: Default::default(),
     })
 }
 
@@ -478,8 +472,8 @@ fn replace_evaluate_image_code<'a>(
 ) -> std::borrow::Cow<'a, str> {
     // TODO: use wgsl-parser instead of this
     if let Some(evaluate_image_code) = evaluate_image_code {
-        let start = source.find("//// START evaluateImage").unwrap();
-        let end = source.find("//// END evaluateImage").unwrap();
+        let start = source.find("//// START sampleObject").unwrap();
+        let end = source.find("//// END sampleObject").unwrap();
 
         let mut result = String::with_capacity(
             source[..start].len() + evaluate_image_code.len() + source[end..].len(),

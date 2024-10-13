@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use glamour::{Point3, Vector2, Vector3};
+use glam::{UVec2, Vec3};
 use pollster::FutureExt;
 use renderer_core::{
     application::{CpuApplication, MaterialInfo, ModelInfo, ProfilerSettings, WindowOrFallback},
@@ -48,12 +48,12 @@ impl Application {
         app.update_models(vec![ModelInfo {
             label: "Default Model".to_owned(),
             transform: Transform {
-                position: Point3::new(0.0, 0.0, 0.0),
+                position: Vec3::new(0.0, 0.0, 0.0),
                 ..Default::default()
             },
             material_info: MaterialInfo {
-                color: Vector3::new(0.6, 1.0, 1.0),
-                emissive: Vector3::new(0.0, 0.0, 0.0),
+                color: Vec3::new(0.6, 1.0, 1.0),
+                emissive: Vec3::new(0.0, 0.0, 0.0),
                 roughness: 0.7,
                 metallic: 0.1,
             },
@@ -69,7 +69,7 @@ impl Application {
         {
             app.camera_controller = CameraController::new(
                 camera_controller::GeneralController {
-                    position: Point3::from(position),
+                    position: Vec3::from(position),
                     orientation: glam::Quat::from_array(orientation),
                     distance_to_center,
                 },
@@ -97,8 +97,7 @@ impl Application {
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        self.app
-            .resize(Vector2::new(new_size.width, new_size.height));
+        self.app.resize(UVec2::new(new_size.width, new_size.height));
     }
 
     pub fn update(&mut self, inputs: &WindowInputs) {

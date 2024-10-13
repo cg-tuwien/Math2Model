@@ -44,7 +44,7 @@ export class ShapeNode extends VPNode {
       },
       value: {
         value: vec3.zero(),
-        code: `${nodeToVariableDeclaration(this)} = ${this.name}(${param ? (param[0].refId ?? param[0].value) : "vec2f(0.0, 0.0)"});`,
+        code: `${nodeToVariableDeclaration(this)} = ${this.name}(${param ? param[0].refId ?? param[0].value : "vec2f(0.0, 0.0)"});`,
         refId: idToVariableName(this.id),
       },
     };
@@ -86,7 +86,7 @@ export function newCylinderShape() {
   return new ShapeNode("Cylinder", Cylinder);
 }
 
-function nameToCode(name: "Heart" | "Sphere" | "Plane") {
+function nameToCode(name: string) {
   switch (name) {
     case "Heart":
       return Heart;

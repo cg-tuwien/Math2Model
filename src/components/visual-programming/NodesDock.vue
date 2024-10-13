@@ -9,26 +9,29 @@ import { NodeEditor } from "rete";
 const props = defineProps<{
   displayNodes: UINode[];
   editor: NodeEditor;
+  header: string;
 }>();
 </script>
 
 <template>
-  <n-list bordered hoverable clickable show-divider>
-    <template #header> Shapes </template>
-    <n-list-item
-      v-for="node of displayNodes"
-      :onclick="() => node.create(node)"
-      draggable="true"
-      v-on:dragstart="
-        (ev) => {
-          ev.dataTransfer.setData('text/plain', JSON.stringify(node));
-          ev.dataTransfer.effectAllowed = 'copy';
-        }
-      "
-    >
-      <SingleNodeDisplay :ui-node="node"></SingleNodeDisplay>
-    </n-list-item>
-  </n-list>
+  <n-infinite-scroll>
+    <n-list bordered hoverable clickable show-divider>
+      <template #header> {{ props.header }} </template>
+      <n-list-item
+        v-for="node of displayNodes"
+        :onclick="() => node.create(node)"
+        :draggable="node.draggable"
+        v-on:dragstart="
+          (ev) => {
+            ev.dataTransfer.setData('text/plain', JSON.stringify(node));
+            ev.dataTransfer.effectAllowed = 'copy';
+          }
+        "
+      >
+        <SingleNodeDisplay :ui-node="node"></SingleNodeDisplay>
+      </n-list-item>
+    </n-list>
+  </n-infinite-scroll>
 </template>
 
 <style scoped></style>

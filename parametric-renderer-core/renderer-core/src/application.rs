@@ -5,7 +5,7 @@ mod wgpu_context;
 mod window_or_fallback;
 
 use frame_counter::{FrameCounter, FrameTime, Seconds};
-use glamour::{Point3, ToRaw, Vector2};
+use glam::{UVec2, Vec2, Vec3};
 use scene::SceneData;
 pub use virtual_model::MaterialInfo;
 use virtual_model::VirtualModel;
@@ -48,17 +48,17 @@ pub struct CpuApplication {
     last_update_instant: Option<Instant>,
     frame_counter: FrameCounter,
     camera: Camera,
-    mouse: Vector2<f32>,
+    mouse: Vec2,
     mouse_held: bool,
     profiler_settings: ProfilerSettings,
 }
 
 impl CpuApplication {
     pub fn new() -> anyhow::Result<Self> {
-        let camera = Camera::new(Vector2::new(1, 1), CameraSettings::default());
+        let camera = Camera::new(UVec2::new(1, 1), CameraSettings::default());
         let camera_controller = CameraController::new(
             GeneralController {
-                position: Point3::new(0.0, 0.0, 4.0),
+                position: Vec3::new(0.0, 0.0, 4.0),
                 orientation: glam::Quat::IDENTITY,
                 distance_to_center: 4.0,
             },
@@ -77,7 +77,7 @@ impl CpuApplication {
             models: vec![],
             last_update_instant: None,
             frame_counter: FrameCounter::new(),
-            mouse: Vector2::ZERO,
+            mouse: Vec2::ZERO,
             mouse_held: false,
             profiler_settings: ProfilerSettings::default(),
         })
@@ -122,7 +122,7 @@ impl CpuApplication {
         self.update_models(models);
     }
 
-    pub fn resize(&mut self, new_size: Vector2<u32>) {
+    pub fn resize(&mut self, new_size: UVec2) {
         if let Some(gpu) = &mut self.gpu {
             let new_size = gpu.resize(new_size);
             if let Some(new_size) = new_size {
@@ -156,7 +156,7 @@ impl CpuApplication {
         }
         self.last_update_instant = Some(now);
         self.camera.update_camera(&self.camera_controller);
-        self.mouse = Vector2::new(
+        self.mouse = Vec2::new(
             inputs.mouse.position.x as f32,
             inputs.mouse.position.y as f32,
         );
@@ -172,7 +172,7 @@ impl CpuApplication {
                 frame: frame_time.frame as u32,
             },
             mouse_data: shader::Mouse {
-                pos: self.mouse.to_raw(),
+                pos: self.mouse,
                 buttons: if self.mouse_held { 1 } else { 0 },
             },
         }
@@ -331,6 +331,7 @@ impl GpuApplication {
                 module: &copy_patches::create_shader_module(device),
                 entry_point: copy_patches::ENTRY_MAIN,
                 compilation_options: Default::default(),
+                cache: Default::default(),
             }),
         };
 
@@ -354,14 +355,14 @@ impl GpuApplication {
     }
 
     #[must_use]
-    pub fn resize(&mut self, new_size: Vector2<u32>) -> Option<Vector2<u32>> {
-        let new_size = new_size.max(Vector2::new(1, 1));
+    pub fn resize(&mut self, new_size: UVec2) -> Option<UVec2> {
+        let new_size = new_size.max(UVec2::new(1, 1));
         if new_size == self.context.size() {
             return None;
         }
         self.context.resize(new_size);
         self.depth_texture =
-            Texture::create_depth_texture(&self.context.device, new_size.clone(), "Depth Texture");
+            Texture::create_depth_texture(&self.context.device, new_size, "Depth Texture");
         Some(new_size)
     }
 
@@ -378,7 +379,7 @@ impl GpuApplication {
                 output.present();
             }
             wgpu_context::SurfaceOrFallback::Fallback { texture } => {
-                let mut command_encoder = self.render_commands(&texture, render_data)?;
+                let mut command_encoder = self.render_commands(texture, render_data)?;
                 self.context.profiler.resolve_queries(&mut command_encoder);
                 self.context
                     .queue
@@ -411,9 +412,7 @@ impl GpuApplication {
                 .write_buffer(
                     queue,
                     &compute_patches::InputBuffer {
-                        model_view_projection: model
-                            .get_model_view_projection(render_data.camera)
-                            .to_raw(),
+                        model_view_projection: model.get_model_view_projection(render_data.camera),
                         threshold_factor: self.threshold_factor,
                     },
                 )
@@ -451,7 +450,7 @@ impl GpuApplication {
                 .write_buffer(
                     queue,
                     &shader::Model {
-                        model_similarity: model.get_model_matrix().to_raw(),
+                        model_similarity: model.get_model_matrix(),
                     },
                 )
                 .unwrap();
@@ -494,7 +493,7 @@ impl GpuApplication {
                     );
                     compute_pass.set_pipeline(&shaders.compute_patches);
                     compute_patches::set_bind_groups(
-                        &mut compute_pass,
+                        &mut compute_pass.recorder,
                         &self.compute_patches.bind_group_0,
                         &model.compute_patches.bind_group_1,
                         &model.compute_patches.bind_group_2[0],
@@ -523,7 +522,7 @@ impl GpuApplication {
                     );
                     compute_pass.set_pipeline(&shaders.compute_patches);
                     compute_patches::set_bind_groups(
-                        &mut compute_pass,
+                        &mut compute_pass.recorder,
                         &self.compute_patches.bind_group_0,
                         &model.compute_patches.bind_group_1,
                         &model.compute_patches.bind_group_2[1],
@@ -546,7 +545,10 @@ impl GpuApplication {
                 let mut compute_pass =
                     commands.scoped_compute_pass("Copy Patch Sizes Pass", &self.context.device);
                 compute_pass.set_pipeline(&self.copy_patches.pipeline);
-                copy_patches::set_bind_groups(&mut compute_pass, &model.copy_patches.bind_group_0);
+                copy_patches::set_bind_groups(
+                    &mut compute_pass.recorder,
+                    &model.copy_patches.bind_group_0,
+                );
                 compute_pass.dispatch_workgroups(1, 1, 1);
             }
         }
@@ -605,7 +607,7 @@ impl GpuApplication {
                     .zip(indirect_draw_offsets)
                 {
                     shader::set_bind_groups(
-                        &mut render_pass,
+                        &mut render_pass.recorder,
                         &self.render_step.bind_group_0,
                         bind_group_1,
                     );
@@ -627,7 +629,7 @@ impl GpuApplication {
         Ok(command_encoder)
     }
 
-    pub fn size(&self) -> Vector2<u32> {
+    pub fn size(&self) -> UVec2 {
         self.context.size()
     }
 

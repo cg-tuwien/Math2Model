@@ -80,7 +80,13 @@ import NodesDock from "@/components/visual-programming/NodesDock.vue";
 import type { UINode } from "@/vpnodes/ui/uinode";
 import { SliderControl } from "@/vpnodes/controls/slider";
 import SliderComponent from "@/vpnodes/components/SliderComponent.vue";
-
+import {
+  Heart24Regular,
+  Circle24Regular,
+  RectangleLandscape24Regular,
+} from "@vicons/fluent";
+import { WaveSawTool, WaveSine } from "@vicons/tabler";
+import { JoinFullRound } from "@vicons/material";
 const emit = defineEmits<{
   update: [content: string];
   save: [content: string];
@@ -108,12 +114,13 @@ const uiNodes: Map<string, UINode> = new Map([
       name: "Heart",
       type: "SHAPE",
       prefix: "parametric",
-      image: "/src/assets/nodes/heart.png",
+      image: Heart24Regular,
       get: () => {
         //addNode(n);
         return newHeartShape();
       },
       create: createUINode,
+      draggable: true,
     },
   ],
   [
@@ -122,12 +129,13 @@ const uiNodes: Map<string, UINode> = new Map([
       name: "Sphere",
       type: "SHAPE",
       prefix: "parametric",
-      image: "/src/assets/nodes/sphere.png",
+      image: Circle24Regular,
       get: () => {
         //addNode(n);
         return newSphereShape();
       },
       create: createUINode,
+      draggable: true,
     },
   ],
   [
@@ -136,12 +144,13 @@ const uiNodes: Map<string, UINode> = new Map([
       name: "Plane",
       type: "SHAPE",
       prefix: "parametric",
-      image: "/src/assets/nodes/plane.png",
+      image: RectangleLandscape24Regular,
       get: () => {
         //addNode(n);
         return newPlaneShape();
       },
       create: createUINode,
+      draggable: true,
     },
   ],
   [
@@ -150,7 +159,7 @@ const uiNodes: Map<string, UINode> = new Map([
       name: "Combine",
       type: "APPLY",
       prefix: "",
-      image: "/src/assets/nodes/combine.png",
+      image: JoinFullRound,
       get: () => {
         //addNode(n);
         return new CombineNode(
@@ -162,6 +171,7 @@ const uiNodes: Map<string, UINode> = new Map([
         );
       },
       create: createUINode,
+      draggable: true,
     },
   ],
   [
@@ -170,7 +180,7 @@ const uiNodes: Map<string, UINode> = new Map([
       name: "Sawtooth",
       type: "APPLY",
       prefix: "",
-      image: "/src/assets/nodes/sawtooth.png",
+      image: WaveSawTool,
       get: () => {
         return new SawtoothNode(
           (id) => {
@@ -183,6 +193,7 @@ const uiNodes: Map<string, UINode> = new Map([
         );
       },
       create: createUINode,
+      draggable: true,
     },
   ],
   [
@@ -191,9 +202,11 @@ const uiNodes: Map<string, UINode> = new Map([
       name: "Sinus",
       type: "APPLY",
       prefix: "",
-      image: "/src/assets/nodes/sinus.png",
+      image: WaveSine,
       get: () => {
         return new SinusNode(
+          "Sine",
+          "sin",
           (id) => {
             area.update("node", id);
             editor.addNode(new NothingNode());
@@ -204,6 +217,31 @@ const uiNodes: Map<string, UINode> = new Map([
         );
       },
       create: createUINode,
+      draggable: true,
+    },
+  ],
+  [
+    "Cosine",
+    {
+      name: "Cosine",
+      type: "APPLY",
+      prefix: "",
+      image: WaveSine,
+      get: () => {
+        return new SinusNode(
+          "Cosine",
+          "cos",
+          (id) => {
+            area.update("node", id);
+            editor.addNode(new NothingNode());
+          },
+          (c) => {
+            area.update("control", c.id);
+          },
+        );
+      },
+      create: createUINode,
+      draggable: true,
     },
   ],
 ]);
@@ -233,7 +271,9 @@ export type Nodes =
   | CustomFunctionNode
   | CallCustomFunctionNode
   | FunctionScopeNode
-  | ShapeNode;
+  | ShapeNode
+  | SawtoothNode
+  | SinusNode;
 
 class Connection<
   A extends Nodes,
@@ -938,6 +978,8 @@ function serializedNodeToNode(
       break;
     case "Sinus":
       node = new SinusNode(
+        "Sine",
+        "sin",
         (id) => {
           area.update("node", id);
           editor.addNode(new NothingNode());
@@ -1023,6 +1065,7 @@ function addTemplate(name: string, json: string) {
       <NodesDock
         :display-nodes="uiNodes.values()"
         :editor="editor"
+        header="Nodes"
         style="width: 25%"
       ></NodesDock>
       <div

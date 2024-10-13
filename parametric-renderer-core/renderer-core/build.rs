@@ -29,6 +29,7 @@ fn watch_shader(path: &str, output_name: &str) {
             derive_encase_host_shareable: true,
             derive_serde: false,
             matrix_vector_types: MatrixVectorTypes::Glam,
+            rustfmt: false,
         },
     )
     .unwrap();

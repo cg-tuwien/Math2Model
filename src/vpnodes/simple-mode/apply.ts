@@ -117,7 +117,7 @@ export class SawtoothNode extends VPNode {
     value: NodeReturn;
   } {
     const { param } = inputs;
-    const p = param ? (param[0].refId ?? valueToType(param[0].value)) : "0";
+    const p = param ? param[0].refId ?? valueToType(param[0].value) : "0";
     console.log(this.cfControl.value);
     return {
       value: {
@@ -149,46 +149,48 @@ export class SawtoothNode extends VPNode {
 }
 
 export class SinusNode extends VPNode {
-  private amplitudeControl: SliderControl;
-  private radialControl: SliderControl;
+  private angularControl: SliderControl;
+  private phaseControl: SliderControl;
   constructor(
+    private name: "Sine" | "Cosine" | "Tangent",
+    private func: "sin" | "cos" | "tan",
     private update: (id: string) => void,
     private updateControl: (c: ClassicPreset.Control) => void,
   ) {
-    super("Apply Sinus Function");
+    super(`Apply ${name} Function`);
 
-    this.amplitudeControl = new SliderControl(
-      5,
-      20,
-      -20,
-      0.1,
-      "Amplitude A (A * sin(w * input))",
+    this.angularControl = new SliderControl(
+      0,
+      Math.PI,
+      -Math.PI,
+      0.01,
+      `Angular frequency w (${this.func}(w * input + phi))`,
       true,
       (value) => {
         this.update(this.id);
       },
       (value) => {
-        this.updateControl(this.amplitudeControl);
+        this.updateControl(this.angularControl);
       },
     );
 
-    this.radialControl = new SliderControl(
-      3,
-      10,
-      -10,
-      0.1,
-      "Radial frequency w (A * sin(w * input))",
+    this.phaseControl = new SliderControl(
+      0,
+      Math.PI,
+      -Math.PI,
+      0.01,
+      `Phase phi (${this.func}(w * input + phi))`,
       true,
       (value) => {
         this.update(this.id);
       },
       (value) => {
-        this.updateControl(this.radialControl);
+        this.updateControl(this.phaseControl);
       },
     );
     this.addInput("param", new ClassicPreset.Input(reteSocket, "input/any"));
-    this.addControl("amplitude", this.amplitudeControl);
-    this.addControl("radial", this.radialControl);
+    this.addControl("amplitude", this.angularControl);
+    this.addControl("radial", this.phaseControl);
     this.addOutput("value", new ClassicPreset.Output(reteSocket, "output/any"));
 
     this.extraHeightControls = 50;
@@ -199,11 +201,11 @@ export class SinusNode extends VPNode {
     value: NodeReturn;
   } {
     const { param } = inputs;
-    const p = param ? (param[0].refId ?? valueToType(param[0].value)) : "0";
+    const p = param ? param[0].refId ?? valueToType(param[0].value) : "0";
     return {
       value: {
         value: param ? param[0].value : 0,
-        code: `${nodeToVariableDeclaration(this)} = ${this.amplitudeControl.value} * sin(${this.radialControl.value} * ${p});`,
+        code: `${nodeToVariableDeclaration(this)} = ${this.func}(${this.angularControl.value} * ${p} + ${this.phaseControl.value});`,
         refId: idToVariableName(this.id),
       },
     };
@@ -211,9 +213,13 @@ export class SinusNode extends VPNode {
 
   serialize(sn: SerializedNode): SerializedNode {
     sn.nodeType = "Sinus";
+    sn.extraStringInformation = [
+      { key: "name", value: this.name },
+      { key: "func", value: this.func },
+    ];
     sn.extraNumberInformation = [
-      { key: "amplitude", value: this.amplitudeControl.value ?? 0 },
-      { key: "radial", value: this.radialControl.value ?? 0 },
+      { key: "amplitude", value: this.angularControl.value ?? 0 },
+      { key: "radial", value: this.phaseControl.value ?? 0 },
     ];
     return super.serialize(sn);
   }
@@ -223,10 +229,23 @@ export class SinusNode extends VPNode {
     if (sn.extraNumberInformation) {
       for (let info of sn.extraNumberInformation) {
         if (info.key == "amplitude") {
-          this.amplitudeControl.value = info.value;
+          this.angularControl.value = info.value;
         }
         if (info.key == "radial") {
-          this.radialControl.value = info.value;
+          this.phaseControl.value = info.value;
+        }
+      }
+    }
+    if (sn.extraStringInformation) {
+      for (let info of sn.extraStringInformation) {
+        if (info.key == "name") {
+          this.name = info.value as "Sine" | "Cosine" | "Tangent";
+          this.label = "Apply " + this.name + " Function";
+        }
+        if (info.key == "func") {
+          this.func = info.value as "sin" | "cos" | "tan";
+          this.angularControl.label = `Angular frequency w (${this.func}(w * input + phi))`;
+          this.phaseControl.label = `Phase phi (${this.func}(w * input + phi))`;
         }
       }
     }
