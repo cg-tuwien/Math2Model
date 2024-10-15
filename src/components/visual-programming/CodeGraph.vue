@@ -60,12 +60,14 @@ import Sphere from "@/../parametric-renderer-core/graphs/Sphere.graph?raw";
 import HeartWGSL from "@/../parametric-renderer-core/graphs/Heart.graph.wgsl?raw";
 import SphereWGSL from "@/../parametric-renderer-core/graphs/Sphere.graph.wgsl?raw";
 import PlaneWGSL from "@/../parametric-renderer-core/graphs/Plane.graph.wgsl?raw";
+import CylinderWGSL from "@/../parametric-renderer-core/graphs/Cylinder.graph.wgsl?raw";
 import {
   type HistoryActions,
   HistoryPlugin,
   Presets as HistoryPresets,
 } from "rete-history-plugin";
 import {
+  newCylinderShape,
   newHeartShape,
   newPlaneShape,
   newSphereShape,
@@ -86,7 +88,7 @@ import {
   RectangleLandscape24Regular,
 } from "@vicons/fluent";
 import { WaveSawTool, WaveSine } from "@vicons/tabler";
-import { JoinFullRound } from "@vicons/material";
+import { JoinFullRound, CategoryOutlined } from "@vicons/material";
 const emit = defineEmits<{
   update: [content: string];
   save: [content: string];
@@ -148,6 +150,20 @@ const uiNodes: Map<string, UINode> = new Map([
       get: () => {
         //addNode(n);
         return newPlaneShape();
+      },
+      create: createUINode,
+      draggable: true,
+    },
+  ],
+  [
+    "Cylinder",
+    {
+      name: "Cylinder",
+      type: "SHAPE",
+      prefix: "parametric",
+      image: CategoryOutlined,
+      get: () => {
+        return newCylinderShape();
       },
       create: createUINode,
       draggable: true,
@@ -746,6 +762,8 @@ async function logCode() {
     SphereWGSL +
     "\n" +
     PlaneWGSL +
+    "\n" +
+    CylinderWGSL +
     "\n\nfn sampleObject(input2: vec2f) -> vec3f {\n" +
     (await orderedCode(allNodes, visited, "\t"));
 

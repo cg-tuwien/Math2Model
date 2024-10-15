@@ -94,6 +94,8 @@ function nameToCode(name: string) {
       return Sphere;
     case "Plane":
       return Plane;
+    case "Cylinder":
+      return Cylinder;
   }
   return "";
 }
