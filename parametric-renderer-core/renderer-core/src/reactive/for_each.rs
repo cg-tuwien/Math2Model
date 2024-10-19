@@ -1,5 +1,7 @@
 use indexmap::{map::Entry, IndexMap};
-use reactive_graph::{computed::ArcMemo, effect::RenderEffect, owner::Owner};
+use reactive_graph::{
+    computed::ArcMemo, effect::RenderEffect, owner::Owner, 
+};
 
 /// Lazily computes a "iterable" of items.
 pub fn new_computed_vec<ItemsFn, Items, T, KeyFn, Key, OutputFn, Output>(

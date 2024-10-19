@@ -2,22 +2,18 @@
 
 use crate::{
     buffer::TypedBuffer,
-    game::{MaterialInfo, ShaderId},
+    game::MaterialInfo,
     mesh::Mesh,
     shaders::{compute_patches, copy_patches, shader},
     texture::Texture,
 };
 
 use super::{wgpu_context::WgpuContext, MAX_PATCH_COUNT, PATCH_SIZES};
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use glam::{Mat4, Vec3, Vec4};
+use uuid::Uuid;
 use wgpu::ShaderModule;
-
-pub struct ShaderArena {
-    shader_keys: HashMap<ShaderId, Arc<ShaderPipelines>>,
-    missing_shader: Arc<ShaderPipelines>,
-}
 
 pub struct ShaderPipelines {
     /// Pipeline per model, for different parametric functions.
@@ -25,40 +21,16 @@ pub struct ShaderPipelines {
     /// Pipeline per model, for different parametric functions.
     pub render: wgpu::RenderPipeline,
     pub shaders: [ShaderModule; 2],
+    pub id: Uuid,
 }
 
-/// Required, because comemo::memoize requires Send and Sync for the return type.
-/// SAFETY: On desktop platforms, they implement Send and Sync.
-/// On WASM, there is only one thread.
-unsafe impl Send for ShaderPipelines {}
-unsafe impl Sync for ShaderPipelines {}
-
-struct IgnoreInput<T>(T);
-impl<T> std::ops::Deref for IgnoreInput<T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl<T> From<T> for IgnoreInput<T> {
-    fn from(inner: T) -> Self {
-        IgnoreInput(inner)
-    }
-}
-impl<T> std::hash::Hash for IgnoreInput<T> {
-    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {
-        // Purposefully empty hash
+impl PartialEq for ShaderPipelines {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
     }
 }
 
-#[comemo::memoize]
-fn make_shader_pipeline(
-    label: &str,
-    code: &str,
-    context: IgnoreInput<&WgpuContext>,
-) -> Arc<ShaderPipelines> {
-    Arc::new(ShaderPipelines::new(label, code, &context.0))
-}
+impl Eq for ShaderPipelines {}
 
 impl ShaderPipelines {
     pub fn new(label: &str, code: &str, context: &WgpuContext) -> Self {
@@ -70,6 +42,7 @@ impl ShaderPipelines {
             compute_patches,
             render,
             shaders: [shader_a, shader_b],
+            id: Uuid::new_v4(),
         }
     }
 
@@ -82,45 +55,12 @@ impl ShaderPipelines {
 
 const MISSING_SHADER: &'static str = include_str!("../../../shaders/DefaultParametric.wgsl");
 
-impl ShaderArena {
-    pub fn new(context: &WgpuContext) -> Self {
-        Self {
-            shader_keys: HashMap::new(),
-            missing_shader: Arc::new(ShaderPipelines::new(
-                "Missing Shader",
-                MISSING_SHADER,
-                context,
-            )),
-        }
-    }
-
-    // TODO: Shader compilation should have a side effect whereby the shader is added to a list of
-    // shaders that must be checked for compilation errors. This list should be checked every frame.
-    pub async fn get_compilation_info(&self, key: &ShaderId) -> Vec<wgpu::CompilationMessage> {
-        match self.shader_keys.get(key) {
-            Some(shader) => shader.get_compilation_info().await,
-            None => vec![],
-        }
-    }
-
-    pub fn get_shader(&self, key: &ShaderId) -> Option<Arc<ShaderPipelines>> {
-        self.shader_keys.get(key).cloned()
-    }
-
-    pub fn get_missing_shader(&self) -> Arc<ShaderPipelines> {
-        self.missing_shader.clone()
-    }
-
-    pub fn add_shader(&mut self, key: ShaderId, label: &str, code: &str, context: &WgpuContext) {
-        let pipeline = make_shader_pipeline(label, code, IgnoreInput(context));
-        self.shader_keys.insert(key, pipeline);
-    }
-
-    // TODO: Call this
-    // TODO: Call "comemo::evict" every once in a while to free up memory
-    pub fn remove_shader(&mut self, key: &ShaderId) {
-        self.shader_keys.remove(key);
-    }
+pub fn make_missing_shader(context: &WgpuContext) -> Arc<ShaderPipelines> {
+    Arc::new(ShaderPipelines::new(
+        "Missing Shader",
+        MISSING_SHADER,
+        context,
+    ))
 }
 
 pub struct ComputePatchesStep {
@@ -469,7 +409,7 @@ fn create_render_pipeline(
     )
 }
 
-fn create_compute_patches_pipeline(
+pub fn create_compute_patches_pipeline(
     label: &str,
     device: &wgpu::Device,
     code: &str,

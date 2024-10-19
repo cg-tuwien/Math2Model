@@ -83,7 +83,12 @@ impl WasmApplication {
 
         let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), {
             let shader_id = shader_id.clone();
-            move |app| app.app.set_shader(shader_id, info)
+            move |app| {
+                app.renderer
+                    .as_mut()
+                    .map(|renderer| renderer.set_shader(shader_id.clone(), &info));
+                app.app.set_shader(shader_id, info);
+            }
         })
         .await;
 
@@ -103,7 +108,11 @@ impl WasmApplication {
 
     pub async fn remove_shader(&self, id: String) {
         let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), |app| {
-            app.app.remove_shader(&ShaderId(id))
+            let shader_id = ShaderId(id);
+            app.app.remove_shader(&shader_id);
+            app.renderer
+                .as_mut()
+                .map(|renderer| renderer.remove_shader(&shader_id));
         })
         .await;
     }

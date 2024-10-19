@@ -1,15 +1,17 @@
 [package]
+edition = "2021"
 name = "web"
 version = "0.2.0"
-edition = "2021"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-anyhow = "1.0"
 any_spawner = { version = "0.1.1", features = ["wasm-bindgen"] }
+anyhow = "1.0"
 console_error_panic_hook = "0.1.7"
+# Needed for the UUID crate that the renderer-core uses
+getrandom = { version = "0.2.15", features = ["js"] }
 glam = { workspace = true }
 renderer-core = { path = "../renderer-core" }
 serde = { version = "1.0", features = ["derive"] }

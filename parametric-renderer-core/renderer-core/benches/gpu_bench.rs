@@ -69,6 +69,10 @@ fn main() {
         .unwrap()
         .build();
 
+    for (shader_id, shader_info) in &app.shaders {
+        renderer.set_shader(shader_id.clone(), shader_info);
+    }
+
     let mut group = c.benchmark_group("render");
     // group.throughput(throughput);
     group.bench_function("render", |b| {

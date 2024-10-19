@@ -75,7 +75,13 @@ impl Application {
         let task = async move {
             println!("Creating renderer");
             let renderer = gpu_builder.await.unwrap().build();
-            let _ = run_on_main(app_commands, |app| app.renderer = Some(renderer)).await;
+            let _ = run_on_main(app_commands, |app| {
+                for (shader_id, shader_info) in &app.app.shaders {
+                    renderer.set_shader(shader_id.clone(), shader_info);
+                }
+                app.renderer = Some(renderer)
+            })
+            .await;
         };
         any_spawner::Executor::spawn_local(task);
     }
