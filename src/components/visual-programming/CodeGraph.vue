@@ -73,12 +73,7 @@ import {
   newSphereShape,
   ShapeNode,
 } from "@/vpnodes/simple-mode/shapes";
-import {
-  CombineNode,
-  MathFunctionNode,
-  SawtoothNode,
-  SinusNode,
-} from "@/vpnodes/simple-mode/apply";
+import { CombineNode, MathFunctionNode } from "@/vpnodes/simple-mode/apply";
 import NodesDock from "@/components/visual-programming/NodesDock.vue";
 import type { UINode } from "@/vpnodes/ui/uinode";
 import { SliderControl } from "@/vpnodes/controls/slider";
@@ -88,7 +83,7 @@ import {
   Circle24Regular,
   RectangleLandscape24Regular,
 } from "@vicons/fluent";
-import { WaveSawTool, WaveSine } from "@vicons/tabler";
+import { WaveSawTool, WaveSine, MathFunction } from "@vicons/tabler";
 import { JoinFullRound, CategoryOutlined } from "@vicons/material";
 const emit = defineEmits<{
   update: [content: string];
@@ -216,7 +211,7 @@ const uiNodes: Map<string, UINode> = new Map([
     },
   ],
   [
-    "Sinus",
+    "Sine",
     {
       name: "Sine",
       type: "APPLY",
@@ -269,11 +264,11 @@ const uiNodes: Map<string, UINode> = new Map([
       name: "POW",
       type: "APPLY",
       prefix: "",
-      image: WaveSine,
+      image: MathFunction,
       get: () => {
         return new MathFunctionNode(
           "Pow",
-          "pow(input2, {x1,0,5,-5,1,same})",
+          "pow(input2, {x1,0,10,-10,0.1,same})",
           (id) => {
             area.update("node", id);
             editor.addNode(new NothingNode());
@@ -315,8 +310,6 @@ export type Nodes =
   | CallCustomFunctionNode
   | FunctionScopeNode
   | ShapeNode
-  | SawtoothNode
-  | SinusNode
   | MathFunctionNode;
 
 class Connection<
@@ -1002,30 +995,6 @@ function serializedNodeToNode(
       break;
     case "Combine":
       node = new CombineNode(
-        (id) => {
-          area.update("node", id);
-          editor.addNode(new NothingNode());
-        },
-        (c) => {
-          area.update("control", c.id);
-        },
-      );
-      break;
-    case "Sawtooth":
-      node = new SawtoothNode(
-        (id) => {
-          area.update("node", id);
-          editor.addNode(new NothingNode());
-        },
-        (c) => {
-          area.update("control", c.id);
-        },
-      );
-      break;
-    case "Sinus":
-      node = new SinusNode(
-        "Sine",
-        "sin",
         (id) => {
           area.update("node", id);
           editor.addNode(new NothingNode());

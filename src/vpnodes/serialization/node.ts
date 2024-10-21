@@ -88,6 +88,4 @@ type NodeType =
   | "Condition"
   | "Shape"
   | "Combine"
-  | "Sawtooth"
-  | "Sinus"
   | "MathFunction";
