@@ -7,9 +7,13 @@ import {
 } from "@/vpnodes/basic/nodes";
 import { SliderControl } from "@/vpnodes/controls/slider";
 import { ClassicPreset } from "rete";
-import { vec3 } from "webgpu-matrix";
-import type { SerializedNode } from "@/vpnodes/serialization/node";
-import { valueToType } from "@/vpnodes/basic/functions";
+import { vec2, vec3 } from "webgpu-matrix";
+import { type SerializedNode } from "@/vpnodes/serialization/node";
+import {
+  typeToValue,
+  typeToValueCode,
+  valueToType,
+} from "@/vpnodes/basic/functions";
 
 export class CombineNode extends VPNode {
   private cfControl: SliderControl;
@@ -145,6 +149,135 @@ export class SawtoothNode extends VPNode {
         }
       }
     }
+  }
+}
+
+export class MathFunctionNode extends VPNode {
+  private variableControls: Map<string, SliderControl> = new Map();
+  constructor(
+    private name: string,
+    private func: string,
+    private update: (id: string) => void,
+    private updateControl: (c: ClassicPreset.Control) => void,
+  ) {
+    super(`Apply ${name} Function`);
+
+    this.setup();
+
+    this.addInput("param", new ClassicPreset.Input(reteSocket, "param / any"));
+
+    this.addOutput(
+      "value",
+      new ClassicPreset.Output(reteSocket, "result / any"),
+    );
+  }
+
+  private setup() {
+    this.label = `Apply ${this.name} Function`;
+    const vars = this.func.split("{");
+    for (let variable of vars) {
+      const expr = variable.split("}")[0].split(",");
+      if (expr.length < 6) continue;
+      const control = new SliderControl(
+        parseFloat(expr[1]),
+        parseFloat(expr[2]),
+        parseFloat(expr[3]),
+        parseFloat(expr[4]),
+        expr[0],
+        false,
+        (value) => this.update(this.id),
+        (value) => this.updateControl(control),
+      );
+      this.variableControls.set(
+        "{" + variable.split("}")[0] + "}/" + expr[5],
+        control,
+      );
+      this.addControl(expr[0], control);
+    }
+  }
+
+  data(inputs: { param: NodeReturn[] }): { value: NodeReturn } {
+    let funcCall = this.func;
+    let { param } = inputs;
+
+    funcCall = funcCall.replace(
+      "input2",
+      String(param ? param[0].refId ?? param[0].value : "input2"),
+    );
+    for (let key of this.variableControls.keys()) {
+      const k = key.split("/");
+      const control = this.variableControls.get(key);
+      if (k[1] === "same") {
+        funcCall = funcCall.replace(
+          k[0],
+          typeToValueCode(
+            valueToType(param ? param[0].value : vec2.create(0.0, 0.0)),
+            control?.value ?? 0.0,
+            control?.value ?? 0.0,
+            control?.value ?? 0.0,
+            control?.value ?? 0.0,
+          ),
+        );
+      } else {
+        funcCall = funcCall.replace(
+          k[0],
+          typeToValueCode(
+            k[1],
+            control?.value ?? 0.0,
+            control?.value ?? 0.0,
+            control?.value ?? 0.0,
+            control?.value ?? 0.0,
+          ),
+        );
+      }
+    }
+
+    return {
+      value: {
+        value: 0,
+        code: `${nodeToVariableDeclaration(this)} = ${funcCall};`,
+        refId: idToVariableName(this.id),
+      },
+    };
+  }
+
+  serialize(sn: SerializedNode): SerializedNode {
+    sn.nodeType = "MathFunction";
+    sn.extraStringInformation = [
+      { key: "name", value: this.name },
+      { key: "func", value: this.func },
+    ];
+    sn.extraNumberInformation = [];
+    for (let key of this.variableControls.keys()) {
+      sn.extraNumberInformation.push({
+        key: key,
+        value: this.variableControls.get(key)?.value ?? 0.0,
+      });
+    }
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    if (sn.extraStringInformation) {
+      for (let info of sn.extraStringInformation) {
+        if (info.key === "name") {
+          this.name = info.value;
+        }
+        if (info.key === "func") {
+          this.func = info.value;
+        }
+      }
+    }
+    this.setup();
+    if (sn.extraNumberInformation) {
+      for (let info of sn.extraNumberInformation) {
+        if (this.variableControls.has(info.key)) {
+          const cont = this.variableControls.get(info.key);
+          if (cont) cont.value = info.value;
+        }
+      }
+    }
+    super.deserialize(sn);
   }
 }
 

@@ -89,4 +89,5 @@ type NodeType =
   | "Shape"
   | "Combine"
   | "Sawtooth"
-  | "Sinus";
+  | "Sinus"
+  | "MathFunction";

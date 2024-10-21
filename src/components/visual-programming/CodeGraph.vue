@@ -75,6 +75,7 @@ import {
 } from "@/vpnodes/simple-mode/shapes";
 import {
   CombineNode,
+  MathFunctionNode,
   SawtoothNode,
   SinusNode,
 } from "@/vpnodes/simple-mode/apply";
@@ -198,7 +199,9 @@ const uiNodes: Map<string, UINode> = new Map([
       prefix: "",
       image: WaveSawTool,
       get: () => {
-        return new SawtoothNode(
+        return new MathFunctionNode(
+          "Sawtooth",
+          "(({sawtooth count,0,10,-10,0.1,f32} * input2) - floor({sawtooth count,0,10,-10,0.1,f32} * input2))",
           (id) => {
             area.update("node", id);
             editor.addNode(new NothingNode());
@@ -215,14 +218,14 @@ const uiNodes: Map<string, UINode> = new Map([
   [
     "Sinus",
     {
-      name: "Sinus",
+      name: "Sine",
       type: "APPLY",
       prefix: "",
       image: WaveSine,
       get: () => {
-        return new SinusNode(
+        return new MathFunctionNode(
           "Sine",
-          "sin",
+          "sin({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
           (id) => {
             area.update("node", id);
             editor.addNode(new NothingNode());
@@ -244,9 +247,33 @@ const uiNodes: Map<string, UINode> = new Map([
       prefix: "",
       image: WaveSine,
       get: () => {
-        return new SinusNode(
+        return new MathFunctionNode(
           "Cosine",
-          "cos",
+          "cos({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
+          (id) => {
+            area.update("node", id);
+            editor.addNode(new NothingNode());
+          },
+          (c) => {
+            area.update("control", c.id);
+          },
+        );
+      },
+      create: createUINode,
+      draggable: true,
+    },
+  ],
+  [
+    "POW",
+    {
+      name: "POW",
+      type: "APPLY",
+      prefix: "",
+      image: WaveSine,
+      get: () => {
+        return new MathFunctionNode(
+          "Pow",
+          "pow(input2, {x1,0,5,-5,1,same})",
           (id) => {
             area.update("node", id);
             editor.addNode(new NothingNode());
@@ -289,7 +316,8 @@ export type Nodes =
   | FunctionScopeNode
   | ShapeNode
   | SawtoothNode
-  | SinusNode;
+  | SinusNode
+  | MathFunctionNode;
 
 class Connection<
   A extends Nodes,
@@ -998,6 +1026,19 @@ function serializedNodeToNode(
       node = new SinusNode(
         "Sine",
         "sin",
+        (id) => {
+          area.update("node", id);
+          editor.addNode(new NothingNode());
+        },
+        (c) => {
+          area.update("control", c.id);
+        },
+      );
+      break;
+    case "MathFunction":
+      node = new MathFunctionNode(
+        "",
+        "",
         (id) => {
           area.update("node", id);
           editor.addNode(new NothingNode());

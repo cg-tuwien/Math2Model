@@ -404,47 +404,60 @@ export class CallCustomFunctionNode extends VPNode {
   }
 }
 
-export function typeToValueCode(type: string): string {
+export function typeToValueCode(
+  type: string,
+  valueX?: number,
+  valueY?: number,
+  valueZ?: number,
+  valueW?: number,
+): string {
   switch (type) {
     case "i32":
-      return "0";
+      return valueX?.toString() ?? "0";
     case "f32":
-      return "0.0";
+      return valueX?.toFixed(20) ?? "0.0";
     case "vec2f":
-      return "vec2f(0.0, 0.0)";
+      return `vec2f(${valueX?.toFixed(20) ?? "0.0"}, ${valueY?.toFixed(20) ?? "0.0"})`;
     case "vec3f":
-      return "vec3f(0.0, 0.0, 0.0)";
+      return `vec3f(${valueX?.toFixed(20) ?? "0.0"}, ${valueY?.toFixed(20) ?? "0.0"}, ${valueZ?.toFixed(20) ?? "0.0"})`;
     case "vec4f":
-      return "vec4f(0.0, 0.0, 0.0, 0.0)";
+      return `vec4f(${valueX?.toFixed(20) ?? "0.0"}, ${valueY?.toFixed(20) ?? "0.0"}, ${valueZ?.toFixed(20) ?? "0.0"}, ${valueW?.toFixed(20) ?? "0.0"})`;
     default:
       return "";
   }
 }
 
-export function typeToValue(type: string) {
+export function typeToValue(
+  type: string,
+  valueX?: number,
+  valueY?: number,
+  valueZ?: number,
+  valueW?: number,
+) {
   switch (type) {
     case "i32":
-      return 0;
+      return valueX ?? 0;
     case "f32":
-      return 0.0;
+      return valueX ?? 0.0;
     case "vec2f":
-      return vec2.create(0.0, 0.0);
+      return vec2.create(valueX ?? 0.0, valueY ?? 0.0);
     case "vec3f":
-      return vec3.create(0.0, 0.0, 0.0);
+      return vec3.create(valueX ?? 0.0, valueY ?? 0.0, valueZ ?? 0.0);
     case "vec4f":
-      return vec4.create(0.0, 0.0, 0.0, 0.0);
+      return vec4.create(
+        valueX ?? 0.0,
+        valueY ?? 0.0,
+        valueZ ?? 0.0,
+        valueW ?? 0.0,
+      );
     default:
       return undefined;
   }
 }
 
-export function valueToType(value: number | vec2 | vec3 | vec4): string {
-  if (value instanceof vec2) {
-    return "vec2f";
-  } else if (value instanceof vec3) {
-    return "vec3f";
-  } else if (value instanceof vec4) {
-    return "vec4f";
+export function valueToType(value: number | Float32Array): string {
+  if (value instanceof Float32Array) {
+    return value.length == 2 ? "vec2f" : value.length == 3 ? "vec3f" : "vec4f";
   } else {
     return "f32";
   }
