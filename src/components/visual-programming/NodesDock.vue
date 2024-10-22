@@ -5,9 +5,10 @@ import type { DeepReadonly } from "vue";
 import type { UINode } from "@/vpnodes/ui/uinode";
 import SingleNodeDisplay from "@/components/visual-programming/SingleNodeDisplay.vue";
 import { NodeEditor } from "rete";
+import MultipleNodesCollapsable from "@/components/visual-programming/MultipleNodesCollapsable.vue";
 
 const props = defineProps<{
-  displayNodes: UINode[];
+  displayNodes: Map<string, Map<string, UINode>>;
   editor: NodeEditor;
   header: string;
 }>();
@@ -15,20 +16,16 @@ const props = defineProps<{
 
 <template>
   <n-infinite-scroll>
-    <n-list bordered hoverable clickable show-divider>
-      <template #header> {{ props.header }} </template>
-      <n-list-item
-        v-for="node of displayNodes"
-        :onclick="() => node.create(node)"
-        :draggable="node.draggable"
-        v-on:dragstart="
-          (ev) => {
-            ev.dataTransfer.setData('text/plain', JSON.stringify(node));
-            ev.dataTransfer.effectAllowed = 'copy';
-          }
-        "
-      >
-        <SingleNodeDisplay :ui-node="node"></SingleNodeDisplay>
+    <n-list show-divide>
+      <template #header>
+        <div class="m-1">{{ props.header }}</div>
+      </template>
+      <n-list-item class="m-1" v-for="name of displayNodes.keys()">
+        <MultipleNodesCollapsable
+          :display-nodes="displayNodes.get(name)"
+          :editor="props.editor"
+          :header="name"
+        ></MultipleNodesCollapsable>
       </n-list-item>
     </n-list>
   </n-infinite-scroll>
