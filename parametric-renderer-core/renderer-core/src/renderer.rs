@@ -780,8 +780,9 @@ fn render_model_component(
         meshes.with_value(|meshes| {
             for (i, (bind_group_1, mesh)) in bind_group_1.iter().zip(meshes.iter()).enumerate() {
                 let buffer_offset = (i as u64)
-                    * copy_patches::DrawIndexedIndirectArgs::METADATA
-                        .alignment
+                    * Vec::<copy_patches::DrawIndexedIndirectArgs>::METADATA
+                        .extra
+                        .stride
                         .get();
                 shader::set_bind_groups(
                     &mut render_pass.recorder,
