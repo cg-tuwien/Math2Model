@@ -10,16 +10,14 @@ use super::WindowOrFallback;
 // TODO: Wrap this in an Arc (and move the size out of the context)
 pub struct WgpuContext {
     pub instance: wgpu::Instance,
-    pub surface: SurfaceOrFallback,
     pub _adapter: wgpu::Adapter,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    size: UVec2,
     pub view_format: wgpu::TextureFormat,
 }
 
 impl WgpuContext {
-    pub async fn new(window: WindowOrFallback) -> anyhow::Result<Self> {
+    pub async fn new(window: WindowOrFallback) -> anyhow::Result<(Self, SurfaceOrFallback)> {
         let size = window.size().max(UVec2::ONE);
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
@@ -95,98 +93,25 @@ impl WgpuContext {
                     window: window
                         .as_window()
                         .expect("Expected window if there is a surface"),
+                    size,
                 }
             }
             None => SurfaceOrFallback::Fallback {
-                texture: Self::create_fallback_texture(&device, size, view_format),
+                texture: create_fallback_texture(&device, size, view_format),
+                size,
             },
         };
 
-        Ok(WgpuContext {
-            instance,
-            surface: surface_or_fallback,
-            _adapter: adapter,
-            device,
-            queue,
-            size,
-            view_format,
-        })
-    }
-
-    /// Tries to resize the swapchain to the new size.
-    /// Returns the actual size of the swapchain if it was resized.
-    pub fn try_resize(&mut self, new_size: UVec2) -> Option<UVec2> {
-        let new_size = new_size.max(UVec2::new(1, 1));
-        if new_size == self.size {
-            return None;
-        }
-        self.size = new_size;
-        match &mut self.surface {
-            SurfaceOrFallback::Surface {
-                surface, config, ..
-            } => {
-                config.width = new_size.x;
-                config.height = new_size.y;
-                surface.configure(&self.device, config);
-                Some(new_size)
-            }
-            SurfaceOrFallback::Fallback { texture } => {
-                *texture = Self::create_fallback_texture(&self.device, new_size, self.view_format);
-                Some(new_size)
-            }
-        }
-    }
-
-    pub fn recreate_swapchain(&self) {
-        match &self.surface {
-            SurfaceOrFallback::Surface {
-                surface, config, ..
-            } => {
-                surface.configure(&self.device, config);
-            }
-            SurfaceOrFallback::Fallback { .. } => {
-                // No-op
-            }
-        }
-    }
-
-    pub fn size(&self) -> UVec2 {
-        self.size
-    }
-
-    fn create_fallback_texture(
-        device: &wgpu::Device,
-        size: UVec2,
-        format: wgpu::TextureFormat,
-    ) -> wgpu::Texture {
-        device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Fallback surface"),
-            size: wgpu::Extent3d {
-                width: size.x,
-                height: size.y,
-                depth_or_array_layers: 1,
+        Ok((
+            WgpuContext {
+                instance,
+                _adapter: adapter,
+                device,
+                queue,
+                view_format,
             },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
-        })
-    }
-
-    pub fn surface_texture(&self) -> Result<SurfaceTexture, wgpu::SurfaceError> {
-        match &self.surface {
-            SurfaceOrFallback::Surface { surface, .. } => {
-                surface.get_current_texture().map(|surface_texture| {
-                    let view = self.create_view(&surface_texture.texture);
-                    SurfaceTexture::Surface(surface_texture, view)
-                })
-            }
-            SurfaceOrFallback::Fallback { texture } => {
-                Ok(SurfaceTexture::Fallback(self.create_view(&texture)))
-            }
-        }
+            surface_or_fallback,
+        ))
     }
 
     fn create_view(&self, texture: &wgpu::Texture) -> wgpu::TextureView {
@@ -225,10 +150,100 @@ pub enum SurfaceOrFallback {
         surface: wgpu::Surface<'static>,
         config: wgpu::SurfaceConfiguration,
         window: Arc<Window>,
+        size: UVec2,
     },
     Fallback {
         texture: wgpu::Texture,
+        size: UVec2,
     },
+}
+
+impl SurfaceOrFallback {
+    pub fn size(&self) -> UVec2 {
+        match self {
+            SurfaceOrFallback::Surface { size, .. } => *size,
+            SurfaceOrFallback::Fallback { size, .. } => *size,
+        }
+    }
+
+    /// Tries to resize the swapchain to the new size.
+    /// Returns the actual size of the swapchain if it was resized.
+    pub fn try_resize(&mut self, context: &WgpuContext, new_size: UVec2) -> Option<UVec2> {
+        let new_size = new_size.max(UVec2::new(1, 1));
+        if new_size == self.size() {
+            return None;
+        }
+        match self {
+            SurfaceOrFallback::Surface {
+                surface,
+                config,
+                size,
+                ..
+            } => {
+                config.width = new_size.x;
+                config.height = new_size.y;
+                surface.configure(&context.device, config);
+                *size = new_size;
+                Some(new_size)
+            }
+            SurfaceOrFallback::Fallback { texture, size } => {
+                *texture = create_fallback_texture(&context.device, new_size, context.view_format);
+                *size = new_size;
+                Some(new_size)
+            }
+        }
+    }
+
+    pub fn recreate_swapchain(&self, context: &WgpuContext) {
+        match self {
+            SurfaceOrFallback::Surface {
+                surface, config, ..
+            } => {
+                surface.configure(&context.device, config);
+            }
+            SurfaceOrFallback::Fallback { .. } => {
+                // No-op
+            }
+        }
+    }
+
+    pub fn surface_texture(
+        &self,
+        context: &WgpuContext,
+    ) -> Result<SurfaceTexture, wgpu::SurfaceError> {
+        match self {
+            SurfaceOrFallback::Surface { surface, .. } => {
+                surface.get_current_texture().map(|surface_texture| {
+                    let view = context.create_view(&surface_texture.texture);
+                    SurfaceTexture::Surface(surface_texture, view)
+                })
+            }
+            SurfaceOrFallback::Fallback { texture, .. } => {
+                Ok(SurfaceTexture::Fallback(context.create_view(&texture)))
+            }
+        }
+    }
+}
+
+fn create_fallback_texture(
+    device: &wgpu::Device,
+    size: UVec2,
+    format: wgpu::TextureFormat,
+) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("Fallback surface"),
+        size: wgpu::Extent3d {
+            width: size.x,
+            height: size.y,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        view_formats: &[],
+    })
 }
 
 pub fn create_profiler(_context: &WgpuContext) -> GpuProfiler {
