@@ -11,7 +11,7 @@ use crate::{
 use super::{wgpu_context::WgpuContext, MAX_PATCH_COUNT, PATCH_SIZES};
 use std::sync::Arc;
 
-use glam::{Mat4, Vec3, Vec4};
+use glam::{Vec3, Vec4};
 use uuid::Uuid;
 use wgpu::ShaderModule;
 
@@ -63,50 +63,13 @@ pub fn make_missing_shader(context: &WgpuContext) -> Arc<ShaderPipelines> {
     ))
 }
 
-pub struct ComputePatchesStep {
-    pub input_buffer: TypedBuffer<compute_patches::InputBuffer>,
-    pub patches_buffer: [TypedBuffer<compute_patches::Patches>; 2],
+pub struct VirtualModel {
     pub render_buffer: Vec<TypedBuffer<compute_patches::RenderBuffer>>,
-    pub indirect_compute_buffer: [TypedBuffer<compute_patches::DispatchIndirectArgs>; 2],
-    pub bind_group_1: compute_patches::bind_groups::BindGroup1,
-    pub bind_group_2: [compute_patches::bind_groups::BindGroup2; 2],
-    pub force_render_uniform: TypedBuffer<compute_patches::ForceRenderFlag>,
+    pub indirect_draw: TypedBuffer<Vec<copy_patches::DrawIndexedIndirectArgs>>,
 }
 
-impl ComputePatchesStep {
-    pub fn new(device: &wgpu::Device, id: &str) -> Self {
-        let input_buffer = TypedBuffer::new_uniform(
-            device,
-            &format!("{id} Compute Patches Input Buffer"),
-            &compute_patches::InputBuffer {
-                model_view_projection: Mat4::IDENTITY,
-                threshold_factor: 1.0,
-            },
-            wgpu::BufferUsages::COPY_DST,
-        );
-
-        let patches_buffer_empty = compute_patches::Patches {
-            patches_length: 0,
-            patches_capacity: 0,
-            patches: vec![],
-        };
-        let patches_buffer = [
-            TypedBuffer::new_storage_with_runtime_array(
-                device,
-                &format!("{id} Patches Buffer 0"),
-                &patches_buffer_empty,
-                MAX_PATCH_COUNT as u64,
-                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
-            ),
-            TypedBuffer::new_storage_with_runtime_array(
-                device,
-                &format!("{id} Patches Buffer 1"),
-                &patches_buffer_empty,
-                MAX_PATCH_COUNT as u64,
-                wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
-            ),
-        ];
-
+impl VirtualModel {
+    pub fn new(context: &WgpuContext, meshes: &[Mesh], id: &str) -> Self {
         let render_buffer_initial = compute_patches::RenderBuffer {
             patches_length: 0,
             patches_capacity: 0,
@@ -116,7 +79,7 @@ impl ComputePatchesStep {
             .iter()
             .map(|size| {
                 TypedBuffer::new_storage_with_runtime_array(
-                    device,
+                    &context.device,
                     &format!("{id} Render Buffer {size}"),
                     &render_buffer_initial,
                     MAX_PATCH_COUNT as u64,
@@ -125,181 +88,32 @@ impl ComputePatchesStep {
             })
             .collect::<Vec<_>>();
 
-        let indirect_compute_empty = compute_patches::DispatchIndirectArgs { x: 0, y: 0, z: 0 };
-        let indirect_compute_buffer = [
-            TypedBuffer::new_storage(
-                device,
-                &format!("{id} Indirect Compute Dispatch Buffer 0"),
-                &indirect_compute_empty,
-                wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
-            ),
-            TypedBuffer::new_storage(
-                device,
-                &format!("{id} Indirect Compute Dispatch Buffer 1"),
-                &indirect_compute_empty,
-                wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
-            ),
-        ];
+        let indirect_draw_data = copy_patches::DrawIndexedIndirectArgs {
+            index_count: 0,
+            instance_count: 0, // Our shader sets this
+            first_index: 0,
+            base_vertex: 0,
+            first_instance: 0,
+        };
 
-        let force_render_uniform = TypedBuffer::new_uniform(
-            device,
-            &format!("{id} Force Render Uniform"),
-            &compute_patches::ForceRenderFlag { flag: 0 },
-            wgpu::BufferUsages::COPY_DST,
-        );
-
-        let bind_group_1 = compute_patches::bind_groups::BindGroup1::from_bindings(
-            device,
-            compute_patches::bind_groups::BindGroupLayout1 {
-                input_buffer: input_buffer.as_entire_buffer_binding(),
-                render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
-                render_buffer_4: render_buffer[1].as_entire_buffer_binding(),
-                render_buffer_8: render_buffer[2].as_entire_buffer_binding(),
-                render_buffer_16: render_buffer[3].as_entire_buffer_binding(),
-                render_buffer_32: render_buffer[4].as_entire_buffer_binding(),
-            },
-        );
-        let bind_group_2 = [
-            compute_patches::bind_groups::BindGroup2::from_bindings(
-                device,
-                compute_patches::bind_groups::BindGroupLayout2 {
-                    patches_from_buffer: patches_buffer[0].as_entire_buffer_binding(),
-                    patches_to_buffer: patches_buffer[1].as_entire_buffer_binding(),
-                    dispatch_next: indirect_compute_buffer[1].as_entire_buffer_binding(),
-                    force_render: force_render_uniform.as_entire_buffer_binding(),
-                },
-            ),
-            compute_patches::bind_groups::BindGroup2::from_bindings(
-                device,
-                compute_patches::bind_groups::BindGroupLayout2 {
-                    patches_from_buffer: patches_buffer[1].as_entire_buffer_binding(), // Swap the order :)
-                    patches_to_buffer: patches_buffer[0].as_entire_buffer_binding(),
-                    dispatch_next: indirect_compute_buffer[0].as_entire_buffer_binding(),
-                    force_render: force_render_uniform.as_entire_buffer_binding(),
-                },
-            ),
-        ];
-
-        Self {
-            input_buffer,
-            patches_buffer,
-            render_buffer,
-            indirect_compute_buffer,
-            bind_group_1,
-            bind_group_2,
-            force_render_uniform,
-        }
-    }
-}
-
-pub struct CopyPatchesStep {
-    pub bind_group_0: copy_patches::bind_groups::BindGroup0,
-    pub indirect_draw_buffers: TypedBuffer<copy_patches::DrawIndexedBuffers>,
-}
-
-impl CopyPatchesStep {
-    pub fn new(
-        device: &wgpu::Device,
-        render_buffer: &[TypedBuffer<compute_patches::RenderBuffer>],
-        meshes: &[crate::mesh::Mesh],
-        id: &str,
-    ) -> Self {
-        let indirect_draw_data = meshes
-            .iter()
-            .map(|mesh| copy_patches::DrawIndexedIndirectArgs {
-                index_count: mesh.num_indices,
-                instance_count: 0, // Our shader sets this
-                first_index: 0,
-                base_vertex: 0,
-                first_instance: 0,
-            })
-            .collect::<Vec<_>>();
-
-        let indirect_draw_buffers = TypedBuffer::new_storage(
-            device,
-            &format!("{id} Indirect Draw Buffers"),
-            &copy_patches::DrawIndexedBuffers {
-                indirect_draw_2: indirect_draw_data[0],
-                indirect_draw_4: indirect_draw_data[1],
-                indirect_draw_8: indirect_draw_data[2],
-                indirect_draw_16: indirect_draw_data[3],
-                indirect_draw_32: indirect_draw_data[4],
-            },
+        let indirect_draw = TypedBuffer::new_storage(
+            &context.device,
+            &format!("{} Indirect Draw Buffers", id),
+            &meshes
+                .iter()
+                .map(|mesh| copy_patches::DrawIndexedIndirectArgs {
+                    index_count: mesh.num_indices,
+                    ..indirect_draw_data
+                })
+                .collect::<Vec<_>>(),
             wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_SRC,
         );
 
-        let bind_group_0 = copy_patches::bind_groups::BindGroup0::from_bindings(
-            device,
-            copy_patches::bind_groups::BindGroupLayout0 {
-                render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
-                render_buffer_4: render_buffer[1].as_entire_buffer_binding(),
-                render_buffer_8: render_buffer[2].as_entire_buffer_binding(),
-                render_buffer_16: render_buffer[3].as_entire_buffer_binding(),
-                render_buffer_32: render_buffer[4].as_entire_buffer_binding(),
-                indirect_draw: indirect_draw_buffers.as_entire_buffer_binding(),
-            },
-        );
-
         Self {
-            bind_group_0,
-            indirect_draw_buffers,
+            render_buffer,
+            indirect_draw,
         }
     }
-}
-
-pub struct RenderStep {
-    pub model_buffer: TypedBuffer<shader::Model>,
-    pub material_buffer: TypedBuffer<shader::Material>,
-    pub bind_group_1: Vec<shader::bind_groups::BindGroup1>,
-}
-
-impl RenderStep {
-    pub fn new(
-        context: &WgpuContext,
-        render_buffer: &[TypedBuffer<compute_patches::RenderBuffer>],
-    ) -> Self {
-        let model_buffer = TypedBuffer::new_uniform(
-            &context.device,
-            "Model Buffer",
-            &shader::Model {
-                model_similarity: Mat4::IDENTITY,
-            },
-            wgpu::BufferUsages::COPY_DST,
-        );
-
-        let material_buffer = TypedBuffer::new_uniform(
-            &context.device,
-            "Material Buffer",
-            &MaterialInfo::missing().to_shader(),
-            wgpu::BufferUsages::COPY_DST,
-        );
-
-        let bind_group_1 = render_buffer
-            .iter()
-            .map(|render| {
-                shader::bind_groups::BindGroup1::from_bindings(
-                    &context.device,
-                    shader::bind_groups::BindGroupLayout1 {
-                        model: model_buffer.as_entire_buffer_binding(),
-                        render_buffer: render.as_entire_buffer_binding(),
-                        material: material_buffer.as_entire_buffer_binding(),
-                    },
-                )
-            })
-            .collect();
-
-        Self {
-            model_buffer,
-            material_buffer,
-            bind_group_1,
-        }
-    }
-}
-
-pub struct VirtualModel {
-    pub compute_patches: ComputePatchesStep,
-    pub copy_patches: CopyPatchesStep,
-    pub render_step: RenderStep,
 }
 
 impl MaterialInfo {
@@ -315,7 +129,7 @@ impl MaterialInfo {
         }
     }
 
-    fn missing() -> Self {
+    pub fn missing() -> Self {
         Self {
             color: Vec3::new(1.0, 0.0, 1.0),
             emissive: Vec3::new(1.0, 0.0, 1.0),
@@ -331,25 +145,6 @@ impl Default for MaterialInfo {
             emissive: Vec3::new(0.0, 0.0, 0.0),
             roughness: 0.0,
             metallic: 0.0,
-        }
-    }
-}
-
-impl VirtualModel {
-    pub fn new(context: &WgpuContext, meshes: &[Mesh], id: &str) -> Self {
-        let compute_patches_step = ComputePatchesStep::new(&context.device, id);
-        let copy_patches_step = CopyPatchesStep::new(
-            &context.device,
-            &compute_patches_step.render_buffer,
-            meshes,
-            id,
-        );
-        let render_step = RenderStep::new(context, &compute_patches_step.render_buffer);
-
-        Self {
-            compute_patches: compute_patches_step,
-            copy_patches: copy_patches_step,
-            render_step,
         }
     }
 }

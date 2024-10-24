@@ -5,6 +5,7 @@ mod wgpu_context;
 
 use std::{collections::HashMap, sync::Arc};
 
+use encase::ShaderType;
 use frame_counter::FrameCounter;
 use glam::UVec2;
 
@@ -22,7 +23,7 @@ use wgpu_profiler::GpuProfiler;
 
 use crate::{
     buffer::TypedBuffer,
-    game::{GameRes, ModelInfo, ShaderId},
+    game::{GameRes, MaterialInfo, ModelInfo, ShaderId},
     mesh::Mesh,
     reactive::{ForEach, MemoComputed, SignalVec},
     shaders::{compute_patches, copy_patches, shader},
@@ -237,33 +238,13 @@ fn render_component(
     let _ = resizer_component(desired_size, context, depth_texture);
 
     // size/2 - 1 == one quad per four pixels
-    let meshes = StoredValue::new(context.with_value(|context| {
+    let quad_meshes = StoredValue::new(context.with_value(|context| {
         PATCH_SIZES
             .iter()
             .map(|size| *size / 2 - 1)
             .map(|splits| Mesh::new_tesselated_quad(&context.device, splits))
             .collect::<Vec<_>>()
     }));
-
-    // Alternative design:
-    // 1. Create a virtual model for each model
-    // 2. Use this virtual model to render the model
-    /*
-    let virtual_models = new_computed_vec(
-        move || models.iter(),
-        |model| model.clone(),
-        move |model| {
-            let context = context.read_value();
-            let meshes = meshes.read_value();
-            let model = model.read();
-            VirtualModel::new(
-                &context,
-                &meshes,
-                model.shader_id.clone(),
-                &format!("ID{}", model.id),
-            )
-        },
-    ); */
 
     let models_components = ForEach::new(
         move || models.iter(),
@@ -278,7 +259,7 @@ fn render_component(
                 copy_patches_pipeline,
                 RenderInfo {
                     render_bind_group_0,
-                    meshes,
+                    meshes: quad_meshes,
                 },
             )
         },
@@ -322,7 +303,7 @@ fn render_component(
                     profiler_guard.scope("Render", &mut command_encoder, &context.device);
 
                 models_components.for_each(|renderers| {
-                    (renderers.lod_stage)(context, render_data, &mut commands);
+                    (renderers.lod_stage)(render_data, &mut commands);
                 });
 
                 let mut render_pass = commands.scoped_render_pass(
@@ -414,7 +395,7 @@ fn model_component(
     copy_patches_pipeline: StoredValue<wgpu::ComputePipeline>,
     render_stage: RenderInfo,
 ) -> ModelRenderers<
-    impl Fn(&WgpuContext, &FrameData, &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>),
+    impl Fn(&FrameData, &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>),
     impl Fn(&mut wgpu_profiler::OwningScope<'_, wgpu::RenderPass<'_>>),
 > {
     let virtual_model = Memo::new_computed({
@@ -427,17 +408,15 @@ fn model_component(
         }
     });
 
-    let lod_stage_component = context.with_value(|context| {
-        lod_stage_component(
-            context,
-            shaders,
-            model.clone(),
-            virtual_model,
-            compute_patches,
-            copy_patches_pipeline,
-            threshold_factor,
-        )
-    });
+    let lod_stage_component = lod_stage_component(
+        context,
+        shaders,
+        model.clone(),
+        virtual_model,
+        compute_patches,
+        copy_patches_pipeline,
+        threshold_factor,
+    );
 
     let render_component = render_model_component(
         context,
@@ -460,17 +439,18 @@ struct ModelRenderers<LodStage, RenderStage> {
 }
 
 fn lod_stage_component(
-    // TODO: Refactor to take a StoredValue<Context>
-    context: &WgpuContext,
+    context: StoredValue<WgpuContext>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     model: ArcReadSignal<ModelInfo>,
     virtual_model: Memo<VirtualModel>,
     compute_patches: StoredValue<ComputePatchesStep>,
     copy_patches_pipeline: StoredValue<wgpu::ComputePipeline>,
     threshold_factor: ReadSignal<f32>,
-) -> impl Fn(&WgpuContext, &FrameData, &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>) {
+) -> impl Fn(&FrameData, &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>) {
+    let device = &context.read_value().device;
+    let id = model.read().id.clone(); // I wonder if this ID stays the same
     let patches_buffer_reset = TypedBuffer::new_storage_with_runtime_array(
-        &context.device,
+        device,
         "Patches Buffer Reset",
         &compute_patches::Patches {
             patches_length: 0,
@@ -481,24 +461,131 @@ fn lod_stage_component(
         wgpu::BufferUsages::COPY_SRC,
     );
     let indirect_compute_buffer_reset = TypedBuffer::new_storage(
-        &context.device,
+        device,
         "Indirect Compute Dispatch Buffer Reset",
         &compute_patches::DispatchIndirectArgs { x: 0, y: 1, z: 1 },
         wgpu::BufferUsages::COPY_SRC,
     );
 
     let force_render_false = TypedBuffer::new_uniform(
-        &context.device,
+        device,
         "Disable Force Render",
         &compute_patches::ForceRenderFlag { flag: 0 },
         wgpu::BufferUsages::COPY_SRC,
     );
     let force_render_true = TypedBuffer::new_uniform(
-        &context.device,
+        device,
         "Enable Force Render",
         &compute_patches::ForceRenderFlag { flag: 1 },
         wgpu::BufferUsages::COPY_SRC,
     );
+
+    let copy_patches_bind_group_0 = Memo::new_computed(move |_| {
+        let virtual_model = virtual_model.read();
+        let render_buffer = &virtual_model.render_buffer;
+        copy_patches::bind_groups::BindGroup0::from_bindings(
+            &context.read_value().device,
+            copy_patches::bind_groups::BindGroupLayout0 {
+                render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
+                render_buffer_4: render_buffer[1].as_entire_buffer_binding(),
+                render_buffer_8: render_buffer[2].as_entire_buffer_binding(),
+                render_buffer_16: render_buffer[3].as_entire_buffer_binding(),
+                render_buffer_32: render_buffer[4].as_entire_buffer_binding(),
+                indirect_draw: virtual_model.indirect_draw.as_entire_buffer_binding(),
+            },
+        )
+    });
+
+    let input_buffer = RwSignal::new(TypedBuffer::new_uniform(
+        &context.read_value().device,
+        &format!("{id} Compute Patches Input Buffer"),
+        &compute_patches::InputBuffer {
+            model_view_projection: glam::Mat4::IDENTITY,
+            threshold_factor: 1.0,
+        },
+        wgpu::BufferUsages::COPY_DST,
+    ));
+
+    let patches_buffer_empty = compute_patches::Patches {
+        patches_length: 0,
+        patches_capacity: 0,
+        patches: vec![],
+    };
+    let patches_buffer = [
+        TypedBuffer::new_storage_with_runtime_array(
+            device,
+            &format!("{id} Patches Buffer 0"),
+            &patches_buffer_empty,
+            MAX_PATCH_COUNT as u64,
+            wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+        ),
+        TypedBuffer::new_storage_with_runtime_array(
+            device,
+            &format!("{id} Patches Buffer 1"),
+            &patches_buffer_empty,
+            MAX_PATCH_COUNT as u64,
+            wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+        ),
+    ];
+
+    let indirect_compute_empty = compute_patches::DispatchIndirectArgs { x: 0, y: 0, z: 0 };
+    let indirect_compute_buffer = [
+        TypedBuffer::new_storage(
+            device,
+            &format!("{id} Indirect Compute Dispatch Buffer 0"),
+            &indirect_compute_empty,
+            wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
+        ),
+        TypedBuffer::new_storage(
+            device,
+            &format!("{id} Indirect Compute Dispatch Buffer 1"),
+            &indirect_compute_empty,
+            wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
+        ),
+    ];
+
+    let force_render_uniform = TypedBuffer::new_uniform(
+        device,
+        &format!("{id} Force Render Uniform"),
+        &compute_patches::ForceRenderFlag { flag: 0 },
+        wgpu::BufferUsages::COPY_DST,
+    );
+
+    let bind_group_1 = Memo::new_computed(move |_| {
+        let virtual_model = virtual_model.read();
+        let render_buffer = &virtual_model.render_buffer;
+        compute_patches::bind_groups::BindGroup1::from_bindings(
+            &context.read_value().device,
+            compute_patches::bind_groups::BindGroupLayout1 {
+                input_buffer: input_buffer.read().as_entire_buffer_binding(),
+                render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
+                render_buffer_4: render_buffer[1].as_entire_buffer_binding(),
+                render_buffer_8: render_buffer[2].as_entire_buffer_binding(),
+                render_buffer_16: render_buffer[3].as_entire_buffer_binding(),
+                render_buffer_32: render_buffer[4].as_entire_buffer_binding(),
+            },
+        )
+    });
+    let bind_group_2 = [
+        compute_patches::bind_groups::BindGroup2::from_bindings(
+            device,
+            compute_patches::bind_groups::BindGroupLayout2 {
+                patches_from_buffer: patches_buffer[0].as_entire_buffer_binding(),
+                patches_to_buffer: patches_buffer[1].as_entire_buffer_binding(),
+                dispatch_next: indirect_compute_buffer[1].as_entire_buffer_binding(),
+                force_render: force_render_uniform.as_entire_buffer_binding(),
+            },
+        ),
+        compute_patches::bind_groups::BindGroup2::from_bindings(
+            device,
+            compute_patches::bind_groups::BindGroupLayout2 {
+                patches_from_buffer: patches_buffer[1].as_entire_buffer_binding(), // Swap the order :)
+                patches_to_buffer: patches_buffer[0].as_entire_buffer_binding(),
+                dispatch_next: indirect_compute_buffer[0].as_entire_buffer_binding(),
+                force_render: force_render_uniform.as_entire_buffer_binding(),
+            },
+        ),
+    ];
 
     let shader = Memo::new({
         let model = model.clone();
@@ -510,29 +597,22 @@ fn lod_stage_component(
         }
     });
 
-    move |context: &WgpuContext,
-          frame_data: &FrameData,
-          commands: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>| {
-        let virtual_model = virtual_model.read();
+    move |frame_data: &FrameData, commands: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>| {
+        let context = context.read_value();
         let queue = &context.queue;
-        virtual_model
-            .compute_patches
-            .force_render_uniform
-            .write_buffer(
-                &context.queue,
-                &compute_patches::ForceRenderFlag { flag: 0 },
-            );
+        let device = &context.device;
+        force_render_uniform.write_buffer(queue, &compute_patches::ForceRenderFlag { flag: 0 });
         let model_view_projection = frame_data.camera.projection_matrix(context.size())
             * frame_data.camera.view_matrix()
             * model.read().transform.to_matrix();
-        virtual_model.compute_patches.input_buffer.write_buffer(
+        input_buffer.read().write_buffer(
             queue,
             &compute_patches::InputBuffer {
                 model_view_projection,
                 threshold_factor: threshold_factor.get(),
             },
         );
-        virtual_model.compute_patches.patches_buffer[0].write_buffer(
+        patches_buffer[0].write_buffer(
             queue,
             &compute_patches::Patches {
                 patches_length: 1,
@@ -544,7 +624,7 @@ fn lod_stage_component(
                 }],
             },
         );
-        virtual_model.compute_patches.indirect_compute_buffer[0].write_buffer(
+        indirect_compute_buffer[0].write_buffer(
             queue,
             &compute_patches::DispatchIndirectArgs { x: 1, y: 1, z: 1 },
         );
@@ -554,7 +634,7 @@ fn lod_stage_component(
             patches_capacity: MAX_PATCH_COUNT,
             patches: vec![],
         };
-        for render_buffer in virtual_model.compute_patches.render_buffer.iter() {
+        for render_buffer in virtual_model.read().render_buffer.iter() {
             render_buffer.write_buffer(queue, &render_buffer_reset);
         }
 
@@ -568,73 +648,53 @@ fn lod_stage_component(
                 let is_last_round = i == double_number_of_rounds - 1;
                 // TODO: Should I create many compute passes, or just one?
                 {
-                    virtual_model.compute_patches.patches_buffer[1]
-                        .copy_all_from(&patches_buffer_reset, commands);
-                    virtual_model.compute_patches.indirect_compute_buffer[1]
+                    patches_buffer[1].copy_all_from(&patches_buffer_reset, commands);
+                    indirect_compute_buffer[1]
                         .copy_all_from(&indirect_compute_buffer_reset, commands);
-
-                    let mut compute_pass = commands.scoped_compute_pass(
-                        format!("Compute Patches From-To {i}"),
-                        &context.device,
-                    );
+                    let mut compute_pass = commands
+                        .scoped_compute_pass(format!("Compute Patches From-To {i}"), device);
                     compute_pass.set_pipeline(&shader.read().compute_patches);
                     compute_patches::set_bind_groups(
                         &mut compute_pass.recorder,
                         &compute_patches.read_value().bind_group_0,
-                        &virtual_model.compute_patches.bind_group_1,
-                        &virtual_model.compute_patches.bind_group_2[0],
+                        &bind_group_1.read(),
+                        &bind_group_2[0],
                     );
-                    compute_pass.dispatch_workgroups_indirect(
-                        &virtual_model.compute_patches.indirect_compute_buffer[0],
-                        0,
-                    );
+                    compute_pass.dispatch_workgroups_indirect(&indirect_compute_buffer[0], 0);
                 }
                 if is_last_round {
                     // Set to true
-                    virtual_model
-                        .compute_patches
-                        .force_render_uniform
-                        .copy_all_from(&force_render_true, commands);
+                    force_render_uniform.copy_all_from(&force_render_true, commands);
                 }
                 {
-                    virtual_model.compute_patches.patches_buffer[0]
-                        .copy_all_from(&patches_buffer_reset, commands);
-                    virtual_model.compute_patches.indirect_compute_buffer[0]
+                    patches_buffer[0].copy_all_from(&patches_buffer_reset, commands);
+                    indirect_compute_buffer[0]
                         .copy_all_from(&indirect_compute_buffer_reset, commands);
 
-                    let mut compute_pass = commands.scoped_compute_pass(
-                        format!("Compute Patches To-From {i}"),
-                        &context.device,
-                    );
+                    let mut compute_pass = commands
+                        .scoped_compute_pass(format!("Compute Patches To-From {i}"), device);
                     compute_pass.set_pipeline(&shader.read().compute_patches);
                     compute_patches::set_bind_groups(
                         &mut compute_pass.recorder,
                         // Maybe refactor so that parent components set bind groups, and children just assume that they're set?
                         &compute_patches.read_value().bind_group_0,
-                        &virtual_model.compute_patches.bind_group_1,
-                        &virtual_model.compute_patches.bind_group_2[1],
+                        &bind_group_1.read(),
+                        &bind_group_2[1],
                     );
-                    compute_pass.dispatch_workgroups_indirect(
-                        &virtual_model.compute_patches.indirect_compute_buffer[1],
-                        0,
-                    );
+                    compute_pass.dispatch_workgroups_indirect(&indirect_compute_buffer[1], 0);
                 }
                 if is_last_round {
                     // Set to false
-                    virtual_model
-                        .compute_patches
-                        .force_render_uniform
-                        .copy_all_from(&force_render_false, commands);
+                    force_render_uniform.copy_all_from(&force_render_false, commands);
                 }
             }
         }
         {
-            let mut compute_pass =
-                commands.scoped_compute_pass("Copy Patch Sizes Pass", &context.device);
+            let mut compute_pass = commands.scoped_compute_pass("Copy Patch Sizes Pass", device);
             compute_pass.set_pipeline(&copy_patches_pipeline.read_value());
             copy_patches::set_bind_groups(
                 &mut compute_pass.recorder,
-                &virtual_model.copy_patches.bind_group_0,
+                &copy_patches_bind_group_0.read(),
             );
             compute_pass.dispatch_workgroups(1, 1, 1);
         }
@@ -656,15 +716,6 @@ fn render_model_component(
     virtual_model: Memo<VirtualModel>,
     meshes: StoredValue<Vec<Mesh>>,
 ) -> impl Fn(&mut wgpu_profiler::OwningScope<'_, wgpu::RenderPass<'_>>) {
-    let indirect_draw_offsets = [
-        std::mem::offset_of!(copy_patches::DrawIndexedBuffers, indirect_draw_2),
-        std::mem::offset_of!(copy_patches::DrawIndexedBuffers, indirect_draw_4),
-        std::mem::offset_of!(copy_patches::DrawIndexedBuffers, indirect_draw_8),
-        std::mem::offset_of!(copy_patches::DrawIndexedBuffers, indirect_draw_16),
-        std::mem::offset_of!(copy_patches::DrawIndexedBuffers, indirect_draw_32),
-    ]
-    .map(|v| v as wgpu::BufferAddress);
-
     let shader = Memo::new({
         let model = model.clone();
         move |_| {
@@ -675,20 +726,51 @@ fn render_model_component(
         }
     });
 
+    let device = &context.read_value().device;
+
+    let model_buffer = TypedBuffer::new_uniform(
+        device,
+        "Model Buffer",
+        &shader::Model {
+            model_similarity: glam::Mat4::IDENTITY,
+        },
+        wgpu::BufferUsages::COPY_DST,
+    );
+
+    let material_buffer = TypedBuffer::new_uniform(
+        device,
+        "Material Buffer",
+        &MaterialInfo::missing().to_shader(),
+        wgpu::BufferUsages::COPY_DST,
+    );
+
+    let bind_group_1 = virtual_model.with(|virtual_model| {
+        virtual_model
+            .render_buffer
+            .iter()
+            .map(|render| {
+                shader::bind_groups::BindGroup1::from_bindings(
+                    device,
+                    shader::bind_groups::BindGroupLayout1 {
+                        model: model_buffer.as_entire_buffer_binding(),
+                        render_buffer: render.as_entire_buffer_binding(),
+                        material: material_buffer.as_entire_buffer_binding(),
+                    },
+                )
+            })
+            .collect::<Vec<_>>()
+    });
+
     Effect::new(move |_| {
         let model = model.read();
-        let virtual_model = virtual_model.read();
         let queue = &context.read_value().queue;
-        virtual_model.render_step.model_buffer.write_buffer(
+        model_buffer.write_buffer(
             queue,
             &shader::Model {
                 model_similarity: model.transform.to_matrix(),
             },
         );
-        virtual_model
-            .render_step
-            .material_buffer
-            .write_buffer(queue, &model.material_info.to_shader());
+        material_buffer.write_buffer(queue, &model.material_info.to_shader());
     });
 
     move |render_pass: &mut wgpu_profiler::OwningScope<'_, wgpu::RenderPass<'_>>| {
@@ -696,13 +778,11 @@ fn render_model_component(
         render_pass.set_pipeline(&shader.read().render);
 
         meshes.with_value(|meshes| {
-            for ((bind_group_1, mesh), buffer_offset) in virtual_model
-                .render_step
-                .bind_group_1
-                .iter()
-                .zip(meshes.iter())
-                .zip(indirect_draw_offsets)
-            {
+            for (i, (bind_group_1, mesh)) in bind_group_1.iter().zip(meshes.iter()).enumerate() {
+                let buffer_offset = (i as u64)
+                    * copy_patches::DrawIndexedIndirectArgs::METADATA
+                        .alignment
+                        .get();
                 shader::set_bind_groups(
                     &mut render_pass.recorder,
                     &render_bind_group_0.read_value(),
@@ -711,10 +791,7 @@ fn render_model_component(
                 render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 render_pass
                     .set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-                render_pass.draw_indexed_indirect(
-                    &virtual_model.copy_patches.indirect_draw_buffers,
-                    buffer_offset,
-                )
+                render_pass.draw_indexed_indirect(&virtual_model.indirect_draw, buffer_offset);
             }
         });
     }
