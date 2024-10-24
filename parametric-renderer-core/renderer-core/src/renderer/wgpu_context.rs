@@ -7,7 +7,6 @@ use winit::window::Window;
 
 use super::WindowOrFallback;
 
-// TODO: Wrap this in an Arc (and move the size out of the context)
 pub struct WgpuContext {
     pub instance: wgpu::Instance,
     pub _adapter: wgpu::Adapter,
