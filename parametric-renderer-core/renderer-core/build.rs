@@ -6,6 +6,7 @@ fn main() {
     watch_shader("../shaders/Shader.wgsl", "Shader");
     watch_shader("../shaders/ComputePatches.wgsl", "ComputePatches");
     watch_shader("../shaders/CopyPatches.wgsl", "CopyPatches");
+    watch_shader("../shaders/GroundPlane.wgsl", "GroundPlane");
 }
 
 fn watch_shader(path: &str, output_name: &str) {

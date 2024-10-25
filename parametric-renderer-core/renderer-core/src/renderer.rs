@@ -26,7 +26,7 @@ use crate::{
     game::{GameRes, MaterialInfo, ModelInfo, ShaderId},
     mesh::Mesh,
     reactive::{ForEach, MemoComputed, SignalVec},
-    shaders::{compute_patches, copy_patches, shader},
+    shaders::{compute_patches, copy_patches, ground_plane_shader, shader},
     texture::Texture,
     window_or_fallback::WindowOrFallback,
 };
@@ -274,6 +274,8 @@ fn render_component(
             .collect::<Vec<_>>(),
     );
 
+    let ground_plane_component = ground_plane_component(surface);
+
     let models_components = ForEach::new(move || models.iter(), |model| model.clone(), {
         move |model: ArcReadSignal<ModelInfo>| {
             model_component(
@@ -366,6 +368,9 @@ fn render_component(
                 (renderers.render_stage)(&mut render_pass);
             });
 
+            // Render transparent objects
+            (ground_plane_component)(render_data, &mut render_pass);
+
             // Finish the profiler
             std::mem::drop(render_pass);
             std::mem::drop(commands);
@@ -386,6 +391,102 @@ fn render_component(
         }
 
         Ok(())
+    }
+}
+
+/// Renders the ground plane
+fn ground_plane_component(
+    surface: RwSignal<SurfaceOrFallback>,
+) -> impl Fn(&FrameData, &mut wgpu_profiler::OwningScope<'_, wgpu::RenderPass<'_>>) {
+    let context = wgpu_context();
+    let quad_mesh = Mesh::new_tesselated_quad(&context.device, 2);
+    let shader = context
+        .device
+        .create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Ground Plane Grid"),
+            source: wgpu::ShaderSource::Wgsl(ground_plane_shader::SOURCE.into()),
+        });
+
+    let pipeline = context
+        .device
+        .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Ground Plane Grid"),
+            layout: Some(&ground_plane_shader::create_pipeline_layout(
+                &context.device,
+            )),
+            vertex: ground_plane_shader::vertex_state(
+                &shader,
+                &ground_plane_shader::vs_main_entry(wgpu::VertexStepMode::Vertex),
+            ),
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: ground_plane_shader::ENTRY_FS_MAIN,
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: context.view_format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: Default::default(),
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Greater,
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            multisample: Default::default(),
+            multiview: None,
+            cache: Default::default(),
+        });
+
+    let uniforms = TypedBuffer::new_uniform(
+        &context.device,
+        "Ground Plane Uniforms",
+        &ground_plane_shader::Uniforms {
+            model_matrix: glam::Mat4::IDENTITY,
+            view_projection_matrix: glam::Mat4::IDENTITY,
+            grid_scale: 0.0,
+        },
+        wgpu::BufferUsages::COPY_DST,
+    );
+
+    let bind_group_0 = ground_plane_shader::bind_groups::BindGroup0::from_bindings(
+        &context.device,
+        ground_plane_shader::bind_groups::BindGroupLayout0 {
+            uniforms: uniforms.as_entire_buffer_binding(),
+        },
+    );
+
+    move |render_data: &FrameData, render_pass| {
+        let size = 100_000.0;
+        let inv_grid_scale = (render_data.camera.position.distance(glam::Vec3::ZERO) / 50.0)
+            .max(1.0)
+            .log2()
+            .ceil()
+            .exp2()
+            .max(1.0);
+        let grid_scale = 1.0 / inv_grid_scale;
+        uniforms.write_buffer(
+            &context.queue,
+            &ground_plane_shader::Uniforms {
+                model_matrix: glam::Mat4::from_scale_rotation_translation(
+                    glam::Vec3::splat(size),
+                    glam::Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
+                    glam::Vec3::new(-size / 2., 0.0, size / 2.),
+                ),
+                view_projection_matrix: render_data.camera.projection_matrix(surface.read().size())
+                    * render_data.camera.view_matrix(),
+                grid_scale,
+            },
+        );
+
+        render_pass.set_pipeline(&pipeline);
+        render_pass.set_vertex_buffer(0, quad_mesh.vertex_buffer.slice(..));
+        render_pass.set_index_buffer(quad_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+        bind_group_0.set(&mut render_pass.recorder);
+        render_pass.draw_indexed(0..quad_mesh.num_indices, 0, 0..1);
     }
 }
 

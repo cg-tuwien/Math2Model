@@ -35,37 +35,60 @@ impl Mesh {
 
     /// Create a new tesselated quad mesh
     pub fn new_tesselated_quad(device: &wgpu::Device, split_count: u32) -> Self {
-        let mut vertices = Vec::new();
-        let mut indices = Vec::new();
-
-        let quad_count_one_side = split_count + 1;
-
-        for i in 0..=quad_count_one_side {
-            for j in 0..=quad_count_one_side {
-                let position = Vec3::new(i as f32, j as f32, 0.0) / (quad_count_one_side as f32);
-                let uv = Vec2::new(i as f32, j as f32) / (quad_count_one_side as f32);
-                vertices.push(shader::VertexInput { position, uv });
-            }
-        }
-
-        let vertices_per_row = quad_count_one_side + 1;
-        for i in 0..quad_count_one_side {
-            for j in 0..quad_count_one_side {
-                let i0 = i * vertices_per_row + j;
-                let i1 = i0 + 1;
-                let i2 = i0 + vertices_per_row;
-                let i3 = i2 + 1;
-
-                indices.push(i0 as u16);
-                indices.push(i1 as u16);
-                indices.push(i2 as u16);
-
-                indices.push(i2 as u16);
-                indices.push(i1 as u16);
-                indices.push(i3 as u16);
-            }
-        }
+        let (vertices, indices) = tesselated_quad(split_count);
 
         Mesh::with_contents(device, &vertices, &indices)
+    }
+}
+
+fn tesselated_quad(split_count: u32) -> (Vec<shader::VertexInput>, Vec<u16>) {
+    let mut vertices = Vec::new();
+    let mut indices = Vec::new();
+
+    let quad_count_one_side = split_count + 1;
+
+    for i in 0..=quad_count_one_side {
+        for j in 0..=quad_count_one_side {
+            let position = Vec3::new(i as f32, j as f32, 0.0) / (quad_count_one_side as f32);
+            let uv = Vec2::new(i as f32, j as f32) / (quad_count_one_side as f32);
+            vertices.push(shader::VertexInput { position, uv });
+        }
+    }
+
+    let vertices_per_row = quad_count_one_side + 1;
+    for i in 0..quad_count_one_side {
+        for j in 0..quad_count_one_side {
+            let i0 = i * vertices_per_row + j;
+            let i1 = i0 + 1;
+            let i2 = i0 + vertices_per_row;
+            let i3 = i2 + 1;
+
+            indices.push(i0 as u16);
+            indices.push(i1 as u16);
+            indices.push(i2 as u16);
+
+            indices.push(i2 as u16);
+            indices.push(i1 as u16);
+            indices.push(i3 as u16);
+        }
+    }
+    (vertices, indices)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unit_quad() {
+        let (vertices, indices) = tesselated_quad(0);
+
+        assert_eq!(vertices.len(), 4);
+        assert_eq!(indices.len(), 6);
+        assert_eq!(indices, vec![0, 1, 2, 2, 1, 3]);
+        assert_eq!(vertices[0].position, Vec3::new(0.0, 0.0, 0.0));
+        assert_eq!(vertices[1].position, Vec3::new(0.0, 1.0, 0.0));
+        assert_eq!(vertices[2].position, Vec3::new(1.0, 0.0, 0.0));
+        assert_eq!(vertices[3].position, Vec3::new(1.0, 1.0, 0.0));
     }
 }

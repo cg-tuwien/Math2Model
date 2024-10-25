@@ -15,3 +15,9 @@ pub mod copy_patches {
     pub const SOURCE: &str = include_str!("../../shaders/CopyPatches.wgsl");
     include!(concat!(env!("OUT_DIR"), "/CopyPatches.rs"));
 }
+
+#[allow(dead_code)]
+pub mod ground_plane_shader {
+    pub const SOURCE: &str = include_str!("../../shaders/GroundPlane.wgsl");
+    include!(concat!(env!("OUT_DIR"), "/GroundPlane.rs"));
+}
