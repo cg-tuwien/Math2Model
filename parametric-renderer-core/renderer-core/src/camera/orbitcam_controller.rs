@@ -49,12 +49,12 @@ impl OrbitcamController {
     ) -> CursorCapture {
         let mut cursor_capture = CursorCapture::Free;
         let mouse_delta = Vec2::new(input.mouse.motion.0 as f32, input.mouse.motion.1 as f32);
-        if input.mouse.pressed(MouseButton::Right) {
+        if input.mouse.pressed(MouseButton::Left) {
             self.update_orientation(mouse_delta, settings);
             cursor_capture = CursorCapture::LockedAndHidden;
         }
 
-        if input.mouse.pressed(MouseButton::Middle) {
+        if input.mouse.pressed(MouseButton::Right) {
             self.update_pan_position(mouse_delta, delta_time, settings);
             cursor_capture = CursorCapture::LockedAndHidden;
         }
@@ -76,7 +76,7 @@ impl OrbitcamController {
         const TWO_PI: f32 = std::f32::consts::PI * 2.0;
         let max_pitch = 88f32;
         self.pitch = new_pitch
-            .min(Angle::from_degrees(max_pitch))
+            .min(Angle::from_degrees(0.))
             .max(Angle::from_degrees(-max_pitch));
         self.yaw = Angle::new(new_yaw.radians.rem_euclid(TWO_PI));
     }
@@ -87,8 +87,8 @@ impl OrbitcamController {
         delta_time: f32,
         settings: &GeneralControllerSettings,
     ) {
-        let horizontal_movement = self.orientation() * (Camera::right() * direction.x * 1.0);
-        let vertical_movement = self.orientation() * (Camera::up() * direction.y * -1.0);
+        let horizontal_movement = self.orientation() * (Camera::right() * direction.x * -1.0);
+        let vertical_movement = self.orientation() * (Camera::up() * direction.y * 1.0);
         self.center += horizontal_movement * settings.pan_speed * delta_time;
         self.center += vertical_movement * settings.pan_speed * delta_time;
     }
