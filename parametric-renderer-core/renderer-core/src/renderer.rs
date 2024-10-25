@@ -12,7 +12,7 @@ use glam::UVec2;
 use reactive_graph::{
     computed::Memo,
     effect::{Effect, RenderEffect},
-    owner::{provide_context, use_context, Owner, StoredValue},
+    owner::{expect_context, provide_context, use_context, Owner, StoredValue},
     prelude::*,
     signal::{signal, ArcReadSignal, ReadSignal, RwSignal, WriteSignal},
 };
@@ -86,7 +86,9 @@ struct MissingShader(Arc<ShaderPipelines>);
 impl GpuApplication {
     pub fn new(context: WgpuContext, surface: SurfaceOrFallback) -> Self {
         let runtime = Owner::new();
+        runtime.set();
         let context = Arc::new(context);
+        provide_context::<Arc<WgpuContext>>(context.clone());
         let surface = RwSignal::new(surface);
         let profiler = StoredValue::new(create_profiler(&context));
         let (desired_size, set_desired_size) = signal(UVec2::new(1, 1));
@@ -99,7 +101,6 @@ impl GpuApplication {
 
         let render_tree = Owner::with(&runtime, || {
             Arc::new(render_component(
-                context.clone(),
                 surface,
                 profiler,
                 desired_size,
@@ -186,9 +187,12 @@ impl GpuApplication {
     }
 }
 
+fn wgpu_context() -> Arc<WgpuContext> {
+    expect_context::<Arc<WgpuContext>>()
+}
+
 /// We're using Leptos :)
 fn render_component(
-    context: Arc<WgpuContext>,
     surface: RwSignal<SurfaceOrFallback>,
     profiler: StoredValue<GpuProfiler>,
     desired_size: ReadSignal<UVec2>,
@@ -197,14 +201,16 @@ fn render_component(
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     models: SignalVec<ModelInfo>,
 ) -> impl Fn(&FrameData) -> Result<(), wgpu::SurfaceError> {
+    let context = wgpu_context();
     let frame_counter = RwSignal::new(FrameCounter::new());
     let new_frame_time = move || frame_counter.write().new_frame();
 
-    let depth_texture = Memo::new_computed({
-        let context = context.clone();
-        move |_| {
-            Texture::create_depth_texture(&context.device, surface.read().size(), "Depth Texture")
-        }
+    let depth_texture = Memo::new_computed(move |_| {
+        Texture::create_depth_texture(
+            &wgpu_context().device,
+            surface.read().size(),
+            "Depth Texture",
+        )
     });
 
     let scene_data = StoredValue::new(SceneData::new(&context.device));
@@ -238,10 +244,9 @@ fn render_component(
 
     // A reactive effect that reruns whenever any of its signals change
     Effect::new({
-        let context = context.clone();
         let new_size = Memo::new(move |_| desired_size.get());
         move |_| {
-            surface.write().try_resize(&context, new_size.get());
+            surface.write().try_resize(&wgpu_context(), new_size.get());
         }
     });
 
@@ -255,10 +260,8 @@ fn render_component(
     );
 
     let models_components = ForEach::new(move || models.iter(), |model| model.clone(), {
-        let context = context.clone();
         move |model: ArcReadSignal<ModelInfo>| {
             model_component(
-                context.clone(),
                 surface,
                 shaders,
                 model.clone(),
@@ -274,6 +277,7 @@ fn render_component(
     });
 
     move |render_data: &FrameData| {
+        let context = wgpu_context();
         let frame_time = new_frame_time();
         // 2. Render
         let surface_texture = match surface.with(|surface| surface.surface_texture(&context)) {
@@ -372,7 +376,6 @@ fn render_component(
 
 /// Returns multiple render functions
 fn model_component(
-    context: Arc<WgpuContext>,
     surface: RwSignal<SurfaceOrFallback>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     model: ArcReadSignal<ModelInfo>,
@@ -386,16 +389,14 @@ fn model_component(
 > {
     let virtual_model = Memo::new_computed({
         let model = model.clone();
-        let context = context.clone();
         move |_| {
             let meshes = render_stage.meshes.read_value();
             let model = model.read();
-            VirtualModel::new(&context, &meshes, &format!("ID{}", model.id))
+            VirtualModel::new(&wgpu_context(), &meshes, &format!("ID{}", model.id))
         }
     });
 
     let lod_stage_component = lod_stage_component(
-        context.clone(),
         surface,
         shaders,
         model.clone(),
@@ -406,7 +407,6 @@ fn model_component(
     );
 
     let render_component = render_model_component(
-        context.clone(),
         render_stage.render_bind_group_0,
         shaders,
         model.clone(),
@@ -426,7 +426,6 @@ struct ModelRenderers<LodStage, RenderStage> {
 }
 
 fn lod_stage_component(
-    context: Arc<WgpuContext>,
     surface: RwSignal<SurfaceOrFallback>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     model: ArcReadSignal<ModelInfo>,
@@ -435,6 +434,7 @@ fn lod_stage_component(
     copy_patches_pipeline: StoredValue<wgpu::ComputePipeline>,
     threshold_factor: ReadSignal<f32>,
 ) -> impl Fn(&FrameData, &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>) {
+    let context = wgpu_context();
     let device = &context.device;
     let id = model.read().id.clone(); // I wonder if this ID stays the same
     let patches_buffer_reset = TypedBuffer::new_storage_with_runtime_array(
@@ -468,23 +468,20 @@ fn lod_stage_component(
         wgpu::BufferUsages::COPY_SRC,
     );
 
-    let copy_patches_bind_group_0 = Memo::new_computed({
-        let context = context.clone();
-        move |_| {
-            let virtual_model = virtual_model.read();
-            let render_buffer = &virtual_model.render_buffer;
-            copy_patches::bind_groups::BindGroup0::from_bindings(
-                &context.device,
-                copy_patches::bind_groups::BindGroupLayout0 {
-                    render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
-                    render_buffer_4: render_buffer[1].as_entire_buffer_binding(),
-                    render_buffer_8: render_buffer[2].as_entire_buffer_binding(),
-                    render_buffer_16: render_buffer[3].as_entire_buffer_binding(),
-                    render_buffer_32: render_buffer[4].as_entire_buffer_binding(),
-                    indirect_draw: virtual_model.indirect_draw.as_entire_buffer_binding(),
-                },
-            )
-        }
+    let copy_patches_bind_group_0 = Memo::new_computed(move |_| {
+        let virtual_model = virtual_model.read();
+        let render_buffer = &virtual_model.render_buffer;
+        copy_patches::bind_groups::BindGroup0::from_bindings(
+            &wgpu_context().device,
+            copy_patches::bind_groups::BindGroupLayout0 {
+                render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
+                render_buffer_4: render_buffer[1].as_entire_buffer_binding(),
+                render_buffer_8: render_buffer[2].as_entire_buffer_binding(),
+                render_buffer_16: render_buffer[3].as_entire_buffer_binding(),
+                render_buffer_32: render_buffer[4].as_entire_buffer_binding(),
+                indirect_draw: virtual_model.indirect_draw.as_entire_buffer_binding(),
+            },
+        )
     });
 
     let input_buffer = RwSignal::new(TypedBuffer::new_uniform(
@@ -542,23 +539,21 @@ fn lod_stage_component(
         wgpu::BufferUsages::COPY_DST,
     );
 
-    let bind_group_1 = Memo::new_computed({
-        let context = context.clone();
-        move |_| {
-            let virtual_model = virtual_model.read();
-            let render_buffer = &virtual_model.render_buffer;
-            compute_patches::bind_groups::BindGroup1::from_bindings(
-                &context.device,
-                compute_patches::bind_groups::BindGroupLayout1 {
-                    input_buffer: input_buffer.read().as_entire_buffer_binding(),
-                    render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
-                    render_buffer_4: render_buffer[1].as_entire_buffer_binding(),
-                    render_buffer_8: render_buffer[2].as_entire_buffer_binding(),
-                    render_buffer_16: render_buffer[3].as_entire_buffer_binding(),
-                    render_buffer_32: render_buffer[4].as_entire_buffer_binding(),
-                },
-            )
-        }
+    let bind_group_1 = Memo::new_computed(move |_| {
+        let context = wgpu_context();
+        let virtual_model = virtual_model.read();
+        let render_buffer = &virtual_model.render_buffer;
+        compute_patches::bind_groups::BindGroup1::from_bindings(
+            &context.device,
+            compute_patches::bind_groups::BindGroupLayout1 {
+                input_buffer: input_buffer.read().as_entire_buffer_binding(),
+                render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
+                render_buffer_4: render_buffer[1].as_entire_buffer_binding(),
+                render_buffer_8: render_buffer[2].as_entire_buffer_binding(),
+                render_buffer_16: render_buffer[3].as_entire_buffer_binding(),
+                render_buffer_32: render_buffer[4].as_entire_buffer_binding(),
+            },
+        )
     });
     let bind_group_2 = [
         compute_patches::bind_groups::BindGroup2::from_bindings(
@@ -587,11 +582,12 @@ fn lod_stage_component(
             let model = model.read();
             let shaders_guard = shaders.read();
             let shader = shaders_guard.get(&model.shader_id).cloned();
-            shader.unwrap_or_else(|| use_context::<MissingShader>().unwrap().0.clone())
+            shader.unwrap_or_else(|| expect_context::<MissingShader>().0.clone())
         }
     });
 
     move |frame_data: &FrameData, commands: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>| {
+        let context = wgpu_context();
         let queue = &context.queue;
         let device = &context.device;
         force_render_uniform.write_buffer(queue, &compute_patches::ForceRenderFlag { flag: 0 });
@@ -702,7 +698,6 @@ struct RenderInfo {
 /// Renders a single model
 /// A model can change even when its ID stays the same. But the number of allocated buffers stays the same.
 fn render_model_component(
-    context: Arc<WgpuContext>,
     render_bind_group_0: StoredValue<shader::bind_groups::BindGroup0>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     model: ArcReadSignal<ModelInfo>,
@@ -719,6 +714,7 @@ fn render_model_component(
         }
     });
 
+    let context = wgpu_context();
     let device = &context.device;
 
     let model_buffer = TypedBuffer::new_uniform(
@@ -756,7 +752,7 @@ fn render_model_component(
 
     Effect::new(move |_| {
         let model = model.read();
-        let queue = &context.queue;
+        let queue = &wgpu_context().queue;
         model_buffer.write_buffer(
             queue,
             &shader::Model {
