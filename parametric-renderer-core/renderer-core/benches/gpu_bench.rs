@@ -70,7 +70,7 @@ fn main() {
         .build();
 
     for (shader_id, shader_info) in &app.shaders {
-        renderer.set_shader(shader_id.clone(), shader_info);
+        renderer.set_shader(shader_id.clone(), shader_info, None);
     }
 
     let mut group = c.benchmark_group("render");

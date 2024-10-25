@@ -128,14 +128,29 @@ impl GpuApplication {
         }
     }
 
-    pub fn set_shader(&self, shader_id: ShaderId, info: &crate::game::ShaderInfo) {
-        self.shaders.update(move |shaders| {
-            shaders.insert(
-                shader_id,
-                Arc::new(ShaderPipelines::new(&info.label, &info.code, &self.context)),
-            );
+    pub fn set_shader(
+        &self,
+        shader_id: ShaderId,
+        info: &crate::game::ShaderInfo,
+        on_shader_compiled: Option<Arc<dyn Fn(&ShaderId, Vec<wgpu::CompilationMessage>)>>,
+    ) {
+        let shaders = self.shaders;
+        let new_shaders = ShaderPipelines::new(&info.label, &info.code, &self.context);
+        any_spawner::Executor::spawn_local(async move {
+            let compilation_results = new_shaders.get_compilation_info().await;
+            let is_error = compilation_results
+                .iter()
+                .any(|v| v.message_type == wgpu::CompilationMessageType::Error);
+            on_shader_compiled.map(|f| f(&shader_id, compilation_results));
+            if !is_error {
+                shaders.update(move |shaders| {
+                    shaders.insert(shader_id, Arc::new(new_shaders));
+                });
+            }
         });
     }
+
+    // TODO: API to query the average FPS. Frontend polls it
 
     pub fn remove_shader(&self, shader_id: &ShaderId) {
         self.shaders.update(|shaders| {

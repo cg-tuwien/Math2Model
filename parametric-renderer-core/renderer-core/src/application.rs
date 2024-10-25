@@ -12,7 +12,7 @@ use winit::{
 };
 
 use crate::{
-    game::GameRes,
+    game::{GameRes, ShaderId},
     input::{InputHandler, WindowInputs},
     renderer::{GpuApplication, GpuApplicationBuilder},
     window_or_fallback::WindowOrFallback,
@@ -39,6 +39,7 @@ pub struct Application {
     pub renderer: Option<GpuApplication>,
     app_commands: EventLoopProxy<AppCommand>,
     on_exit_callback: Option<Box<dyn FnOnce(&mut Application)>>,
+    pub on_shader_compiled: Option<Arc<dyn Fn(&ShaderId, Vec<wgpu::CompilationMessage>)>>,
     _canvas: WasmCanvas,
 }
 
@@ -54,6 +55,7 @@ impl Application {
             renderer: None,
             app_commands,
             on_exit_callback: Some(Box::new(on_exit)),
+            on_shader_compiled: None,
             _canvas: canvas,
         }
     }
@@ -72,12 +74,13 @@ impl Application {
         let gpu_builder = GpuApplicationBuilder::new(WindowOrFallback::Window(window));
 
         let app_commands = self.app_commands.clone();
+        let on_shader_compiled = self.on_shader_compiled.clone();
         let task = async move {
             println!("Creating renderer");
             let renderer = gpu_builder.await.unwrap().build();
-            let _ = run_on_main(app_commands, |app| {
+            let _ = run_on_main(app_commands, move |app| {
                 for (shader_id, shader_info) in &app.app.shaders {
-                    renderer.set_shader(shader_id.clone(), shader_info);
+                    renderer.set_shader(shader_id.clone(), shader_info, on_shader_compiled.clone());
                 }
                 app.renderer = Some(renderer)
             })

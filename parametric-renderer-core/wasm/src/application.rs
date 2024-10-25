@@ -11,7 +11,9 @@ use wasm_bindgen::{prelude::wasm_bindgen, JsError, JsValue};
 use web_sys::HtmlCanvasElement;
 use winit::event_loop::{EventLoop, EventLoopProxy};
 
-use crate::wasm_abi::{WasmCompilationResults, WasmModelInfo, WasmShaderInfo};
+use crate::wasm_abi::{
+    WasmCompilationMessage, WasmCompilationResults, WasmModelInfo, WasmShaderInfo,
+};
 
 #[wasm_bindgen]
 pub struct WasmApplication {
@@ -84,9 +86,10 @@ impl WasmApplication {
         let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), {
             let shader_id = shader_id.clone();
             move |app| {
-                app.renderer
-                    .as_mut()
-                    .map(|renderer| renderer.set_shader(shader_id.clone(), &info));
+                let on_shader_compiled = app.on_shader_compiled.clone();
+                app.renderer.as_mut().map(|renderer| {
+                    renderer.set_shader(shader_id.clone(), &info, on_shader_compiled)
+                });
                 app.app.set_shader(shader_id, info);
             }
         })
@@ -133,7 +136,34 @@ impl WasmApplication {
         });
 
         let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), move |app| {
-            app.app.lod_stage = wrapped
+            app.app.lod_stage = wrapped;
+        })
+        .await;
+    }
+
+    pub async fn set_on_shader_compiled(
+        &mut self,
+        on_shader_compiled: Option<web_sys::js_sys::Function>,
+    ) {
+        let wrapped = on_shader_compiled.map(|on_shader_compiled| -> Arc<dyn Fn(&ShaderId, Vec<wgpu::CompilationMessage>) + 'static> {
+            Arc::new(move |shader_id: &ShaderId, messages: Vec<wgpu::CompilationMessage>| {
+                let this = wasm_bindgen::JsValue::NULL;
+                let messages = messages
+                    .into_iter()
+                    .map(|message| WasmCompilationMessage::from(message))
+                    .collect::<Vec<_>>();
+                match on_shader_compiled.call2(
+                    &this,
+                    &JsValue::from_str(&shader_id.0),
+                    &serde_wasm_bindgen::to_value(&messages).unwrap(),
+                ) {
+                    Ok(_) => (),
+                    Err(e) => error!("Error calling on_shader_compiled: {:?}", e),
+                }
+            })
+        });
+        let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), move |app| {
+            app.on_shader_compiled = wrapped;
         })
         .await;
     }
