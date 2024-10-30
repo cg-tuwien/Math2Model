@@ -96,24 +96,31 @@ export class MathFunctionNode extends VPNode {
     private func: string,
     private update: (id: string) => void,
     private updateControl: (c: ClassicPreset.Control) => void,
+    private isApply: boolean = true,
+    private inputType: "f32" | "vec2f" | "vec3f" | "vec4f" | "any" = "any",
+    private outputType: "f32" | "vec2f" | "vec3f" | "vec4f" | "any" = "any",
   ) {
-    super(`Apply ${name} Function`);
+    super(`${isApply ? "Apply" : "Calculate"} ${name} Function`);
 
     this.setup();
+  }
+
+  private setup() {
+    this.label = `${this.isApply ? "Apply" : "Calculate"} ${this.name} Function`;
+
+    if (this.hasInput("param")) this.removeInput("param");
+    if (this.hasOutput("value")) this.removeOutput("value");
 
     this.addInput(
       "param",
-      new ClassicPreset.Input(reteSocket, "param / vec3f"),
+      new ClassicPreset.Input(reteSocket, `param / ${this.inputType}`),
     );
 
     this.addOutput(
       "value",
-      new ClassicPreset.Output(reteSocket, "result / vec3f"),
+      new ClassicPreset.Output(reteSocket, `result / ${this.outputType}`),
     );
-  }
 
-  private setup() {
-    this.label = `Apply ${this.name} Function`;
     const vars = this.func.split("{");
     for (let variable of vars) {
       const expr = variable.split("}")[0].split(",");
@@ -146,7 +153,13 @@ export class MathFunctionNode extends VPNode {
 
     funcCall = funcCall.replaceAll(
       "input2",
-      String(param ? param[0].refId ?? param[0].value : "input2"),
+      String(
+        param
+          ? param[0].refId ?? param[0].value
+          : this.inputType == "any"
+            ? "input2"
+            : typeToValueCode(this.inputType),
+      ),
     );
     for (let key of this.variableControls.keys()) {
       const k = key.split("/");
@@ -176,10 +189,14 @@ export class MathFunctionNode extends VPNode {
       }
     }
 
+    var code = `${this.isApply ? nodeToVariableDeclaration(this) + "_1" : nodeToVariableDeclaration(this)} = ${funcCall};`;
+    if (this.isApply)
+      code += `\n\t${nodeToVariableDeclaration(this)} = vec3f(${param ? param[0].refId + ".x" : 0.0}, ${idToVariableName(this.id)}_1.x * ${idToVariableName(this.id)}_1.y, ${param ? param[0].refId + ".z" : 0.0});`;
+
     return {
       value: {
         value: param ? param[0].value : 0.0,
-        code: `${nodeToVariableDeclaration(this)}_1 = ${funcCall};\n${nodeToVariableDeclaration(this)} = vec3f(${param ? param[0].refId + ".x" : 0.0}, ${idToVariableName(this.id)}_1.x * ${idToVariableName(this.id)}_1.y, ${param ? param[0].refId + ".z" : 0.0});`,
+        code: code,
         refId: idToVariableName(this.id),
       },
     };
@@ -190,6 +207,8 @@ export class MathFunctionNode extends VPNode {
     sn.extraStringInformation = [
       { key: "name", value: this.name },
       { key: "func", value: this.func },
+      { key: "inputType", value: this.inputType },
+      { key: "outputType", value: this.outputType },
     ];
     sn.extraNumberInformation = [];
     for (let key of this.variableControls.keys()) {
@@ -198,6 +217,7 @@ export class MathFunctionNode extends VPNode {
         value: this.variableControls.get(key)?.value ?? 0.0,
       });
     }
+    sn.inputs.push({ key: "isApply", value: this.isApply, type: "number" });
     return super.serialize(sn);
   }
 
@@ -210,6 +230,27 @@ export class MathFunctionNode extends VPNode {
         if (info.key === "func") {
           this.func = info.value;
         }
+        if (info.key === "inputType") {
+          this.inputType = info.value as
+            | "f32"
+            | "vec2f"
+            | "vec3f"
+            | "vec4f"
+            | "any";
+        }
+        if (info.key === "outputType") {
+          this.outputType = info.value as
+            | "f32"
+            | "vec2f"
+            | "vec3f"
+            | "vec4f"
+            | "any";
+        }
+      }
+    }
+    for (let input of sn.inputs) {
+      if (input.type === "number" && input.key === "isApply") {
+        this.isApply = input.value;
       }
     }
     this.setup();

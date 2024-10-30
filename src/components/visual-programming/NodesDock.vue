@@ -12,6 +12,16 @@ const props = defineProps<{
   editor: NodeEditor;
   header: string;
 }>();
+
+let i = 0;
+const colors = [
+  "#A44A46",
+  "#63E092",
+  "#E1CF69",
+  "#4E46A3",
+  "#E069AF",
+  "#4CA346",
+];
 </script>
 
 <template>
@@ -25,6 +35,7 @@ const props = defineProps<{
           :display-nodes="displayNodes.get(name)"
           :editor="props.editor"
           :header="name"
+          :color="colors[i++]"
         ></MultipleNodesCollapsable>
       </n-list-item>
     </n-list>

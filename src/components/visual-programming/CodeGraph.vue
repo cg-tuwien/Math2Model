@@ -83,8 +83,16 @@ import {
   Circle24Regular,
   RectangleLandscape24Regular,
 } from "@vicons/fluent";
-import { WaveSawTool, WaveSine, MathFunction } from "@vicons/tabler";
+import {
+  WaveSawTool,
+  WaveSine,
+  MathFunction,
+  WaveSquare,
+  ArrowsSplit,
+  ArrowsJoin,
+} from "@vicons/tabler";
 import { JoinFullRound, CategoryOutlined } from "@vicons/material";
+import { Scale } from "@vicons/carbon";
 const emit = defineEmits<{
   update: [content: string];
   save: [content: string];
@@ -195,30 +203,6 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
         },
       ],
       [
-        "Sawtooth",
-        {
-          name: "Sawtooth",
-          type: "APPLY",
-          prefix: "",
-          image: WaveSawTool,
-          get: () => {
-            return new MathFunctionNode(
-              "Sawtooth",
-              "(({sawtooth count,0,10,-10,0.1,f32} * input2) - floor({sawtooth count,0,10,-10,0.1,f32} * input2))",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
         "Sine",
         {
           name: "Sine",
@@ -236,6 +220,9 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               (c) => {
                 area.update("control", c.id);
               },
+              true,
+              "vec3f",
+              "vec3f",
             );
           },
           create: createUINode,
@@ -260,6 +247,36 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               (c) => {
                 area.update("control", c.id);
               },
+              true,
+              "vec3f",
+              "vec3f",
+            );
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "Sawtooth",
+        {
+          name: "Sawtooth",
+          type: "APPLY",
+          prefix: "",
+          image: WaveSawTool,
+          get: () => {
+            return new MathFunctionNode(
+              "Sawtooth",
+              "(({sawtooth count,0,10,-10,0.1,f32} * input2) - floor({sawtooth count,0,10,-10,0.1,f32} * input2))",
+              (id) => {
+                area.update("node", id);
+                editor.addNode(new NothingNode());
+              },
+              (c) => {
+                area.update("control", c.id);
+              },
+              true,
+              "vec3f",
+              "vec3f",
             );
           },
           create: createUINode,
@@ -271,6 +288,274 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
         {
           name: "POW",
           type: "APPLY",
+          prefix: "",
+          image: WaveSine,
+          get: () => {
+            return new MathFunctionNode(
+              "Pow",
+              "pow(input2, {x1,0,10,-10,0.1,same})",
+              (id) => {
+                area.update("node", id);
+                editor.addNode(new NothingNode());
+              },
+              (c) => {
+                area.update("control", c.id);
+              },
+              true,
+              "vec3f",
+              "vec3f",
+            );
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "Square",
+        {
+          name: "Square",
+          type: "APPLY",
+          prefix: "",
+          image: WaveSquare,
+          get: () => {
+            return new MathFunctionNode(
+              "Square",
+              "sign(sin(input2*{frequency,1,10,-10,0.1,f32}))",
+              (id) => {
+                area.update("node", id);
+                editor.addNode(new NothingNode());
+              },
+              (c) => {
+                area.update("control", c.id);
+              },
+              true,
+              "vec3f",
+              "vec3f",
+            );
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "Scale",
+        {
+          name: "Scale",
+          type: "APPLY",
+          prefix: "",
+          image: Scale,
+          get: () => {
+            return new MathFunctionNode(
+              "Scale",
+              "mat3x3(vec3f({scale x,1,100,-100,0.1,f32},0.0,0.0), vec3f(0.0,{scale y,1,100,-100,0.1,f32},0.0), vec3f(0.0,0.0,{scale z,1,100,-100,0.1,f32})) * input2",
+              (id) => {
+                area.update("node", id);
+                editor.addNode(new NothingNode());
+              },
+              (c) => {
+                area.update("control", c.id);
+              },
+              false,
+              "vec3f",
+              "vec3f",
+            );
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+    ]),
+  ],
+  [
+    "Parameters",
+    new Map([
+      [
+        "Split",
+        {
+          name: "Split",
+          type: "ARRANGE",
+          prefix: "vec->x,y,z",
+          image: ArrowsSplit,
+          get: () => {
+            return new SeparateNode((n) => area.update("node", n.id));
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "Join",
+        {
+          name: "Join",
+          type: "ARRANGE",
+          prefix: "x,y,z->vec",
+          image: ArrowsJoin,
+          get: () => {
+            return new JoinNode((n) => area.update("node", n.id));
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+    ]),
+  ],
+  [
+    "Maths",
+    new Map([
+      [
+        "Add",
+        {
+          name: "Add",
+          type: "CALCULATE",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new MathOpNode("+", (node, control) => {
+              area.update("node", node.id);
+              area.update("control", control.id);
+            });
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "Subtract",
+        {
+          name: "Subtract",
+          type: "CALCULATE",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new MathOpNode("-", (n, c) => {
+              area.update("node", n.id);
+              area.update("control", c.id);
+            });
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "Multiply",
+        {
+          name: "Multiply",
+          type: "CALCULATE",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new MathOpNode("*", (node, control) => {
+              area.update("node", node.id);
+              area.update("control", control.id);
+            });
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "Divide",
+        {
+          name: "Divide",
+          type: "CALCULATE",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new MathOpNode("/", (n, c) => {
+              area.update("node", n.id);
+              area.update("control", c.id);
+            });
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "sin(x)",
+        {
+          name: "sin(x)",
+          type: "CALCULATE",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new MathFunctionNode(
+              "Sine",
+              "sin({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
+              (id) => {
+                area.update("node", id);
+                editor.addNode(new NothingNode());
+              },
+              (c) => {
+                area.update("control", c.id);
+              },
+              false,
+              "any",
+              "any",
+            );
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "cos(x)",
+        {
+          name: "cos(x)",
+          type: "CALCULATE",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new MathFunctionNode(
+              "Cosine",
+              "cos({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
+              (id) => {
+                area.update("node", id);
+                editor.addNode(new NothingNode());
+              },
+              (c) => {
+                area.update("control", c.id);
+              },
+              false,
+              "any",
+              "any",
+            );
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "sawtooth(x)",
+        {
+          name: "sawtooth(x)",
+          type: "CALCULATE",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new MathFunctionNode(
+              "Sawtooth",
+              "(({sawtooth count,0,10,-10,0.1,f32} * input2) - floor({sawtooth count,0,10,-10,0.1,f32} * input2))",
+              (id) => {
+                area.update("node", id);
+                editor.addNode(new NothingNode());
+              },
+              (c) => {
+                area.update("control", c.id);
+              },
+              false,
+              "any",
+              "any",
+            );
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "pow(x)",
+        {
+          name: "pow(x)",
+          type: "CALCULATE",
           prefix: "",
           image: MathFunction,
           get: () => {
@@ -284,6 +569,9 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               (c) => {
                 area.update("control", c.id);
               },
+              false,
+              "any",
+              "any",
             );
           },
           create: createUINode,

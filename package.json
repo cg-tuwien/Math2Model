@@ -17,6 +17,7 @@
   "dependencies": {
     "@iconify-json/mdi": "^1.1.67",
     "@stefnotch/typestef": "^1.0.3",
+    "@vicons/carbon": "^0.12.0",
     "@vueuse/core": "^10.11.0",
     "@zip.js/zip.js": "^2.7.45",
     "monaco-editor": "^0.50.0",

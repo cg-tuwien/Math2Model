@@ -7,6 +7,7 @@ const props = defineProps<{
   displayNodes: Map<string, UINode>;
   editor: NodeEditor;
   header: string;
+  color: string;
 }>();
 </script>
 
@@ -25,7 +26,7 @@ const props = defineProps<{
             }
           "
         >
-          <SingleNodeDisplay :ui-node="node"></SingleNodeDisplay>
+          <SingleNodeDisplay :ui-node="node" :color="color"></SingleNodeDisplay>
         </n-list-item>
       </n-list>
     </n-collapse-item>
