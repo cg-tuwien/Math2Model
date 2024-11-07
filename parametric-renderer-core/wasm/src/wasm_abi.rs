@@ -65,19 +65,6 @@ pub struct WasmShaderInfo {
 
 #[derive(Tsify, Serialize, Deserialize)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
-pub struct WasmCompilationResults {
-    pub results: Vec<WasmCompilationResult>,
-}
-
-#[derive(Tsify, Serialize, Deserialize)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
-pub struct WasmCompilationResult {
-    pub shader_id: String,
-    pub messages: Vec<WasmCompilationMessage>,
-}
-
-#[derive(Tsify, Serialize, Deserialize)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmCompilationMessage {
     pub message: String,
     pub message_type: WasmCompilationMessageType,

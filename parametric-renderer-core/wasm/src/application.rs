@@ -11,9 +11,7 @@ use wasm_bindgen::{prelude::wasm_bindgen, JsError, JsValue};
 use web_sys::HtmlCanvasElement;
 use winit::event_loop::{EventLoop, EventLoopProxy};
 
-use crate::wasm_abi::{
-    WasmCompilationMessage, WasmCompilationResults, WasmModelInfo, WasmShaderInfo,
-};
+use crate::wasm_abi::{WasmCompilationMessage, WasmModelInfo, WasmShaderInfo};
 
 #[wasm_bindgen]
 pub struct WasmApplication {
@@ -76,7 +74,7 @@ impl WasmApplication {
         .await;
     }
 
-    pub async fn update_shader(&self, shader_info: WasmShaderInfo) -> WasmCompilationResults {
+    pub async fn update_shader(&self, shader_info: WasmShaderInfo) {
         let shader_id = ShaderId(shader_info.id);
         let info = ShaderInfo {
             label: shader_info.label,
@@ -94,19 +92,6 @@ impl WasmApplication {
             }
         })
         .await;
-
-        let results = vec![];
-        // OWO Am I not holding a mutex lock for way too long here?
-        /*let compilation_results = run_on_main(|app| app.renderer);
-            { self.app.lock().unwrap().get_compilation_messages(shader_id) }.await;
-        let results = compilation_results
-            .into_iter()
-            .map(|(shader_id, messages)| WasmCompilationResult {
-                shader_id: shader_id.0,
-                messages: messages.into_iter().map(Into::into).collect(),
-            })
-            .collect();*/
-        WasmCompilationResults { results }
     }
 
     pub async fn remove_shader(&self, id: String) {
