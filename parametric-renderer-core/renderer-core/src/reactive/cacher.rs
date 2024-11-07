@@ -63,7 +63,7 @@ where
     /// Remember to put this into a `Memo` or `Computed` to avoid recomputing the value.
     /// Usage example
     /// ```raw
-    /// TODO: Add usage example
+    ///
     ///
     /// ```
     pub fn get_or<Value: Send + Sync + 'static>(

@@ -26,7 +26,7 @@ use crate::{
     game::{GameRes, MaterialInfo, ModelInfo, ShaderId},
     mesh::Mesh,
     reactive::{ForEach, MemoComputed, SignalVec},
-    shaders::{compute_patches, copy_patches, ground_plane_shader, shader},
+    shaders::{compute_patches, copy_patches, ground_plane, shader},
     texture::Texture,
     window_or_fallback::WindowOrFallback,
 };
@@ -404,30 +404,26 @@ fn ground_plane_component(
         .device
         .create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Ground Plane Grid"),
-            source: wgpu::ShaderSource::Wgsl(ground_plane_shader::SOURCE.into()),
+            source: wgpu::ShaderSource::Wgsl(ground_plane::SOURCE.into()),
         });
 
     let pipeline = context
         .device
         .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Ground Plane Grid"),
-            layout: Some(&ground_plane_shader::create_pipeline_layout(
-                &context.device,
-            )),
-            vertex: ground_plane_shader::vertex_state(
+            layout: Some(&ground_plane::create_pipeline_layout(&context.device)),
+            vertex: ground_plane::vertex_state(
                 &shader,
-                &ground_plane_shader::vs_main_entry(wgpu::VertexStepMode::Vertex),
+                &ground_plane::vs_main_entry(wgpu::VertexStepMode::Vertex),
             ),
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: ground_plane_shader::ENTRY_FS_MAIN,
-                targets: &[Some(wgpu::ColorTargetState {
+            fragment: Some(ground_plane::fragment_state(
+                &shader,
+                &ground_plane::fs_main_entry([Some(wgpu::ColorTargetState {
                     format: context.view_format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
+                })]),
+            )),
             primitive: Default::default(),
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: Texture::DEPTH_FORMAT,
@@ -444,7 +440,7 @@ fn ground_plane_component(
     let uniforms = TypedBuffer::new_uniform(
         &context.device,
         "Ground Plane Uniforms",
-        &ground_plane_shader::Uniforms {
+        &ground_plane::Uniforms {
             model_matrix: glam::Mat4::IDENTITY,
             view_projection_matrix: glam::Mat4::IDENTITY,
             grid_scale: 0.0,
@@ -452,9 +448,9 @@ fn ground_plane_component(
         wgpu::BufferUsages::COPY_DST,
     );
 
-    let bind_group_0 = ground_plane_shader::bind_groups::BindGroup0::from_bindings(
+    let bind_group_0 = ground_plane::bind_groups::BindGroup0::from_bindings(
         &context.device,
-        ground_plane_shader::bind_groups::BindGroupLayout0 {
+        ground_plane::bind_groups::BindGroupLayout0 {
             uniforms: uniforms.as_entire_buffer_binding(),
         },
     );
@@ -470,7 +466,7 @@ fn ground_plane_component(
         let grid_scale = 1.0 / inv_grid_scale;
         uniforms.write_buffer(
             &context.queue,
-            &ground_plane_shader::Uniforms {
+            &ground_plane::Uniforms {
                 model_matrix: glam::Mat4::from_scale_rotation_translation(
                     glam::Vec3::splat(size),
                     glam::Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),

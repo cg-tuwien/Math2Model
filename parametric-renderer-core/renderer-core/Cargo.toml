@@ -20,7 +20,7 @@ reactive_graph = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
-web-sys = { version = "0.3.70", optional = true, features = [
+web-sys = { version = "0.3.72", optional = true, features = [
     "HtmlCanvasElement",
 ] }
 web-time = "1.1.0"
@@ -38,7 +38,7 @@ harness = false
 name = "gpu_bench"
 
 [build-dependencies]
-wgsl_to_wgpu = "0.10.1"
+wgsl_to_wgpu = { version = "0.10.1", git = "https://github.com/stefnotch/wgsl_to_wgpu.git", branch = "feat/backport-shader-source" }
 
 [features]
 default = []

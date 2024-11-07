@@ -1,14 +1,14 @@
 [package]
+default-run = "desktop"
+edition = "2021"
 name = "desktop"
 version = "0.2.0"
-edition = "2021"
-default-run = "desktop"
 
 [dependencies]
-anyhow = "1.0"
 any_spawner = { version = "0.1.1", features = ["futures-executor"] }
+anyhow = "1.0"
 glam = { workspace = true }
-nanoserde = { workspace = true }
+nanoserde = "0.1.37"
 renderer-core = { path = "../renderer-core" }
 thiserror = { workspace = true }
 tracing = { workspace = true }
