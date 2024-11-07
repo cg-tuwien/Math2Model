@@ -3,6 +3,7 @@ import init, {
   WasmApplication,
   type WasmModelInfo,
   type WasmShaderInfo,
+  type WasmCompilationMessage,
 } from "../../parametric-renderer-core/pkg";
 
 await init();
@@ -12,9 +13,6 @@ export class WgpuEngine {
   static createEngine(canvasElement: HTMLCanvasElement) {
     const engine = new WasmApplication();
     engine.run(canvasElement);
-    engine.set_on_shader_compiled((...args: any[]) => {
-      console.log(args);
-    });
     return new WgpuEngine(engine);
   }
   async updateModels(js_models: WasmModelInfo[]) {
@@ -25,6 +23,11 @@ export class WgpuEngine {
   }
   async removeShader(id: string) {
     await this.engine.remove_shader(id);
+  }
+  setOnShaderCompiled(
+    callback: (shaderId: string, messages: WasmCompilationMessage[]) => void
+  ) {
+    this.engine.set_on_shader_compiled(callback);
   }
   setLodStage(
     callback:

@@ -1,3 +1,7 @@
+//// START sampleObject
+fn sampleObject(input: vec2f) -> vec3f { return vec3(input, 0.0); }
+//// END sampleObject
+
 ////#include "./Common.wgsl"
 //// AUTOGEN a3e9ed29815a874bd85200dd8dcf0acab01cd6236e68b912d7e96522fbd9fd21
 struct EncodedPatch {
@@ -104,7 +108,7 @@ fn assert(condition: bool) {
 //// END OF AUTOGEN
 
 ////#include "./EvaluateImage.wgsl"
-//// AUTOGEN 026c5fd0ec94098b53d2549d4f92f2c2ffb569eb1f84c0d3e800e02ecebbaa63
+//// AUTOGEN 961c21364e8c69d94e53b62808c484d25210f06c0cbf6045824e429da62423c4
 struct Time {
   elapsed: f32,
   delta: f32,
@@ -126,11 +130,7 @@ fn mouse_held(button: u32) -> bool {
 @group(0) @binding(1) var<uniform> screen : Screen;
 @group(0) @binding(2) var<uniform> mouse : Mouse;
 
-//// START sampleObject
-fn sampleObject(input: vec2f) -> vec3f { return vec3(input, 0.0); }
-//// END sampleObject
 //// END OF AUTOGEN
-
 
 struct InputBuffer {
     threshold_factor: f32,

@@ -5,6 +5,8 @@ import { watchDebounced, useElementSize } from "@vueuse/core";
 import type { FilePath } from "@/filesystem/reactive-files";
 import { showInfo } from "@/notification";
 
+export type Marker = monaco.editor.IMarkerData;
+
 const monacoMount = ref<HTMLDivElement | null>(null);
 
 export interface KeyedCode {
@@ -16,6 +18,7 @@ export interface KeyedCode {
 const props = defineProps<{
   keyedCode: DeepReadonly<KeyedCode> | null;
   isDark: boolean;
+  markers: monaco.editor.IMarkerData[];
 }>();
 const emit = defineEmits<{ update: [code: () => string] }>();
 
@@ -45,6 +48,16 @@ const themeName = computed(() => (props.isDark ? "vs-dark" : "vs"));
 watch(themeName, (v) => {
   monaco.editor.setTheme(v);
 });
+
+watch(
+  () => props.markers,
+  (v) => {
+    const model = editor.value?.getModel();
+    if (!model) return;
+    monaco.editor.setModelMarkers(model, "owner", v);
+  },
+  { deep: true }
+);
 
 watch(
   () => props.keyedCode?.name,

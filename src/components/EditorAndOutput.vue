@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import CodeEditor, { type KeyedCode } from "@/components/CodeEditor.vue";
+import CodeEditor, {
+  type KeyedCode,
+  type Marker,
+} from "@/components/CodeEditor.vue";
+import { MarkerSeverity } from "monaco-editor/esm/vs/editor/editor.api";
 import IconFolderMultipleOutline from "~icons/mdi/folder-multiple-outline";
 import IconFileTreeOutline from "~icons/mdi/file-tree-outline";
 import { ref, watchEffect, computed, h } from "vue";
@@ -29,6 +33,7 @@ import DefaultShaderCode from "@/../parametric-renderer-core/shaders/DefaultPara
 import type { ObjectUpdate } from "./input/object-update";
 import WebGpu from "@/components/WebGpu.vue";
 import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
+import { useErrorStore } from "@/stores/error-store";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -39,6 +44,10 @@ const props = defineProps<{
 }>();
 
 const store = useStore();
+const errorsStore = useErrorStore();
+props.engine.setOnShaderCompiled((shader, messages) => {
+  errorsStore.setErrors(makeFilePath(shader), messages);
+});
 
 // The underlying data
 const sceneFile = ref<string | null>(null);
@@ -143,6 +152,30 @@ watchEffect(() => {
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
   const openedFileName = ref<FilePath | null>(startFile);
   const keyedCode = ref<KeyedCode | null>(null);
+  const markers = computed<Marker[]>(() => {
+    if (openedFileName.value === null) return [];
+    const messages = errorsStore.errors.get(openedFileName.value) ?? [];
+
+    return messages.map((message) => {
+      const startColumn = message.location?.line_position ?? 1;
+      const endColumn = startColumn + (message.location?.length ?? 1);
+      // TODO: Translate to UTF-16 ^^^
+      const lineNumber = message.location?.line_number ?? 1;
+      return {
+        message: message.message,
+        startLineNumber: lineNumber,
+        startColumn,
+        endColumn,
+        endLineNumber: lineNumber,
+        severity:
+          message.message_type === "Error"
+            ? MarkerSeverity.Error
+            : message.message_type === "Warning"
+              ? MarkerSeverity.Warning
+              : MarkerSeverity.Info,
+      } satisfies Marker;
+    });
+  });
 
   watchImmediate(openedFileName, (fileName) => {
     if (fileName === null) {
@@ -218,6 +251,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
 
   return {
     code: computed(() => keyedCode.value),
+    markers,
     openFile,
     addFiles,
     renameFile,
@@ -391,6 +425,7 @@ function removeModel(ids: string[]) {
             class="self-stretch overflow-hidden flex-1"
             :keyed-code="openFile.code.value"
             :is-dark="store.isDark"
+            :markers="openFile.markers.value"
             @update="openFile.setNewCode($event)"
           >
           </CodeEditor>
