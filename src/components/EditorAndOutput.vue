@@ -228,7 +228,8 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
 
 type TabName = "filebrowser" | "sceneview";
 function useTabs() {
-  const splitSize = ref(0.2);
+  const defaultSplitSize = 0.1;
+  const splitSize = ref(defaultSplitSize);
   const selectedTab = ref<TabName>("filebrowser");
   function renderTabIcon(name: TabName) {
     if (name === "filebrowser") {
@@ -244,7 +245,7 @@ function useTabs() {
   function toggleTabSize() {
     const isTabBig = splitSize.value > 0.01;
     if (!isTabBig) {
-      splitSize.value = 0.2;
+      splitSize.value = defaultSplitSize;
     } else if (isTabBig && lastSelectedTab.value === selectedTab.value) {
       splitSize.value = 0.0;
     }
@@ -317,7 +318,7 @@ function removeModel(ids: string[]) {
 </script>
 
 <template>
-  <main class="flex h-full">
+  <main class="flex flex-1 min-h-0">
     <n-tabs
       type="line"
       animated
@@ -341,7 +342,6 @@ function removeModel(ids: string[]) {
       direction="horizontal"
       :max="0.75"
       :min="0"
-      :default-size="0.2"
       v-model:size="tabs.splitSize.value"
     >
       <template #1>
