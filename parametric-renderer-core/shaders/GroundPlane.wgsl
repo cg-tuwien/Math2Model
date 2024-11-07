@@ -29,13 +29,13 @@ fn fs_main(
     @location(0) uv: vec2f,
     @builtin(position) pos: vec4f
 ) -> @location(0) vec4f {
-    let coord = uv.xy * uniforms.grid_scale;
-    let grid = abs(fract(coord - 0.5) - 0.5) / fwidth(coord);
+    let coord = uv.xy * uniforms.grid_scale * vec2f(0.5);
+    let grid = abs(fract(coord - 0.5) - 0.5) / fwidth(coord) * 2.0;
     let line = min(grid.x, grid.y);
 
     let color = 1.0 - min(line, 1.0);
     let center = vec2f(0.5);
-    let dist = length(coord - center) / 100.0;
+    let dist = length(coord - center) / 10.0;
     let fade_factor = 1.0 - dist;
     return vec4f(vec3f(1.0), color * fade_factor);
 }
