@@ -400,42 +400,83 @@ fn ground_plane_component(
 ) -> impl Fn(&FrameData, &mut wgpu_profiler::OwningScope<'_, wgpu::RenderPass<'_>>) {
     let context = wgpu_context();
     let quad_mesh = Mesh::new_tesselated_quad(&context.device, 2);
-    let shader = context
-        .device
-        .create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Ground Plane Grid"),
-            source: wgpu::ShaderSource::Wgsl(ground_plane::SOURCE.into()),
-        });
 
-    let pipeline = context
-        .device
-        .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Ground Plane Grid"),
-            layout: Some(&ground_plane::create_pipeline_layout(&context.device)),
-            vertex: ground_plane::vertex_state(
-                &shader,
-                &ground_plane::vs_main_entry(wgpu::VertexStepMode::Vertex),
-            ),
-            fragment: Some(ground_plane::fragment_state(
-                &shader,
-                &ground_plane::fs_main_entry([Some(wgpu::ColorTargetState {
-                    format: context.view_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })]),
-            )),
-            primitive: Default::default(),
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: Texture::DEPTH_FORMAT,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Greater,
-                stencil: Default::default(),
-                bias: Default::default(),
-            }),
-            multisample: Default::default(),
-            multiview: None,
-            cache: Default::default(),
-        });
+    let shader_source = RwSignal::new(ground_plane::SOURCE.to_string());
+
+    #[cfg(feature = "desktop")]
+    let _file_watcher = {
+        let source_path = "./shaders/GroundPlane.wgsl";
+        let mut file_watcher = notify_debouncer_full::new_debouncer(
+            std::time::Duration::from_millis(1000),
+            None,
+            move |result: notify_debouncer_full::DebounceEventResult| match result {
+                Ok(events) => {
+                    let any_modification = events.into_iter().any(|e| e.kind.is_modify());
+                    if any_modification {
+                        let contents = std::fs::read_to_string(source_path).unwrap();
+                        shader_source.set(contents);
+                    }
+                }
+                Err(err) => tracing::error!("Error watching shaders: {:?}", err),
+            },
+        )
+        .unwrap();
+        file_watcher
+            .watch(
+                "./shaders",
+                notify_debouncer_full::notify::RecursiveMode::Recursive,
+            )
+            .unwrap();
+        file_watcher
+    };
+
+    let shader = Memo::new_computed({
+        let context = context.clone();
+        move |_| {
+            context
+                .device
+                .create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some("Ground Plane Grid"),
+                    source: wgpu::ShaderSource::Wgsl(shader_source.read().as_str().into()),
+                })
+        }
+    });
+
+    let pipeline = Memo::new_computed({
+        let context = context.clone();
+        move |_| {
+            let shader = shader.read();
+            context
+                .device
+                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("Ground Plane Grid"),
+                    layout: Some(&ground_plane::create_pipeline_layout(&context.device)),
+                    vertex: ground_plane::vertex_state(
+                        &shader,
+                        &ground_plane::vs_main_entry(wgpu::VertexStepMode::Vertex),
+                    ),
+                    fragment: Some(ground_plane::fragment_state(
+                        &shader,
+                        &ground_plane::fs_main_entry([Some(wgpu::ColorTargetState {
+                            format: context.view_format,
+                            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })]),
+                    )),
+                    primitive: Default::default(),
+                    depth_stencil: Some(wgpu::DepthStencilState {
+                        format: Texture::DEPTH_FORMAT,
+                        depth_write_enabled: true,
+                        depth_compare: wgpu::CompareFunction::Greater,
+                        stencil: Default::default(),
+                        bias: Default::default(),
+                    }),
+                    multisample: Default::default(),
+                    multiview: None,
+                    cache: Default::default(),
+                })
+        }
+    });
 
     let uniforms = TypedBuffer::new_uniform(
         &context.device,
@@ -456,6 +497,8 @@ fn ground_plane_component(
     );
 
     move |render_data: &FrameData, render_pass| {
+        #[cfg(feature = "desktop")]
+        let _watcher = &_file_watcher;
         let size = 100_000.0;
         let inv_grid_scale = (render_data.camera.position.distance(glam::Vec3::ZERO) / 50.0)
             .max(1.0)
@@ -478,7 +521,7 @@ fn ground_plane_component(
             },
         );
 
-        render_pass.set_pipeline(&pipeline);
+        render_pass.set_pipeline(&pipeline.read());
         render_pass.set_vertex_buffer(0, quad_mesh.vertex_buffer.slice(..));
         render_pass.set_index_buffer(quad_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
         bind_group_0.set(&mut render_pass.recorder);

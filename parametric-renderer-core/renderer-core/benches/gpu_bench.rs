@@ -1,6 +1,6 @@
 use std::{cell::Cell, sync::Arc};
 
-use criterion::{
+use criterion2::{
     measurement::{Measurement, ValueFormatter},
     Criterion, Throughput,
 };

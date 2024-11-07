@@ -15,6 +15,7 @@ bytemuck = { workspace = true }
 encase = { workspace = true }
 glam = { workspace = true }
 indexmap = { workspace = true }
+notify-debouncer-full = { version = "0.4.0", optional = true }
 pinky-swear = "6.2.0"
 reactive_graph = { workspace = true }
 thiserror = { workspace = true }
@@ -28,10 +29,9 @@ wgpu = { workspace = true }
 wgpu-profiler = "0.18.2"
 winit = { workspace = true }
 
-
 [dev-dependencies]
 any_spawner = { version = "0.1.1", features = ["futures-executor"] }
-criterion = "0.5.1"
+criterion2 = "0.5.1"
 pollster = "0.3"
 
 [[bench]]
@@ -43,5 +43,6 @@ wgsl_to_wgpu = { version = "0.10.1", git = "https://github.com/stefnotch/wgsl_to
 
 [features]
 default = []
+desktop = ["notify-debouncer-full"]
 tracy = ["wgpu-profiler/tracy"]
 wasm-bindgen = ["web-sys"]
