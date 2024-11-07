@@ -4,6 +4,7 @@ import { computed, ref, shallowRef, watch, type DeepReadonly } from "vue";
 import { useDebounceFn, useElementSize } from "@vueuse/core";
 import type { FilePath } from "@/filesystem/reactive-files";
 import { showInfo } from "@/notification";
+import { GraphicalDataFlow } from "@vicons/carbon";
 
 const monacoMount = ref<HTMLDivElement | null>(null);
 
@@ -27,7 +28,7 @@ watch(
   [width, height],
   useDebounceFn(() => {
     editor.value?.layout();
-  }, 100)
+  }, 100),
 );
 
 let surpressChange = false;
@@ -37,7 +38,7 @@ watch(
     surpressChange = true;
     editor.value?.setValue(props.keyedCode?.code ?? "<no code>");
     surpressChange = false;
-  }
+  },
 );
 
 const isReadonly = computed(() => props.keyedCode === null || props.isReadonly);
@@ -56,7 +57,7 @@ watch(
     const model = editor.value?.getModel();
     if (!model) return;
     monaco.editor.setModelLanguage(model, guessLanguage(v ?? ""));
-  }
+  },
 );
 
 function guessLanguage(name: string): "wgsl" | "json" {
@@ -85,7 +86,7 @@ watch(monacoMount, (element) => {
     monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
     function () {
       showInfo("You don't need to save!");
-    }
+    },
   );
 
   editor.value.onDidChangeModelContent((e) => {

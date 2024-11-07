@@ -109,7 +109,11 @@ watchEffect(() => {
     const model = props.models.find((model) => model.id === keys[0]);
     if (model) {
       currentModel.value = model;
-      emit("select", model.code);
+      let selectVal = model.code;
+      if (model.code.endsWith(".wgsl") && model.code.includes(".graph")) {
+        selectVal = makeFilePath(model.code.replace(".wgsl", ""));
+      }
+      emit("select", selectVal);
     }
   } else if (keys.length > 1) {
     const models: VirtualModelState[] = [];
