@@ -28,6 +28,7 @@ wgpu = { workspace = true }
 wgpu-profiler = "0.18.2"
 winit = { workspace = true }
 
+
 [dev-dependencies]
 any_spawner = { version = "0.1.1", features = ["futures-executor"] }
 criterion = "0.5.1"

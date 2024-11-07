@@ -14,6 +14,7 @@ uuid = { version = "1.11.0", features = ["v4"] }
 wgpu = { version = "22.1.0", default-features = false, features = [
   "webgpu",
   "wgsl",
+  "fragile-send-sync-non-atomic-wasm",
 ] }
 winit = { version = "0.30.5" }
 
