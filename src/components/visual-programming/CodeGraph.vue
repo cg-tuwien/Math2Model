@@ -93,6 +93,11 @@ import {
 } from "@vicons/tabler";
 import { JoinFullRound, CategoryOutlined } from "@vicons/material";
 import { Scale } from "@vicons/carbon";
+import ReturnNodeStyle from "@/components/visual-programming/CustomNodeStyles/ReturnNodeStyle.vue";
+import VariableOutNodeStyle from "@/components/visual-programming/CustomNodeStyles/VariableOutNodeStyle.vue";
+import DefaultNodeStyle from "@/components/visual-programming/CustomNodeStyles/DefaultNodeStyle.vue";
+import SocketStyle from "@/components/visual-programming/CustomNodeStyles/SocketStyle.vue";
+import ConnectionStyle from "@/components/visual-programming/CustomNodeStyles/ConnectionStyle.vue";
 const emit = defineEmits<{
   update: [content: string];
   save: [content: string];
@@ -742,6 +747,7 @@ const twoPiNode = new VariableOutNode(
 
 async function rearrange() {
   await arrange.layout({ applier });
+  await area.translate(endNode.id, { x: 200, y: 200 });
   return new NothingNode();
 }
 
@@ -904,6 +910,21 @@ async function createEditor() {
           if (data.payload instanceof ClassicPreset.InputControl) {
             return VuePresets.classic.Control;
           }
+        },
+        node(context) {
+          if (context.payload instanceof ReturnNode) {
+            return ReturnNodeStyle;
+          }
+          if (context.payload instanceof VariableOutNode) {
+            return VariableOutNodeStyle;
+          }
+          return DefaultNodeStyle;
+        },
+        socket(context) {
+          return SocketStyle;
+        },
+        connection(context) {
+          return ConnectionStyle;
         },
       },
     }),

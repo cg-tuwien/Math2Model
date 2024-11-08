@@ -1,5 +1,3 @@
-import type { SawtoothNode } from "@/vpnodes/simple-mode/apply";
-
 export class SerializedNode {
   public size: [number, number] = [0, 0];
   public uuid: string = "";

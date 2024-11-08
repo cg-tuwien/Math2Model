@@ -227,8 +227,15 @@ function addModelNew(fileEnd: "wgsl" | "graph") {
     return;
   }
 
+  const fileName = toAddModel.value[0] + new Date().toLocaleString();
   toAddModel.value[1] = makeFilePath(
-    toAddModel.value[0].replaceAll(" ", "-") + "." + fileEnd,
+    fileName
+      .replaceAll(" ", "-")
+      .replaceAll(":", "")
+      .replaceAll(".", "")
+      .replaceAll(",", "") +
+      "." +
+      fileEnd,
   );
   emit("addModel", toAddModel.value[0], toAddModel.value[1]);
   isAdding.value = false;

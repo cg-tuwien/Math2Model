@@ -36,6 +36,7 @@
     "rete-scopes-plugin": "^2.1.0",
     "rete-structures": "^2.0.1",
     "rete-vue-plugin": "^2.1.0",
+    "sass": "^1.80.6",
     "seemly": "^0.3.8",
     "vue": "^3.4.31",
     "vue-router": "^4.4.0",
