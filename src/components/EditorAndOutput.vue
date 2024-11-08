@@ -175,9 +175,7 @@ const shadersDropdown = computed<SelectMixedOption[]>(() => {
       value: "graph",
     });
 
-  return shadersSeperator.concat(
-    shaderList.concat(graphsSeperator.concat(graphList)),
-  );
+  return shaderList.concat(graphList);
 });
 
 const graphsDropdown = computed<SelectMixedOption[]>(() => {

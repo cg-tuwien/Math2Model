@@ -97,7 +97,10 @@ const selectedKeys = computed(() => {
   return selected;
 });
 let currentModel = ref<DeepReadonly<VirtualModelState> | null>(null);
-let toAddModel = ref<[string, FilePath] | null>(null);
+let toAddModel = ref<[string, FilePath]>([
+  "New Model",
+  makeFilePath("new-model"),
+]);
 let customShader = ref<string | null>(null);
 let customGraph = ref<string | null>(null);
 
@@ -169,7 +172,9 @@ function eulerAnglesUpdate(value: ObjectUpdate<number>) {
   );
 }
 
+const isAdding = ref<boolean>(false);
 function startAddModel() {
+  isAdding.value = true;
   if (props.shaders.length > 0) {
     const filePath = props.shaders[0].value as FilePath;
     toAddModel.value = ["New Model", filePath ?? makeFilePath("new-shader")];
@@ -179,7 +184,7 @@ function startAddModel() {
 }
 
 function stopAddModel() {
-  toAddModel.value = null;
+  isAdding.value = false;
 }
 
 function addModel() {
@@ -212,9 +217,22 @@ function addModel() {
   }
 
   emit("addModel", toAddModel.value[0], toAddModel.value[1]);
-  toAddModel.value = null;
   customShader.value = null;
   customGraph.value = null;
+}
+
+function addModelNew(fileEnd: "wgsl" | "graph") {
+  if (!toAddModel.value) {
+    showError("Illegal State!", null);
+    return;
+  }
+
+  toAddModel.value[1] = makeFilePath(
+    toAddModel.value[0].replaceAll(" ", "-") + "." + fileEnd,
+  );
+  emit("addModel", toAddModel.value[0], toAddModel.value[1]);
+  isAdding.value = false;
+  //toAddModel.value = null;
 }
 
 function removeModel() {
@@ -239,6 +257,41 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
 }
 </script>
 <template>
+  <n-modal :show="isAdding" closable class="w-full sm:w-1/2 lg:w-1/3">
+    <n-card
+      title="Create new Model"
+      closable
+      :v-if="isAdding"
+      :on-close="() => (isAdding = false)"
+    >
+      <template #action>
+        <n-flex vertical>
+          <n-flex justify="space-between">
+            <n-text
+              >Create a code-based model, if you want full freedom. Pick this
+              option if you have advanced knowledge in mathematics and
+              programming.</n-text
+            >
+            <n-text
+              >Create a graph-based model, if you want a more restricted option.
+              Pick this option if you have basic knowledge in
+              mathematics.</n-text
+            >
+          </n-flex>
+          <n-text type="info">optional enter model name</n-text>
+          <n-input v-model:value="toAddModel[0]"></n-input>
+          <n-flex justify="end">
+            <n-button type="info" :on-click="() => addModelNew('graph')"
+              >New Graph</n-button
+            >
+            <n-button type="primary" :on-click="() => addModelNew('wgsl')"
+              >New Code</n-button
+            >
+          </n-flex>
+        </n-flex>
+      </template>
+    </n-card>
+  </n-modal>
   <n-flex justify="">
     <n-flex vertical class="mr-1 ml-1">
       <n-h3 class="underline">Scene</n-h3>
@@ -258,7 +311,7 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
       </NodeTree>
     </n-flex>
     <n-divider></n-divider>
-    <div v-if="currentModel && !toAddModel" class="mr-1 ml-1">
+    <div v-if="currentModel && !isAdding" class="mr-1 ml-1">
       <n-h3 class="underline">Inspector</n-h3>
       <n-text>Name</n-text>
       <n-input
@@ -343,7 +396,7 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
         </div>
       </n-flex>
     </div>
-    <div v-if="toAddModel" class="mr-1 ml-1">
+    <!--<div v-if="toAddModel" class="mr-1 ml-1">
       <n-flex>
         <n-text>Name</n-text>
         <n-input v-model:value="toAddModel[0]" type="text" clearable></n-input>
@@ -376,6 +429,6 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
         <n-button @click="stopAddModel()">Cancel</n-button>
         <n-button @click="addModel()">Confirm</n-button>
       </n-flex>
-    </div>
+    </div>-->
   </n-flex>
 </template>
