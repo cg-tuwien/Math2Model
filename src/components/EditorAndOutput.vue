@@ -44,6 +44,8 @@ import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import type { ObjectUpdate } from "./input/object-update";
 import CodeGraph from "@/components/visual-programming/CodeGraph.vue";
 import WebGpu from "@/components/WebGpu.vue";
+import { CodeCircle20Regular } from "@vicons/fluent";
+import { GraphicalDataFlow } from "@vicons/carbon";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -296,12 +298,12 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
 type TabName = "filebrowser" | "sceneview";
 function useTabs() {
   const splitSize = ref(0.2);
-  const selectedTab = ref<TabName>("filebrowser");
+  const selectedTab = ref<TabName>("sceneview");
   function renderTabIcon(name: TabName) {
-    if (name === "filebrowser") {
-      return h(IconFolderMultipleOutline);
-    } else if (name === "sceneview") {
+    if (name === "sceneview") {
       return h(IconFileTreeOutline);
+    } else if (name === "filebrowser") {
+      return h(IconFolderMultipleOutline);
     } else {
       assertUnreachable(name);
     }
@@ -408,13 +410,13 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
       v-model:value="tabs.selectedTab.value"
     >
       <n-tab
-        name="filebrowser"
-        :tab="tabs.renderTabIcon('filebrowser')"
+        name="sceneview"
+        :tab="tabs.renderTabIcon('sceneview')"
         @click="tabs.toggleTabSize()"
       ></n-tab>
       <n-tab
-        name="sceneview"
-        :tab="tabs.renderTabIcon('sceneview')"
+        name="filebrowser"
+        :tab="tabs.renderTabIcon('filebrowser')"
         @click="tabs.toggleTabSize()"
       ></n-tab>
     </n-tabs>
@@ -427,18 +429,7 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
     >
       <template #1>
         <div class="pt-2 h-full w-full overflow-y-auto">
-          <div v-if="tabs.selectedTab.value === 'filebrowser'">
-            <FileBrowser
-              :fs="props.fs"
-              @open-file="openFile.openFile($event)"
-              @add-files="openFile.addFiles($event)"
-              @rename-file="
-                (oldName, newName) => openFile.renameFile(oldName, newName)
-              "
-              @delete-files="openFile.deleteFiles($event)"
-            ></FileBrowser>
-          </div>
-          <div v-else-if="tabs.selectedTab.value === 'sceneview'">
+          <div v-if="tabs.selectedTab.value === 'sceneview'">
             <SceneHierarchy
               :models="scene.state.value.models"
               :scene="scene.api.value"
@@ -452,6 +443,17 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
               @select="(vertex) => openFile.openFile(vertex)"
               @removeModel="(ids) => removeModel(ids)"
             ></SceneHierarchy>
+          </div>
+          <div v-else-if="tabs.selectedTab.value === 'filebrowser'">
+            <FileBrowser
+              :fs="props.fs"
+              @open-file="openFile.openFile($event)"
+              @add-files="openFile.addFiles($event)"
+              @rename-file="
+                (oldName, newName) => openFile.renameFile(oldName, newName)
+              "
+              @delete-files="openFile.deleteFiles($event)"
+            ></FileBrowser>
           </div>
           <div v-else>
             <p>Unknown tab</p>

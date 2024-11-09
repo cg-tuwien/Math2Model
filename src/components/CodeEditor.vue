@@ -4,6 +4,7 @@ import { computed, ref, shallowRef, watch, type DeepReadonly } from "vue";
 import { watchDebounced, useElementSize } from "@vueuse/core";
 import type { FilePath } from "@/filesystem/reactive-files";
 import { showInfo } from "@/notification";
+import { GraphicalDataFlow } from "@vicons/carbon";
 
 const monacoMount = ref<HTMLDivElement | null>(null);
 

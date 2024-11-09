@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { darkTheme, lightTheme } from "naive-ui";
+import { darkTheme, lightTheme, useThemeVars } from "naive-ui";
 import { RouterView } from "vue-router";
 import { useStore } from "./stores/store";
 import { computed } from "vue";
 
 const store = useStore();
 const theme = computed(() => (store.isDark ? darkTheme : lightTheme));
+const themeVars = useThemeVars();
 </script>
 
 <template>

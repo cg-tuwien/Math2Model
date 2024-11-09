@@ -83,4 +83,7 @@ type NodeType =
   | "CustomFunction"
   | "CallCustomFunction"
   | "LogicScope"
-  | "Condition";
+  | "Condition"
+  | "Shape"
+  | "Combine"
+  | "MathFunction";

@@ -7,7 +7,7 @@ import {
   reteSocket,
   VPNode,
 } from "@/vpnodes/basic/nodes";
-import type { SerializedNode } from "@/vpnodes/serialization/node";
+import { type SerializedNode } from "@/vpnodes/serialization/node";
 
 export class VectorNode extends VPNode {
   private xControl: ClassicPreset.InputControl<"number", number>;
@@ -286,6 +286,12 @@ export class SeparateNode extends VPNode {
     sn.nodeType = "Separate";
     return super.serialize(sn);
   }
+
+  deserialize(sn: SerializedNode) {
+    super.deserialize(sn);
+    this.addOutput("z", this.zOutput);
+    this.addOutput("w", this.wOutput);
+  }
 }
 
 export class JoinNode extends VPNode {
@@ -316,10 +322,10 @@ export class JoinNode extends VPNode {
     let yVal = y ? y[0].value : 0;
     let zVal = z ? z[0].value : 0;
     let wVal = w ? w[0].value : 0;
-    let xRef = x ? x[0].refId ?? "" : "";
-    let yRef = y ? y[0].refId ?? "" : "";
-    let zRef = z ? z[0].refId ?? "" : "";
-    let wRef = w ? w[0].refId ?? "" : "";
+    let xRef = x ? (x[0].refId ?? "") : "";
+    let yRef = y ? (y[0].refId ?? "") : "";
+    let zRef = z ? (z[0].refId ?? "") : "";
+    let wRef = w ? (w[0].refId ?? "") : "";
 
     let result = {
       value: {
@@ -363,5 +369,11 @@ export class JoinNode extends VPNode {
   serialize(sn: SerializedNode): SerializedNode {
     sn.nodeType = "Join";
     return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    super.deserialize(sn);
+    this.addInput("z", this.zInput);
+    this.addInput("w", this.wInput);
   }
 }

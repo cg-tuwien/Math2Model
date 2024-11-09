@@ -114,6 +114,11 @@
           "key": "def",
           "value": "vec3f(input2.x, 0, input2.y)",
           "type": "text"
+        },
+        {
+           "key": "customName",
+           "value": "Output Vertex/vec3f",
+           "type": "text"
         }
       ],
       "nodeType": "Return"

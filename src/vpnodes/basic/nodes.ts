@@ -105,7 +105,7 @@ export class NodeReturn {
 export class ReturnNode extends VPNode {
   constructor(
     public def: any,
-    customName?: string,
+    private customName?: string,
   ) {
     super(customName ?? "Return");
 
@@ -136,12 +136,20 @@ export class ReturnNode extends VPNode {
   serialize(sn: SerializedNode) {
     sn.nodeType = "Return";
     sn.inputs.push({ key: "def", value: this.def, type: "text" });
+    sn.inputs.push({
+      key: "customName",
+      value: this.customName ?? "Return",
+      type: "text",
+    });
     return super.serialize(sn);
   }
 
   deserialize(sn: SerializedNode) {
     for (let input of sn.inputs) {
       if (input.type === "text" && input.key === "def") this.def = input.value;
+      if (input.type === "text" && input.key === "customName") {
+        this.label = input.value;
+      }
     }
     super.deserialize(sn);
   }
