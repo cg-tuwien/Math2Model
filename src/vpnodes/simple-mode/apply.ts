@@ -46,6 +46,10 @@ export class CombineNode extends VPNode {
       "param2",
       new ClassicPreset.Input(reteSocket, "shape 2/vec3f"),
     );
+    this.addInput(
+      "param3",
+      new ClassicPreset.Input(reteSocket, "combine factor/f32"),
+    );
     this.addControl("cfactor", this.cfControl);
     this.addOutput(
       "value",
@@ -53,17 +57,30 @@ export class CombineNode extends VPNode {
     );
   }
 
-  data(inputs: { param1: NodeReturn[]; param2: NodeReturn[] }): {
+  data(inputs: {
+    param1: NodeReturn[];
+    param2: NodeReturn[];
+    param3: NodeReturn[];
+  }): {
     value: NodeReturn;
   } {
-    const { param1, param2 } = inputs;
+    const { param1, param2, param3 } = inputs;
     const p1 = param1 ? param1[0].refId : "vec3f(0.0, 0.0, 0.0)";
     const p2 = param2 ? param2[0].refId : "vec3f(0.0, 0.0, 0.0)";
+    const p3 = param3 ? param3[0].refId : this.cfControl.value;
+    if (param3 && this.hasControl("cfactor")) {
+      this.removeControl("cfactor");
+    } else if (!param3 && !this.hasControl("cfactor")) {
+      this.addControl("cfactor", this.cfControl);
+    }
+
+    if (this.update) this.update(this.id);
+
     console.log(this.cfControl.value);
     return {
       value: {
         value: vec3.zero(),
-        code: `${nodeToVariableDeclaration(this)} = mix(${p1}, ${p2}, ${this.cfControl.value});`,
+        code: `${nodeToVariableDeclaration(this)} = mix(${p1}, ${p2}, ${p3});`,
         refId: idToVariableName(this.id),
       },
     };
@@ -155,7 +172,7 @@ export class MathFunctionNode extends VPNode {
       "input2",
       String(
         param
-          ? param[0].refId ?? param[0].value
+          ? (param[0].refId ?? param[0].value)
           : this.inputType == "any"
             ? "input2"
             : typeToValueCode(this.inputType),

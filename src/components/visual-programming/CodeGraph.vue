@@ -585,6 +585,57 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
       ],
     ]),
   ],
+  [
+    "Constants",
+    new Map([
+      [
+        "Elapsed Time",
+        {
+          name: "Elapsed Time",
+          type: "CONSTANT",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new VariableOutNode(0.0, "", "time.elapsed");
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "Delta Time",
+        {
+          name: "Delta Time",
+          type: "CONSTANT",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new VariableOutNode(0.0, "", "time.delta");
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "Frame",
+        {
+          name: "Frame",
+          type: "CONSTANT",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new VariableOutNode(
+              0.0,
+              "var frame = f32(time.frame);",
+              "frame",
+            );
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+    ]),
+  ],
 ]);
 
 const container = ref<HTMLElement | null>(null);
@@ -761,6 +812,50 @@ const applier = new ArrangeAppliers.TransitionApplier<Schemes, AreaExtra>({
     // called on every frame update
   },
 });
+
+async function checkForUnsafeConnections(
+  connection: ClassicPreset.Connection<Nodes, Nodes>,
+) {
+  const start = connection.source;
+  let end = connection.target;
+  if (start === end) {
+    await editor.removeConnection(connection.id);
+    showError(
+      "This connection is not allowed, since it would create a cycle!",
+      "Invalid Connection",
+    );
+    return;
+  }
+
+  await editor.removeConnection(connection.id);
+
+  const graph = structures(editor);
+
+  // Check ancestors of start node
+  const ancestors = graph.predecessors(start).nodes;
+  // if end node is part of ancestors -> Cycle!
+  for (let node in ancestors) {
+    console.log("checking node " + node);
+    if (node.id === end) {
+      // await editor.removeConnection(connection.id);
+      showError(
+        "This connection is not allowed, since it would create a cycle!",
+        "Invalid Connection",
+      );
+      return;
+    }
+  }
+
+  await editor.addConnection(
+    new ClassicPreset.Connection(
+      editor.getNode(connection.source),
+      connection.sourceOutput,
+      editor.getNode(connection.target),
+      connection.targetInput,
+    ),
+  );
+}
+
 async function createEditor() {
   area = new AreaPlugin<Schemes, AreaExtra>(
     container.value ?? new HTMLElement(),
@@ -949,6 +1044,11 @@ async function createEditor() {
 
   editor.addPipe((context) => {
     //console.log("should update", context.type, shouldUpdate);
+    if (context.type === "connectioncreated") {
+      //checkForUnsafeConnections(
+      //  context.data as ClassicPreset.Connection<Nodes, Nodes>,
+      //); // TODO: FIX IT!;
+    }
     if (
       [
         "connectioncreated",

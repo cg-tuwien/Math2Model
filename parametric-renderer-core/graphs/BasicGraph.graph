@@ -3,9 +3,9 @@
     {
       "size": [
         180,
-        140
+        160
       ],
-      "uuid": "ca7119aa1d1ec48e",
+      "uuid": "d568f5cf384975b4",
       "inputs": [],
       "nodeType": "VariableOut",
       "extraStringInformation": [
@@ -31,9 +31,9 @@
     {
       "size": [
         180,
-        140
+        160
       ],
-      "uuid": "447b473ac22fe8a3",
+      "uuid": "fd07c5afff4f8c3b",
       "inputs": [],
       "nodeType": "VariableOut",
       "extraStringInformation": [
@@ -56,9 +56,9 @@
     {
       "size": [
         180,
-        140
+        160
       ],
-      "uuid": "f858c30c6763ff8a",
+      "uuid": "f01aac605c637112",
       "inputs": [],
       "nodeType": "VariableOut",
       "extraStringInformation": [
@@ -81,9 +81,9 @@
     {
       "size": [
         180,
-        140
+        160
       ],
-      "uuid": "3834ee731eaec9bf",
+      "uuid": "5bf067eff41bfb49",
       "inputs": [],
       "nodeType": "VariableOut",
       "extraStringInformation": [
@@ -106,9 +106,9 @@
     {
       "size": [
         180,
-        140
+        160
       ],
-      "uuid": "3fa20f93058c84fc",
+      "uuid": "6e575f120c941278",
       "inputs": [
         {
           "key": "def",
@@ -116,12 +116,40 @@
           "type": "text"
         },
         {
-           "key": "customName",
-           "value": "Output Vertex/vec3f",
-           "type": "text"
+          "key": "customName",
+          "value": "Return",
+          "type": "text"
+        },
+        {
+          "type": "node",
+          "value": "eeb4b44cb8558b76",
+          "keyFrom": "value",
+          "keyTo": "returnIn"
         }
       ],
       "nodeType": "Return"
+    },
+    {
+      "size": [
+        180,
+        180
+      ],
+      "uuid": "eeb4b44cb8558b76",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "d568f5cf384975b4",
+          "keyFrom": "value",
+          "keyTo": "param"
+        }
+      ],
+      "nodeType": "Shape",
+      "extraStringInformation": [
+        {
+          "key": "name",
+          "value": "Sphere"
+        }
+      ]
     }
   ]
 }

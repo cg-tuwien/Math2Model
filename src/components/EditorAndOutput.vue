@@ -421,6 +421,7 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
       ></n-tab>
     </n-tabs>
     <n-split
+      style="height: 96.8vh"
       direction="horizontal"
       :max="0.75"
       :min="0"
