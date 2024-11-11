@@ -18,7 +18,6 @@ log = { workspace = true }
 renderer-core = { path = "../renderer-core", features = ["wasm-bindgen"] }
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = "0.6.5"
-time = { version = "0.3.36", features = ["wasm-bindgen"] }
 tsify-next = "0.5.4"
 wasm-bindgen = "0.2.95"
 wasm-bindgen-futures = "0.4.45"

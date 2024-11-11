@@ -105,6 +105,7 @@ where
     Callback: (FnOnce(&mut Application) -> T) + 'static,
     T: Send + 'static,
 {
+    // TODO: Replace with reactive_graph https://docs.rs/reactive_graph/latest/reactive_graph/computed/struct.ArcAsyncDerived.html#method.into_future
     let (promise, pinky) = PinkySwear::<T>::new();
     let callback = move |app: &mut Application| {
         let return_value = callback(app);
