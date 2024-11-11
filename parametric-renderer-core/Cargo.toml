@@ -19,10 +19,3 @@ any_spawner = { git = "https://github.com/leptos-rs/leptos", branch = "main" }
 
 [profile.release]
 debug = true
-
-[profile.wasm-release]
-codegen-units = 1
-debug = false
-inherits = "release"
-lto = true
-opt-level = 'z'

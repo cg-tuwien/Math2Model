@@ -1,8 +1,8 @@
 {
   "scripts": {
-    "build": "wasm-pack build --dev --target web --out-dir=../pkg ./wasm",
-    "release": "wasm-pack build --profile=wasm-release --target web --out-dir=../pkg ./wasm",
-    "postinstall": "wasm-pack build --dev --target web --out-dir=../pkg ./wasm"
+    "build": "wasm-pack build --dev --target=web --out-dir=../pkg ./wasm",
+    "release": "wasm-pack build --release --target=web --out-dir=../pkg ./wasm",
+    "postinstall": "wasm-pack build --dev --target=web --out-dir=../pkg ./wasm"
   },
   "devDependencies": {
     "wasm-pack": "^0.13.1"
