@@ -1,4 +1,5 @@
 use glam::{Quat, Vec3};
+use log::error;
 use renderer_core::{
     application::{run_on_main, AppCommand, Application, WasmCanvas},
     camera::camera_controller::{self, CameraController},
@@ -6,7 +7,6 @@ use renderer_core::{
     input::WinitAppHelper,
 };
 use std::sync::Arc;
-use tracing::error;
 use wasm_bindgen::{prelude::wasm_bindgen, JsError, JsValue};
 use web_sys::HtmlCanvasElement;
 use winit::event_loop::{EventLoop, EventLoopProxy};

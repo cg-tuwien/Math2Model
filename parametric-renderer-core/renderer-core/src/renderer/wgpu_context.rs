@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use glam::UVec2;
-use tracing::info;
+use log::info;
 use wgpu_profiler::{GpuProfiler, GpuProfilerSettings};
 use winit::window::Window;
 
@@ -251,25 +251,6 @@ pub fn create_profiler(_context: &WgpuContext) -> GpuProfiler {
         ..GpuProfilerSettings::default()
     };
 
-    #[cfg(feature = "tracy")]
-    let profiler = GpuProfiler::new_with_tracy_client(
-        gpu_profiler_settings.clone(),
-        _context._adapter.get_info().backend,
-        &_context.device,
-        &_context.queue,
-    )
-    .unwrap_or_else(|e| match e {
-        wgpu_profiler::CreationError::TracyClientNotRunning
-        | wgpu_profiler::CreationError::TracyGpuContextCreationError(_) => {
-            tracing::warn!("Failed to connect to Tracy. Continuing without Tracy integration.");
-            GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler")
-        }
-        _ => {
-            panic!("Failed to create profiler: {}", e);
-        }
-    });
-
-    #[cfg(not(feature = "tracy"))]
     let profiler = GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler");
     profiler
 }

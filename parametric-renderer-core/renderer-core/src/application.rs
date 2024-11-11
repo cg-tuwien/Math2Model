@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use glam::UVec2;
+use log::{error, info, warn};
 use pinky_swear::PinkySwear;
-use tracing::{error, info, warn};
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalSize,

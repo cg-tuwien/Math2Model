@@ -9,6 +9,7 @@ use encase::ShaderType;
 use frame_counter::FrameCounter;
 use glam::UVec2;
 
+use log::error;
 use reactive_graph::{
     computed::Memo,
     effect::{Effect, RenderEffect},
@@ -417,7 +418,7 @@ fn ground_plane_component(
                         shader_source.set(contents);
                     }
                 }
-                Err(err) => tracing::error!("Error watching shaders: {:?}", err),
+                Err(err) => error!("Error watching shaders: {:?}", err),
             },
         )
         .unwrap();

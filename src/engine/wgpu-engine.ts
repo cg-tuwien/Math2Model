@@ -27,7 +27,7 @@ export class WgpuEngine {
   setOnShaderCompiled(
     callback: (shaderId: string, messages: WasmCompilationMessage[]) => void
   ) {
-    this.engine.set_on_shader_compiled(callback);
+    setTimeout(() => this.engine.set_on_shader_compiled(callback), 0);
   }
   setLodStage(
     callback:

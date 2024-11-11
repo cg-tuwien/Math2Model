@@ -15,10 +15,10 @@ bytemuck = { workspace = true }
 encase = { workspace = true }
 glam = { workspace = true }
 indexmap = { workspace = true }
+log = { workspace = true }
 notify-debouncer-full = { version = "0.4.0", optional = true }
 pinky-swear = "6.2.0"
 reactive_graph = { workspace = true }
-tracing = { workspace = true }
 uuid = { workspace = true }
 web-sys = { version = "0.3.72", optional = true, features = [
     "HtmlCanvasElement",
@@ -43,5 +43,4 @@ wgsl_to_wgpu = { version = "0.11.0", git = "https://github.com/ScanMountGoat/wgs
 [features]
 default = []
 desktop = ["notify-debouncer-full"]
-tracy = ["wgpu-profiler/tracy"]
 wasm-bindgen = ["web-sys"]
