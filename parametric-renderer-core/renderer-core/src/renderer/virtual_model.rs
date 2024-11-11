@@ -169,7 +169,7 @@ fn create_render_pipeline(
             ),
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
-                entry_point: shader::ENTRY_FS_MAIN,
+                entry_point: Some(shader::ENTRY_FS_MAIN),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: context.view_format,
                     blend: Some(wgpu::BlendState::REPLACE),
@@ -219,7 +219,7 @@ pub fn create_compute_patches_pipeline(
             label: Some(&format!("Compute Patches {}", label)),
             layout: Some(&compute_patches::create_pipeline_layout(device)),
             module: &shader,
-            entry_point: compute_patches::ENTRY_MAIN,
+            entry_point: Some(compute_patches::ENTRY_MAIN),
             compilation_options: Default::default(),
             cache: Default::default(),
         }),

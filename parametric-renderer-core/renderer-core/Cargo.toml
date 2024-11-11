@@ -18,7 +18,6 @@ indexmap = { workspace = true }
 notify-debouncer-full = { version = "0.4.0", optional = true }
 pinky-swear = "6.2.0"
 reactive_graph = { workspace = true }
-thiserror = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 web-sys = { version = "0.3.72", optional = true, features = [
@@ -26,20 +25,20 @@ web-sys = { version = "0.3.72", optional = true, features = [
 ] }
 web-time = "1.1.0"
 wgpu = { workspace = true }
-wgpu-profiler = "0.18.2"
+wgpu-profiler = "0.19.0"
 winit = { workspace = true }
 
 [dev-dependencies]
 any_spawner = { version = "0.1.1", features = ["futures-executor"] }
-criterion2 = "0.5.1"
-pollster = "0.3"
+criterion2 = "2.0.0"
+pollster = "0.4.0"
 
 [[bench]]
 harness = false
 name = "gpu_bench"
 
 [build-dependencies]
-wgsl_to_wgpu = { version = "0.10.1", git = "https://github.com/stefnotch/wgsl_to_wgpu.git", branch = "feat/backport-shader-source" }
+wgsl_to_wgpu = { version = "0.11.0", git = "https://github.com/ScanMountGoat/wgsl_to_wgpu", branch = "main" }
 
 [features]
 default = []

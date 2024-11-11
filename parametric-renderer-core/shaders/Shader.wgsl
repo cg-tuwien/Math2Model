@@ -1,5 +1,10 @@
 //// START sampleObject
-fn sampleObject(input: vec2f) -> vec3f { return vec3(input, 0.0); }
+fn sampleObject(input: vec2f) -> vec3f {
+  let a = time;
+  let b = screen;
+  let c = mouse;
+  return vec3(input, 0.0); 
+}
 //// END sampleObject
 
 ////#include "./Common.wgsl"

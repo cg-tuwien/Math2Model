@@ -251,7 +251,7 @@ fn render_component(
             label: Some("Copy Patches"),
             layout: Some(&copy_patches::create_pipeline_layout(&context.device)),
             module: &copy_patches::create_shader_module(&context.device),
-            entry_point: copy_patches::ENTRY_MAIN,
+            entry_point: Some(copy_patches::ENTRY_MAIN),
             compilation_options: Default::default(),
             cache: Default::default(),
         },

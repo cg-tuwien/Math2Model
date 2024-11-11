@@ -23,6 +23,7 @@ impl std::fmt::Display for ShaderModule {
 
 // src/build.rs
 fn main() {
+    let start_time = std::time::Instant::now();
     let mut shaders = vec![];
     shaders.push(watch_shader("../shaders/Shader.wgsl", "shader"));
     shaders.push(watch_shader(
@@ -41,6 +42,10 @@ fn main() {
 
     let out_dir = std::env::var("OUT_DIR").unwrap();
     std::fs::write(format!("{out_dir}/shaders.rs"), text.as_bytes()).unwrap();
+    println!(
+        "cargo::warning=Compiled shaders in {}ms",
+        start_time.elapsed().as_millis()
+    );
 }
 
 struct RustStrLiteral<'a>(&'a str);
