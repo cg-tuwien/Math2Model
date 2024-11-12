@@ -1,7 +1,6 @@
-use std::path::Path;
-
+use core::fmt;
 use nanoserde::{DeJson, DeJsonErr, SerJson};
-use thiserror::Error;
+use std::path::Path;
 
 #[derive(DeJson, SerJson, Debug, Clone)]
 pub struct CacheFile {
@@ -43,10 +42,28 @@ impl Default for CacheFile {
     }
 }
 
-#[derive(Debug, Error)]
+// See also https://www.reddit.com/r/rust/comments/gj8inf/comment/fqlmknt/
+#[derive(Debug)]
 pub enum LoadConfigError {
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("Failed to parse config file: {0}")]
-    Parse(#[from] DeJsonErr),
+    Io(std::io::Error),
+    Parse(DeJsonErr),
+}
+
+impl fmt::Display for LoadConfigError {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LoadConfigError::Io(v) => write!(fmt, "IO error: {v}"),
+            LoadConfigError::Parse(v) => write!(fmt, "Failed to parse config file: {v}"),
+        }
+    }
+}
+impl From<std::io::Error> for LoadConfigError {
+    fn from(source: std::io::Error) -> Self {
+        LoadConfigError::Io(source)
+    }
+}
+impl From<DeJsonErr> for LoadConfigError {
+    fn from(source: DeJsonErr) -> Self {
+        LoadConfigError::Parse(source)
+    }
 }

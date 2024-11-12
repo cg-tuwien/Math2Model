@@ -1,26 +1,20 @@
 [package]
+default-run = "desktop"
+edition = "2021"
 name = "desktop"
 version = "0.2.0"
-edition = "2021"
-default-run = "desktop"
 
 [dependencies]
-anyhow = "1.0.86"
+any_spawner = { version = "0.1.1", features = ["futures-executor"] }
+anyhow = "1.0.93"
+env_logger = { version = "0.11.5", default-features = false }
 glam = { workspace = true }
-nanoserde = { workspace = true }
-pollster = "0.3"
-renderer-core = { path = "../renderer-core" }
-thiserror = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { version = "0.3.18", default-features = false, features = [
-  "smallvec",
-  "fmt",
-  "std",
-] }
-wgpu = { workspace = true }
-wgpu-profiler = "0.18.0"
+log = { workspace = true }
+nanoserde = "0.1.37"
+renderer-core = { path = "../renderer-core", features = ["desktop"] }
+wgpu = { workspace = true, features = ["wgsl"] }
+wgpu-profiler = "0.19.0"
 winit = { workspace = true }
 
 [features]
 default = []
-tracy = ["renderer-core/tracy"]

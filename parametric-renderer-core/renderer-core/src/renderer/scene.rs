@@ -1,7 +1,7 @@
 use crate::{buffer::TypedBuffer, camera::Camera, shaders::shader};
-use glam::{Vec2, Vec4};
+use glam::{Mat4, UVec2, Vec2, Vec4};
 
-use super::RenderData;
+use super::{frame_counter::FrameTime, FrameData};
 
 pub struct SceneData {
     pub time_buffer: TypedBuffer<shader::Time>,
@@ -12,9 +12,8 @@ pub struct SceneData {
 }
 
 impl SceneData {
-    pub fn new(device: &wgpu::Device, camera: &Camera) -> anyhow::Result<Self> {
-        let size = camera.size();
-        Ok(Self {
+    pub fn new(device: &wgpu::Device) -> Self {
+        Self {
             time_buffer: TypedBuffer::new_uniform(
                 device,
                 "Time Buffer",
@@ -24,16 +23,16 @@ impl SceneData {
                     frame: 0,
                 },
                 wgpu::BufferUsages::COPY_DST,
-            )?,
+            ),
             screen_buffer: TypedBuffer::new_uniform(
                 device,
                 "Screen Buffer",
                 &shader::Screen {
-                    resolution: size,
-                    inv_resolution: Vec2::new(1.0 / (size.x as f32), 1.0 / (size.y as f32)),
+                    resolution: UVec2::ONE,
+                    inv_resolution: Vec2::ONE,
                 },
                 wgpu::BufferUsages::COPY_DST,
-            )?,
+            ),
             mouse_buffer: TypedBuffer::new_uniform(
                 device,
                 "Mouse Buffer",
@@ -42,13 +41,17 @@ impl SceneData {
                     buttons: 0,
                 },
                 wgpu::BufferUsages::COPY_DST,
-            )?,
+            ),
             camera_buffer: TypedBuffer::new_uniform(
                 device,
                 "Camera Buffer",
-                &camera.to_shader(),
+                &shader::Camera {
+                    view: Mat4::IDENTITY,
+                    projection: Mat4::IDENTITY,
+                    world_position: Vec4::ZERO,
+                },
                 wgpu::BufferUsages::COPY_DST,
-            )?,
+            ),
             light_buffer: TypedBuffer::new_storage(
                 device,
                 "Light Buffer",
@@ -61,8 +64,8 @@ impl SceneData {
                     }],
                 },
                 wgpu::BufferUsages::COPY_DST,
-            )?,
-        })
+            ),
+        }
     }
 
     pub fn as_bind_group_0(&self, device: &wgpu::Device) -> shader::bind_groups::BindGroup0 {
@@ -78,34 +81,45 @@ impl SceneData {
         )
     }
 
-    pub fn write_buffers(&self, render_data: &RenderData, queue: &wgpu::Queue) {
-        self.time_buffer
-            .write_buffer(queue, &render_data.time_data)
-            .unwrap();
-        let size = render_data.camera.size();
-        self.screen_buffer
-            .write_buffer(
-                queue,
-                &shader::Screen {
-                    resolution: size,
-                    inv_resolution: Vec2::new(1.0 / (size.x as f32), 1.0 / (size.y as f32)),
-                },
-            )
-            .unwrap();
-        self.mouse_buffer
-            .write_buffer(queue, &render_data.mouse_data)
-            .unwrap();
+    pub fn write_buffers(
+        &self,
+        size: UVec2,
+        render_data: &FrameData,
+        frame_time: &FrameTime,
+        queue: &wgpu::Queue,
+    ) {
+        self.time_buffer.write_buffer(
+            queue,
+            &shader::Time {
+                elapsed: frame_time.elapsed.0,
+                delta: frame_time.delta.0,
+                frame: frame_time.frame as u32,
+            },
+        );
+        self.screen_buffer.write_buffer(
+            queue,
+            &shader::Screen {
+                resolution: size,
+                inv_resolution: Vec2::new(1.0 / (size.x as f32), 1.0 / (size.y as f32)),
+            },
+        );
+        self.mouse_buffer.write_buffer(
+            queue,
+            &shader::Mouse {
+                pos: render_data.mouse_pos,
+                buttons: if render_data.mouse_held { 1 } else { 0 },
+            },
+        );
         self.camera_buffer
-            .write_buffer(queue, &render_data.camera.to_shader())
-            .unwrap();
+            .write_buffer(queue, &render_data.camera.to_shader(size));
     }
 }
 
 impl Camera {
-    pub fn to_shader(&self) -> shader::Camera {
+    pub fn to_shader(&self, size: UVec2) -> shader::Camera {
         shader::Camera {
             view: self.view_matrix(),
-            projection: self.projection_matrix(),
+            projection: self.projection_matrix(size),
             world_position: self.position.extend(1.0),
         }
     }

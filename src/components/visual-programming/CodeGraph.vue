@@ -6,7 +6,7 @@ import {
   VuePlugin,
 } from "rete-vue-plugin";
 import { ClassicPreset, type GetSchemes, NodeEditor } from "rete";
-import { type DeepReadonly, onMounted, ref, watch } from "vue";
+import { computed, type DeepReadonly, onMounted, ref, watch } from "vue";
 import {
   ConnectionPlugin,
   Presets as ConnectionPresets,
@@ -110,9 +110,33 @@ export interface KeyedGraph {
 
 const props = defineProps<{
   fs: ReactiveFilesystem;
-  graphs: SelectMixedOption[];
   keyedGraph: DeepReadonly<KeyedGraph> | null;
 }>();
+
+const fileNames = ref(new Set<FilePath>());
+props.fs.watchFromStart((change) => {
+  if (!change.key.endsWith(".graph")) return;
+  if (change.type === "insert") {
+    fileNames.value.add(change.key);
+  } else if (change.type === "remove") {
+    fileNames.value.delete(change.key);
+  }
+});
+
+const graphsDropdown = computed<SelectMixedOption[]>(() => {
+  return [...fileNames.value]
+    .toSorted()
+    .filter((fileName) => fileName.endsWith(".graph"))
+    .map(
+      (fileName): SelectMixedOption => ({
+        label: fileName.substring(
+          0,
+          fileName.valueOf().length - ".graph".length
+        ),
+        value: fileName,
+      })
+    );
+});
 
 function createUINode(uiNode: UINode) {
   addNode(uiNode.get());
@@ -121,7 +145,7 @@ function createUINode(uiNode: UINode) {
 const uiNodes: Map<string, Map<string, UINode>> = new Map([
   [
     "Shapes",
-    new Map([
+    new Map<string, UINode>([
       [
         "Heart",
         {
@@ -185,7 +209,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
   ],
   [
     "Apply",
-    new Map([
+    new Map<string, UINode>([
       [
         "Combine",
         {
@@ -200,7 +224,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
                 area.update("node", id);
                 editor.addNode(new NothingNode());
               },
-              (c) => area.update("control", c.id),
+              (c) => area.update("control", c.id)
             );
           },
           create: createUINode,
@@ -227,7 +251,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               },
               true,
               "vec3f",
-              "vec3f",
+              "vec3f"
             );
           },
           create: createUINode,
@@ -254,7 +278,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               },
               true,
               "vec3f",
-              "vec3f",
+              "vec3f"
             );
           },
           create: createUINode,
@@ -281,7 +305,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               },
               true,
               "vec3f",
-              "vec3f",
+              "vec3f"
             );
           },
           create: createUINode,
@@ -308,7 +332,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               },
               true,
               "vec3f",
-              "vec3f",
+              "vec3f"
             );
           },
           create: createUINode,
@@ -335,7 +359,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               },
               true,
               "vec3f",
-              "vec3f",
+              "vec3f"
             );
           },
           create: createUINode,
@@ -362,7 +386,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               },
               false,
               "vec3f",
-              "vec3f",
+              "vec3f"
             );
           },
           create: createUINode,
@@ -373,7 +397,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
   ],
   [
     "Parameters",
-    new Map([
+    new Map<string, UINode>([
       [
         "Split",
         {
@@ -406,7 +430,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
   ],
   [
     "Maths",
-    new Map([
+    new Map<string, UINode>([
       [
         "Add",
         {
@@ -495,7 +519,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               },
               false,
               "any",
-              "any",
+              "any"
             );
           },
           create: createUINode,
@@ -522,7 +546,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               },
               false,
               "any",
-              "any",
+              "any"
             );
           },
           create: createUINode,
@@ -549,7 +573,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               },
               false,
               "any",
-              "any",
+              "any"
             );
           },
           create: createUINode,
@@ -576,7 +600,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               },
               false,
               "any",
-              "any",
+              "any"
             );
           },
           create: createUINode,
@@ -587,7 +611,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
   ],
   [
     "Constants",
-    new Map([
+    new Map<string, UINode>([
       [
         "Elapsed Time",
         {
@@ -627,7 +651,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
             return new VariableOutNode(
               0.0,
               "var frame = f32(time.frame);",
-              "frame",
+              "frame"
             );
           },
           create: createUINode,
@@ -707,7 +731,7 @@ watch(
     await editor.clear();
     await deserialize(code);
     shouldUpdate = true;
-  },
+  }
 );
 
 async function newFunctionNode(area: AreaPlugin<Schemes, AreaExtra>) {
@@ -717,7 +741,7 @@ async function newFunctionNode(area: AreaPlugin<Schemes, AreaExtra>) {
     (n) => editor.addNode(n),
     (n) => editor.removeNode(n.id),
     (nA, kA, nB, kB) =>
-      editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB)),
+      editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB))
   );
   await editor.addNode(cfn);
   cfn.functionScope.retNode.parent = cfn.functionScope.id;
@@ -730,20 +754,20 @@ async function newConditionNode(
   scope1: string,
   scope2: string,
   area: AreaPlugin<Schemes, AreaExtra>,
-  operator: "==" | "!=" | ">" | "<" | ">=" | "<=",
+  operator: "==" | "!=" | ">" | "<" | ">=" | "<="
 ): Promise<Nodes> {
   shouldUpdate = false;
   const sc1 = new LogicScopeNode(
     scope1,
     (n) => area.update("node", n.id),
     (n) => editor.addNode(n),
-    (n) => editor.removeNode(n.id),
+    (n) => editor.removeNode(n.id)
   );
   const sc2 = new LogicScopeNode(
     scope2,
     (n) => area.update("node", n.id),
     (n) => editor.addNode(n),
-    (n) => editor.removeNode(n.id),
+    (n) => editor.removeNode(n.id)
   );
 
   await editor.addNode(sc1);
@@ -783,17 +807,17 @@ const startNode = new VariableOutNode(vec2.create(1, 1), "", "input2");
 const piNode = new VariableOutNode(
   3.14159265359,
   "var PI = 3.14159265359;",
-  "PI",
+  "PI"
 );
 const halfPiNode = new VariableOutNode(
   3.14159265359 / 2,
   "var HALF_PI = 3.14159265359 / 2.0;",
-  "HALF_PI",
+  "HALF_PI"
 );
 const twoPiNode = new VariableOutNode(
   3.14159265359 * 2,
   "var TWO_PI = 3.14159265359 * 2.0;",
-  "TWO_PI",
+  "TWO_PI"
 );
 
 async function rearrange() {
@@ -814,7 +838,7 @@ const applier = new ArrangeAppliers.TransitionApplier<Schemes, AreaExtra>({
 });
 
 async function checkForUnsafeConnections(
-  connection: ClassicPreset.Connection<Nodes, Nodes>,
+  connection: ClassicPreset.Connection<Nodes, Nodes>
 ) {
   const start = connection.source;
   let end = connection.target;
@@ -822,7 +846,7 @@ async function checkForUnsafeConnections(
     await editor.removeConnection(connection.id);
     showError(
       "This connection is not allowed, since it would create a cycle!",
-      "Invalid Connection",
+      { title: "Invalid Connection" }
     );
     return;
   }
@@ -832,7 +856,7 @@ async function checkForUnsafeConnections(
   const graph = structures(editor);
 
   // Check ancestors of start node
-  const ancestors = graph.predecessors(start).nodes;
+  const ancestors = graph.predecessors(start).nodes();
   // if end node is part of ancestors -> Cycle!
   for (let node in ancestors) {
     console.log("checking node " + node);
@@ -840,7 +864,7 @@ async function checkForUnsafeConnections(
       // await editor.removeConnection(connection.id);
       showError(
         "This connection is not allowed, since it would create a cycle!",
-        "Invalid Connection",
+        { title: "Invalid Connection" }
       );
       return;
     }
@@ -851,14 +875,14 @@ async function checkForUnsafeConnections(
       editor.getNode(connection.source),
       connection.sourceOutput,
       editor.getNode(connection.target),
-      connection.targetInput,
-    ),
+      connection.targetInput
+    )
   );
 }
 
 async function createEditor() {
   area = new AreaPlugin<Schemes, AreaExtra>(
-    container.value ?? new HTMLElement(),
+    container.value ?? new HTMLElement()
   );
   AreaExtensions.selectableNodes(area, AreaExtensions.selector(), {
     accumulating: AreaExtensions.accumulateOnCtrl(),
@@ -1022,7 +1046,7 @@ async function createEditor() {
           return ConnectionStyle;
         },
       },
-    }),
+    })
   );
   render.addPreset(VuePresets.contextMenu.setup());
   scopes.addPreset(ScopesPresets.classic.setup());
@@ -1065,7 +1089,7 @@ async function createEditor() {
         .getNodes()
         .filter(
           (n) =>
-            !(n instanceof LogicScopeNode || n instanceof FunctionScopeNode),
+            !(n instanceof LogicScopeNode || n instanceof FunctionScopeNode)
         )
         .forEach((n) => n.updateSize(area));
 
@@ -1087,7 +1111,7 @@ async function getNodesCode(
   node: Nodes,
   visited: string[],
   graph: Structures<Nodes, Conns>,
-  indent: string = "",
+  indent: string = ""
 ) {
   const nodeData = await engine.fetch(node.id);
   let fullCode = "";
@@ -1174,7 +1198,7 @@ async function getNodesCode(
 async function getScopeCode(
   scopeChildren: Nodes[],
   visited: string[],
-  prevIndent: string,
+  prevIndent: string
 ) {
   if (scopeChildren.length <= 0) return;
 
@@ -1216,7 +1240,7 @@ async function logCode() {
 async function orderedCode(
   allNodes: Nodes[],
   visited: string[],
-  indent: string = "",
+  indent: string = ""
 ) {
   if (allNodes.length <= 0) return "";
   const graph = structures(editor);
@@ -1271,7 +1295,7 @@ async function serialize() {
 async function replaceOrAddDeserialize(
   name: string,
   json: string,
-  add: boolean,
+  add: boolean
 ) {
   if (!add) {
     await editor.clear();
@@ -1284,7 +1308,7 @@ async function replaceOrAddDeserialize(
       (n) => editor.removeNode(n.id),
       (nA, kA, nB, kB) =>
         editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB)),
-      true,
+      true
     );
     func.nControl.setValue(1);
     func.paramControls[0].cont.selected = "vec2f";
@@ -1345,8 +1369,8 @@ async function deserialize(json: string, parent?: string) {
             editor.getNodes().filter((n) => n.id === idMap.get(input.value))[0],
             input.keyFrom,
             editor.getNodes().filter((n) => n.id === idMap.get(sn.uuid))[0],
-            input.keyTo,
-          ),
+            input.keyTo
+          )
         );
       }
     }
@@ -1360,7 +1384,7 @@ async function deserialize(json: string, parent?: string) {
 
 function serializedNodeToNode(
   sn: SerializedNode,
-  idMap: Map<string, string>,
+  idMap: Map<string, string>
 ): Nodes {
   let node: Nodes;
   switch (sn.nodeType) {
@@ -1420,7 +1444,7 @@ function serializedNodeToNode(
         },
         (c) => {
           area.update("control", c.id);
-        },
+        }
       );
       break;
     case "MathFunction":
@@ -1433,7 +1457,7 @@ function serializedNodeToNode(
         },
         (c) => {
           area.update("control", c.id);
-        },
+        }
       );
       break;
   }
@@ -1449,7 +1473,7 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
   props.fs
     .readTextFile(filePath)
     ?.then((content) =>
-      replaceOrAddDeserialize(filePath.replace(".graph", ""), content, add),
+      replaceOrAddDeserialize(filePath.replace(".graph", ""), content, add)
     )
     .catch((reason) => showError("Could not load graph " + filePath, reason));
 }
@@ -1473,7 +1497,10 @@ function addTemplate(name: string, json: string) {
       </template>
       <template #action>
         <n-flex vertical>
-          <n-select v-model:value="loadName" :options="props.graphs"></n-select>
+          <n-select
+            v-model:value="loadName"
+            :options="graphsDropdown"
+          ></n-select>
           <div class="flex justify-around">
             <n-button
               type="primary"
@@ -1528,7 +1555,7 @@ function addTemplate(name: string, json: string) {
           (ev) => {
             ev.preventDefault();
             const node = JSON.parse(
-              ev.dataTransfer.getData('text/plain'),
+              ev.dataTransfer.getData('text/plain')
             ) as UINode;
             let toCreate: Nodes | null = null;
             for (let category of uiNodes.values()) {
@@ -1561,7 +1588,7 @@ function addTemplate(name: string, json: string) {
                     },
                     (c) => {
                       area.update('control', c.id);
-                    },
+                    }
                   );
                   break;
               }
@@ -1571,7 +1598,7 @@ function addTemplate(name: string, json: string) {
               addNodeAtMousePosition(
                 toCreate,
                 area.area.pointer.x,
-                area.area.pointer.y,
+                area.area.pointer.y
               );
             }
           }

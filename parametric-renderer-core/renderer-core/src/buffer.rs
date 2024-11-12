@@ -24,22 +24,22 @@ where
         label: &str,
         data: &T,
         usage: wgpu::BufferUsages,
-    ) -> Result<Self, encase::internal::Error>
+    ) -> Self
     where
         T: encase::ShaderType + encase::internal::WriteInto,
     {
         let usage = usage | wgpu::BufferUsages::UNIFORM;
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(label),
-            contents: &write_uniform_buffer(data)?,
+            contents: &write_uniform_buffer(data),
             usage,
         });
 
-        Ok(Self {
+        Self {
             buffer,
             variant: TypedBufferVariant::Uniform,
             _phantom: PhantomData,
-        })
+        }
     }
 
     pub fn new_storage(
@@ -47,22 +47,22 @@ where
         label: &str,
         data: &T,
         usage: wgpu::BufferUsages,
-    ) -> Result<Self, encase::internal::Error>
+    ) -> Self
     where
         T: encase::ShaderType + encase::internal::WriteInto,
     {
         let usage = usage | wgpu::BufferUsages::STORAGE;
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some(label),
-            contents: &write_storage_buffer(data)?,
+            contents: &write_storage_buffer(data),
             usage,
         });
 
-        Ok(Self {
+        Self {
             buffer,
             variant: TypedBufferVariant::Storage,
             _phantom: PhantomData,
-        })
+        }
     }
 
     pub fn new_storage_with_runtime_array(
@@ -71,12 +71,12 @@ where
         data: &T,
         count: u64,
         usage: wgpu::BufferUsages,
-    ) -> Result<Self, encase::internal::Error>
+    ) -> Self
     where
         T: encase::ShaderType + encase::internal::WriteInto + encase::CalculateSizeFor,
     {
         let usage = usage | wgpu::BufferUsages::STORAGE;
-        let contents = write_storage_buffer(data)?;
+        let contents = write_storage_buffer(data);
         let size = T::calculate_size_for(count).get();
         assert!(size >= contents.len() as u64);
 
@@ -98,24 +98,22 @@ where
             .copy_from_slice(&contents);
         buffer.unmap();
 
-        Ok(Self {
+        Self {
             buffer,
             variant: TypedBufferVariant::Storage,
             _phantom: PhantomData,
-        })
+        }
     }
 
-    pub fn write_buffer(&self, queue: &wgpu::Queue, data: &T) -> Result<(), encase::internal::Error>
+    pub fn write_buffer(&self, queue: &wgpu::Queue, data: &T)
     where
         T: encase::ShaderType + encase::internal::WriteInto,
     {
         let contents = match self.variant {
-            TypedBufferVariant::Uniform => write_uniform_buffer(data)?,
-            TypedBufferVariant::Storage => write_storage_buffer(data)?,
+            TypedBufferVariant::Uniform => write_uniform_buffer(data),
+            TypedBufferVariant::Storage => write_storage_buffer(data),
         };
         queue.write_buffer(&self.buffer, 0, contents.as_slice());
-
-        Ok(())
     }
 
     pub fn copy_all_from(&self, other: &Self, commands: &mut wgpu::CommandEncoder) {
@@ -142,20 +140,24 @@ where
     }
 }
 
-fn write_uniform_buffer<T>(data: &T) -> Result<Vec<u8>, encase::internal::Error>
+fn write_uniform_buffer<T>(data: &T) -> Vec<u8>
 where
     T: ?Sized + encase::ShaderType + encase::internal::WriteInto,
 {
     let mut buffer = encase::UniformBuffer::from(Vec::new());
-    buffer.write(data)?;
-    Ok(buffer.into_inner())
+    buffer
+        .write(data)
+        .expect("Failed to write uniform buffer. Did we run out of CPU memory?");
+    buffer.into_inner()
 }
 
-fn write_storage_buffer<T>(data: &T) -> Result<Vec<u8>, encase::internal::Error>
+fn write_storage_buffer<T>(data: &T) -> Vec<u8>
 where
     T: ?Sized + encase::ShaderType + encase::internal::WriteInto,
 {
     let mut buffer = encase::StorageBuffer::from(Vec::new());
-    buffer.write(data)?;
-    Ok(buffer.into_inner())
+    buffer
+        .write(data)
+        .expect("Failed to write storage buffer.  Did we run out of CPU memory?");
+    buffer.into_inner()
 }

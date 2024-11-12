@@ -1,11 +1,5 @@
-import { computedAsync } from "@vueuse/core";
-import {
-  reactive,
-  computed,
-  type Ref,
-  type MaybeRefOrGetter,
-  toValue,
-} from "vue";
+import { FineMap, type MapChange } from "@/fine-collections";
+import { type WatchStopHandle, type WatchOptions } from "vue";
 
 export interface ReadonlyFiles {
   listFiles(): FilePath[];
@@ -34,49 +28,36 @@ export class FileMetadata {
   }
 }
 
-export function useTextFile(
-  name: MaybeRefOrGetter<FilePath | null>,
-  fs: ReactiveFilesystem
-): Readonly<Ref<string | null>> {
-  return computedAsync(async () => {
-    // Accessed synchronously, will be tracked
-    const fileName = toValue(name);
-    if (fileName === null) return null;
-    const metadata = fs.files.value.get(fileName) ?? null;
-    if (metadata === null) return null;
-    // No longer tracked
-    return await fs.readTextFile(fileName);
-  }, null);
-}
-
-export function useBinaryFile(
-  name: MaybeRefOrGetter<FilePath | null>,
-  fs: ReactiveFilesystem
-): Ref<ArrayBuffer | null> {
-  return computedAsync(async () => {
-    // Accessed synchronously, will be tracked
-    const fileName = toValue(name);
-    if (fileName === null) return null;
-    const metadata = fs.files.value.get(fileName) ?? null;
-    if (metadata === null) return null;
-    // No longer tracked
-    return await fs.readBinaryFile(fileName);
-  }, null);
-}
-
 export class ReactiveFilesystem implements WritableFiles {
-  private _files: Map<FilePath, FileMetadata> = reactive(new Map());
+  private _files: FineMap<FilePath, FileMetadata> = new FineMap();
   private taskQueue: Promise<void> = Promise.resolve();
-  private _filesReadonly = computed(
-    () => this._files as ReadonlyMap<FilePath, FileMetadata>
-  );
+
   private constructor(public readonly name: FilePath) {}
 
-  get files() {
-    return this._filesReadonly;
+  /**
+   * Watches all changes to the files in the filesystem.
+   */
+  watch(
+    callback: (change: MapChange<FilePath, FileMetadata>) => void,
+    options: WatchOptions<boolean> = {}
+  ): WatchStopHandle {
+    return this._files.watch(callback, options);
   }
 
-  static async create(name: FilePath) {
+  /**
+   * Starts from an empty filesystem and watches all changes to the files in the filesystem.
+   */
+  watchFromStart(
+    callback: (change: MapChange<FilePath, FileMetadata>) => void,
+    options: WatchOptions<boolean> = {}
+  ): WatchStopHandle {
+    for (const [key, value] of this._files.entries()) {
+      callback({ type: "insert", key, value });
+    }
+    return this._files.watch(callback, options);
+  }
+
+  static async create(name: FilePath): Promise<ReactiveFilesystem> {
     const instance = new ReactiveFilesystem(name);
     await instance.addTask(async (sceneDirectory) => {
       for await (const entry of (sceneDirectory as any).entries()) {
@@ -87,14 +68,14 @@ export class ReactiveFilesystem implements WritableFiles {
     return instance;
   }
 
-  private async getSceneDirectory() {
+  private async getSceneDirectory(): Promise<FileSystemDirectoryHandle> {
     const root = await navigator.storage.getDirectory();
     return await root.getDirectoryHandle(this.name, { create: true });
   }
 
   private addTask<T>(
     makeTask: (sceneDirectory: FileSystemDirectoryHandle) => Promise<T>
-  ) {
+  ): Promise<T> {
     const orderedTask = this.taskQueue.then(async () => {
       const sceneDirectory = await this.getSceneDirectory();
       return makeTask(sceneDirectory);
@@ -110,7 +91,7 @@ export class ReactiveFilesystem implements WritableFiles {
     return Array.from(this._files.keys());
   }
 
-  private setOrIncrementVersion(name: FilePath) {
+  private setOrIncrementVersion(name: FilePath): void {
     const metadata = this._files.get(name);
     if (metadata !== undefined) {
       this._files.set(name, new FileMetadata(metadata.version + 1));
@@ -119,7 +100,7 @@ export class ReactiveFilesystem implements WritableFiles {
     }
   }
 
-  writeTextFile(name: FilePath, content: string) {
+  writeTextFile(name: FilePath, content: string): Promise<void> {
     this.setOrIncrementVersion(name);
     return this.addTask(async (sceneDirectory) => {
       const fileHandle = await sceneDirectory.getFileHandle(
@@ -134,7 +115,7 @@ export class ReactiveFilesystem implements WritableFiles {
     });
   }
 
-  writeBinaryFile(name: FilePath, content: ArrayBuffer | File) {
+  writeBinaryFile(name: FilePath, content: ArrayBuffer | File): Promise<void> {
     this.setOrIncrementVersion(name);
     return this.addTask(async (sceneDirectory) => {
       const fileHandle = await sceneDirectory.getFileHandle(
@@ -149,14 +130,14 @@ export class ReactiveFilesystem implements WritableFiles {
     });
   }
 
-  deleteFile(name: FilePath) {
+  deleteFile(name: FilePath): Promise<void> {
     this._files.delete(name);
     return this.addTask(async (sceneDirectory) => {
       await sceneDirectory.removeEntry(encodeFilePath(name));
     });
   }
 
-  renameFile(oldName: FilePath, newName: FilePath) {
+  renameFile(oldName: FilePath, newName: FilePath): Promise<void> {
     if (!this._files.has(oldName)) return Promise.resolve();
     this._files.delete(oldName);
     this.setOrIncrementVersion(newName);
@@ -179,7 +160,11 @@ export class ReactiveFilesystem implements WritableFiles {
     });
   }
 
-  readTextFile(name: FilePath) {
+  /**
+   * Guarantees ordering of reads and writes.
+   * If multiple reads are requested, they will resolve in the order they were requested.
+   */
+  readTextFile(name: FilePath): Promise<string> | null {
     if (!this._files.has(name)) return null;
 
     return this.addTask(async (sceneDirectory) => {
@@ -189,7 +174,7 @@ export class ReactiveFilesystem implements WritableFiles {
     });
   }
 
-  readBinaryFile(name: FilePath) {
+  readBinaryFile(name: FilePath): Promise<ArrayBuffer> | null {
     if (!this._files.has(name)) return null;
 
     return this.addTask(async (sceneDirectory) => {
@@ -199,11 +184,11 @@ export class ReactiveFilesystem implements WritableFiles {
     });
   }
 
-  hasFile(name: FilePath) {
+  hasFile(name: FilePath): boolean {
     return this._files.has(name);
   }
 }
 
-function encodeFilePath(name: FilePath) {
+function encodeFilePath(name: FilePath): FilePath {
   return name;
 }

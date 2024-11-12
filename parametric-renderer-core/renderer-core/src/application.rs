@@ -1,732 +1,308 @@
-mod frame_counter;
-mod scene;
-mod virtual_model;
-mod wgpu_context;
-mod window_or_fallback;
+use std::sync::Arc;
 
-use frame_counter::{FrameCounter, FrameTime, Seconds};
-use glam::{UVec2, Vec2, Vec3};
-use scene::SceneData;
-pub use virtual_model::MaterialInfo;
-use virtual_model::VirtualModel;
-use web_time::Instant;
-use wgpu_context::WgpuContext;
-pub use window_or_fallback::WindowOrFallback;
-
-use crate::{
-    buffer::TypedBuffer,
-    camera::{
-        camera_controller::{
-            CameraController, ChosenKind, GeneralController, GeneralControllerSettings,
-        },
-        Camera, CameraSettings,
-    },
-    input::WindowInputs,
-    mesh::Mesh,
-    shaders::{compute_patches, copy_patches, shader},
-    texture::Texture,
-    transform::Transform,
+use glam::UVec2;
+use log::{error, info, warn};
+use winit::{
+    application::ApplicationHandler,
+    dpi::PhysicalSize,
+    event_loop::EventLoopProxy,
+    keyboard::{Key, NamedKey},
+    window::Window,
 };
 
-#[derive(Debug, Clone, Default)]
-pub struct ProfilerSettings {
-    pub gpu: bool,
+use crate::{
+    game::{GameRes, ShaderId},
+    input::{InputHandler, WindowInputs},
+    renderer::{frame_counter::Seconds, GpuApplication, GpuApplicationBuilder},
+    window_or_fallback::WindowOrFallback,
+};
+pub struct WasmCanvas {
+    #[cfg(target_arch = "wasm32")]
+    pub canvas: web_sys::HtmlCanvasElement,
 }
-
-#[derive(Debug, Clone)]
-pub struct ModelInfo {
-    pub transform: Transform,
-    pub material_info: MaterialInfo,
-    pub label: String, // TODO: Make this a label for the shader only!
-    pub evaluate_image_code: String,
-}
-
-pub struct CpuApplication {
-    pub gpu: Option<GpuApplication>,
-    pub camera_controller: CameraController,
-    models: Vec<ModelInfo>,
-    last_update_instant: Option<Instant>,
-    frame_counter: FrameCounter,
-    camera: Camera,
-    mouse: Vec2,
-    mouse_held: bool,
-    profiler_settings: ProfilerSettings,
-}
-
-impl CpuApplication {
-    pub fn new() -> anyhow::Result<Self> {
-        let camera = Camera::new(UVec2::new(1, 1), CameraSettings::default());
-        let camera_controller = CameraController::new(
-            GeneralController {
-                position: Vec3::new(0.0, 0.0, 4.0),
-                orientation: glam::Quat::IDENTITY,
-                distance_to_center: 4.0,
-            },
-            GeneralControllerSettings {
-                fly_speed: 5.0,
-                pan_speed: 1.0,
-                rotation_sensitivity: 0.01,
-            },
-            ChosenKind::Freecam,
-        );
-
-        Ok(Self {
-            gpu: None,
-            camera,
-            camera_controller,
-            models: vec![],
-            last_update_instant: None,
-            frame_counter: FrameCounter::new(),
-            mouse: Vec2::ZERO,
-            mouse_held: false,
-            profiler_settings: ProfilerSettings::default(),
-        })
+impl WasmCanvas {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn new() -> Self {
+        Self {}
     }
 
-    pub fn get_profiling(&self) -> ProfilerSettings {
-        self.profiler_settings.clone()
-    }
-
-    pub fn set_profiling(&mut self, new_settings: ProfilerSettings) {
-        self.profiler_settings = new_settings;
-        if let Some(gpu) = &mut self.gpu {
-            gpu.context.set_profiling(self.profiler_settings.gpu);
-        }
-    }
-
-    pub async fn create_surface(&mut self, window: WindowOrFallback) -> anyhow::Result<()> {
-        if self.gpu.is_some() {
-            return Ok(());
-        }
-        let gpu = self.start_create_gpu(window).create_surface().await?;
-        self.set_gpu(gpu);
-        Ok(())
-    }
-
-    pub fn start_create_gpu(&mut self, window: WindowOrFallback) -> GpuApplicationBuilder {
-        self.camera.update_size(window.size());
-
-        GpuApplicationBuilder {
-            camera: self.camera.clone(),
-            profiler_settings: self.profiler_settings.clone(),
-            window,
-        }
-    }
-
-    pub fn set_gpu(&mut self, gpu_application: GpuApplication) {
-        let size = gpu_application.context.size();
-        self.gpu = Some(gpu_application);
-        self.set_profiling(self.profiler_settings.clone());
-        self.resize(size);
-        let models = std::mem::take(&mut self.models);
-        self.update_models(models);
-    }
-
-    pub fn resize(&mut self, new_size: UVec2) {
-        if let Some(gpu) = &mut self.gpu {
-            let new_size = gpu.resize(new_size);
-            if let Some(new_size) = new_size {
-                self.camera.update_size(new_size);
-            }
-        }
-    }
-
-    pub fn update_models(&mut self, models: Vec<ModelInfo>) {
-        self.models = models;
-        if let Some(gpu) = &mut self.gpu {
-            update_virtual_models(
-                &mut gpu.shader_arena,
-                &mut gpu.virtual_models,
-                &self.models,
-                &gpu.context,
-                &gpu.meshes,
-            )
-            .unwrap();
-        }
-    }
-
-    pub fn update(&mut self, inputs: &WindowInputs) {
-        let now = Instant::now();
-        if let Some(last_update_instant) = self.last_update_instant {
-            let delta = Seconds((now - last_update_instant).as_secs_f32());
-            let cursor_capture = self.camera_controller.update(inputs, delta.0);
-            if let Some(gpu) = &mut self.gpu {
-                gpu.update_cursor_capture(cursor_capture, inputs);
-            }
-        }
-        self.last_update_instant = Some(now);
-        self.camera.update_camera(&self.camera_controller);
-        self.mouse = Vec2::new(
-            inputs.mouse.position.x as f32,
-            inputs.mouse.position.y as f32,
-        );
-        self.mouse_held = inputs.mouse.pressed(winit::event::MouseButton::Left);
-    }
-
-    fn render_data(&self, frame_time: &FrameTime) -> RenderData<'_> {
-        RenderData {
-            camera: &self.camera,
-            time_data: shader::Time {
-                elapsed: frame_time.elapsed.0,
-                delta: frame_time.delta.0,
-                frame: frame_time.frame as u32,
-            },
-            mouse_data: shader::Mouse {
-                pos: self.mouse,
-                buttons: if self.mouse_held { 1 } else { 0 },
-            },
-        }
-    }
-
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        let frame_time = self.frame_counter.new_frame();
-        if let Some(mut gpu) = self.gpu.take() {
-            let result = gpu.render(self.render_data(&frame_time));
-            self.gpu = Some(gpu);
-            result
-        } else {
-            Ok(())
-        }
-    }
-
-    pub fn get_profiling_data(&mut self) -> Option<Vec<wgpu_profiler::GpuTimerQueryResult>> {
-        assert!(self.gpu.is_some());
-        assert!(self.profiler_settings.gpu);
-        self.gpu.as_mut().and_then(|gpu| {
-            gpu.context
-                .profiler
-                .process_finished_frame(gpu.context.queue.get_timestamp_period())
-        })
+    #[cfg(target_arch = "wasm32")]
+    pub fn new(canvas: web_sys::HtmlCanvasElement) -> Self {
+        Self { canvas }
     }
 }
 
-struct RenderStep {
-    bind_group_0: shader::bind_groups::BindGroup0,
-}
-struct ComputePatchesStep {
-    bind_group_0: compute_patches::bind_groups::BindGroup0,
-}
-struct CopyPatchesStep {
-    pipeline: wgpu::ComputePipeline,
-}
-
-pub struct GpuApplicationBuilder {
-    pub camera: Camera,
-    pub profiler_settings: ProfilerSettings,
-    pub window: WindowOrFallback,
+pub struct Application {
+    pub app: GameRes,
+    window: Option<Arc<Window>>,
+    pub renderer: Option<GpuApplication>,
+    pub time_counters: TimeCounters,
+    app_commands: EventLoopProxy<AppCommand>,
+    on_exit_callback: Option<Box<dyn FnOnce(&mut Application)>>,
+    pub on_shader_compiled: Option<Arc<dyn Fn(&ShaderId, Vec<wgpu::CompilationMessage>)>>,
+    _canvas: WasmCanvas,
 }
 
-impl GpuApplicationBuilder {
-    pub async fn create_surface(self) -> anyhow::Result<GpuApplication> {
-        GpuApplication::new(self.window, &self.camera, &self.profiler_settings).await
-    }
-}
-
-pub struct GpuApplication {
-    context: WgpuContext,
-    depth_texture: Texture,
-    scene_data: SceneData,
-    shader_arena: virtual_model::ShaderArena,
-    virtual_models: Vec<VirtualModel>,
-    compute_patches: ComputePatchesStep,
-    copy_patches: CopyPatchesStep,
-    render_step: RenderStep,
-    patches_buffer_reset: TypedBuffer<compute_patches::Patches>,
-    force_render_values: [TypedBuffer<compute_patches::ForceRenderFlag>; 2],
-    render_buffer_reset: compute_patches::RenderBuffer,
-    indirect_compute_buffer_reset: TypedBuffer<compute_patches::DispatchIndirectArgs>,
-    meshes: Vec<Mesh>,
-    threshold_factor: f32, // TODO: Make this adjustable
-    cursor_capture: WindowCursorCapture,
-}
-
-const PATCH_SIZES: [u32; 5] = [2, 4, 8, 16, 32];
-const MAX_PATCH_COUNT: u32 = 100_000;
-
-impl GpuApplication {
-    pub async fn new(
-        window: WindowOrFallback,
-        camera: &Camera,
-        profiler_settings: &ProfilerSettings,
-    ) -> anyhow::Result<Self> {
-        let mut context = WgpuContext::new(window).await?;
-        context.set_profiling(profiler_settings.gpu);
-        let device = &context.device;
-
-        let scene_data = SceneData::new(device, camera)?;
-
-        // Some arbitrary splits (size/2 - 1 == one quad per four pixels)
-        let meshes = [0, 1, 3, 7, 15]
-            .iter()
-            .map(|&size| Mesh::new_tesselated_quad(device, size))
-            .collect::<Vec<_>>();
-        assert!(meshes.len() == PATCH_SIZES.len());
-
-        let shader_arena = virtual_model::ShaderArena::new();
-        let virtual_models = vec![];
-
-        let render_buffer_reset = compute_patches::RenderBuffer {
-            patches_length: 0,
-            patches_capacity: MAX_PATCH_COUNT,
-            patches: vec![],
-        };
-
-        let depth_texture = Texture::create_depth_texture(device, context.size(), "Depth Texture");
-
-        let render_step = RenderStep {
-            bind_group_0: scene_data.as_bind_group_0(device),
-        };
-
-        let threshold_factor = 1.0;
-
-        let patches_buffer_reset = TypedBuffer::new_storage_with_runtime_array(
-            device,
-            "Patches Buffer Reset",
-            &compute_patches::Patches {
-                patches_length: 0,
-                patches_capacity: MAX_PATCH_COUNT,
-                patches: vec![],
-            },
-            1,
-            wgpu::BufferUsages::COPY_SRC,
-        )?;
-
-        let indirect_compute_buffer_reset = TypedBuffer::new_storage(
-            device,
-            "Indirect Compute Dispatch Buffer Reset",
-            &compute_patches::DispatchIndirectArgs { x: 0, y: 1, z: 1 },
-            wgpu::BufferUsages::COPY_SRC,
-        )?;
-
-        let force_render_values = [
-            TypedBuffer::new_uniform(
-                device,
-                "Disable Force Render",
-                &compute_patches::ForceRenderFlag { flag: 0 },
-                wgpu::BufferUsages::COPY_SRC,
-            )?,
-            TypedBuffer::new_uniform(
-                device,
-                "Enable Force Render",
-                &compute_patches::ForceRenderFlag { flag: 1 },
-                wgpu::BufferUsages::COPY_SRC,
-            )?,
-        ];
-
-        let compute_patches = ComputePatchesStep {
-            bind_group_0: compute_patches::bind_groups::BindGroup0::from_bindings(
-                device,
-                compute_patches::bind_groups::BindGroupLayout0 {
-                    mouse: scene_data.mouse_buffer.as_entire_buffer_binding(),
-                    screen: scene_data.screen_buffer.as_entire_buffer_binding(),
-                    time: scene_data.time_buffer.as_entire_buffer_binding(),
-                },
-            ),
-        };
-
-        let copy_patches = CopyPatchesStep {
-            pipeline: device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                label: Some("Copy Patches"),
-                layout: Some(&copy_patches::create_pipeline_layout(device)),
-                module: &copy_patches::create_shader_module(device),
-                entry_point: copy_patches::ENTRY_MAIN,
-                compilation_options: Default::default(),
-                cache: Default::default(),
-            }),
-        };
-
-        Ok(Self {
-            context,
-            indirect_compute_buffer_reset,
-            render_step,
-            compute_patches,
-            copy_patches,
-            patches_buffer_reset,
-            render_buffer_reset,
-            force_render_values,
-            depth_texture,
-            scene_data,
-            meshes,
-            shader_arena,
-            virtual_models,
-            threshold_factor,
-            cursor_capture: WindowCursorCapture::Free,
-        })
-    }
-
-    #[must_use]
-    pub fn resize(&mut self, new_size: UVec2) -> Option<UVec2> {
-        let new_size = new_size.max(UVec2::new(1, 1));
-        if new_size == self.context.size() {
-            return None;
+impl Application {
+    pub fn new(
+        app_commands: EventLoopProxy<AppCommand>,
+        on_exit: impl FnOnce(&mut Application) + 'static,
+        canvas: WasmCanvas,
+    ) -> Self {
+        Self {
+            window: None,
+            app: GameRes::new(),
+            renderer: None,
+            time_counters: TimeCounters::default(),
+            app_commands,
+            on_exit_callback: Some(Box::new(on_exit)),
+            on_shader_compiled: None,
+            _canvas: canvas,
         }
-        self.context.resize(new_size);
-        self.depth_texture =
-            Texture::create_depth_texture(&self.context.device, new_size, "Depth Texture");
-        Some(new_size)
     }
 
-    pub fn render(&mut self, render_data: RenderData) -> Result<(), wgpu::SurfaceError> {
-        match &self.context.surface {
-            wgpu_context::SurfaceOrFallback::Surface { surface, .. } => {
-                // TODO: Handle all cases properly https://github.com/gfx-rs/wgpu/blob/a0c185a28c232ee2ab63f72d6fd3a63a3f787309/examples/src/framework.rs#L216
-                let output = surface.get_current_texture()?;
-                let mut command_encoder = self.render_commands(&output.texture, render_data)?;
-                self.context.profiler.resolve_queries(&mut command_encoder);
-                self.context
-                    .queue
-                    .submit(std::iter::once(command_encoder.finish()));
-                output.present();
-            }
-            wgpu_context::SurfaceOrFallback::Fallback { texture } => {
-                let mut command_encoder = self.render_commands(texture, render_data)?;
-                self.context.profiler.resolve_queries(&mut command_encoder);
-                self.context
-                    .queue
-                    .submit(std::iter::once(command_encoder.finish()));
-            }
-        };
-
-        self.context.profiler.end_frame().unwrap();
-        Ok(())
-    }
-
-    pub fn render_commands(
-        &self,
-        surface_texture: &wgpu::Texture,
-        render_data: RenderData,
-    ) -> Result<wgpu::CommandEncoder, wgpu::SurfaceError> {
-        let queue = &self.context.queue;
-        let view = surface_texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(self.context.view_format),
-            ..Default::default()
-        });
-
-        self.scene_data.write_buffers(&render_data, queue);
-
-        // Write the buffers for each model
-        for model in self.virtual_models.iter() {
-            model
-                .compute_patches
-                .input_buffer
-                .write_buffer(
-                    queue,
-                    &compute_patches::InputBuffer {
-                        model_view_projection: model.get_model_view_projection(render_data.camera),
-                        threshold_factor: self.threshold_factor,
-                    },
-                )
-                .unwrap();
-            model.compute_patches.patches_buffer[0]
-                .write_buffer(
-                    queue,
-                    &compute_patches::Patches {
-                        patches_length: 1,
-                        patches_capacity: MAX_PATCH_COUNT,
-                        patches: vec![compute_patches::EncodedPatch {
-                            // Just the leading 1 bit
-                            u: 1,
-                            v: 1,
-                        }],
-                    },
-                )
-                .unwrap();
-            model.compute_patches.indirect_compute_buffer[0]
-                .write_buffer(
-                    queue,
-                    &compute_patches::DispatchIndirectArgs { x: 1, y: 1, z: 1 },
-                )
-                .unwrap();
-
-            for render_buffer in model.compute_patches.render_buffer.iter() {
-                render_buffer
-                    .write_buffer(queue, &self.render_buffer_reset)
-                    .unwrap();
-            }
-
-            model
-                .render_step
-                .model_buffer
-                .write_buffer(
-                    queue,
-                    &shader::Model {
-                        model_similarity: model.get_model_matrix(),
-                    },
-                )
-                .unwrap();
-            model
-                .render_step
-                .material_buffer
-                .write_buffer(queue, &model.material_info.to_shader())
-                .unwrap();
+    fn on_exit(&mut self) {
+        info!("Stopping the application.");
+        if let Some(on_exit_callback) = self.on_exit_callback.take() {
+            on_exit_callback(self);
         }
+    }
 
-        let mut command_encoder =
-            self.context
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
-        // Profiling
-        let mut commands =
-            self.context
-                .profiler
-                .scope("Render", &mut command_encoder, &self.context.device);
+    fn create_surface(&mut self, window: Window) {
+        let window = Arc::new(window);
+        self.window = Some(window.clone());
 
-        for model in self.virtual_models.iter() {
-            let shaders = self.shader_arena.get_shader(model.shaders_key);
-            // Each round, we do a ping-pong and pong-ping
-            // 2*4 rounds is enough to subdivide a 4k screen into 16x16 pixel patches
-            let double_number_of_rounds = 4;
-            for i in 0..double_number_of_rounds {
-                let is_last_round = i == double_number_of_rounds - 1;
-                // TODO: Should I create many compute passes, or just one?
-                {
-                    model.compute_patches.patches_buffer[1]
-                        .copy_all_from(&self.patches_buffer_reset, &mut commands);
-                    model.compute_patches.indirect_compute_buffer[1]
-                        .copy_all_from(&self.indirect_compute_buffer_reset, &mut commands);
+        let gpu_builder = GpuApplicationBuilder::new(WindowOrFallback::Window(window));
 
-                    let mut compute_pass = commands.scoped_compute_pass(
-                        format!("Compute Patches From-To {i}"),
-                        &self.context.device,
-                    );
-                    compute_pass.set_pipeline(&shaders.compute_patches);
-                    compute_patches::set_bind_groups(
-                        &mut compute_pass.recorder,
-                        &self.compute_patches.bind_group_0,
-                        &model.compute_patches.bind_group_1,
-                        &model.compute_patches.bind_group_2[0],
-                    );
-                    compute_pass.dispatch_workgroups_indirect(
-                        &model.compute_patches.indirect_compute_buffer[0],
-                        0,
-                    );
+        let app_commands = self.app_commands.clone();
+        let on_shader_compiled = self.on_shader_compiled.clone();
+        let task = async move {
+            println!("Creating renderer");
+            let renderer = gpu_builder.await.unwrap().build();
+            let _ = run_on_main(app_commands, move |app| {
+                for (shader_id, shader_info) in &app.app.shaders {
+                    renderer.set_shader(shader_id.clone(), shader_info, on_shader_compiled.clone());
                 }
-                if is_last_round {
-                    // Set to true
-                    model
-                        .compute_patches
-                        .force_render_uniform
-                        .copy_all_from(&self.force_render_values[1], &mut commands);
-                }
-                {
-                    model.compute_patches.patches_buffer[0]
-                        .copy_all_from(&self.patches_buffer_reset, &mut commands);
-                    model.compute_patches.indirect_compute_buffer[0]
-                        .copy_all_from(&self.indirect_compute_buffer_reset, &mut commands);
+                app.renderer = Some(renderer)
+            })
+            .await;
+        };
+        any_spawner::Executor::spawn_local(task);
+    }
+}
 
-                    let mut compute_pass = commands.scoped_compute_pass(
-                        format!("Compute Patches To-From {i}"),
-                        &self.context.device,
-                    );
-                    compute_pass.set_pipeline(&shaders.compute_patches);
-                    compute_patches::set_bind_groups(
-                        &mut compute_pass.recorder,
-                        &self.compute_patches.bind_group_0,
-                        &model.compute_patches.bind_group_1,
-                        &model.compute_patches.bind_group_2[1],
-                    );
-                    compute_pass.dispatch_workgroups_indirect(
-                        &model.compute_patches.indirect_compute_buffer[1],
-                        0,
-                    );
-                }
-                if is_last_round {
-                    // Set to false
-                    model
-                        .compute_patches
-                        .force_render_uniform
-                        .copy_all_from(&self.force_render_values[0], &mut commands);
-                }
-            }
+pub enum AppCommand {
+    RunCallback(Box<dyn FnOnce(&mut Application)>),
+}
 
-            {
-                let mut compute_pass =
-                    commands.scoped_compute_pass("Copy Patch Sizes Pass", &self.context.device);
-                compute_pass.set_pipeline(&self.copy_patches.pipeline);
-                copy_patches::set_bind_groups(
-                    &mut compute_pass.recorder,
-                    &model.copy_patches.bind_group_0,
-                );
-                compute_pass.dispatch_workgroups(1, 1, 1);
-            }
+/// Run a function on the main thread and awaits its result.
+/// Not a part of the Application, because we want to be able to call this without the lifetime constraint of the Application.
+#[must_use]
+pub async fn run_on_main<Callback, T>(
+    app_commands: EventLoopProxy<AppCommand>,
+    callback: Callback,
+) -> T
+where
+    Callback: (FnOnce(&mut Application) -> T) + 'static,
+    T: Send + 'static,
+{
+    let (sender, receiver) = futures_channel::oneshot::channel();
+    let callback = move |app: &mut Application| {
+        let return_value = callback(app);
+        _ = sender.send(return_value);
+    };
+    app_commands
+        .send_event(AppCommand::RunCallback(Box::new(callback)))
+        .map_err(|_| ())
+        .expect("Failed to send event, event loop not running?");
+    receiver.await.expect("Was the main thread stopped?")
+}
+
+impl ApplicationHandler<AppCommand> for Application {
+    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+        // A really good app might recreate the renderer here?
+        if let Some(window) = &self.window {
+            window.request_redraw();
+            return;
         }
 
-        let mut render_pass = commands.scoped_render_pass(
-            "Render Pass",
-            &self.context.device,
-            wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
-                            a: 1.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_texture.view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(0.0), // Reverse Z checklist https://iolite-engine.com/blog_posts/reverse_z_cheatsheet
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
-                timestamp_writes: None,
-                occlusion_query_set: None,
+        let window_attributes = Window::default_attributes();
+        #[cfg(target_arch = "wasm32")]
+        let window_attributes = {
+            use winit::platform::web::WindowAttributesExtWebSys;
+            window_attributes.with_canvas(Some(self._canvas.canvas.clone()))
+        };
+
+        let window = event_loop.create_window(window_attributes).unwrap();
+        self.create_surface(window);
+    }
+
+    fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: AppCommand) {
+        match event {
+            AppCommand::RunCallback(callback) => callback(self),
+        }
+    }
+
+    fn new_events(
+        &mut self,
+        _event_loop: &winit::event_loop::ActiveEventLoop,
+        _cause: winit::event::StartCause,
+    ) {
+        any_spawner::Executor::poll_local();
+    }
+
+    fn window_event(
+        &mut self,
+        _event_loop: &winit::event_loop::ActiveEventLoop,
+        _window_id: winit::window::WindowId,
+        event: winit::event::WindowEvent,
+    ) {
+        match &event {
+            winit::event::WindowEvent::RedrawRequested => match self.window {
+                Some(ref mut window) => window.request_redraw(),
+                None => {}
             },
-        );
-        for model in self.virtual_models.iter() {
-            let shaders = self.shader_arena.get_shader(model.shaders_key);
-            {
-                render_pass.set_pipeline(&shaders.render);
-                let indirect_draw_offsets = [
-                    std::mem::offset_of!(copy_patches::DrawIndexedBuffers, indirect_draw_2)
-                        as wgpu::BufferAddress,
-                    std::mem::offset_of!(copy_patches::DrawIndexedBuffers, indirect_draw_4)
-                        as wgpu::BufferAddress,
-                    std::mem::offset_of!(copy_patches::DrawIndexedBuffers, indirect_draw_8)
-                        as wgpu::BufferAddress,
-                    std::mem::offset_of!(copy_patches::DrawIndexedBuffers, indirect_draw_16)
-                        as wgpu::BufferAddress,
-                    std::mem::offset_of!(copy_patches::DrawIndexedBuffers, indirect_draw_32)
-                        as wgpu::BufferAddress,
-                ];
-                for ((bind_group_1, mesh), buffer_offset) in model
-                    .render_step
-                    .bind_group_1
-                    .iter()
-                    .zip(self.meshes.iter())
-                    .zip(indirect_draw_offsets)
-                {
-                    shader::set_bind_groups(
-                        &mut render_pass.recorder,
-                        &self.render_step.bind_group_0,
-                        bind_group_1,
+            // TODO: I think I can get rid of this
+            winit::event::WindowEvent::CursorMoved { .. } => match self.window {
+                Some(ref mut window) => window.request_redraw(),
+                None => {}
+            },
+            _ => {}
+        }
+    }
+}
+
+impl InputHandler for Application {
+    fn update(&mut self, event_loop: &winit::event_loop::ActiveEventLoop, input: WindowInputs<'_>) {
+        #[cfg(not(target_arch = "wasm32"))]
+        if input
+            .keyboard
+            .just_released_logical(Key::Named(NamedKey::Escape))
+        {
+            self.on_exit();
+            return event_loop.exit();
+        }
+        if input.close_requested {
+            self.on_exit();
+            return event_loop.exit();
+        }
+
+        // Press P to print profiling data
+        #[cfg(not(target_arch = "wasm32"))]
+        if input
+            .keyboard
+            .just_pressed_physical(winit::keyboard::KeyCode::KeyP)
+        {
+            match &self.time_counters.last_results {
+                Some(data) => {
+                    let file_name = format!(
+                        "profile-{}.json",
+                        // use the current time as a unique-enugh identifier
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_millis()
                     );
-                    render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                    render_pass
-                        .set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-                    render_pass.draw_indexed_indirect(
-                        &model.copy_patches.indirect_draw_buffers,
-                        buffer_offset,
+                    wgpu_profiler::chrometrace::write_chrometrace(
+                        std::path::Path::new(&file_name),
+                        data,
                     )
+                    .unwrap();
+                    info!("Profiling data written to {file_name}");
+                }
+                None => {
+                    warn!("Profiling data not available");
                 }
             }
         }
 
-        // Finish the profiler
-        std::mem::drop(render_pass);
-        std::mem::drop(commands);
-
-        Ok(command_encoder)
-    }
-
-    pub fn size(&self) -> UVec2 {
-        self.context.size()
-    }
-
-    pub fn device(&self) -> &wgpu::Device {
-        &self.context.device
-    }
-
-    pub fn force_wait(&self) {
-        self.context.instance.poll_all(true);
-    }
-}
-
-fn update_virtual_models(
-    shader_arena: &mut virtual_model::ShaderArena,
-    virtual_models: &mut Vec<VirtualModel>,
-    models: &[ModelInfo],
-    context: &WgpuContext,
-    meshes: &[Mesh],
-) -> anyhow::Result<()> {
-    // Update existing models
-    for (virtual_model, model) in virtual_models.iter_mut().zip(models.iter()) {
-        virtual_model.transform = model.transform.clone();
-        virtual_model.material_info = model.material_info.clone();
-        virtual_model.shaders_key = shader_arena.get_or_create_shader(
-            &model.label,
-            context,
-            model.evaluate_image_code.as_str(),
-        );
-    }
-    // Resize virtual models
-    if virtual_models.len() > models.len() {
-        virtual_models.truncate(models.len());
-    } else if virtual_models.len() < models.len() {
-        for model in models.iter().skip(virtual_models.len()) {
-            let mut virtual_model = VirtualModel::new(
-                context,
-                meshes,
-                shader_arena.get_or_create_shader(
-                    &model.label,
-                    context,
-                    model.evaluate_image_code.as_str(),
-                ),
-            )?;
-            virtual_model.transform = model.transform.clone();
-            virtual_model.material_info = model.material_info.clone();
-            virtual_models.push(virtual_model);
+        if let Some(PhysicalSize { width, height }) = input.new_size {
+            self.renderer
+                .as_mut()
+                .map(|r| r.resize(UVec2::new(width, height)));
         }
-    }
 
-    // Clean up unused shaders
-    shader_arena.retain(virtual_models.iter().map(|model| model.shaders_key));
-    Ok(())
-}
-pub struct RenderData<'a> {
-    camera: &'a Camera,
-    time_data: shader::Time,
-    mouse_data: shader::Mouse,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum CursorCapture {
-    Free,
-    LockedAndHidden,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum WindowCursorCapture {
-    Free,
-    LockedAndHidden(winit::dpi::PhysicalPosition<f64>),
-}
-
-impl GpuApplication {
-    pub fn update_cursor_capture(&mut self, cursor_capture: CursorCapture, inputs: &WindowInputs) {
-        let window = match &self.context.surface {
-            wgpu_context::SurfaceOrFallback::Surface { window, .. } => window,
-            wgpu_context::SurfaceOrFallback::Fallback { .. } => return,
-        };
-        match (self.cursor_capture, cursor_capture) {
-            (WindowCursorCapture::LockedAndHidden(position), CursorCapture::Free) => {
-                window
-                    .set_cursor_grab(winit::window::CursorGrabMode::None)
-                    .unwrap();
-                window.set_cursor_visible(true);
-                let _ = window.set_cursor_position(position);
-                self.cursor_capture = WindowCursorCapture::Free;
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.time_counters.frame_count % 20 == 0 {
+            if let Some(window) = self.window.as_mut() {
+                let title = format!(
+                    "Math2Model - CPU {:.2}ms GPU {:.2}ms",
+                    self.time_counters.avg_delta_time() * 1000.0,
+                    self.time_counters.avg_gpu_time() * 1000.0
+                );
+                window.set_title(&title);
             }
-            (WindowCursorCapture::Free, CursorCapture::Free) => {}
-            (WindowCursorCapture::LockedAndHidden(_), CursorCapture::LockedAndHidden) => {}
-            (WindowCursorCapture::Free, CursorCapture::LockedAndHidden) => {
-                let cursor_position = inputs.mouse.position;
-                window
-                    .set_cursor_grab(winit::window::CursorGrabMode::Confined)
-                    .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))
-                    .unwrap();
-                window.set_cursor_visible(false);
-                self.cursor_capture = WindowCursorCapture::LockedAndHidden(cursor_position);
+        }
+
+        self.app.update(&input);
+        match self.renderer.as_mut().map(|r| r.render(&self.app)) {
+            None => (),
+            Some(Ok(render_results)) => {
+                self.time_counters
+                    .push_frame(render_results.delta_time, render_results.profiler_results);
+            }
+            Some(Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated)) => {
+                info!("Lost or outdated surface");
+                // Nothing to do, surface will be recreated
+            }
+            Some(Err(wgpu::SurfaceError::OutOfMemory)) => {
+                error!("Out of memory");
+                self.on_exit();
+                return event_loop.exit();
+            }
+            Some(Err(e)) => {
+                warn!("Unexpected error: {:?}", e);
             }
         }
     }
+}
+
+#[derive(Default)]
+pub struct TimeCounters {
+    frame_count: u64,
+    cpu_delta_times: Vec<Seconds>,
+    gpu_frame_times: Vec<Seconds>,
+    last_results: Option<Vec<wgpu_profiler::GpuTimerQueryResult>>,
+}
+
+impl TimeCounters {
+    fn push_frame(
+        &mut self,
+        cpu_delta_time: Seconds,
+        gpu_time_results: Option<Vec<wgpu_profiler::GpuTimerQueryResult>>,
+    ) {
+        self.frame_count += 1;
+        self.cpu_delta_times.push(cpu_delta_time);
+        if self.cpu_delta_times.len() > 10 {
+            self.cpu_delta_times.remove(0);
+        }
+        if let Some(gpu_time_results) = gpu_time_results {
+            let time_range = gpu_time_results
+                .iter()
+                .filter_map(|v| v.time.clone())
+                .reduce(|a, b| a.start.min(b.start)..a.end.max(b.end));
+            if let Some(frame_time) = time_range.map(|v| Seconds((v.end - v.start) as f32)) {
+                self.gpu_frame_times.push(frame_time);
+                if self.gpu_frame_times.len() > 10 {
+                    self.gpu_frame_times.remove(0);
+                }
+            }
+            self.last_results = Some(gpu_time_results);
+        }
+    }
+
+    pub fn avg_delta_time(&self) -> f32 {
+        avg_seconds(&self.cpu_delta_times)
+    }
+
+    pub fn avg_gpu_time(&self) -> f32 {
+        avg_seconds(&self.gpu_frame_times)
+    }
+}
+
+fn avg_seconds(data: &[Seconds]) -> f32 {
+    if data.is_empty() {
+        return 0.0;
+    }
+    data.iter().map(|v| v.0).sum::<f32>() / (data.len() as f32)
 }
