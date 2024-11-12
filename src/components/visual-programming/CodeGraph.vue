@@ -113,8 +113,18 @@ const props = defineProps<{
   keyedGraph: DeepReadonly<KeyedGraph> | null;
 }>();
 
+const fileNames = ref(new Set<FilePath>());
+props.fs.watchFromStart((change) => {
+  if (!change.key.endsWith(".graph")) return;
+  if (change.type === "insert") {
+    fileNames.value.add(change.key);
+  } else if (change.type === "remove") {
+    fileNames.value.delete(change.key);
+  }
+});
+
 const graphsDropdown = computed<SelectMixedOption[]>(() => {
-  return [...props.fs.files.value.keys()]
+  return [...fileNames.value]
     .toSorted()
     .filter((fileName) => fileName.endsWith(".graph"))
     .map(
@@ -135,7 +145,7 @@ function createUINode(uiNode: UINode) {
 const uiNodes: Map<string, Map<string, UINode>> = new Map([
   [
     "Shapes",
-    new Map([
+    new Map<string, UINode>([
       [
         "Heart",
         {
@@ -199,7 +209,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
   ],
   [
     "Apply",
-    new Map([
+    new Map<string, UINode>([
       [
         "Combine",
         {
@@ -387,7 +397,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
   ],
   [
     "Parameters",
-    new Map([
+    new Map<string, UINode>([
       [
         "Split",
         {
@@ -420,7 +430,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
   ],
   [
     "Maths",
-    new Map([
+    new Map<string, UINode>([
       [
         "Add",
         {
@@ -601,7 +611,7 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
   ],
   [
     "Constants",
-    new Map([
+    new Map<string, UINode>([
       [
         "Elapsed Time",
         {
