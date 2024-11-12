@@ -193,6 +193,11 @@ impl GpuApplication {
     pub fn force_wait(&self) {
         self.set_force_wait.set(true);
     }
+
+    pub fn set_threshold_factor(&self, factor: f32) {
+        self.set_threshold_factor
+            .set(factor.clamp(0.0001, 100000.0));
+    }
 }
 
 fn wgpu_context() -> Arc<WgpuContext> {

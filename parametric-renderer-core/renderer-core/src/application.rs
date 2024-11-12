@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use glam::UVec2;
 use log::{error, info, warn};
-use pinky_swear::PinkySwear;
 use winit::{
     application::ApplicationHandler,
     dpi::PhysicalSize,
@@ -37,7 +36,7 @@ pub struct Application {
     pub app: GameRes,
     window: Option<Arc<Window>>,
     pub renderer: Option<GpuApplication>,
-    time_counters: TimeCounters,
+    pub time_counters: TimeCounters,
     app_commands: EventLoopProxy<AppCommand>,
     on_exit_callback: Option<Box<dyn FnOnce(&mut Application)>>,
     pub on_shader_compiled: Option<Arc<dyn Fn(&ShaderId, Vec<wgpu::CompilationMessage>)>>,
@@ -107,17 +106,16 @@ where
     Callback: (FnOnce(&mut Application) -> T) + 'static,
     T: Send + 'static,
 {
-    // TODO: Replace with reactive_graph https://docs.rs/reactive_graph/latest/reactive_graph/computed/struct.ArcAsyncDerived.html#method.into_future
-    let (promise, pinky) = PinkySwear::<T>::new();
+    let (sender, receiver) = futures_channel::oneshot::channel();
     let callback = move |app: &mut Application| {
         let return_value = callback(app);
-        pinky.swear(return_value);
+        _ = sender.send(return_value);
     };
     app_commands
         .send_event(AppCommand::RunCallback(Box::new(callback)))
         .map_err(|_| ())
         .expect("Failed to send event, event loop not running?");
-    promise.await
+    receiver.await.expect("Was the main thread stopped?")
 }
 
 impl ApplicationHandler<AppCommand> for Application {
@@ -260,7 +258,7 @@ impl InputHandler for Application {
 }
 
 #[derive(Default)]
-struct TimeCounters {
+pub struct TimeCounters {
     frame_count: u64,
     cpu_delta_times: Vec<Seconds>,
     gpu_frame_times: Vec<Seconds>,
@@ -293,11 +291,11 @@ impl TimeCounters {
         }
     }
 
-    fn avg_delta_time(&self) -> f32 {
+    pub fn avg_delta_time(&self) -> f32 {
         avg_seconds(&self.cpu_delta_times)
     }
 
-    fn avg_gpu_time(&self) -> f32 {
+    pub fn avg_gpu_time(&self) -> f32 {
         avg_seconds(&self.gpu_frame_times)
     }
 }

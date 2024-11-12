@@ -11,7 +11,7 @@ use wasm_bindgen::{prelude::wasm_bindgen, JsError, JsValue};
 use web_sys::HtmlCanvasElement;
 use winit::event_loop::{EventLoop, EventLoopProxy};
 
-use crate::wasm_abi::{WasmCompilationMessage, WasmModelInfo, WasmShaderInfo};
+use crate::wasm_abi::{WasmCompilationMessage, WasmFrameTime, WasmModelInfo, WasmShaderInfo};
 
 #[wasm_bindgen]
 pub struct WasmApplication {
@@ -149,6 +149,26 @@ impl WasmApplication {
         });
         let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), move |app| {
             app.on_shader_compiled = wrapped;
+        })
+        .await;
+    }
+
+    pub async fn get_frame_time(&self) -> WasmFrameTime {
+        let frame_time = run_on_main(self.event_loop_proxy.clone().unwrap(), |app| {
+            WasmFrameTime {
+                avg_delta_time: app.time_counters.avg_delta_time(),
+                avg_gpu_time: app.time_counters.avg_gpu_time(),
+            }
+        })
+        .await;
+        frame_time
+    }
+
+    pub async fn try_set_threshold_factor(&self, factor: f32) {
+        let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), move |app| {
+            if let Some(renderer) = &app.renderer {
+                renderer.set_threshold_factor(factor);
+            }
         })
         .await;
     }
