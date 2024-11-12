@@ -30,8 +30,14 @@ import {
 import type { WgpuEngine } from "@/engine/wgpu-engine";
 import HeartSphereCode from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
 import DefaultShaderCode from "@/../parametric-renderer-core/shaders/DefaultParametric.wgsl?raw";
+import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
+import BasicGraphShader from "@/../parametric-renderer-core/graphs/BasicGraphShader.graph.wgsl?raw";
+import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import type { ObjectUpdate } from "./input/object-update";
+import CodeGraph from "@/components/visual-programming/CodeGraph.vue";
 import WebGpu from "@/components/WebGpu.vue";
+import { CodeCircle20Regular } from "@vicons/fluent";
+import { GraphicalDataFlow } from "@vicons/carbon";
 import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
 import { useErrorStore } from "@/stores/error-store";
 
@@ -149,9 +155,12 @@ watchEffect(() => {
   props.engine.updateModels(models);
 });
 
+type EditorType = "shader" | "graph";
+
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
   const openedFileName = ref<FilePath | null>(startFile);
   const keyedCode = ref<KeyedCode | null>(null);
+  const editorType = ref<EditorType>("shader");
   const markers = computed<Marker[]>(() => {
     if (openedFileName.value === null) return [];
     const messages = errorsStore.errors.get(openedFileName.value) ?? [];
@@ -190,6 +199,14 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
       name: fileName,
     };
 
+    if (fileName.endsWith(".wgsl")) {
+      editorType.value = "shader";
+    } else if (fileName.endsWith(".graph")) {
+      editorType.value = "graph";
+    } else {
+      editorType.value = "shader";
+    }
+
     // And now asynchronously load the file
     let file = fs.readTextFile(fileName);
     if (file === null) {
@@ -209,6 +226,13 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
     });
   });
 
+  const isReadonly = computed(() => {
+    if (keyedCode.value === null) {
+      return true;
+    }
+    return keyedCode.value.name.endsWith(".graph.wgsl");
+  });
+
   function openFile(v: FilePath) {
     openedFileName.value = v;
   }
@@ -225,6 +249,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
       openFile(newName);
     }
   }
+
   function deleteFiles(files: Set<FilePath>) {
     files.forEach((file) => {
       fs.deleteFile(file);
@@ -250,6 +275,9 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
   }, 500);
 
   return {
+    path: computed(() => openedFileName.value),
+    editorType: computed(() => editorType.value),
+    isReadonly,
     code: computed(() => keyedCode.value),
     markers,
     openFile,
@@ -264,12 +292,12 @@ type TabName = "filebrowser" | "sceneview";
 function useTabs() {
   const defaultSplitSize = 0.1;
   const splitSize = ref(defaultSplitSize);
-  const selectedTab = ref<TabName>("filebrowser");
+  const selectedTab = ref<TabName>("sceneview");
   function renderTabIcon(name: TabName) {
-    if (name === "filebrowser") {
-      return h(IconFolderMultipleOutline);
-    } else if (name === "sceneview") {
+    if (name === "sceneview") {
       return h(IconFileTreeOutline);
+    } else if (name === "filebrowser") {
+      return h(IconFolderMultipleOutline);
     } else {
       assertUnreachable(name);
     }
@@ -313,10 +341,18 @@ function updateModels(ids: string[], update: ObjectUpdate<any>) {
 
 function addModel(name: string, shaderName: string) {
   if (shaderName) {
-    const vertexSource = makeFilePath(shaderName);
+    let vertexSource = makeFilePath(shaderName);
 
     if (!props.fs.hasFile(vertexSource)) {
-      props.fs.writeTextFile(vertexSource, HeartSphereCode);
+      if (vertexSource.endsWith(".wgsl"))
+        props.fs.writeTextFile(vertexSource, HeartSphereCode);
+      else if (vertexSource.endsWith(".graph")) {
+        props.fs.writeTextFile(vertexSource, BasicGraph);
+        vertexSource = makeFilePath(
+          vertexSource.replace(".graph", ".graph.wgsl")
+        );
+        props.fs.writeTextFile(vertexSource, BasicGraphShader);
+      }
     }
 
     const newModel: VirtualModelState = {
@@ -349,6 +385,12 @@ function removeModel(ids: string[]) {
 
   saveScene();
 }
+
+function saveGraphWgsl(filePath: FilePath, content: string) {
+  // Extension should be ".graph.wgsl"
+  filePath = makeFilePath(filePath.replace(".graph", ".graph.wgsl"));
+  props.fs.writeTextFile(filePath, content);
+}
 </script>
 
 <template>
@@ -362,13 +404,13 @@ function removeModel(ids: string[]) {
       v-model:value="tabs.selectedTab.value"
     >
       <n-tab
-        name="filebrowser"
-        :tab="tabs.renderTabIcon('filebrowser')"
+        name="sceneview"
+        :tab="tabs.renderTabIcon('sceneview')"
         @click="tabs.toggleTabSize()"
       ></n-tab>
       <n-tab
-        name="sceneview"
-        :tab="tabs.renderTabIcon('sceneview')"
+        name="filebrowser"
+        :tab="tabs.renderTabIcon('filebrowser')"
         @click="tabs.toggleTabSize()"
       ></n-tab>
     </n-tabs>
@@ -380,18 +422,7 @@ function removeModel(ids: string[]) {
     >
       <template #1>
         <div class="pt-2 h-full w-full overflow-y-auto">
-          <div v-if="tabs.selectedTab.value === 'filebrowser'">
-            <FileBrowser
-              :fs="props.fs"
-              @open-file="openFile.openFile($event)"
-              @add-files="openFile.addFiles($event)"
-              @rename-file="
-                (oldName, newName) => openFile.renameFile(oldName, newName)
-              "
-              @delete-files="openFile.deleteFiles($event)"
-            ></FileBrowser>
-          </div>
-          <div v-else-if="tabs.selectedTab.value === 'sceneview'">
+          <div v-if="tabs.selectedTab.value === 'sceneview'">
             <SceneHierarchy
               :models="scene.state.value.models"
               :fs="props.fs"
@@ -403,33 +434,79 @@ function removeModel(ids: string[]) {
               @removeModel="(ids) => removeModel(ids)"
             ></SceneHierarchy>
           </div>
+          <div v-else-if="tabs.selectedTab.value === 'filebrowser'">
+            <FileBrowser
+              :fs="props.fs"
+              @open-file="openFile.openFile($event)"
+              @add-files="openFile.addFiles($event)"
+              @rename-file="
+                (oldName, newName) => openFile.renameFile(oldName, newName)
+              "
+              @delete-files="openFile.deleteFiles($event)"
+            ></FileBrowser>
+          </div>
           <div v-else>
             <p>Unknown tab</p>
           </div>
         </div>
       </template>
       <template #2>
-        <div class="flex h-full w-full">
-          <!--<WebGpu
-            :gpuDevice="props.gpuDevice"
-            :engine="props.engine"
-            :fs="props.fs"
-          ></WebGpu>-->
-          <div
-            ref="canvasContainer"
-            class="self-stretch overflow-hidden flex-1"
-          >
-            <div v-if="sceneFile == null">Missing scene.json</div>
-          </div>
-          <CodeEditor
-            class="self-stretch overflow-hidden flex-1"
-            :keyed-code="openFile.code.value"
-            :is-dark="store.isDark"
-            :markers="openFile.markers.value"
-            @update="openFile.setNewCode($event)"
-          >
-          </CodeEditor>
-        </div>
+        <n-split
+          direction="horizontal"
+          :max="0.75"
+          :min="0.15"
+          :default-size="0.5"
+        >
+          <template #1>
+            <div class="flex h-full w-full">
+              <div
+                ref="canvasContainer"
+                class="self-stretch overflow-hidden flex-1"
+              >
+                <div v-if="sceneFile == null">Missing scene.json</div>
+              </div>
+            </div>
+          </template>
+          <template #2>
+            <div class="flex h-full w-full">
+              <CodeEditor
+                v-if="openFile.editorType.value === 'shader'"
+                class="self-stretch overflow-hidden flex-1"
+                :keyed-code="openFile.code.value"
+                :is-readonly="openFile.isReadonly.value"
+                :is-dark="store.isDark"
+                :markers="openFile.markers.value"
+                @update="openFile.setNewCode($event)"
+              >
+              </CodeEditor>
+              <CodeGraph
+                v-if="openFile.editorType.value === 'graph'"
+                class="self-stretch overflow-hidden flex-1"
+                :fs="props.fs"
+                :keyedGraph="openFile.code.value"
+                @update="
+                  (content) => {
+                    if (openFile.path.value !== null) {
+                      saveGraphWgsl(openFile.path.value, content);
+                    } else {
+                      console.error('Invalid state!');
+                    }
+                  }
+                "
+                @save="
+                  (content) => {
+                    if (openFile.path.value !== null) {
+                      props.fs.writeTextFile(openFile.path.value, content);
+                    } else {
+                      console.error('Invalid state!');
+                    }
+                  }
+                "
+                ref="graphRef"
+              ></CodeGraph>
+            </div>
+          </template>
+        </n-split>
       </template>
     </n-split>
   </main>

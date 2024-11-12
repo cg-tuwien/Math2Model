@@ -93,8 +93,12 @@ const selectedKeys = computed(() => {
   return selected;
 });
 let currentModel = ref<DeepReadonly<VirtualModelState> | null>(null);
-let toAddModel = ref<[string, FilePath] | null>(null);
+let toAddModel = ref<[string, FilePath]>([
+  "New Model",
+  makeFilePath("new-model"),
+]);
 let customShader = ref<string | null>(null);
+let customGraph = ref<string | null>(null);
 
 watchEffect(() => {
   const keys = selectedKeys.value;
@@ -104,7 +108,11 @@ watchEffect(() => {
     const model = props.models.find((model) => model.id === keys[0]);
     if (model) {
       currentModel.value = model;
-      emit("select", model.code);
+      let selectVal = model.code;
+      if (model.code.endsWith(".wgsl") && model.code.includes(".graph")) {
+        selectVal = makeFilePath(model.code.replace(".wgsl", ""));
+      }
+      emit("select", selectVal);
     }
   } else if (keys.length > 1) {
     const models: VirtualModelState[] = [];
@@ -160,6 +168,7 @@ function eulerAnglesUpdate(value: ObjectUpdate<number>) {
   );
 }
 
+const isAdding = ref<boolean>(false);
 const fileNames = ref(new Set<FilePath>());
 props.fs.watchFromStart((change) => {
   if (!change.key.endsWith(".wgsl")) return;
@@ -189,6 +198,7 @@ const shadersDropdown = computed<SelectMixedOption[]>(() => {
 });
 
 function startAddModel() {
+  isAdding.value = true;
   if (shadersDropdown.value.length > 0) {
     const filePath = shadersDropdown.value[0].value as FilePath;
     toAddModel.value = ["New Model", filePath ?? makeFilePath("new-shader")];
@@ -198,7 +208,7 @@ function startAddModel() {
 }
 
 function stopAddModel() {
-  toAddModel.value = null;
+  isAdding.value = false;
 }
 
 function addModel() {
@@ -211,23 +221,48 @@ function addModel() {
     return;
   }
 
-  if (toAddModel.value[1] == undefined) {
-    if (!customShader) {
+  if (toAddModel.value[1] === "wgsl" || toAddModel.value[1] === "graph") {
+    if (!customShader || !customGraph) {
       showError("Invalid State!");
       return;
     }
-    if (customShader.value === null) {
+    if (customGraph.value === null && customShader.value === null) {
       showError(
         "Please enter a name for the new shader or select an existing shader."
       );
       return;
     }
-    toAddModel.value[1] = makeFilePath(customShader.value + ".wgsl");
+    if (customGraph.value !== null) {
+      toAddModel.value[1] = makeFilePath(customGraph.value + ".graph");
+    } else {
+      toAddModel.value[1] = makeFilePath(customShader.value + ".wgsl");
+    }
   }
 
   emit("addModel", toAddModel.value[0], toAddModel.value[1]);
-  toAddModel.value = null;
   customShader.value = null;
+  customGraph.value = null;
+}
+
+function addModelNew(fileEnd: "wgsl" | "graph") {
+  if (!toAddModel.value) {
+    showError("Illegal State!");
+    return;
+  }
+
+  const fileName = toAddModel.value[0] + new Date().toLocaleString();
+  toAddModel.value[1] = makeFilePath(
+    fileName
+      .replaceAll(" ", "-")
+      .replaceAll(":", "")
+      .replaceAll(".", "")
+      .replaceAll(",", "") +
+      "." +
+      fileEnd
+  );
+  emit("addModel", toAddModel.value[0], toAddModel.value[1]);
+  isAdding.value = false;
+  //toAddModel.value = null;
 }
 
 function removeModel() {
@@ -252,6 +287,41 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
 }
 </script>
 <template>
+  <n-modal :show="isAdding" closable class="w-full sm:w-1/2 lg:w-1/3">
+    <n-card
+      title="Create new Model"
+      closable
+      :v-if="isAdding"
+      :on-close="() => (isAdding = false)"
+    >
+      <template #action>
+        <n-flex vertical>
+          <n-flex justify="space-between">
+            <n-text
+              >Create a code-based model, if you want full freedom. Pick this
+              option if you have advanced knowledge in mathematics and
+              programming.</n-text
+            >
+            <n-text
+              >Create a graph-based model, if you want a more restricted option.
+              Pick this option if you have basic knowledge in
+              mathematics.</n-text
+            >
+          </n-flex>
+          <n-text type="info">optional enter model name</n-text>
+          <n-input v-model:value="toAddModel[0]"></n-input>
+          <n-flex justify="end">
+            <n-button type="info" :on-click="() => addModelNew('graph')"
+              >New Graph</n-button
+            >
+            <n-button type="primary" :on-click="() => addModelNew('wgsl')"
+              >New Code</n-button
+            >
+          </n-flex>
+        </n-flex>
+      </template>
+    </n-card>
+  </n-modal>
   <n-flex justify="">
     <n-flex vertical class="mr-1 ml-1">
       <n-h3 class="underline">Scene</n-h3>
@@ -271,7 +341,7 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
       </NodeTree>
     </n-flex>
     <n-divider></n-divider>
-    <div v-if="currentModel && !toAddModel" class="mr-1 ml-1">
+    <div v-if="currentModel && !isAdding" class="mr-1 ml-1">
       <n-h3 class="underline">Inspector</n-h3>
       <n-text>Name</n-text>
       <n-input
@@ -358,7 +428,7 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
         </div>
       </n-flex>
     </div>
-    <div v-if="toAddModel" class="mr-1 ml-1">
+    <!--<div v-if="toAddModel" class="mr-1 ml-1">
       <n-flex>
         <n-text>Name</n-text>
         <n-input v-model:value="toAddModel[0]" type="text" clearable></n-input>
@@ -367,12 +437,21 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
           placeholder="Select a shader for the model"
           :options="shadersDropdown"
           v-model:value="toAddModel[1]"
+          v-on:update-value="(v) => console.log(v)"
         ></n-select>
         <n-input
-          v-if="toAddModel[1] === 'NEW...'"
+          v-if="toAddModel[1] === 'wgsl'"
           v-model:value="customShader"
           type="text"
           placeholder="Please input a name for the new Shader"
+          clearable
+        >
+        </n-input>
+        <n-input
+          v-if="toAddModel[1] === 'graph'"
+          v-model:value="customGraph"
+          type="text"
+          placeholder="Please input a name for the new Graph"
           clearable
         >
         </n-input>
@@ -382,6 +461,6 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
         <n-button @click="stopAddModel()">Cancel</n-button>
         <n-button @click="addModel()">Confirm</n-button>
       </n-flex>
-    </div>
+    </div>-->
   </n-flex>
 </template>

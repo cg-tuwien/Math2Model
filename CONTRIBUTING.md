@@ -85,4 +85,4 @@ From there `App.vue` gets loaded, which is responsible for the overall layout of
 
 ## Deployment
 
-The website is hosted on GitHub Pages. The `gh-pages` branch is used for deployment. It is deployed using a GitHub action. [The action needs to be manually triggered](https://github.com/cg-tuwien/Math2Model/actions/workflows/deploy.yml).
+The website is hosted on GitHub Pages. It is deployed using a GitHub action called `deploy`. [The action needs to be manually triggered](https://github.com/cg-tuwien/Math2Model/actions/workflows/deploy.yml).
