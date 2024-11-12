@@ -103,9 +103,9 @@ fn main() {
                 new_scale_factor: Default::default(),
                 close_requested: Default::default(),
             });
-            renderer.render(&app).unwrap();
             renderer.force_wait();
-            timer.increment_query(renderer.get_profiling_data().unwrap());
+            let render_results = renderer.render(&app).unwrap();
+            timer.increment_query(render_results.profiler_results.unwrap());
         })
     });
     group.finish();

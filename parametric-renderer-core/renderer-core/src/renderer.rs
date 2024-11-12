@@ -6,7 +6,7 @@ mod wgpu_context;
 use std::{collections::HashMap, sync::Arc};
 
 use encase::ShaderType;
-use frame_counter::FrameCounter;
+use frame_counter::{FrameCounter, Seconds};
 use glam::UVec2;
 
 use log::error;
@@ -68,7 +68,7 @@ pub struct GpuApplication {
     profiler: StoredValue<GpuProfiler>,
     profiling_enabled: bool,
     _runtime: Owner,
-    render_tree: Arc<dyn Fn(&FrameData) -> Result<(), wgpu::SurfaceError>>,
+    render_tree: Arc<dyn Fn(&FrameData) -> Result<RenderResults, wgpu::SurfaceError>>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     set_desired_size: WriteSignal<UVec2>,
     set_force_wait: WriteSignal<bool>,
@@ -151,15 +151,13 @@ impl GpuApplication {
         });
     }
 
-    // TODO: API to query the average FPS. Frontend polls it
-
     pub fn remove_shader(&self, shader_id: &ShaderId) {
         self.shaders.update(|shaders| {
             shaders.remove(shader_id);
         });
     }
 
-    pub fn render(&mut self, game: &GameRes) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self, game: &GameRes) -> Result<RenderResults, wgpu::SurfaceError> {
         self.cursor_capture = self.update_cursor_capture(game.cursor_capture);
 
         if self.profiling_enabled != game.profiler_settings.gpu {
@@ -195,12 +193,6 @@ impl GpuApplication {
     pub fn force_wait(&self) {
         self.set_force_wait.set(true);
     }
-
-    pub fn get_profiling_data(&self) -> Option<Vec<wgpu_profiler::GpuTimerQueryResult>> {
-        self.profiler
-            .write_value()
-            .process_finished_frame(self.context.queue.get_timestamp_period())
-    }
 }
 
 fn wgpu_context() -> Arc<WgpuContext> {
@@ -216,7 +208,7 @@ fn render_component(
     force_wait: ReadSignal<bool>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     models: SignalVec<ModelInfo>,
-) -> impl Fn(&FrameData) -> Result<(), wgpu::SurfaceError> {
+) -> impl Fn(&FrameData) -> Result<RenderResults, wgpu::SurfaceError> {
     let context = wgpu_context();
     let frame_counter = RwSignal::new(FrameCounter::new());
     let new_frame_time = move || frame_counter.write().new_frame();
@@ -303,10 +295,10 @@ fn render_component(
             err @ Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 // Roughly based on https://github.com/gfx-rs/wgpu/blob/a0c185a28c232ee2ab63f72d6fd3a63a3f787309/examples/src/framework.rs#L216
                 surface.update(|surface| surface.recreate_swapchain(&context));
-                return err.map(|_| ());
+                return err.map(|_| RenderResults::skip());
             }
             err => {
-                return err.map(|_| ());
+                return err.map(|_| RenderResults::skip());
             }
         };
 
@@ -385,13 +377,23 @@ fn render_component(
 
         surface_texture.present();
 
-        profiler.update_value(|profiler| profiler.end_frame().unwrap());
+        let render_results = {
+            let delta_time = frame_time.delta;
+            let mut profiler = profiler.write_value();
+            profiler.end_frame().unwrap();
+            let profiler_results =
+                profiler.process_finished_frame(context.queue.get_timestamp_period());
+            RenderResults {
+                delta_time,
+                profiler_results,
+            }
+        };
 
         if force_wait.get() {
             context.instance.poll_all(true);
         }
 
-        Ok(())
+        Ok(render_results)
     }
 }
 
@@ -958,6 +960,18 @@ fn update_models(models: SignalVec<ModelInfo>, game_models: &Vec<ModelInfo>) {
         }
         std::cmp::Ordering::Equal => {}
         std::cmp::Ordering::Greater => models.truncate(game_models.len()),
+    }
+}
+
+#[derive(Default)]
+pub struct RenderResults {
+    pub delta_time: Seconds,
+    pub profiler_results: Option<Vec<wgpu_profiler::GpuTimerQueryResult>>,
+}
+
+impl RenderResults {
+    pub fn skip() -> Self {
+        Self::default()
     }
 }
 

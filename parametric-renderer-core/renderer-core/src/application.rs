@@ -14,7 +14,7 @@ use winit::{
 use crate::{
     game::{GameRes, ShaderId},
     input::{InputHandler, WindowInputs},
-    renderer::{GpuApplication, GpuApplicationBuilder},
+    renderer::{frame_counter::Seconds, GpuApplication, GpuApplicationBuilder},
     window_or_fallback::WindowOrFallback,
 };
 pub struct WasmCanvas {
@@ -37,6 +37,7 @@ pub struct Application {
     pub app: GameRes,
     window: Option<Arc<Window>>,
     pub renderer: Option<GpuApplication>,
+    time_counters: TimeCounters,
     app_commands: EventLoopProxy<AppCommand>,
     on_exit_callback: Option<Box<dyn FnOnce(&mut Application)>>,
     pub on_shader_compiled: Option<Arc<dyn Fn(&ShaderId, Vec<wgpu::CompilationMessage>)>>,
@@ -53,6 +54,7 @@ impl Application {
             window: None,
             app: GameRes::new(),
             renderer: None,
+            time_counters: TimeCounters::default(),
             app_commands,
             on_exit_callback: Some(Box::new(on_exit)),
             on_shader_compiled: None,
@@ -193,7 +195,7 @@ impl InputHandler for Application {
             .keyboard
             .just_pressed_physical(winit::keyboard::KeyCode::KeyP)
         {
-            match self.renderer.as_mut().and_then(|v| v.get_profiling_data()) {
+            match &self.time_counters.last_results {
                 Some(data) => {
                     let file_name = format!(
                         "profile-{}.json",
@@ -205,7 +207,7 @@ impl InputHandler for Application {
                     );
                     wgpu_profiler::chrometrace::write_chrometrace(
                         std::path::Path::new(&file_name),
-                        &data,
+                        data,
                     )
                     .unwrap();
                     info!("Profiling data written to {file_name}");
@@ -221,10 +223,26 @@ impl InputHandler for Application {
                 .as_mut()
                 .map(|r| r.resize(UVec2::new(width, height)));
         }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.time_counters.frame_count % 20 == 0 {
+            if let Some(window) = self.window.as_mut() {
+                let title = format!(
+                    "Math2Model - CPU {:.2}ms GPU {:.2}ms",
+                    self.time_counters.avg_delta_time() * 1000.0,
+                    self.time_counters.avg_gpu_time() * 1000.0
+                );
+                window.set_title(&title);
+            }
+        }
+
         self.app.update(&input);
         match self.renderer.as_mut().map(|r| r.render(&self.app)) {
             None => (),
-            Some(Ok(_)) => (),
+            Some(Ok(render_results)) => {
+                self.time_counters
+                    .push_frame(render_results.delta_time, render_results.profiler_results);
+            }
             Some(Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated)) => {
                 info!("Lost or outdated surface");
                 // Nothing to do, surface will be recreated
@@ -239,4 +257,54 @@ impl InputHandler for Application {
             }
         }
     }
+}
+
+#[derive(Default)]
+struct TimeCounters {
+    frame_count: u64,
+    cpu_delta_times: Vec<Seconds>,
+    gpu_frame_times: Vec<Seconds>,
+    last_results: Option<Vec<wgpu_profiler::GpuTimerQueryResult>>,
+}
+
+impl TimeCounters {
+    fn push_frame(
+        &mut self,
+        cpu_delta_time: Seconds,
+        gpu_time_results: Option<Vec<wgpu_profiler::GpuTimerQueryResult>>,
+    ) {
+        self.frame_count += 1;
+        self.cpu_delta_times.push(cpu_delta_time);
+        if self.cpu_delta_times.len() > 10 {
+            self.cpu_delta_times.remove(0);
+        }
+        if let Some(gpu_time_results) = gpu_time_results {
+            let time_range = gpu_time_results
+                .iter()
+                .filter_map(|v| v.time.clone())
+                .reduce(|a, b| a.start.min(b.start)..a.end.max(b.end));
+            if let Some(frame_time) = time_range.map(|v| Seconds((v.end - v.start) as f32)) {
+                self.gpu_frame_times.push(frame_time);
+                if self.gpu_frame_times.len() > 10 {
+                    self.gpu_frame_times.remove(0);
+                }
+            }
+            self.last_results = Some(gpu_time_results);
+        }
+    }
+
+    fn avg_delta_time(&self) -> f32 {
+        avg_seconds(&self.cpu_delta_times)
+    }
+
+    fn avg_gpu_time(&self) -> f32 {
+        avg_seconds(&self.gpu_frame_times)
+    }
+}
+
+fn avg_seconds(data: &[Seconds]) -> f32 {
+    if data.is_empty() {
+        return 0.0;
+    }
+    data.iter().map(|v| v.0).sum::<f32>() / (data.len() as f32)
 }
