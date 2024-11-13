@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { darkTheme, lightTheme, useThemeVars } from "naive-ui";
+import { darkTheme, lightTheme } from "naive-ui";
 import { RouterView } from "vue-router";
 import { useStore } from "./stores/store";
 import { computed } from "vue";
+import { useFsStore } from "./stores/fs-store";
 
 const store = useStore();
+const fsStore = useFsStore();
 const theme = computed(() => (store.isDark ? darkTheme : lightTheme));
-const themeVars = useThemeVars();
 </script>
 
 <template>
@@ -17,13 +18,13 @@ const themeVars = useThemeVars();
     >
       <TopBar></TopBar>
       <n-modal
-        :show="store.importProjectDialog !== null"
+        :show="fsStore.importProjectDialog !== null"
         :mask-closable="false"
       >
         <ImportDialog
-          v-if="store.importProjectDialog !== null"
-          :dialog="store.importProjectDialog"
-          @finish="(v) => store.finishImport(v)"
+          v-if="fsStore.importProjectDialog !== null"
+          :dialog="fsStore.importProjectDialog"
+          @finish="(v) => fsStore.finishImport(v)"
         ></ImportDialog>
         <div v-else></div>
       </n-modal>

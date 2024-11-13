@@ -19,9 +19,7 @@ if (canvasElement === null) {
 GpuDevicePromise.then((v) => {
   gpuDevice.value = markRaw(v);
 });
-WgpuEngine.createEngine(canvasElement).then((v) => {
-  engine.value = markRaw(v);
-});
+engine.value = markRaw(WgpuEngine.createEngine(canvasElement));
 </script>
 
 <template>

@@ -1,26 +1,17 @@
 <script setup lang="ts">
-import CodeEditor, { type KeyedCode } from "@/components/CodeEditor.vue";
+import CodeEditor, {
+  type KeyedCode,
+  type Marker,
+} from "@/components/CodeEditor.vue";
+import { MarkerSeverity } from "monaco-editor/esm/vs/editor/editor.api";
 import IconFolderMultipleOutline from "~icons/mdi/folder-multiple-outline";
 import IconFileTreeOutline from "~icons/mdi/file-tree-outline";
-import {
-  ref,
-  shallowRef,
-  watch,
-  watchEffect,
-  onUnmounted,
-  onMounted,
-  computed,
-  h,
-  type Ref,
-  reactive,
-  defineComponent,
-} from "vue";
+import { ref, watchEffect, computed, h } from "vue";
 import { useDebounceFn, watchImmediate } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import {
   ReactiveFilesystem,
   makeFilePath,
-  useTextFile,
   type FilePath,
 } from "@/filesystem/reactive-files";
 import { showError, showFileError } from "@/notification";
@@ -37,7 +28,8 @@ import {
   serializeScene,
 } from "@/filesystem/scene-file";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
-import HeartSphere from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
+import HeartSphereCode from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
+import DefaultShaderCode from "@/../parametric-renderer-core/shaders/DefaultParametric.wgsl?raw";
 import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
 import BasicGraphShader from "@/../parametric-renderer-core/graphs/BasicGraphShader.graph.wgsl?raw";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
@@ -46,6 +38,8 @@ import CodeGraph from "@/components/visual-programming/CodeGraph.vue";
 import WebGpu from "@/components/WebGpu.vue";
 import { CodeCircle20Regular } from "@vicons/fluent";
 import { GraphicalDataFlow } from "@vicons/carbon";
+import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
+import { useErrorStore } from "@/stores/error-store";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -56,9 +50,23 @@ const props = defineProps<{
 }>();
 
 const store = useStore();
+const errorsStore = useErrorStore();
+props.engine.setOnShaderCompiled((shader, messages) => {
+  errorsStore.setErrors(makeFilePath(shader), messages);
+});
 
 // The underlying data
-const sceneFile = useTextFile(SceneFileName, props.fs);
+const sceneFile = ref<string | null>(null);
+
+props.fs.watchFromStart((change) => {
+  if (change.key === SceneFileName) {
+    // Thread safety: Ordered reads are guaranteed by readTextFile.
+    props.fs.readTextFile(change.key)?.then((v) => {
+      sceneFile.value = v;
+    });
+  }
+});
+
 const scene = useVirtualScene();
 watchEffect(() => {
   if (sceneFile.value === null) {
@@ -76,7 +84,7 @@ watchEffect(() => {
 const openFile = useOpenFile(
   // Open the first .wgsl file if it exists
   props.fs.listFiles().find((v) => v.endsWith(".wgsl")) ?? null,
-  props.fs,
+  props.fs
 );
 
 const canvasContainer = ref<HTMLDivElement | null>(null);
@@ -87,104 +95,64 @@ watchEffect(() => {
 });
 
 {
-  // TODO: Make the Rust side pull files instead of this
-  const referencedFiles = shallowRef(
-    new Map<FilePath, Readonly<Ref<string | null>>>(),
-  );
-  watchImmediate(
-    () => scene.state.value.models,
-    (models) => {
-      const newReferencedFiles = new Map<
-        FilePath,
-        Readonly<Ref<string | null>>
-      >();
-      for (let model of models) {
-        const fileName = model.code;
-        if (newReferencedFiles.has(fileName)) {
-          continue;
-        }
-        const fileReference =
-          referencedFiles.value.get(fileName) ??
-          useTextFile(fileName, props.fs);
-        newReferencedFiles.set(fileName, fileReference);
+  // Watch for shader file changes
+  let shaderFiles = new Map<FilePath, Promise<string>>();
+  const readShaderAsync = (file: FilePath) => {
+    const promise = props.fs.readTextFile(file);
+    if (promise === null) return;
+    shaderFiles.set(file, promise);
+    promise.then((code) => {
+      if (shaderFiles.get(file) === promise) {
+        props.engine.updateShader({
+          id: file,
+          label: file,
+          code,
+        });
       }
-
-      referencedFiles.value = newReferencedFiles;
-    },
-  );
-
-  watchEffect(() => {
-    let models = scene.state.value.models.map((v) => {
-      let code =
-        referencedFiles.value.get(v.code)?.value ??
-        `fn sampleObject(input: vec2f) -> vec3f { return vec3(input, 0.0); }`;
-
-      let model = {
-        transform: {
-          position: [v.position.x, v.position.y, v.position.z],
-          rotation: [v.rotation.x, v.rotation.y, v.rotation.z],
-          scale: v.scale,
-        },
-        material_info: {
-          color: [v.material.color.x, v.material.color.y, v.material.color.z],
-          emissive: [
-            v.material.emissive.x,
-            v.material.emissive.y,
-            v.material.emissive.z,
-          ],
-          roughness: v.material.roughness,
-          metallic: v.material.metallic,
-        },
-        label: v.code,
-        evaluate_image_code: code,
-      };
-      return model;
     });
-    props.engine.updateModels(models);
+  };
+  props.fs.watchFromStart((change) => {
+    if (!change.key.endsWith(".wgsl")) return;
+    if (change.type === "insert") {
+      props.engine.updateShader({
+        id: change.key,
+        label: change.key,
+        code: DefaultShaderCode,
+      });
+      readShaderAsync(change.key);
+    } else if (change.type === "update") {
+      readShaderAsync(change.key);
+    } else if (change.type === "remove") {
+      shaderFiles.delete(change.key);
+      props.engine.removeShader(change.key);
+    }
   });
 }
 
-const shadersDropdown = computed<SelectMixedOption[]>(() => {
-  const shaderList: SelectMixedOption[] = [...props.fs.files.value.keys()]
-    .toSorted()
-    .filter((fileName) => fileName.endsWith(".wgsl"))
-    .map(
-      (fileName): SelectMixedOption => ({
-        label: fileName,
-        value: fileName,
-      }),
-    )
-    .concat({
-      label: "New Shader...",
-      value: "wgsl",
-    });
-  const graphList: SelectMixedOption[] = [...props.fs.files.value.keys()]
-    .toSorted()
-    .filter((fileName) => fileName.endsWith(".graph"))
-    .map(
-      (fileName): SelectMixedOption => ({ label: fileName, value: fileName }),
-    )
-    .concat({
-      label: "New Graph...",
-      value: "graph",
-    });
-
-  return shaderList.concat(graphList);
-});
-
-const graphsDropdown = computed<SelectMixedOption[]>(() => {
-  return [...props.fs.files.value.keys()]
-    .toSorted()
-    .filter((fileName) => fileName.endsWith(".graph"))
-    .map(
-      (fileName): SelectMixedOption => ({
-        label: fileName.substring(
-          0,
-          fileName.valueOf().length - ".graph".length,
-        ),
-        value: fileName,
-      }),
-    );
+watchEffect(() => {
+  let models = scene.state.value.models.map((v) => {
+    let model: WasmModelInfo = {
+      id: v.id,
+      transform: {
+        position: [v.position.x, v.position.y, v.position.z],
+        rotation: [v.rotation.x, v.rotation.y, v.rotation.z],
+        scale: v.scale,
+      },
+      material_info: {
+        color: [v.material.color.x, v.material.color.y, v.material.color.z],
+        emissive: [
+          v.material.emissive.x,
+          v.material.emissive.y,
+          v.material.emissive.z,
+        ],
+        roughness: v.material.roughness,
+        metallic: v.material.metallic,
+      },
+      shader_id: v.code,
+    };
+    return model;
+  });
+  props.engine.updateModels(models);
 });
 
 type EditorType = "shader" | "graph";
@@ -193,6 +161,30 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
   const openedFileName = ref<FilePath | null>(startFile);
   const keyedCode = ref<KeyedCode | null>(null);
   const editorType = ref<EditorType>("shader");
+  const markers = computed<Marker[]>(() => {
+    if (openedFileName.value === null) return [];
+    const messages = errorsStore.errors.get(openedFileName.value) ?? [];
+
+    return messages.map((message) => {
+      const startColumn = message.location?.line_position ?? 1;
+      const endColumn = startColumn + (message.location?.length ?? 1);
+      // TODO: Translate to UTF-16 ^^^
+      const lineNumber = message.location?.line_number ?? 1;
+      return {
+        message: message.message,
+        startLineNumber: lineNumber,
+        startColumn,
+        endColumn,
+        endLineNumber: lineNumber,
+        severity:
+          message.message_type === "Error"
+            ? MarkerSeverity.Error
+            : message.message_type === "Warning"
+              ? MarkerSeverity.Warning
+              : MarkerSeverity.Info,
+      } satisfies Marker;
+    });
+  });
 
   watchImmediate(openedFileName, (fileName) => {
     if (fileName === null) {
@@ -287,6 +279,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
     editorType: computed(() => editorType.value),
     isReadonly,
     code: computed(() => keyedCode.value),
+    markers,
     openFile,
     addFiles,
     renameFile,
@@ -297,7 +290,8 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
 
 type TabName = "filebrowser" | "sceneview";
 function useTabs() {
-  const splitSize = ref(0.2);
+  const defaultSplitSize = 0.1;
+  const splitSize = ref(defaultSplitSize);
   const selectedTab = ref<TabName>("sceneview");
   function renderTabIcon(name: TabName) {
     if (name === "sceneview") {
@@ -313,7 +307,7 @@ function useTabs() {
   function toggleTabSize() {
     const isTabBig = splitSize.value > 0.01;
     if (!isTabBig) {
-      splitSize.value = 0.2;
+      splitSize.value = defaultSplitSize;
     } else if (isTabBig && lastSelectedTab.value === selectedTab.value) {
       splitSize.value = 0.0;
     }
@@ -351,11 +345,11 @@ function addModel(name: string, shaderName: string) {
 
     if (!props.fs.hasFile(vertexSource)) {
       if (vertexSource.endsWith(".wgsl"))
-        props.fs.writeTextFile(vertexSource, HeartSphere);
+        props.fs.writeTextFile(vertexSource, HeartSphereCode);
       else if (vertexSource.endsWith(".graph")) {
         props.fs.writeTextFile(vertexSource, BasicGraph);
         vertexSource = makeFilePath(
-          vertexSource.replace(".graph", ".graph.wgsl"),
+          vertexSource.replace(".graph", ".graph.wgsl")
         );
         props.fs.writeTextFile(vertexSource, BasicGraphShader);
       }
@@ -400,7 +394,7 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
 </script>
 
 <template>
-  <main class="flex h-full">
+  <main class="flex flex-1 min-h-0">
     <n-tabs
       type="line"
       animated
@@ -421,11 +415,9 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
       ></n-tab>
     </n-tabs>
     <n-split
-      style="height: 96.8vh"
       direction="horizontal"
       :max="0.75"
       :min="0"
-      :default-size="0.2"
       v-model:size="tabs.splitSize.value"
     >
       <template #1>
@@ -433,10 +425,7 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
           <div v-if="tabs.selectedTab.value === 'sceneview'">
             <SceneHierarchy
               :models="scene.state.value.models"
-              :scene="scene.api.value"
-              :files="props.fs"
-              :scene-path="SceneFileName"
-              :shaders="shadersDropdown"
+              :fs="props.fs"
               @update="(keys, update) => updateModels(keys, update)"
               @addModel="
                 (modelName, shaderName) => addModel(modelName, shaderName)
@@ -473,9 +462,8 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
               <div
                 ref="canvasContainer"
                 class="self-stretch overflow-hidden flex-1"
-                style="height: 99%"
               >
-                <!--<div v-if="sceneFile == null">Missing scene.json</div> TODO: Include again (wait this is not the actual repository, I just realized) -->
+                <div v-if="sceneFile == null">Missing scene.json</div>
               </div>
             </div>
           </template>
@@ -487,6 +475,7 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
                 :keyed-code="openFile.code.value"
                 :is-readonly="openFile.isReadonly.value"
                 :is-dark="store.isDark"
+                :markers="openFile.markers.value"
                 @update="openFile.setNewCode($event)"
               >
               </CodeEditor>
@@ -495,7 +484,6 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
                 class="self-stretch overflow-hidden flex-1"
                 :fs="props.fs"
                 :keyedGraph="openFile.code.value"
-                :graphs="graphsDropdown"
                 @update="
                   (content) => {
                     if (openFile.path.value !== null) {

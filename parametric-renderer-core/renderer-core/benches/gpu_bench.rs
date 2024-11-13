@@ -6,7 +6,11 @@ use criterion::{
 };
 use glam::Vec3;
 use pollster::FutureExt;
-use renderer_core::application::{CpuApplication, ProfilerSettings, WindowOrFallback};
+use renderer_core::{
+    game::{GameRes, ShaderId, ShaderInfo},
+    renderer::GpuApplicationBuilder,
+    window_or_fallback::WindowOrFallback,
+};
 
 const DEFAULT_SHADER_CODE: &'static str = include_str!("../../shaders/HeartSphere.wgsl");
 
@@ -20,22 +24,30 @@ fn main() {
     // See https://github.com/FL33TW00D/wgpu-bench/blob/db76a8dc5508ba183f36df9f6b2551712d582355/src/bench.rs#L165
     // which gets the throughput from https://github.com/FL33TW00D/wgpu-bench/blob/db76a8dc5508ba183f36df9f6b2551712d582355/benches/mlx-gemv/gemv.rs#L114
 
-    let mut app = CpuApplication::new().unwrap();
-    app.set_profiling(ProfilerSettings { gpu: true });
+    let mut app = GameRes::new();
+    app.profiler_settings.gpu = true;
+    let shader_id = ShaderId("HeartSphere.wgsl".into());
+    app.set_shader(
+        shader_id.clone(),
+        ShaderInfo {
+            label: "HeartSphere".into(),
+            code: DEFAULT_SHADER_CODE.into(),
+        },
+    );
 
-    app.update_models(vec![renderer_core::application::ModelInfo {
-        label: "Default Model".to_owned(),
+    app.update_models(vec![renderer_core::game::ModelInfo {
+        id: "0659dcb1-6229-46bd-a306-6ceebfcf2e42".into(),
         transform: renderer_core::transform::Transform {
             position: Vec3::new(0.0, 0.0, 0.0),
             ..Default::default()
         },
-        material_info: renderer_core::application::MaterialInfo {
+        material_info: renderer_core::game::MaterialInfo {
             color: Vec3::new(0.6, 1.0, 1.0),
             emissive: Vec3::new(0.0, 0.0, 0.0),
             roughness: 0.7,
             metallic: 0.1,
         },
-        evaluate_image_code: DEFAULT_SHADER_CODE.to_owned(),
+        shader_id,
     }]);
 
     // TODO: Why is this needed for benchmarking?
@@ -49,14 +61,17 @@ fn main() {
             )
             .unwrap(),
     );
-    app.create_surface(WindowOrFallback::Window(window))
-        .block_on()
-        .unwrap();
-    /*app.create_surface(WindowOrFallback::Headless {
+    /*WindowOrFallback::Headless {
         size: Vec2::new(1280, 720),
-    })
-    .block_on()
-    .unwrap();*/
+    }*/
+    let mut renderer = GpuApplicationBuilder::new(WindowOrFallback::Window(window))
+        .block_on()
+        .unwrap()
+        .build();
+
+    for (shader_id, shader_info) in &app.shaders {
+        renderer.set_shader(shader_id.clone(), shader_info, None);
+    }
 
     let mut group = c.benchmark_group("render");
     // group.throughput(throughput);
@@ -88,9 +103,9 @@ fn main() {
                 new_scale_factor: Default::default(),
                 close_requested: Default::default(),
             });
-            app.render().unwrap();
-            app.gpu.as_ref().unwrap().force_wait();
-            timer.increment_query(app.get_profiling_data().unwrap());
+            renderer.force_wait();
+            let render_results = renderer.render(&app).unwrap();
+            timer.increment_query(render_results.profiler_results.unwrap());
         })
     });
     group.finish();
@@ -191,7 +206,6 @@ impl ValueFormatter for WgpuTimerFormatter {
         "ms"
     }
 
-    /// TODO!
     fn scale_throughputs(
         &self,
         _typical_value: f64,
