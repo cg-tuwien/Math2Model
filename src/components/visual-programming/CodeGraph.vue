@@ -53,7 +53,7 @@ import {
   type ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
-import { showError } from "@/notification";
+import { showError, showInfo } from "@/notification";
 import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
 import Heart from "@/../parametric-renderer-core/graphs/Heart.graph?raw";
 import Sphere from "@/../parametric-renderer-core/graphs/Sphere.graph?raw";
@@ -816,44 +816,35 @@ const applier = new ArrangeAppliers.TransitionApplier<Schemes, AreaExtra>({
 async function checkForUnsafeConnections(
   connection: ClassicPreset.Connection<Nodes, Nodes>,
 ) {
+  console.log("Called checkForUnsafeConnection()");
   const start = connection.source;
-  let end = connection.target;
+  const end = connection.target;
+  let removeFlag = false;
   if (start === end) {
     await editor.removeConnection(connection.id);
-    showError(
-      "This connection is not allowed, since it would create a cycle!",
-      "Invalid Connection",
-    );
+    showInfo("This connection is not allowed, since it would create a cycle!");
     return;
   }
 
-  await editor.removeConnection(connection.id);
+  shouldUpdate = false;
+  // await editor.removeConnection(connection.id);
 
   const graph = structures(editor);
 
   // Check ancestors of start node
-  const ancestors = graph.predecessors(start).nodes;
+  const ancestors = graph.predecessors(start).nodes();
   // if end node is part of ancestors -> Cycle!
-  for (let node in ancestors) {
-    console.log("checking node " + node);
-    if (node.id === end) {
-      // await editor.removeConnection(connection.id);
-      showError(
-        "This connection is not allowed, since it would create a cycle!",
-        "Invalid Connection",
-      );
-      return;
-    }
+  removeFlag = ancestors.map((n) => n.id).includes(end);
+
+  shouldUpdate = true;
+
+  if (removeFlag) {
+    await editor.removeConnection(connection.id);
+    showInfo("This connection is not allowed, since it would create a cycle!");
+    return;
   }
 
-  await editor.addConnection(
-    new ClassicPreset.Connection(
-      editor.getNode(connection.source),
-      connection.sourceOutput,
-      editor.getNode(connection.target),
-      connection.targetInput,
-    ),
-  );
+  await editor.addNode(new NothingNode());
 }
 
 async function createEditor() {
@@ -1045,37 +1036,41 @@ async function createEditor() {
   editor.addPipe((context) => {
     //console.log("should update", context.type, shouldUpdate);
     if (context.type === "connectioncreated") {
-      //checkForUnsafeConnections(
-      //  context.data as ClassicPreset.Connection<Nodes, Nodes>,
-      //); // TODO: FIX IT!;
+      if (shouldUpdate) {
+        checkForUnsafeConnections(
+          context.data as ClassicPreset.Connection<Nodes, Nodes>,
+        ).then(update); // TODO: FIX IT!;
+      }
     }
     if (
       [
-        "connectioncreated",
         "connectionremoved",
         "nodecreated",
         "noderemoved",
         "scopeupdated",
       ].includes(context.type)
     ) {
-      engine.reset();
-      if (!shouldUpdate) return;
-      // arrange.layout();
-      editor
-        .getNodes()
-        .filter(
-          (n) =>
-            !(n instanceof LogicScopeNode || n instanceof FunctionScopeNode),
-        )
-        .forEach((n) => n.updateSize(area));
-
-      saveGraphThrottled();
+      update();
     }
 
     return context;
   });
 
   await logCode();
+}
+
+function update() {
+  engine.reset();
+  if (!shouldUpdate) return;
+  // arrange.layout();
+  editor
+    .getNodes()
+    .filter(
+      (n) => !(n instanceof LogicScopeNode || n instanceof FunctionScopeNode),
+    )
+    .forEach((n) => n.updateSize(area));
+
+  saveGraphThrottled();
 }
 
 async function saveGraph() {
