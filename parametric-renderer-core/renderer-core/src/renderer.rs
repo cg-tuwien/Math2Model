@@ -768,7 +768,7 @@ fn lod_stage_component(
         patches_buffer[0].write_buffer(
             queue,
             &compute_patches::Patches {
-                patches_length: 1,
+                patches_length: instance_count,
                 patches_capacity: MAX_PATCH_COUNT,
                 patches: (0..instance_count)
                     .map(|i| {
@@ -784,7 +784,11 @@ fn lod_stage_component(
         );
         indirect_compute_buffer[0].write_buffer(
             queue,
-            &compute_patches::DispatchIndirectArgs { x: 1, y: 1, z: 1 },
+            &compute_patches::DispatchIndirectArgs {
+                x: instance_count,
+                y: 1,
+                z: 1,
+            },
         );
 
         let render_buffer_reset = compute_patches::RenderBuffer {
