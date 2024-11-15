@@ -113,6 +113,7 @@ where
             TypedBufferVariant::Uniform => write_uniform_buffer(data),
             TypedBufferVariant::Storage => write_storage_buffer(data),
         };
+        // TODO: Use https://docs.rs/wgpu/23.0.0/wgpu/struct.Queue.html#method.write_buffer_with instead
         queue.write_buffer(&self.buffer, 0, contents.as_slice());
     }
 

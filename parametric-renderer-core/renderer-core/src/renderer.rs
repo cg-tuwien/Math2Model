@@ -599,6 +599,8 @@ fn lod_stage_component(
     let context = wgpu_context();
     let device = &context.device;
     let id = model.read().id.clone(); // I wonder if this ID stays the same
+
+    // TODO: Hoist these higher up (share across all models)
     let patches_buffer_reset = TypedBuffer::new_storage_with_runtime_array(
         device,
         "Patches Buffer Reset",
@@ -613,6 +615,7 @@ fn lod_stage_component(
     let indirect_compute_buffer_reset = TypedBuffer::new_storage(
         device,
         "Indirect Compute Dispatch Buffer Reset",
+        // We only write to x. y and z have their default value.
         &compute_patches::DispatchIndirectArgs { x: 0, y: 1, z: 1 },
         wgpu::BufferUsages::COPY_SRC,
     );
@@ -678,18 +681,18 @@ fn lod_stage_component(
         ),
     ];
 
-    let indirect_compute_empty = compute_patches::DispatchIndirectArgs { x: 0, y: 0, z: 0 };
     let indirect_compute_buffer = [
         TypedBuffer::new_storage(
             device,
             &format!("{id} Indirect Compute Dispatch Buffer 0"),
-            &indirect_compute_empty,
+            // None of these values will ever be read
+            &compute_patches::DispatchIndirectArgs { x: 0, y: 0, z: 0 },
             wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
         ),
         TypedBuffer::new_storage(
             device,
             &format!("{id} Indirect Compute Dispatch Buffer 1"),
-            &indirect_compute_empty,
+            &compute_patches::DispatchIndirectArgs { x: 0, y: 0, z: 0 },
             wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
         ),
     ];
