@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { makeFilePath } from "./reactive-files";
 
+// Warning:
+// Changes to this file mean that you could be breaking someone's scene out there!
+// So make sure to keep compatibility in mind.
+
 export const SceneFileName = makeFilePath("scene.json");
 
 export const SceneFileSchemaUrl = "http://virtual/scene-schema.json" as const;
@@ -21,6 +25,7 @@ export const ModelSchema = z.object({
   scale: z.number(),
   parametricShader: z.string(),
   material: MaterialParameterSchema,
+  instanceCount: z.number().catch(() => 1),
 });
 
 export type SerializedModel = z.infer<typeof ModelSchema>;

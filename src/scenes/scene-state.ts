@@ -76,6 +76,7 @@ export interface VirtualModelState {
   rotation: ReadonlyEulerAngles;
   scale: number;
   material: MaterialParameter;
+  instanceCount: number;
 }
 
 export interface VirtualSceneState {
@@ -165,6 +166,7 @@ function serializeModel(model: VirtualModelState): SerializedModel {
       metallic: model.material.metallic,
       emissive: model.material.emissive.serialize(),
     },
+    instanceCount: model.instanceCount,
   };
 }
 
@@ -183,5 +185,6 @@ function deserializeModel(data: SerializedModel): VirtualModelState {
       metallic: data.material.metallic,
       emissive: ReadonlyVector3.fromSerialized(data.material.emissive),
     },
+    instanceCount: data.instanceCount,
   };
 }

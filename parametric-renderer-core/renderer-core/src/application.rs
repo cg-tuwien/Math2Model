@@ -3,11 +3,7 @@ use std::sync::Arc;
 use glam::UVec2;
 use log::{error, info, warn};
 use winit::{
-    application::ApplicationHandler,
-    dpi::PhysicalSize,
-    event_loop::EventLoopProxy,
-    keyboard::{Key, NamedKey},
-    window::Window,
+    application::ApplicationHandler, dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window,
 };
 
 use crate::{
@@ -177,7 +173,9 @@ impl InputHandler for Application {
         #[cfg(not(target_arch = "wasm32"))]
         if input
             .keyboard
-            .just_released_logical(Key::Named(NamedKey::Escape))
+            .just_released_logical(winit::keyboard::Key::Named(
+                winit::keyboard::NamedKey::Escape,
+            ))
         {
             self.on_exit();
             return event_loop.exit();

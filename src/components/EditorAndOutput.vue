@@ -149,6 +149,7 @@ watchEffect(() => {
         metallic: v.material.metallic,
       },
       shader_id: v.code,
+      instance_count: v.instanceCount,
     };
     return model;
   });
@@ -369,6 +370,7 @@ function addModel(name: string, shaderName: string) {
         metallic: Math.random(),
         emissive: new ReadonlyVector3(0, 0, 0),
       },
+      instanceCount: 1,
     };
 
     scene.api.value.addModel(newModel);
