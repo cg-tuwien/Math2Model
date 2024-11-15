@@ -116,7 +116,7 @@ impl SceneData {
 }
 
 impl Camera {
-    pub fn to_shader(&self, size: UVec2) -> shader::Camera {
+    fn to_shader(&self, size: UVec2) -> shader::Camera {
         shader::Camera {
             view: self.view_matrix(),
             projection: self.projection_matrix(size),

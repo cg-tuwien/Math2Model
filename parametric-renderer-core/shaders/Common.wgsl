@@ -1,10 +1,12 @@
 struct EncodedPatch {
   u: u32,
   v: u32,
+  instance: u32
 };
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
+  instance: u32
 };
 struct Patches {
   patches_length: atomic<u32>,
@@ -37,16 +39,16 @@ fn patch_u_child(u: u32, child_bit: u32) -> u32 {
   return (u << 1) | (child_bit & 1);
 }
 fn patch_top_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 0u));
+  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 0u), encoded.instance);
 }
 fn patch_bottom_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 1u));
+  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 1u), encoded.instance);
 }
 fn patch_left_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(patch_u_child(encoded.u, 0u), encoded.v);
+  return EncodedPatch(patch_u_child(encoded.u, 0u), encoded.v, encoded.instance);
 }
 fn patch_right_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(patch_u_child(encoded.u, 1u), encoded.v);
+  return EncodedPatch(patch_u_child(encoded.u, 1u), encoded.v, encoded.instance);
 }
 fn patch_top_left_child(encoded: EncodedPatch) -> EncodedPatch {
   return patch_top_child(patch_left_child(encoded));
@@ -93,7 +95,7 @@ fn patch_decode(encoded: EncodedPatch) -> Patch {
   // But we care about this_patch.max == next_patch.min, 
   // so we need to do the floating point calculations more carefully
   
-  return Patch(min_value, max_value);
+  return Patch(min_value, max_value, encoded.instance);
 }
 
 fn assert(condition: bool) {

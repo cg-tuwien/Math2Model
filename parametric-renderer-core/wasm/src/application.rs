@@ -66,6 +66,7 @@ impl WasmApplication {
                 transform: v.transform.into(),
                 material_info: v.material_info.into(),
                 shader_id: ShaderId(v.shader_id),
+                instance_count: v.instance_count,
             })
             .collect();
         let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), |app| {

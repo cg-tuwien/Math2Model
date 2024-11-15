@@ -12,7 +12,9 @@ fn sampleObject(input: vec2f) -> vec3f {
     let sphere = vec3(x, y, z) * 3.0;
     let heart = vec3(x2, y2, z2) * 0.2;
 
-    let p = vec3(mix(sphere, heart, 0.7) * 1.);
+    let translation = vec3(f32(instance_id), 0., f32(instance_id) * 0.2) * 10.;
+
+    let p = vec3(mix(sphere, heart, 0.7) * 1.) + translation;
 
     return p;
 }

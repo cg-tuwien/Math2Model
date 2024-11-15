@@ -11,7 +11,7 @@ use winit::event_loop::EventLoop;
 use crate::config::{CacheFile, CachedCamera, CachedChosenController};
 
 const CACHE_FILE: &'static str = "cache.json";
-const DEFAULT_SHADER_CODE: &'static str = include_str!("../../shaders/HeartSphere.wgsl");
+const HEART_SPHERE_SHADER_CODE: &'static str = include_str!("../../shaders/HeartSphere.wgsl");
 
 fn save_cache(mut cache_file: CacheFile) -> impl FnOnce(&mut Application) {
     move |app: &mut Application| {
@@ -44,7 +44,7 @@ pub fn run() -> anyhow::Result<()> {
         shader_id.clone(),
         ShaderInfo {
             label: "HeartSphere".into(),
-            code: DEFAULT_SHADER_CODE.into(),
+            code: HEART_SPHERE_SHADER_CODE.into(),
         },
     );
     application.app.update_models(vec![ModelInfo {
@@ -60,6 +60,7 @@ pub fn run() -> anyhow::Result<()> {
             metallic: 0.1,
         },
         shader_id,
+        instance_count: 5,
     }]);
 
     if let Some(CachedCamera {

@@ -26,6 +26,7 @@ pub struct ModelInfo {
     pub transform: Transform,
     pub material_info: MaterialInfo,
     pub shader_id: ShaderId,
+    pub instance_count: u32,
 }
 
 #[derive(Debug, Clone, PartialEq)]

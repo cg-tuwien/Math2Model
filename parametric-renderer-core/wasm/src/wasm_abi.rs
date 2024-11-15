@@ -10,6 +10,7 @@ pub struct WasmModelInfo {
     pub transform: WasmTransform,
     pub material_info: WasmMaterialInfo,
     pub shader_id: String,
+    pub instance_count: u32,
 }
 
 #[derive(Tsify, Serialize, Deserialize)]

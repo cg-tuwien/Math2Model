@@ -48,6 +48,7 @@ fn main() {
             metallic: 0.1,
         },
         shader_id,
+        instance_count: 1,
     }]);
 
     // TODO: Why is this needed for benchmarking?

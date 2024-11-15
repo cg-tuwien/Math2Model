@@ -764,16 +764,22 @@ fn lod_stage_component(
                 threshold_factor: threshold_factor.get(),
             },
         );
+        let instance_count = model.with(|v| v.instance_count);
         patches_buffer[0].write_buffer(
             queue,
             &compute_patches::Patches {
                 patches_length: 1,
                 patches_capacity: MAX_PATCH_COUNT,
-                patches: vec![compute_patches::EncodedPatch {
-                    // Just the leading 1 bit
-                    u: 1,
-                    v: 1,
-                }],
+                patches: (0..instance_count)
+                    .map(|i| {
+                        compute_patches::EncodedPatch {
+                            // Just the leading 1 bit
+                            u: 1,
+                            v: 1,
+                            instance: i,
+                        }
+                    })
+                    .collect(),
             },
         );
         indirect_compute_buffer[0].write_buffer(
