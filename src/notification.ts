@@ -13,7 +13,7 @@ export function showError(
   opts: { error?: any; title?: string } = {}
 ) {
   // TODO: show the entire error on request
-  console.error(msg, opts.error);
+  console.trace(msg, opts.error);
   notification.error({
     title: opts.title ?? "Error",
     content: msg,
@@ -26,7 +26,7 @@ export function showFileError(
   opts: { error?: any; title?: string } = {}
 ) {
   // TODO: Show the file path in the error message. And make it clickable to open the file.
-  console.error(msg, opts.error);
+  console.trace(msg, opts.error);
   notification.error({
     title: `Error in ${file}`,
     content: msg,
