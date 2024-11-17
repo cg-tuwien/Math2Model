@@ -388,7 +388,7 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
             placeholder="Select a shader for the model"
             :options="shadersDropdown"
             :value="currentModel.code"
-            @update="
+            @update-value="
               (v: string) => change('code', new ObjectUpdate([], () => v + ''))
             "
           ></n-select>
