@@ -1,5 +1,7 @@
 ////#include "./Common.wgsl"
 //// AUTOGEN a3e9ed29815a874bd85200dd8dcf0acab01cd6236e68b912d7e96522fbd9fd21
+// Encoded patch contains x and y coordinates to describe the patch, the bits of u and v
+// describe a binary subdivision pattern of the full 1x1 square
 struct EncodedPatch {
   u: u32,
   v: u32,
@@ -169,12 +171,22 @@ const WORKGROUP_SIZE = U_X * U_Y;
 // A vec2 with screen space coordinates
 alias vec2Screen = vec2<f32>;
 
+
+// Storage in workgroup to combine our 32 samples
 var<workgroup> u_samples: array<array<vec2Screen, U_X>, U_Y>;
 var<workgroup> v_samples: array<array<vec2Screen, U_X>, U_Y>;
 const U_LENGTHS_X = U_X - 1; // Last sample per row doesn't have a next sample
 var<workgroup> u_lengths: array<array<f32, U_LENGTHS_X>, U_Y>;
 var<workgroup> v_lengths: array<array<f32, U_LENGTHS_X>, U_Y>;
 var<workgroup> frustum_sides: array<u32, 25>;
+
+fn force_render_internal(quad_encoded: EncodedPatch)
+{
+    let write_index = atomicAdd(&render_buffer_2.patches_length, 1u);
+    if (write_index < render_buffer_2.patches_capacity && false) {
+        render_buffer_2.patches[write_index] = quad_encoded;
+    }
+}
 
 /// Split the patch and write it to the output buffers
 fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>) {
@@ -184,56 +196,14 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
   let patch_bottom_left = patch_bottom_left_child(quad_encoded);
 
   if (force_render.flag == 1u) {
-    /* No splits, render the patch
-    +---+---+
-    |       |
-    +       +
-    |       |
-    +---+---+
-    */
-    let max_u_length = max(max(u_length[0], u_length[1]), max(u_length[2], u_length[3]));
-    let max_v_length = max(max(v_length[0], v_length[1]), max(v_length[2], v_length[3]));
-
-    let threshold_16 = (16.0 * screen.inv_resolution) * input_buffer.threshold_factor;
-    let threshold_8 = (8.0 * screen.inv_resolution) * input_buffer.threshold_factor;
-    let threshold_4 = (4.0 * screen.inv_resolution) * input_buffer.threshold_factor;
-    let threshold_2 = (2.0 * screen.inv_resolution) * input_buffer.threshold_factor;
-
-    if (max_u_length > threshold_16.x || max_v_length > threshold_16.y) {
-      let write_index = atomicAdd(&render_buffer_32.patches_length, 1u);
-      if (write_index < render_buffer_32.patches_capacity) {
-        render_buffer_32.patches[write_index] = quad_encoded;
-      }
-    } else if (max_u_length > threshold_8.x || max_v_length > threshold_8.y) {
-      let write_index = atomicAdd(&render_buffer_16.patches_length, 1u);
-      if (write_index < render_buffer_16.patches_capacity) {
-        render_buffer_16.patches[write_index] = quad_encoded;
-      }
-    } else if (max_u_length > threshold_4.x || max_v_length > threshold_4.y) {
-      let write_index = atomicAdd(&render_buffer_8.patches_length, 1u);
-      if (write_index < render_buffer_8.patches_capacity) {
-        render_buffer_8.patches[write_index] = quad_encoded;
-      }
-    } else if (max_u_length > threshold_2.x || max_v_length > threshold_2.y) {
-      let write_index = atomicAdd(&render_buffer_4.patches_length, 1u);
-      if (write_index < render_buffer_4.patches_capacity) {
-        render_buffer_4.patches[write_index] = quad_encoded;
-      }
-    } else {
-      let write_index = atomicAdd(&render_buffer_2.patches_length, 1u);
-      if (write_index < render_buffer_2.patches_capacity) {
-        render_buffer_2.patches[write_index] = quad_encoded;
-      }
-    }
+    force_render_internal(quad_encoded);
   } else {
-    /*
-    Split all 4 ways
-    +---+---+
-    |   |   |
-    +---+---+
-    |   |   |
-    +---+---+
-    */
+    // Split all 4 ways
+    // +---+---+
+    // |   |   |
+    // +---+---+
+    // |   |   |
+    // +---+---+
     let write_index = atomicAdd(&patches_to_buffer.patches_length, 4u);
     if write_index + 4 < patches_to_buffer.patches_capacity {
       atomicAdd(&dispatch_next.x, 4u);
@@ -269,32 +239,6 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
   let quad = patch_decode(patches_from_buffer.patches[patch_index]);
   let quad_size = quad.max - quad.min;
 
-  // Culling is done by checking if all samples are outside of exactly one of the frustum planes :)
-  // 5*5 = 25 extra samples for frustum culling
-  let extra_sample_index = vec2<u32>(sample_index % 5u, sample_index / 5u);
-  let extra_sample_location = quad.min + vec2(
-    // Divide by 4.0 because we have 5 samples, but we want to go from 0 to 1
-    (quad_size.x / 4.0) * f32(extra_sample_index.x),
-    (quad_size.y / 4.0) * f32(extra_sample_index.y)
-  );
-  if (sample_index < 25) {
-    let extra_sample = sampleObject(extra_sample_location);
-    let extra_clip_space = input_buffer.model_view_projection * vec4f(extra_sample.xyz, 1.0);
-    frustum_sides[sample_index] = get_frustum_side(extra_clip_space);
-  }
-  workgroupBarrier(); // wait for frustum_sides
-  // Now parallel combine the frustum sides
-  for (var i: u32 = 16u; i > 0u; i >>= 1u) {
-    if (sample_index < i && sample_index + i < 25u) {
-      frustum_sides[sample_index] &= frustum_sides[sample_index + i];
-    }
-    workgroupBarrier();
-  }
-  // frustum_sides[0] now contains the combined frustum sides for the entire patch
-  if (workgroupUniformLoad(&frustum_sides[0]) != 0u) {
-    return; // Skip the entire patch
-  }
-
   let u_v_sample_index = vec2<u32>(sample_index % U_X, sample_index / U_X);
 
   // 4*8 = 32 U samples
@@ -323,6 +267,7 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
 
   workgroupBarrier(); // wait for u_samples and v_samples
   if (u_v_sample_index.x < U_X - 1) {
+    // calculate distances between u samples
     let u_length = distance(u_samples[u_v_sample_index.y][u_v_sample_index.x], u_samples[u_v_sample_index.y][u_v_sample_index.x + 1]);
     u_lengths[u_v_sample_index.y][u_v_sample_index.x] = u_length;
     // v might go in a different direction, but the array layout is the same

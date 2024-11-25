@@ -261,6 +261,7 @@ async function main() {
     buffers: LodStageBuffers,
     commandEncoder: GPUCommandEncoder
   ) {
+    debugger;
     const compiledShader = compiledShaders.value.get(makeFilePath(shaderPath));
     if (!compiledShader) {
       console.error("Shader not found: ", shaderPath);
@@ -269,7 +270,7 @@ async function main() {
     const pipeline = compiledShader.pipeline;
 
     // We inefficiently recreate the bind groups every time.
-    const bindGroup0 = device.createBindGroup({
+    const userInputBindGroup = device.createBindGroup({
       layout: layout0,
       entries: [
         {
@@ -287,7 +288,7 @@ async function main() {
       ],
     });
 
-    const bindGroup1 = device.createBindGroup({
+    const toRenderPatchesBindGroup = device.createBindGroup({
       layout: layout1,
       entries: [
         {
@@ -316,7 +317,7 @@ async function main() {
         },
       ],
     });
-    const bindGroups2 = [
+    const pingPongPatchesBindGroup = [
       device.createBindGroup({
         layout: layout2,
         entries: [
@@ -382,9 +383,9 @@ async function main() {
 
       let computePassPing = commandEncoder.beginComputePass();
       computePassPing.setPipeline(pipeline);
-      computePassPing.setBindGroup(0, bindGroup0);
-      computePassPing.setBindGroup(1, bindGroup1);
-      computePassPing.setBindGroup(2, bindGroups2[0]);
+      computePassPing.setBindGroup(0, userInputBindGroup);
+      computePassPing.setBindGroup(1, toRenderPatchesBindGroup);
+      computePassPing.setBindGroup(2, pingPongPatchesBindGroup[0]);
       computePassPing.dispatchWorkgroupsIndirect(buffers.indirectDispatch0, 0);
       computePassPing.end();
 
@@ -418,9 +419,9 @@ async function main() {
 
       let computePassPong = commandEncoder.beginComputePass({ label: "Pong" });
       computePassPong.setPipeline(pipeline);
-      computePassPong.setBindGroup(0, bindGroup0);
-      computePassPong.setBindGroup(1, bindGroup1);
-      computePassPong.setBindGroup(2, bindGroups2[1]);
+      computePassPong.setBindGroup(0, userInputBindGroup);
+      computePassPong.setBindGroup(1, toRenderPatchesBindGroup);
+      computePassPong.setBindGroup(2, pingPongPatchesBindGroup[1]);
       computePassPong.dispatchWorkgroupsIndirect(buffers.indirectDispatch1, 0);
       computePassPong.end();
 
