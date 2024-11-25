@@ -68,9 +68,12 @@ impl WasmApplication {
                 shader_id: ShaderId(v.shader_id),
                 instance_count: v.instance_count,
             })
-            .collect();
+            .collect::<Vec<_>>();
         let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), |app| {
-            app.app.update_models(models)
+            app.renderer.as_mut().map(|renderer| {
+                renderer.update_models(&models);
+            });
+            app.app.update_models(models);
         })
         .await;
     }

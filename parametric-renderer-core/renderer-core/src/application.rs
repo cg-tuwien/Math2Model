@@ -73,12 +73,12 @@ impl Application {
         let app_commands = self.app_commands.clone();
         let on_shader_compiled = self.on_shader_compiled.clone();
         let task = async move {
-            println!("Creating renderer");
             let renderer = gpu_builder.await.unwrap().build();
             let _ = run_on_main(app_commands, move |app| {
                 for (shader_id, shader_info) in &app.app.shaders {
                     renderer.set_shader(shader_id.clone(), shader_info, on_shader_compiled.clone());
                 }
+                renderer.update_models(&app.app.models);
                 app.renderer = Some(renderer)
             })
             .await;
