@@ -362,7 +362,7 @@ async function main() {
       }),
     ];
 
-    const doubleNumberOfRounds = 1;
+    const doubleNumberOfRounds = 2;
     for (let i = 0; i < doubleNumberOfRounds; i++) {
       const isLastRound = i === doubleNumberOfRounds - 1;
       // Ping

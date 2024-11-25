@@ -183,7 +183,7 @@ var<workgroup> frustum_sides: array<u32, 25>;
 fn force_render_internal(quad_encoded: EncodedPatch)
 {
     let write_index = atomicAdd(&render_buffer_2.patches_length, 1u);
-    if (write_index < render_buffer_2.patches_capacity && false) {
+    if (write_index < render_buffer_2.patches_capacity) {
         render_buffer_2.patches[write_index] = quad_encoded;
     }
 }
