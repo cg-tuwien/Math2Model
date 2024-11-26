@@ -28,7 +28,7 @@ use wgpu_profiler::GpuProfiler;
 
 use crate::{
     buffer::{CommandEncoderExt, TypedBuffer},
-    game::{GameRes, MaterialInfo, ModelInfo, ShaderId},
+    game::{GameRes, MaterialInfo, ModelInfo, ShaderId, TextureId, TextureInfo},
     mesh::Mesh,
     reactive::{ForEach, MemoComputed, SignalVec},
     shaders::{compute_patches, copy_patches, ground_plane, shader},
@@ -71,6 +71,7 @@ pub struct GpuApplication {
     render_effect: RenderEffect<Result<RenderResults, wgpu::SurfaceError>>,
     set_render_data: ArcWriteSignal<FrameData>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
+    textures: RwSignal<HashMap<TextureId, Arc<Texture>>>,
     set_desired_size: WriteSignal<UVec2>,
     set_force_wait: WriteSignal<bool>,
     /// Sets the threshold factor for the LOD algorithm
@@ -100,6 +101,7 @@ impl GpuApplication {
 
         provide_context(MissingShader(make_missing_shader(&context)));
         let shaders = RwSignal::new(HashMap::new());
+        let textures = RwSignal::new(HashMap::new());
 
         let render_tree = Owner::with(&runtime, || {
             Arc::new(render_component(
@@ -109,6 +111,7 @@ impl GpuApplication {
                 threshold_factor,
                 force_wait,
                 shaders,
+                textures,
                 models.clone(),
             ))
         });
@@ -125,6 +128,7 @@ impl GpuApplication {
             render_effect,
             set_render_data,
             shaders,
+            textures,
 
             set_desired_size,
             set_threshold_factor,
@@ -182,6 +186,19 @@ impl GpuApplication {
         });
     }
 
+    pub fn set_texture(&mut self, id: TextureId, info: &TextureInfo) {
+        let texture = Texture::new_rgba(&self.context.device, &self.context.queue, info);
+        self.textures.update(move |textures| {
+            textures.insert(id, Arc::new(texture));
+        });
+    }
+
+    pub fn remove_texture(&mut self, id: &TextureId) {
+        self.textures.update(|textures| {
+            textures.remove(id);
+        });
+    }
+
     pub fn render(&mut self, game: &GameRes) -> Result<RenderResults, wgpu::SurfaceError> {
         self.cursor_capture = self.update_cursor_capture(game.cursor_capture);
 
@@ -235,6 +252,7 @@ fn render_component(
     threshold_factor: ReadSignal<f32>,
     force_wait: ReadSignal<bool>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
+    textures: RwSignal<HashMap<TextureId, Arc<Texture>>>,
     models: SignalVec<ModelInfo>,
 ) -> impl Fn(&FrameData) -> Result<RenderResults, wgpu::SurfaceError> {
     let context = wgpu_context();

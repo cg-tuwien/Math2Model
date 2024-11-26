@@ -46,10 +46,26 @@ pub struct ShaderInfo {
     pub code: String,
 }
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct TextureId(pub String);
+
+pub struct TextureInfo {
+    pub width: u32,
+    /// RGBA
+    pub data: Vec<u8>,
+}
+
+impl TextureInfo {
+    pub fn height(&self) -> u32 {
+        (self.data.len() / 4) as u32 / self.width
+    }
+}
+
 pub struct GameRes {
     pub camera_controller: CameraController,
     pub models: Vec<ModelInfo>,
     pub shaders: HashMap<ShaderId, ShaderInfo>,
+    pub textures: HashMap<TextureId, TextureInfo>,
     last_update_instant: Option<Instant>,
     pub camera: Camera,
     pub mouse: Vec2,
@@ -81,6 +97,7 @@ impl GameRes {
             camera_controller,
             models: vec![],
             shaders: HashMap::new(),
+            textures: Default::default(),
             last_update_instant: None,
             mouse: Vec2::ZERO,
             mouse_held: false,
@@ -95,11 +112,19 @@ impl GameRes {
     }
 
     pub fn set_shader(&mut self, shader_id: ShaderId, info: ShaderInfo) {
-        self.shaders.insert(shader_id.clone(), info);
+        self.shaders.insert(shader_id, info);
     }
 
     pub fn remove_shader(&mut self, shader_id: &ShaderId) {
         self.shaders.remove(shader_id);
+    }
+
+    pub fn set_texture(&mut self, id: TextureId, info: TextureInfo) {
+        self.textures.insert(id, info);
+    }
+
+    pub fn remove_texture(&mut self, id: &TextureId) {
+        self.textures.remove(id);
     }
 
     pub fn update(&mut self, inputs: &WindowInputs) {

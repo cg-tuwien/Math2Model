@@ -131,3 +131,13 @@ impl From<wgpu::SourceLocation> for WasmSourceLocation {
         }
     }
 }
+
+/// Can store a https://developer.mozilla.org/en-US/docs/Web/API/ImageData
+#[derive(Tsify, Serialize, Deserialize)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct WasmTexture {
+    pub id: String,
+    pub width: u32,
+    /// RGBA
+    pub data: Vec<u8>,
+}
