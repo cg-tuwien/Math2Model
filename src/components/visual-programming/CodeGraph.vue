@@ -92,7 +92,7 @@ import {
   ArrowsJoin,
 } from "@vicons/tabler";
 import { JoinFullRound, CategoryOutlined } from "@vicons/material";
-import { Scale } from "@vicons/carbon";
+import { Category, Scale } from "@vicons/carbon";
 import ReturnNodeStyle from "@/components/visual-programming/CustomNodeStyles/ReturnNodeStyle.vue";
 import VariableOutNodeStyle from "@/components/visual-programming/CustomNodeStyles/VariableOutNodeStyle.vue";
 import DefaultNodeStyle from "@/components/visual-programming/CustomNodeStyles/DefaultNodeStyle.vue";
@@ -711,7 +711,7 @@ type Conns =
   | Connection<NumberNode, FunctionCallNode>
   | Connection<InitializeNode, LogicScopeNode>;
 
-type Schemes = GetSchemes<Nodes, Conns>;
+export type Schemes = GetSchemes<Nodes, Conns>;
 
 const editor = new NodeEditor<Schemes>();
 const engine = new DataflowEngine<Schemes>();
@@ -829,7 +829,7 @@ async function rearrange() {
 let area: AreaPlugin<Schemes, AreaExtra>;
 const scopes = new ScopesPlugin<Schemes>();
 const history = new HistoryPlugin<Schemes, HistoryActions<Schemes>>();
-const applier = new ArrangeAppliers.TransitionApplier<Schemes, AreaExtra>({
+const applier = new ArrangeAppliers.TransitionApplier<Schemes, never>({
   duration: 100,
   timingFunction: (t) => t,
   async onTick() {
@@ -1065,7 +1065,7 @@ async function createEditor() {
     if (context.type === "connectioncreated") {
       if (shouldUpdate) {
         checkForUnsafeConnections(
-          context.data as ClassicPreset.Connection<Nodes, Nodes>,
+          context.data as ClassicPreset.Connection<Nodes, Nodes>
         ).then(update); // TODO: FIX IT!;
       }
     }
@@ -1093,7 +1093,7 @@ function update() {
   editor
     .getNodes()
     .filter(
-      (n) => !(n instanceof LogicScopeNode || n instanceof FunctionScopeNode),
+      (n) => !(n instanceof LogicScopeNode || n instanceof FunctionScopeNode)
     )
     .forEach((n) => n.updateSize(area));
 
@@ -1546,19 +1546,21 @@ function addTemplate(name: string, json: string) {
         v-on:dragover="
           (ev) => {
             ev.preventDefault();
-            ev.dataTransfer.dropEffect = 'copy';
+            if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'copy';
           }
         "
         v-on:drop="
           (ev) => {
             ev.preventDefault();
+            if (ev.dataTransfer == null) return;
             const node = JSON.parse(
               ev.dataTransfer.getData('text/plain')
             ) as UINode;
             let toCreate: Nodes | null = null;
             for (let category of uiNodes.values()) {
-              if (category.has(node.name)) {
-                toCreate = category.get(node.name).get();
+              if (category && category.has(node.name)) {
+                const uiNode = category.get(node.name);
+                toCreate = uiNode ? uiNode.get() : null;
               }
             }
             //area.area.setPointerFrom(ev);

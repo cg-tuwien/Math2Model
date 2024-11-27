@@ -6,10 +6,11 @@ import type { UINode } from "@/vpnodes/ui/uinode";
 import SingleNodeDisplay from "@/components/visual-programming/SingleNodeDisplay.vue";
 import { NodeEditor } from "rete";
 import MultipleNodesCollapsable from "@/components/visual-programming/MultipleNodesCollapsable.vue";
+import type { Schemes } from "./CodeGraph.vue";
 
 const props = defineProps<{
   displayNodes: Map<string, Map<string, UINode>>;
-  editor: NodeEditor;
+  editor: NodeEditor<Schemes>;
   header: string;
 }>();
 
@@ -32,7 +33,7 @@ const colors = [
       </template>
       <n-list-item class="m-1" v-for="name of displayNodes.keys()">
         <MultipleNodesCollapsable
-          :display-nodes="displayNodes.get(name)"
+          :display-nodes="displayNodes.get(name) ?? new Map<string, UINode>()"
           :editor="props.editor"
           :header="name"
           :color="colors[i++]"
