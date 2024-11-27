@@ -3,11 +3,7 @@ use std::sync::Arc;
 use glam::UVec2;
 use log::{error, info, warn};
 use winit::{
-    application::ApplicationHandler,
-    dpi::PhysicalSize,
-    event_loop::EventLoopProxy,
-    keyboard::{Key, NamedKey},
-    window::Window,
+    application::ApplicationHandler, dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window,
 };
 
 use crate::{
@@ -77,12 +73,12 @@ impl Application {
         let app_commands = self.app_commands.clone();
         let on_shader_compiled = self.on_shader_compiled.clone();
         let task = async move {
-            println!("Creating renderer");
             let renderer = gpu_builder.await.unwrap().build();
             let _ = run_on_main(app_commands, move |app| {
                 for (shader_id, shader_info) in &app.app.shaders {
                     renderer.set_shader(shader_id.clone(), shader_info, on_shader_compiled.clone());
                 }
+                renderer.update_models(&app.app.models);
                 app.renderer = Some(renderer)
             })
             .await;
@@ -177,7 +173,9 @@ impl InputHandler for Application {
         #[cfg(not(target_arch = "wasm32"))]
         if input
             .keyboard
-            .just_released_logical(Key::Named(NamedKey::Escape))
+            .just_released_logical(winit::keyboard::Key::Named(
+                winit::keyboard::NamedKey::Escape,
+            ))
         {
             self.on_exit();
             return event_loop.exit();

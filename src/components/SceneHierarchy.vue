@@ -391,10 +391,26 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
             placeholder="Select a shader for the model"
             :options="shadersDropdown"
             :value="currentModel.code"
-            @update="
+            @update-value="
               (v: string) => change('code', new ObjectUpdate([], () => v + ''))
             "
           ></n-select>
+          <n-text>Instance Count</n-text>
+          <NumberInput
+            :value="currentModel.instanceCount"
+            :step="1"
+            @update="
+              (v) =>
+                change(
+                  'instanceCount',
+                  new ObjectUpdate(
+                    v.path,
+                    (curr) => Math.max(Math.round(v.newValue(curr)), 1),
+                    v.isSliding
+                  )
+                )
+            "
+          ></NumberInput>
           <n-text>Material</n-text>
           <n-text>Color</n-text>
           <VectorInput

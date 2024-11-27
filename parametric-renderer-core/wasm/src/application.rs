@@ -3,7 +3,7 @@ use log::error;
 use renderer_core::{
     application::{run_on_main, AppCommand, Application, WasmCanvas},
     camera::camera_controller::{self, CameraController},
-    game::{ModelInfo, ShaderId, ShaderInfo},
+    game::{ModelInfo, ShaderId, ShaderInfo, TextureId, TextureInfo},
     input::WinitAppHelper,
 };
 use std::sync::Arc;
@@ -11,7 +11,9 @@ use wasm_bindgen::{prelude::wasm_bindgen, JsError, JsValue};
 use web_sys::HtmlCanvasElement;
 use winit::event_loop::{EventLoop, EventLoopProxy};
 
-use crate::wasm_abi::{WasmCompilationMessage, WasmFrameTime, WasmModelInfo, WasmShaderInfo};
+use crate::wasm_abi::{
+    WasmCompilationMessage, WasmFrameTime, WasmModelInfo, WasmShaderInfo, WasmTexture,
+};
 
 #[wasm_bindgen]
 pub struct WasmApplication {
@@ -68,9 +70,12 @@ impl WasmApplication {
                 shader_id: ShaderId(v.shader_id),
                 instance_count: v.instance_count,
             })
-            .collect();
+            .collect::<Vec<_>>();
         let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), |app| {
-            app.app.update_models(models)
+            app.renderer.as_mut().map(|renderer| {
+                renderer.update_models(&models);
+            });
+            app.app.update_models(models);
         })
         .await;
     }
@@ -102,6 +107,36 @@ impl WasmApplication {
             app.renderer
                 .as_mut()
                 .map(|renderer| renderer.remove_shader(&shader_id));
+        })
+        .await;
+    }
+
+    pub async fn update_texture(&self, texture: WasmTexture) {
+        let id = TextureId(texture.id);
+        let info = TextureInfo {
+            width: texture.width,
+            data: texture.data,
+        };
+
+        let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), {
+            let id = id.clone();
+            move |app| {
+                app.renderer
+                    .as_mut()
+                    .map(|renderer| renderer.set_texture(id.clone(), &info));
+                app.app.set_texture(id, info);
+            }
+        })
+        .await;
+    }
+
+    pub async fn remove_texture(&self, id: String) {
+        let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), |app| {
+            let id = TextureId(id);
+            app.app.remove_texture(&id);
+            app.renderer
+                .as_mut()
+                .map(|renderer| renderer.remove_texture(&id));
         })
         .await;
     }

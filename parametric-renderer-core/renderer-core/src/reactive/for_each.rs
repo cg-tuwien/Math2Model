@@ -1,7 +1,5 @@
 use indexmap::{map::Entry, IndexMap};
-use reactive_graph::{
-    computed::ArcMemo, effect::RenderEffect, owner::Owner, 
-};
+use reactive_graph::{computed::ArcMemo, effect::RenderEffect, owner::Owner};
 
 /// Lazily computes a "iterable" of items.
 pub fn new_computed_vec<ItemsFn, Items, T, KeyFn, Key, OutputFn, Output>(
@@ -31,7 +29,7 @@ where
                 Some(v) => v,
                 None => {
                     found_all_cached = false;
-                    let owner = parent.child();
+                    let owner = parent.with(Owner::new);
                     (owner.with(|| (output_fn)(item)), owner)
                 }
             };
@@ -88,7 +86,7 @@ where
                 let new_item = match old_cache.swap_remove(&key) {
                     Some(v) => v,
                     None => {
-                        let owner = parent.child();
+                        let owner = parent.with(Owner::new);
                         (owner.with(|| (output_fn)(item)), owner)
                     }
                 };
