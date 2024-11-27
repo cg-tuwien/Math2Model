@@ -12,7 +12,6 @@ import { type SerializedNode } from "@/vpnodes/serialization/node";
 
 export class NumberNode extends VPNode {
   private valueControl: ClassicPreset.InputControl<"number", number>;
-  private valueIn: ClassicPreset.Input<ClassicPreset.Socket>;
   constructor(private update?: (node: ClassicPreset.Node) => void) {
     super("Number");
 
@@ -75,8 +74,8 @@ export class MathOpNode extends VPNode {
     private operator: "+" | "-" | "/" | "*" | "%",
     private update?: (
       node: ClassicPreset.Node,
-      control: ClassicPreset.InputControl<"number">,
-    ) => void,
+      control: ClassicPreset.InputControl<"number">
+    ) => void
   ) {
     super(opToName(operator));
 
@@ -84,21 +83,21 @@ export class MathOpNode extends VPNode {
       "number",
       {
         initial: 0,
-      },
+      }
     );
     this.rightControl = new ClassicPreset.InputControl<"number", number>(
       "number",
       {
         initial: 0,
-      },
+      }
     );
     this.addInput(
       "left",
-      new ClassicPreset.Input(reteSocket, "First Operand/any"),
+      new ClassicPreset.Input(reteSocket, "First Operand/any")
     );
     this.addInput(
       "right",
-      new ClassicPreset.Input(reteSocket, "Second Operand/any"),
+      new ClassicPreset.Input(reteSocket, "Second Operand/any")
     );
 
     this.addControl("left", this.leftControl);
@@ -108,10 +107,9 @@ export class MathOpNode extends VPNode {
     this.updateSize();
   }
 
-  data(inputs: {
-    left?: NodeReturn[] | number[];
-    right?: NodeReturn[] | number[];
-  }): { value: NodeReturn } {
+  data(inputs: { left?: NodeReturn[]; right?: NodeReturn[] }): {
+    value: NodeReturn;
+  } {
     const { left, right } = inputs;
 
     let leftValue = this.leftControl.value ?? 0.0;

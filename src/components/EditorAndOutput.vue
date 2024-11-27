@@ -165,7 +165,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
     if (openedFileName.value === null) return [];
     const messages = errorsStore.errors.get(openedFileName.value) ?? [];
 
-    return messages.map((message) => {
+    return messages.map((message: any) => {
       const startColumn = message.location?.line_position ?? 1;
       const endColumn = startColumn + (message.location?.length ?? 1);
       // TODO: Translate to UTF-16 ^^^

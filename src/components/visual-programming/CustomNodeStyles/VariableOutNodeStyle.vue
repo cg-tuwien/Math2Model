@@ -79,8 +79,8 @@
 import { ref, defineComponent, type DeepReadonly } from "vue";
 import { Ref } from "rete-vue-plugin";
 
-function sortByIndex(entries) {
-  entries.sort((a, b) => {
+function sortByIndex(entries: any) {
+  entries.sort((a: any, b: any) => {
     const ai = (a[1] && a[1].index) || 0;
     const bi = (b[1] && b[1].index) || 0;
 
