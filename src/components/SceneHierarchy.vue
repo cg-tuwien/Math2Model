@@ -256,7 +256,10 @@ function addModelNew(fileEnd: "wgsl" | "graph") {
       .replaceAll(" ", "-")
       .replaceAll(":", "")
       .replaceAll(".", "")
-      .replaceAll(",", "") +
+      .replaceAll(",", "")
+      .replaceAll("/", "")
+      .replaceAll("\\", "")
+      .replaceAll("-", "_") +
       "." +
       fileEnd
   );
