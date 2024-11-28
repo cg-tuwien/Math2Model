@@ -11,6 +11,9 @@ import type { LodStageBuffers } from "@/webgpu-hook";
 import { onUnmounted, ref } from "vue";
 import { mat4, vec3 } from "webgpu-matrix";
 import LodStageWgsl from "./lod_stage.wgsl?raw";
+import PrepVerticesStageWgsl from "./prep_vertices_stage.wgsl?raw";
+import OutputVerticesWgsl from "./vertices_stage.wgsl?raw"
+
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -63,7 +66,7 @@ async function main() {
   const _adapter = await navigator.gpu.requestAdapter(); // Wait for Rust backend to be in business
   const device = props.gpuDevice;
 
-  const layout0 = device.createBindGroupLayout({
+  const sceneUniformsLayout = device.createBindGroupLayout({
     entries: [
       {
         binding: 0,
@@ -166,9 +169,90 @@ async function main() {
       },
     ],
   });
-  const pipelineLayout = device.createPipelineLayout({
-    bindGroupLayouts: [layout0, layout1, layout2],
+
+
+  const prepVerticesBinding0 = device.createBindGroupLayout({
+    entries: [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage",
+        },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage",
+        },
+      },
+    ],
   });
+
+  const vertexOutputLayout = device.createBindGroupLayout({
+    entries: [
+      //{
+      //  binding: 0,
+      //  visibility: GPUShaderStage.COMPUTE,
+      //  buffer: {
+      //    type: "uniform",
+      //  },
+      //},
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage",
+        },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "storage",
+        },
+      },
+    ],
+  });
+
+  const pipelineLayout = device.createPipelineLayout({
+    bindGroupLayouts: [sceneUniformsLayout, layout1, layout2],
+  });
+
+  const prepVerticesStageLayout = device.createPipelineLayout({
+    bindGroupLayouts: [prepVerticesBinding0],
+  });
+  const outputVerticesLayout = device.createPipelineLayout({
+    bindGroupLayouts: [sceneUniformsLayout,vertexOutputLayout],
+  });
+
+
+
+  async function makeShaderFromCodeAndPipeline(code: string, shaderPipelineLayout: GPUPipelineLayout) : Promise<{
+    pipeline: GPUComputePipeline;
+    shader: GPUShaderModule
+  }> {
+    const shader = props.gpuDevice.createShaderModule({
+      code,
+    });
+    shader.getCompilationInfo().then((info) => {
+      console.log("Shader compilation resulted in ", info);
+    });
+    const pipeline = props.gpuDevice.createComputePipeline({
+      layout: shaderPipelineLayout,
+      compute: {
+        module: shader,
+        entryPoint: "main",
+      },
+    });
+    return { shader, pipeline };
+  }
+
+  async function makeShaderFromCode(code: string) {
+    return makeShaderFromCodeAndPipeline(code, pipelineLayout);
+  }
+
   async function makeShader(fs: ReactiveFilesystem, key: FilePath) {
     // Race condition free, because the fs resolves read requests in order
     let code = await fs.readTextFile(key);
@@ -180,22 +264,27 @@ async function main() {
         code
       );
     }
-    const shader = props.gpuDevice.createShaderModule({
-      code,
-    });
-    shader.getCompilationInfo().then((info) => {
-      console.log("Shader compilation resulted in ", info);
-    });
-    const pipeline = props.gpuDevice.createComputePipeline({
-      layout: pipelineLayout,
-      compute: {
-        module: shader,
-        entryPoint: "main",
-      },
-    });
-    return { shader, pipeline };
+    return makeShaderFromCode(code);
   }
-  props.fs.watchFromStart((change) => {
+
+
+  let prepVerticesStageShaderAndPipeline = await makeShaderFromCodeAndPipeline(PrepVerticesStageWgsl,prepVerticesStageLayout);
+  let outputVerticesShaderAndPipeline = await makeShaderFromCodeAndPipeline(OutputVerticesWgsl,outputVerticesLayout)
+
+
+  let oneVertexEntry = 32;
+  let startVertexOffset = 8;
+  let padding = 8;
+  let vertOutputBuffer = device.createBuffer({
+    label: "VertOutputBuffer",size: startVertexOffset+padding+oneVertexEntry*1000,
+    usage:GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE
+  });
+  let vertReadableBuffer = device.createBuffer({
+    label: "VertReadableBuffer",size: startVertexOffset+padding+oneVertexEntry*1000,
+    usage:GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+  });
+
+    props.fs.watchFromStart((change) => {
     if (!change.key.endsWith(".wgsl")) return;
     if (change.type === "insert" || change.type === "update") {
       makeShader(props.fs, change.key).then((shader) => {
@@ -261,7 +350,7 @@ async function main() {
     buffers: LodStageBuffers,
     commandEncoder: GPUCommandEncoder
   ) {
-    debugger;
+    //console.log(compiledShaders);
     const compiledShader = compiledShaders.value.get(makeFilePath(shaderPath));
     if (!compiledShader) {
       console.error("Shader not found: ", shaderPath);
@@ -271,7 +360,7 @@ async function main() {
 
     // We inefficiently recreate the bind groups every time.
     const userInputBindGroup = device.createBindGroup({
-      layout: layout0,
+      layout: sceneUniformsLayout,
       entries: [
         {
           binding: 0,
@@ -317,6 +406,7 @@ async function main() {
         },
       ],
     });
+
     const pingPongPatchesBindGroup = [
       device.createBindGroup({
         layout: layout2,
@@ -362,7 +452,45 @@ async function main() {
       }),
     ];
 
+    let bindGroupVertPrep = device.createBindGroup({
+      layout: prepVerticesBinding0,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: buffers.patches0 },
+        },
+        {
+          binding: 1,
+          resource: {buffer: buffers.indirectDispatch1}
+        }
+      ],
+    });
+
+// @group(1) @binding(0) var<uniform> model: Model;
+// @group(1) @binding(1) var<storage, read> render_buffer: RenderBufferRead;
+// @group(1) @binding(2) var<storage, read_write> output_buffer: OutputBuffer;
+
+    let outputVerticesBindGroup = device.createBindGroup({
+      layout: vertexOutputLayout,
+      entries: [
+        //{
+        //  binding: 0,
+        //  resource: { buffer:  },
+        //},
+        {
+          binding: 1,
+          resource: {buffer: buffers.patches0}
+        },
+        {
+          binding: 2,
+          resource: {buffer: vertOutputBuffer}
+        }
+      ],
+    });
+
+
     const doubleNumberOfRounds = 2;
+    // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
     for (let i = 0; i < doubleNumberOfRounds; i++) {
       const isLastRound = i === doubleNumberOfRounds - 1;
       // Ping
@@ -435,10 +563,42 @@ async function main() {
         );
       }
     }
-  }
+
+    // Prepare vertices output
+    let computePassPrep = commandEncoder.beginComputePass({label: "prepareVertexOutput"});
+    computePassPrep.setPipeline(prepVerticesStageShaderAndPipeline.pipeline);
+    computePassPrep.setBindGroup(0, bindGroupVertPrep);
+    computePassPrep.dispatchWorkgroups(1);
+    computePassPrep.end();
+
+    // Run vertex output shader
+    let computePassVertices = commandEncoder.beginComputePass({label: "vertexOutputStage"});
+    computePassVertices.setPipeline(outputVerticesShaderAndPipeline.pipeline);
+    computePassVertices.setBindGroup(0, userInputBindGroup);
+    computePassVertices.setBindGroup(1, outputVerticesBindGroup);
+    computePassVertices.dispatchWorkgroupsIndirect(buffers.indirectDispatch1,0);
+
+    computePassVertices.end();
+    counter--;
+    if(counter === 0)
+    {
+      commandEncoder.copyBufferToBuffer(vertOutputBuffer,0,vertReadableBuffer,0,vertOutputBuffer.size);
+      setTimeout(() => {
+        vertReadableBuffer.mapAsync(GPUMapMode.READ, 0, vertReadableBuffer.size).then(() => {
+          const arrayBuffer = vertReadableBuffer
+              .getMappedRange(0, vertReadableBuffer.size)
+              .slice(0);
+          const uint32Array = new Float32Array(arrayBuffer);
+          console.log("vertReadableBuffer Output:", uint32Array); // Only zeroes. Huh
+          vertReadableBuffer.unmap();
+        });
+      }, 10);
+    }
+  } 
 
   props.engine.setLodStage(lodStageCallback);
 }
+let counter = 10;
 main();
 </script>
 <template>

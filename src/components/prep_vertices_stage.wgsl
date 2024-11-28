@@ -1,3 +1,8 @@
+struct EncodedPatch {
+  u: u32,
+  v: u32,
+};
+
 struct RenderBufferRead {
   patches_length: u32,
   patches_capacity: u32,
@@ -10,7 +15,7 @@ struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/stru
   z: u32,
 };
 
-@group(0) @binding(0) var<storage, read> render_buffer_2 : RenderBufferRead;
+@group(0) @binding(0) var<storage, read_write> render_buffer_2 : RenderBufferRead;
 @group(0) @binding(1) var<storage, read_write> dispatch_next: DispatchIndirectArgs;
 
 /// Copies the render buffer sizes to the indirect dispatching of the vertices stage

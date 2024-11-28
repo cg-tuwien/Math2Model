@@ -139,11 +139,11 @@ struct OutputBuffer {
     length: atomic<u32>,
     capacity: u32,
     // Always in groups of 4
-    vertices: VertexOutput
+    vertices: array<VertexOutput,1000>
 }
 
-@group(1) @binding(0) var<uniform> model: Model;
-@group(1) @binding(1) var<storage, read> render_buffer: RenderBufferRead;
+//@group(1) @binding(0) var<uniform> model: Model;
+@group(1) @binding(1) var<storage, read_write> render_buffer: RenderBufferRead;
 @group(1) @binding(2) var<storage, read_write> output_buffer: OutputBuffer;
 
 struct VertexOutput {
@@ -155,7 +155,7 @@ struct VertexOutput {
 var<workgroup> quad_vertices: array<VertexOutput, 4>;
 
 @compute @workgroup_size(4, 1, 1)
-fn vs_main(
+fn main(
     @builtin(workgroup_id) workgroup_id : vec3<u32>,
     @builtin(local_invocation_id) local_invocation_id : vec3<u32>
 ) {
@@ -165,20 +165,20 @@ fn vs_main(
     let quad = patch_decode(render_buffer.patches[patch_index]);
 
     // Coordinates of one of the corners
-    let quad_point = quad.min;
-    if(local_invocation_id == 0) {
+    var quad_point = quad.min;
+    if(local_invocation_id.x == 0) {
         quad_point = quad.min;
-    } else if (local_invocation_id == 1) {
+    } else if (local_invocation_id.x == 1) {
         quad_point = vec2f(quad.min.x, quad.max.y);
-    } else if (local_invocation_id == 2) {
+    } else if (local_invocation_id.x == 2) {
         quad_point = quad.max;
     } else {
-        quad_point = vec2f(quad.max_value.x, quad.min.y);
+        quad_point = vec2f(quad.max.x, quad.min.y);
     }
 
     // Sample corner
     let pos = sampleObject(quad_point);
-    let world_pos = model.model_similarity * vec4<f32>(pos, 1.0);
+    let world_pos = /*model.model_similarity * */vec4<f32>(pos, 1.0);
 
     // Prepare output
     var out: VertexOutput;
@@ -186,11 +186,11 @@ fn vs_main(
     out.texture_coords = quad_point;
 
     // Write to shared array and wait
-    quad_vertices[local_invocation_id] = out;
+    quad_vertices[local_invocation_id.x] = out;
     workgroupBarrier();
 
     // Finally, write to output_buffer
-    if(local_invocation_id == 0) {
+    if(local_invocation_id.x == 0) {
         let write_index = atomicAdd(&output_buffer.length, 4u);
         if (write_index < output_buffer.capacity) {
             output_buffer.vertices[write_index] = quad_vertices[0];
