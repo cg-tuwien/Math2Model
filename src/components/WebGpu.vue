@@ -12,8 +12,7 @@ import { onUnmounted, ref } from "vue";
 import { mat4, vec3 } from "webgpu-matrix";
 import LodStageWgsl from "./lod_stage.wgsl?raw";
 import PrepVerticesStageWgsl from "./prep_vertices_stage.wgsl?raw";
-import OutputVerticesWgsl from "./vertices_stage.wgsl?raw"
-
+import OutputVerticesWgsl from "./vertices_stage.wgsl?raw";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -26,8 +25,14 @@ const compiledShaders = ref<
   Map<
     FilePath,
     {
-      shader: GPUShaderModule;
-      pipeline: GPUComputePipeline;
+      lodStage: {
+        shader: GPUShaderModule;
+        pipeline: GPUComputePipeline;
+      };
+      verticesStage: {
+        shader: GPUShaderModule;
+        pipeline: GPUComputePipeline;
+      };
     }
   >
 >(new Map());
@@ -170,14 +175,13 @@ async function main() {
     ],
   });
 
-
   const prepVerticesBinding0 = device.createBindGroupLayout({
     entries: [
       {
         binding: 0,
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
-          type: "storage",
+          type: "read-only-storage",
         },
       },
       {
@@ -224,15 +228,16 @@ async function main() {
     bindGroupLayouts: [prepVerticesBinding0],
   });
   const outputVerticesLayout = device.createPipelineLayout({
-    bindGroupLayouts: [sceneUniformsLayout,vertexOutputLayout],
+    bindGroupLayouts: [sceneUniformsLayout, vertexOutputLayout],
   });
 
-
-
-  async function makeShaderFromCodeAndPipeline(code: string, shaderPipelineLayout: GPUPipelineLayout) : Promise<{
+  function makeShaderFromCodeAndPipeline(
+    code: string,
+    shaderPipelineLayout: GPUPipelineLayout
+  ): {
     pipeline: GPUComputePipeline;
-    shader: GPUShaderModule
-  }> {
+    shader: GPUShaderModule;
+  } {
     const shader = props.gpuDevice.createShaderModule({
       code,
     });
@@ -243,53 +248,70 @@ async function main() {
       layout: shaderPipelineLayout,
       compute: {
         module: shader,
-        entryPoint: "main",
       },
     });
     return { shader, pipeline };
   }
 
-  async function makeShaderFromCode(code: string) {
-    return makeShaderFromCodeAndPipeline(code, pipelineLayout);
-  }
-
-  async function makeShader(fs: ReactiveFilesystem, key: FilePath) {
+  async function getShaderCode(
+    fs: ReactiveFilesystem,
+    key: FilePath
+  ): Promise<{
+    lodStage: string;
+    verticesStage: string;
+  }> {
     // Race condition free, because the fs resolves read requests in order
-    let code = await fs.readTextFile(key);
-    if (code === null) {
-      code = LodStageWgsl; // Fallback to the default shader
-    } else {
-      code = LodStageWgsl.replace(
-        /\/\/\/\/ START sampleObject([^]+?)\/\/\/\/ END sampleObject/,
-        code
-      );
+    const code = await fs.readTextFile(key);
+
+    const result = {
+      lodStage: LodStageWgsl,
+      verticesStage: OutputVerticesWgsl,
+    };
+    if (code !== null) {
+      const replaceWithCode = (v: string) =>
+        v.replace(
+          /\/\/\/\/ START sampleObject([^]+?)\/\/\/\/ END sampleObject/,
+          code
+        );
+      result.lodStage = replaceWithCode(result.lodStage);
+      result.verticesStage = replaceWithCode(result.verticesStage);
     }
-    return makeShaderFromCode(code);
+    return result;
   }
 
-
-  let prepVerticesStageShaderAndPipeline = await makeShaderFromCodeAndPipeline(PrepVerticesStageWgsl,prepVerticesStageLayout);
-  let outputVerticesShaderAndPipeline = await makeShaderFromCodeAndPipeline(OutputVerticesWgsl,outputVerticesLayout)
-
+  let prepVerticesStageShaderAndPipeline = makeShaderFromCodeAndPipeline(
+    PrepVerticesStageWgsl,
+    prepVerticesStageLayout
+  );
 
   let oneVertexEntry = 32;
   let startVertexOffset = 8;
   let padding = 8;
   let vertOutputBuffer = device.createBuffer({
-    label: "VertOutputBuffer",size: startVertexOffset+padding+oneVertexEntry*1000,
-    usage:GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE
+    label: "VertOutputBuffer",
+    size: startVertexOffset + padding + oneVertexEntry * 1000,
+    usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE,
   });
   let vertReadableBuffer = device.createBuffer({
-    label: "VertReadableBuffer",size: startVertexOffset+padding+oneVertexEntry*1000,
-    usage:GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
+    label: "VertReadableBuffer",
+    size: startVertexOffset + padding + oneVertexEntry * 1000,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
   });
 
-    props.fs.watchFromStart((change) => {
+  props.fs.watchFromStart((change) => {
     if (!change.key.endsWith(".wgsl")) return;
     if (change.type === "insert" || change.type === "update") {
-      makeShader(props.fs, change.key).then((shader) => {
-        compiledShaders.value.set(change.key, shader);
-      });
+      getShaderCode(props.fs, change.key).then(
+        ({ lodStage, verticesStage }) => {
+          compiledShaders.value.set(change.key, {
+            lodStage: makeShaderFromCodeAndPipeline(lodStage, pipelineLayout),
+            verticesStage: makeShaderFromCodeAndPipeline(
+              verticesStage,
+              outputVerticesLayout
+            ),
+          });
+        }
+      );
     } else {
       compiledShaders.value.delete(change.key);
     }
@@ -345,6 +367,11 @@ async function main() {
     GPUBufferUsage.COPY_SRC
   );
 
+  const dispatchVerticesStage = createBufferWith(
+    concatArrayBuffers([new Uint32Array([1, 1, 1])]),
+    GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT
+  );
+
   function lodStageCallback(
     shaderPath: string,
     buffers: LodStageBuffers,
@@ -356,7 +383,7 @@ async function main() {
       console.error("Shader not found: ", shaderPath);
       return;
     }
-    const pipeline = compiledShader.pipeline;
+    const pipeline = compiledShader.lodStage.pipeline;
 
     // We inefficiently recreate the bind groups every time.
     const userInputBindGroup = device.createBindGroup({
@@ -457,18 +484,18 @@ async function main() {
       entries: [
         {
           binding: 0,
-          resource: { buffer: buffers.patches0 },
+          resource: { buffer: buffers.finalPatches2 },
         },
         {
           binding: 1,
-          resource: {buffer: buffers.indirectDispatch1}
-        }
+          resource: { buffer: dispatchVerticesStage },
+        },
       ],
     });
 
-// @group(1) @binding(0) var<uniform> model: Model;
-// @group(1) @binding(1) var<storage, read> render_buffer: RenderBufferRead;
-// @group(1) @binding(2) var<storage, read_write> output_buffer: OutputBuffer;
+    // @group(1) @binding(0) var<uniform> model: Model;
+    // @group(1) @binding(1) var<storage, read> render_buffer: RenderBufferRead;
+    // @group(1) @binding(2) var<storage, read_write> output_buffer: OutputBuffer;
 
     let outputVerticesBindGroup = device.createBindGroup({
       layout: vertexOutputLayout,
@@ -479,15 +506,14 @@ async function main() {
         //},
         {
           binding: 1,
-          resource: {buffer: buffers.patches0}
+          resource: { buffer: buffers.patches0 },
         },
         {
           binding: 2,
-          resource: {buffer: vertOutputBuffer}
-        }
+          resource: { buffer: vertOutputBuffer },
+        },
       ],
     });
-
 
     const doubleNumberOfRounds = 2;
     // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
@@ -565,36 +591,47 @@ async function main() {
     }
 
     // Prepare vertices output
-    let computePassPrep = commandEncoder.beginComputePass({label: "prepareVertexOutput"});
+    let computePassPrep = commandEncoder.beginComputePass({
+      label: "prepareVertexOutput",
+    });
     computePassPrep.setPipeline(prepVerticesStageShaderAndPipeline.pipeline);
     computePassPrep.setBindGroup(0, bindGroupVertPrep);
     computePassPrep.dispatchWorkgroups(1);
     computePassPrep.end();
 
     // Run vertex output shader
-    let computePassVertices = commandEncoder.beginComputePass({label: "vertexOutputStage"});
-    computePassVertices.setPipeline(outputVerticesShaderAndPipeline.pipeline);
+    let computePassVertices = commandEncoder.beginComputePass({
+      label: "vertexOutputStage",
+    });
+    computePassVertices.setPipeline(compiledShader.verticesStage.pipeline);
     computePassVertices.setBindGroup(0, userInputBindGroup);
     computePassVertices.setBindGroup(1, outputVerticesBindGroup);
-    computePassVertices.dispatchWorkgroupsIndirect(buffers.indirectDispatch1,0);
+    computePassVertices.dispatchWorkgroupsIndirect(dispatchVerticesStage, 0);
 
     computePassVertices.end();
     counter--;
-    if(counter === 0)
-    {
-      commandEncoder.copyBufferToBuffer(vertOutputBuffer,0,vertReadableBuffer,0,vertOutputBuffer.size);
+    if (counter === 0) {
+      commandEncoder.copyBufferToBuffer(
+        vertOutputBuffer,
+        0,
+        vertReadableBuffer,
+        0,
+        vertOutputBuffer.size
+      );
       setTimeout(() => {
-        vertReadableBuffer.mapAsync(GPUMapMode.READ, 0, vertReadableBuffer.size).then(() => {
-          const arrayBuffer = vertReadableBuffer
+        vertReadableBuffer
+          .mapAsync(GPUMapMode.READ, 0, vertReadableBuffer.size)
+          .then(() => {
+            const arrayBuffer = vertReadableBuffer
               .getMappedRange(0, vertReadableBuffer.size)
               .slice(0);
-          const uint32Array = new Float32Array(arrayBuffer);
-          console.log("vertReadableBuffer Output:", uint32Array); // Only zeroes. Huh
-          vertReadableBuffer.unmap();
-        });
+            const uint32Array = new Float32Array(arrayBuffer);
+            console.log("vertReadableBuffer Output:", uint32Array); // Only zeroes. Huh
+            vertReadableBuffer.unmap();
+          });
       }, 10);
     }
-  } 
+  }
 
   props.engine.setLodStage(lodStageCallback);
 }
