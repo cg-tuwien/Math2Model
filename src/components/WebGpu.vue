@@ -207,7 +207,7 @@ async function main() {
         binding: 1,
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
-          type: "storage",
+          type: "read-only-storage",
         },
       },
       {
@@ -287,14 +287,19 @@ async function main() {
   let oneVertexEntry = 32;
   let startVertexOffset = 8;
   let padding = 8;
+  const vertOutputBufferSize =
+    startVertexOffset + padding + oneVertexEntry * 1000;
   let vertOutputBuffer = device.createBuffer({
     label: "VertOutputBuffer",
-    size: startVertexOffset + padding + oneVertexEntry * 1000,
-    usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE,
+    size: vertOutputBufferSize,
+    usage:
+      GPUBufferUsage.COPY_SRC |
+      GPUBufferUsage.COPY_DST |
+      GPUBufferUsage.STORAGE,
   });
   let vertReadableBuffer = device.createBuffer({
     label: "VertReadableBuffer",
-    size: startVertexOffset + padding + oneVertexEntry * 1000,
+    size: vertOutputBufferSize,
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
   });
 
@@ -349,6 +354,11 @@ async function main() {
   const MAX_PATCHES = 10_000;
   const patchesBufferReset = createBufferWith(
     concatArrayBuffers([new Uint32Array([0, MAX_PATCHES])]),
+    GPUBufferUsage.COPY_SRC
+  );
+
+  const vertOutputBufferReset = createBufferWith(
+    concatArrayBuffers([new Uint32Array([0, vertOutputBufferSize])]),
     GPUBufferUsage.COPY_SRC
   );
 
@@ -599,6 +609,14 @@ async function main() {
     computePassPrep.dispatchWorkgroups(1);
     computePassPrep.end();
 
+    commandEncoder.copyBufferToBuffer(
+      vertOutputBufferReset,
+      0,
+      vertOutputBuffer,
+      0,
+      vertOutputBufferReset.size
+    );
+
     // Run vertex output shader
     let computePassVertices = commandEncoder.beginComputePass({
       label: "vertexOutputStage",
@@ -607,8 +625,8 @@ async function main() {
     computePassVertices.setBindGroup(0, userInputBindGroup);
     computePassVertices.setBindGroup(1, outputVerticesBindGroup);
     computePassVertices.dispatchWorkgroupsIndirect(dispatchVerticesStage, 0);
-
     computePassVertices.end();
+
     counter--;
     if (counter === 0) {
       commandEncoder.copyBufferToBuffer(

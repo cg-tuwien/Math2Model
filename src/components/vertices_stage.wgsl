@@ -139,11 +139,11 @@ struct OutputBuffer {
     length: atomic<u32>,
     capacity: u32,
     // Always in groups of 4
-    vertices: array<VertexOutput,1000>
+    vertices: array<VertexOutput>
 }
 
 //@group(1) @binding(0) var<uniform> model: Model;
-@group(1) @binding(1) var<storage, read_write> render_buffer: RenderBufferRead;
+@group(1) @binding(1) var<storage, read> render_buffer: RenderBufferRead;
 @group(1) @binding(2) var<storage, read_write> output_buffer: OutputBuffer;
 
 struct VertexOutput {
