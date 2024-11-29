@@ -9,10 +9,14 @@ import {
 } from "@/filesystem/reactive-files";
 import type { LodStageBuffers } from "@/webgpu-hook";
 import { onUnmounted, ref } from "vue";
-import { mat4, vec3 } from "webgpu-matrix";
+import { mat4, vec3, vec2 } from "webgpu-matrix";
 import LodStageWgsl from "./lod_stage.wgsl?raw";
 import PrepVerticesStageWgsl from "./prep_vertices_stage.wgsl?raw";
 import OutputVerticesWgsl from "./vertices_stage.wgsl?raw";
+import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
+import * as THREE from 'three';
+
+const a = new THREE.Vector3( 0, 1, 0 );
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -65,6 +69,59 @@ function createBufferWith(
   new Uint8Array(buffer.getMappedRange()).set(contents);
   buffer.unmap();
   return buffer;
+}
+
+function downloadFile(data: any) {
+  
+}
+
+function exportMesh(vertexStream: Float32Array) {
+  const uintArray = new Uint32Array(vertexStream.buffer);
+
+  let capacity = uintArray[1];
+  console.log("Capacity: " + capacity);
+  let slicedStream = vertexStream.slice(4);
+  let index = 0;
+  let arrayVertices = [];
+  let geometry = new THREE.BufferGeometry();
+  while (index < slicedStream.length)
+  {
+    let section = slicedStream.slice(index,index+3);
+    let section2 = slicedStream.slice(index+4,index+6);
+    arrayVertices.push({
+      vert: new THREE.Vector3(section[0],section[1],section[2]),
+      uv: new THREE.Vector2(section2[0],section2[1])
+    });
+
+
+    console.log("Slice: " + section + " Slice 2: " + section2);
+    index+=8;
+  }
+  let vertices = new Float32Array(arrayVertices.length*3);
+  let inds = new Uint32Array(arrayVertices.length*6);
+  index = 0;
+  for (const verticesKey in arrayVertices) {
+    let v = arrayVertices[verticesKey].vert;
+    vertices[verticesKey*3]=v.x;
+    vertices[verticesKey*3+1]=v.y;
+    vertices[verticesKey*3+2]=v.z;
+  }
+  for (let i = 0; i < arrayVertices.length; i+=4) {
+    inds[index++] = i;
+    inds[index++] = i+1;
+    inds[index++] = i+2;
+
+    inds[index++] = i;
+    inds[index++] = i+2;
+    inds[index++] = i+3;
+  }
+  geometry.setAttribute( 'position', new THREE.BufferAttribute( vertices, 3 ) );
+  geometry.setIndex( inds );
+  let mesh = new THREE.Mesh(geometry);
+  let exporter = new OBJExporter();
+  const data = exporter.parse( mesh );
+  downloadFile( data );
+  console.log(mesh);
 }
 
 async function main() {
@@ -643,9 +700,10 @@ async function main() {
             const arrayBuffer = vertReadableBuffer
               .getMappedRange(0, vertReadableBuffer.size)
               .slice(0);
-            const uint32Array = new Float32Array(arrayBuffer);
-            console.log("vertReadableBuffer Output:", uint32Array); // Only zeroes. Huh
+            const vertexStream = new Float32Array(arrayBuffer);
+            console.log("vertReadableBuffer Output:", vertexStream); // Only zeroes. Huh
             vertReadableBuffer.unmap();
+            exportMesh(vertexStream);
           });
       }, 10);
     }
