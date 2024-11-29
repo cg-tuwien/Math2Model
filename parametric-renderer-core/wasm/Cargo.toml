@@ -7,7 +7,7 @@ version = "0.2.0"
 crate-type = ["cdylib"]
 
 [dependencies]
-any_spawner = { version = "0.1.1", features = ["wasm-bindgen"] }
+any_spawner = { version = "0.2.0-rc3", features = ["wasm-bindgen"] }
 anyhow = "1.0.93"
 console_error_panic_hook = "0.1.7"
 console_log = "1.0"

@@ -13,9 +13,5 @@ uuid = { version = "1.11.0", features = ["v4"] }
 wgpu = { version = "23.0.1", default-features = false }
 winit = { version = "0.30.5" }
 
-[patch.crates-io]
-any_spawner = { git = "https://github.com/leptos-rs/leptos", branch = "main" }
-
-
 [profile.release]
 debug = true

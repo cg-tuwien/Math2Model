@@ -81,22 +81,13 @@ checksum = "735d4f398ca57cfa2880225c2bf81c3b9af3be5bb22e44ae70118dad38713e84"
 
 [[package]]
 name = "any_spawner"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9747eb01aed7603aba23f7c869d5d7e5d37aab9c3501aced42d8fdb786f1f6e3"
-dependencies = [
- "futures",
- "thiserror 1.0.69",
- "wasm-bindgen-futures",
-]
-
-[[package]]
-name = "any_spawner"
 version = "0.2.0-rc3"
-source = "git+https://github.com/leptos-rs/leptos?branch=main#5947aa299e5299eb3dc75c58e28affb15e79b6ff"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbc47c1d117b59b9919e3b2e0454cae3cd4ee24a19330f567f6b694d822fbb02"
 dependencies = [
  "futures",
  "thiserror 2.0.3",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -524,7 +515,7 @@ checksum = "96a6ac251f4a2aca6b3f91340350eab87ae57c3f127ffeb585e92bd336717991"
 name = "desktop"
 version = "0.2.0"
 dependencies = [
- "any_spawner 0.1.1",
+ "any_spawner",
  "anyhow",
  "env_logger",
  "glam",
@@ -1840,7 +1831,7 @@ version = "0.1.0-rc3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce9f77ce285c755ccb4c947281af705d4d7af659c05ed501456d8608498666d2"
 dependencies = [
- "any_spawner 0.2.0-rc3",
+ "any_spawner",
  "async-lock",
  "futures",
  "guardian",
@@ -1881,7 +1872,7 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 name = "renderer-core"
 version = "0.2.0"
 dependencies = [
- "any_spawner 0.1.1",
+ "any_spawner",
  "anyhow",
  "bytemuck",
  "criterion2",
@@ -2516,7 +2507,7 @@ dependencies = [
 name = "web"
 version = "0.2.0"
 dependencies = [
- "any_spawner 0.1.1",
+ "any_spawner",
  "anyhow",
  "console_error_panic_hook",
  "console_log",
