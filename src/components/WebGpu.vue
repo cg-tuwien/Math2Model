@@ -70,9 +70,17 @@ function createBufferWith(
   buffer.unmap();
   return buffer;
 }
+function saveFile( text: string, filename: string ) {
+  save( new Blob( [ text ], { type: 'text/plain' } ), filename );
+}
 
-function downloadFile(data: any) {
-  
+function save( blob: Blob, filename: string ) {
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(blobUrl);
 }
 
 function exportMesh(vertexStream: Float32Array) {
@@ -120,7 +128,7 @@ function exportMesh(vertexStream: Float32Array) {
   let mesh = new THREE.Mesh(geometry);
   let exporter = new OBJExporter();
   const data = exporter.parse( mesh );
-  downloadFile( data );
+  saveFile( data,"wowcool3dmodel.obj" );
   console.log(mesh);
 }
 
