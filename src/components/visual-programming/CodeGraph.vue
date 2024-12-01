@@ -82,6 +82,7 @@ import {
   Heart24Regular,
   Circle24Regular,
   RectangleLandscape24Regular,
+  BracesVariable24Filled,
 } from "@vicons/fluent";
 import {
   WaveSawTool,
@@ -90,6 +91,7 @@ import {
   WaveSquare,
   ArrowsSplit,
   ArrowsJoin,
+  Code,
 } from "@vicons/tabler";
 import { JoinFullRound, CategoryOutlined } from "@vicons/material";
 import { Category, Scale } from "@vicons/carbon";
@@ -101,6 +103,7 @@ import ConnectionStyle from "@/components/visual-programming/CustomNodeStyles/Co
 const emit = defineEmits<{
   update: [content: string];
   save: [content: string];
+  code: [];
 }>();
 
 export interface KeyedGraph {
@@ -652,6 +655,24 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               0.0,
               "var frame = f32(time.frame);",
               "frame"
+            );
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "Instance ID",
+        {
+          name: "Instance ID",
+          type: "CONSTANT",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new VariableOutNode(
+              0.0,
+              "var instanceId = f32(instance_id);",
+              "instanceId"
             );
           },
           create: createUINode,
@@ -1603,20 +1624,19 @@ function addTemplate(name: string, json: string) {
             }
           }
         "
-      ></div>
-    </n-flex>
-    <n-flex>
-      <n-button
-        @click="
-          //deserialize(
-          //  `{&quot;graph&quot;:[{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;ffec57f1db36b382&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;input2&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:{&quot;0&quot;:1,&quot;1&quot;:1}}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;c813ab16c5471e3c&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var PI = 3.14159265359;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:3.14159265359}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;0ecbb9b9a229ce19&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var HALF_PI = 3.14159265359 / 2.0;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;HALF_PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:1.570796326795}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;4a065e8821ad82e0&quot;,&quot;inputs&quot;:[],&quot;nodeType&quot;:&quot;VariableOut&quot;,&quot;extraStringInformation&quot;:[{&quot;key&quot;:&quot;code&quot;,&quot;value&quot;:&quot;var TWO_PI = 3.14159265359 * 2.0;&quot;},{&quot;key&quot;:&quot;ref&quot;,&quot;value&quot;:&quot;TWO_PI&quot;}],&quot;extraNumberInformation&quot;:[{&quot;key&quot;:&quot;value&quot;,&quot;value&quot;:6.28318530718}]},{&quot;size&quot;:[180,140],&quot;uuid&quot;:&quot;4e2cf9be57e0e973&quot;,&quot;inputs&quot;:[{&quot;key&quot;:&quot;def&quot;,&quot;value&quot;:&quot;vec3f(input2.x, 0, input2.y)&quot;,&quot;type&quot;:&quot;text&quot;}],&quot;nodeType&quot;:&quot;Return&quot;}]}`,
-          //);
-          loading = true
-        "
-        v-on:pointerdown.stop=""
       >
-        Load
-      </n-button>
+        <n-button
+          quaternary
+          circle
+          class="float-right m-2 z-10 mt-7"
+          type="primary"
+          v-on:click="emit('code')"
+        >
+          <template #icon>
+            <n-icon :component="Code"></n-icon>
+          </template>
+        </n-button>
+      </div>
     </n-flex>
   </n-flex>
 </template>

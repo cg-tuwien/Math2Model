@@ -4,6 +4,7 @@ import { computed, ref, shallowRef, watch, type DeepReadonly } from "vue";
 import { watchDebounced, useElementSize } from "@vueuse/core";
 import type { FilePath } from "@/filesystem/reactive-files";
 import { showInfo } from "@/notification";
+import { Connect } from "@vicons/carbon";
 
 export type Marker = monaco.editor.IMarkerData;
 
@@ -21,7 +22,7 @@ const props = defineProps<{
   markers: monaco.editor.IMarkerData[];
   isReadonly: boolean;
 }>();
-const emit = defineEmits<{ update: [code: () => string] }>();
+const emit = defineEmits<{ update: [code: () => string]; graph: [] }>();
 
 const editor = shallowRef<monaco.editor.IStandaloneCodeEditor | null>(null);
 
@@ -110,7 +111,20 @@ watch(monacoMount, (element) => {
       ref="monacoMount"
       class="border border-gray-500 self-stretch flex-1 overflow-hidden"
       :class="{ 'bg-gray-800': isReadonly }"
-    ></div>
+    >
+      <n-button
+        v-if="props.keyedCode?.name.includes('.graph')"
+        quaternary
+        circle
+        class="float-right m-2 z-10"
+        type="primary"
+        v-on:click="emit('graph')"
+      >
+        <template #icon>
+          <n-icon :component="Connect"></n-icon>
+        </template>
+      </n-button>
+    </div>
   </div>
 </template>
 <style scoped></style>
