@@ -82,6 +82,7 @@ import {
   Heart24Regular,
   Circle24Regular,
   RectangleLandscape24Regular,
+  BracesVariable24Filled,
 } from "@vicons/fluent";
 import {
   WaveSawTool,
@@ -90,6 +91,7 @@ import {
   WaveSquare,
   ArrowsSplit,
   ArrowsJoin,
+  Code,
 } from "@vicons/tabler";
 import { JoinFullRound, CategoryOutlined } from "@vicons/material";
 import { Category, Scale } from "@vicons/carbon";
@@ -101,6 +103,7 @@ import ConnectionStyle from "@/components/visual-programming/CustomNodeStyles/Co
 const emit = defineEmits<{
   update: [content: string];
   save: [content: string];
+  code: [];
 }>();
 
 export interface KeyedGraph {
@@ -652,6 +655,24 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               0.0,
               "var frame = f32(time.frame);",
               "frame"
+            );
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "Instance ID",
+        {
+          name: "Instance ID",
+          type: "CONSTANT",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new VariableOutNode(
+              0.0,
+              "var instanceId = f32(instance_id);",
+              "instanceId"
             );
           },
           create: createUINode,
@@ -1603,8 +1624,19 @@ function addTemplate(name: string, json: string) {
             }
           }
         "
-      ></div>
-      <n-button><n-icon :component="WaveSawTool"></n-icon></n-button>
+      >
+        <n-button
+          quaternary
+          circle
+          class="float-right m-2 z-10 mt-7"
+          type="primary"
+          v-on:click="emit('code')"
+        >
+          <template #icon>
+            <n-icon :component="Code"></n-icon>
+          </template>
+        </n-button>
+      </div>
     </n-flex>
   </n-flex>
 </template>

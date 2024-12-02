@@ -479,6 +479,13 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
                 :is-dark="store.isDark"
                 :markers="openFile.markers.value"
                 @update="openFile.setNewCode($event)"
+                @graph="
+                  openFile.openFile(
+                    makeFilePath(
+                      openFile.path.value?.replace('.wgsl', '') ?? ''
+                    )
+                  )
+                "
               >
               </CodeEditor>
               <CodeGraph
@@ -502,6 +509,13 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
                     } else {
                       console.error('Invalid state!');
                     }
+                  }
+                "
+                @code="
+                  () => {
+                    openFile.openFile(
+                      makeFilePath(openFile.path.value + '.wgsl')
+                    );
                   }
                 "
                 ref="graphRef"
