@@ -100,6 +100,7 @@ import VariableOutNodeStyle from "@/components/visual-programming/CustomNodeStyl
 import DefaultNodeStyle from "@/components/visual-programming/CustomNodeStyles/DefaultNodeStyle.vue";
 import SocketStyle from "@/components/visual-programming/CustomNodeStyles/SocketStyle.vue";
 import ConnectionStyle from "@/components/visual-programming/CustomNodeStyles/ConnectionStyle.vue";
+import { sleep } from "seemly";
 const emit = defineEmits<{
   update: [content: string];
   save: [content: string];
@@ -140,6 +141,8 @@ const graphsDropdown = computed<SelectMixedOption[]>(() => {
       })
     );
 });
+
+const loadingPercentage = ref(0);
 
 function createUINode(uiNode: UINode) {
   addNode(uiNode.get());
@@ -235,6 +238,33 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
         },
       ],
       [
+        "Scale",
+        {
+          name: "Scale",
+          type: "APPLY",
+          prefix: "",
+          image: Scale,
+          get: () => {
+            return new MathFunctionNode(
+              "Scale",
+              "mat3x3(vec3f({scale x,1,100,-100,0.1,f32},0.0,0.0), vec3f(0.0,{scale y,1,100,-100,0.1,f32},0.0), vec3f(0.0,0.0,{scale z,1,100,-100,0.1,f32})) * input2",
+              (id) => {
+                area.update("node", id);
+                editor.addNode(new NothingNode());
+              },
+              (c) => {
+                area.update("control", c.id);
+              },
+              false,
+              "vec3f",
+              "vec3f"
+            );
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
         "Sine",
         {
           name: "Sine",
@@ -252,9 +282,9 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               (c) => {
                 area.update("control", c.id);
               },
-              true,
-              "vec3f",
-              "vec3f"
+              false,
+              "any",
+              "any"
             );
           },
           create: createUINode,
@@ -279,9 +309,9 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               (c) => {
                 area.update("control", c.id);
               },
-              true,
-              "vec3f",
-              "vec3f"
+              false,
+              "any",
+              "any"
             );
           },
           create: createUINode,
@@ -306,9 +336,9 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               (c) => {
                 area.update("control", c.id);
               },
-              true,
-              "vec3f",
-              "vec3f"
+              false,
+              "any",
+              "any"
             );
           },
           create: createUINode,
@@ -333,9 +363,9 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               (c) => {
                 area.update("control", c.id);
               },
-              true,
-              "vec3f",
-              "vec3f"
+              false,
+              "any",
+              "any"
             );
           },
           create: createUINode,
@@ -360,9 +390,9 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
               (c) => {
                 area.update("control", c.id);
               },
-              true,
-              "vec3f",
-              "vec3f"
+              false,
+              "any",
+              "any"
             );
           },
           create: createUINode,
@@ -370,16 +400,16 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
         },
       ],
       [
-        "Scale",
+        "Step",
         {
-          name: "Scale",
+          name: "Step",
           type: "APPLY",
           prefix: "",
-          image: Scale,
+          image: WaveSquare,
           get: () => {
             return new MathFunctionNode(
-              "Scale",
-              "mat3x3(vec3f({scale x,1,100,-100,0.1,f32},0.0,0.0), vec3f(0.0,{scale y,1,100,-100,0.1,f32},0.0), vec3f(0.0,0.0,{scale z,1,100,-100,0.1,f32})) * input2",
+              "Step",
+              "step({edge,1,10,-10,1,same}, input2)",
               (id) => {
                 area.update("node", id);
                 editor.addNode(new NothingNode());
@@ -388,8 +418,8 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
                 area.update("control", c.id);
               },
               false,
-              "vec3f",
-              "vec3f"
+              "any",
+              "any"
             );
           },
           create: createUINode,
@@ -502,119 +532,61 @@ const uiNodes: Map<string, Map<string, UINode>> = new Map([
           draggable: true,
         },
       ],
-      [
-        "sin(x)",
-        {
-          name: "sin(x)",
-          type: "CALCULATE",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new MathFunctionNode(
-              "Sine",
-              "sin({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "cos(x)",
-        {
-          name: "cos(x)",
-          type: "CALCULATE",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new MathFunctionNode(
-              "Cosine",
-              "cos({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "sawtooth(x)",
-        {
-          name: "sawtooth(x)",
-          type: "CALCULATE",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new MathFunctionNode(
-              "Sawtooth",
-              "(({sawtooth count,0,10,-10,0.1,f32} * input2) - floor({sawtooth count,0,10,-10,0.1,f32} * input2))",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "pow(x)",
-        {
-          name: "pow(x)",
-          type: "CALCULATE",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new MathFunctionNode(
-              "Pow",
-              "pow(input2, {x1,0,10,-10,0.1,same})",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
     ]),
   ],
   [
     "Constants",
     new Map<string, UINode>([
+      [
+        "PI",
+        {
+          name: "PI",
+          type: "CONSTANT",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new VariableOutNode(0.0, "var PI = 3.14159265359;", "PI");
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "TWO PI",
+        {
+          name: "TWO PI",
+          type: "CONSTANT",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new VariableOutNode(
+              0.0,
+              "var TWO_PI = 3.14159265359 * 2.0;",
+              "TWO_PI"
+            );
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
+      [
+        "HALF PI",
+        {
+          name: "HALF PI",
+          type: "CONSTANT",
+          prefix: "",
+          image: MathFunction,
+          get: () => {
+            return new VariableOutNode(
+              0.0,
+              "var HALF_PI = 3.14159265359 / 2.0;",
+              "HALF_PI"
+            );
+          },
+          create: createUINode,
+          draggable: true,
+        },
+      ],
       [
         "Elapsed Time",
         {
@@ -1019,6 +991,11 @@ async function createEditor() {
       case "KeyZ":
         void history.redo();
         break;
+      case "KeyS":
+        e.preventDefault();
+        e.stopPropagation();
+        void rearrange();
+        break;
       default:
     }
   });
@@ -1294,6 +1271,8 @@ async function serialize() {
   const sg = new SerializedGraph();
   for (let node of editor.getNodes()) {
     const sn = new SerializedNode();
+    const nodePos = area.nodeViews.get(node.id)?.position;
+    sn.position = [nodePos?.x ?? 0, nodePos?.y ?? 0];
     sg.add(node.serialize(sn));
   }
 
@@ -1359,6 +1338,8 @@ async function deserialize(json: string, parent?: string) {
     nodes.set(sn.uuid, node);
     node.deserialize(sn);
     await editor.addNode(node);
+    if (sn.position)
+      void area.translate(node.id, { x: sn.position[0], y: sn.position[1] });
   }
 
   for (let snObj of sg.graph) {
@@ -1397,8 +1378,14 @@ async function deserialize(json: string, parent?: string) {
   }
 
   shouldUpdate = true;
-  await rearrange();
   await editor.addNode(new NothingNode());
+  // await rearrange();
+}
+
+async function loadingBar() {
+  while (loadingPercentage.value < 100) {
+    loadingPercentage.value += 1;
+  }
 }
 
 function serializedNodeToNode(
@@ -1625,6 +1612,14 @@ function addTemplate(name: string, json: string) {
           }
         "
       >
+        <n-space>
+          <n-progress
+            v-if="loadingPercentage < 0"
+            type="circle"
+            :percentage="loadingPercentage"
+            :status="loadingPercentage < 100 ? 'info' : 'success'"
+          ></n-progress>
+        </n-space>
         <n-button
           quaternary
           circle

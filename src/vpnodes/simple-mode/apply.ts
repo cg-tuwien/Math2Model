@@ -19,7 +19,7 @@ export class CombineNode extends VPNode {
   private cfControl: SliderControl;
   constructor(
     private update: (id: string) => void,
-    private updateControl: (c: ClassicPreset.Control) => void,
+    private updateControl: (c: ClassicPreset.Control) => void
   ) {
     super("Combine Shapes");
 
@@ -35,25 +35,25 @@ export class CombineNode extends VPNode {
       },
       (value) => {
         this.updateControl(this.cfControl);
-      },
+      }
     );
 
     this.addInput(
       "param1",
-      new ClassicPreset.Input(reteSocket, "shape 1/vec3f"),
+      new ClassicPreset.Input(reteSocket, "shape 1/vec3f")
     );
     this.addInput(
       "param2",
-      new ClassicPreset.Input(reteSocket, "shape 2/vec3f"),
+      new ClassicPreset.Input(reteSocket, "shape 2/vec3f")
     );
     this.addInput(
       "param3",
-      new ClassicPreset.Input(reteSocket, "combine factor/f32"),
+      new ClassicPreset.Input(reteSocket, "combine factor/f32")
     );
     this.addControl("cfactor", this.cfControl);
     this.addOutput(
       "value",
-      new ClassicPreset.Output(reteSocket, "output[x, y, z]/vec3f"),
+      new ClassicPreset.Output(reteSocket, "output[x, y, z]/vec3f")
     );
   }
 
@@ -115,7 +115,7 @@ export class MathFunctionNode extends VPNode {
     private updateControl: (c: ClassicPreset.Control) => void,
     private isApply: boolean = true,
     private inputType: "f32" | "vec2f" | "vec3f" | "vec4f" | "any" = "any",
-    private outputType: "f32" | "vec2f" | "vec3f" | "vec4f" | "any" = "any",
+    private outputType: "f32" | "vec2f" | "vec3f" | "vec4f" | "any" = "any"
   ) {
     super(`${isApply ? "Apply" : "Calculate"} ${name} Function`);
 
@@ -130,12 +130,12 @@ export class MathFunctionNode extends VPNode {
 
     this.addInput(
       "param",
-      new ClassicPreset.Input(reteSocket, `param / ${this.inputType}`),
+      new ClassicPreset.Input(reteSocket, `param / ${this.inputType}`)
     );
 
     this.addOutput(
       "value",
-      new ClassicPreset.Output(reteSocket, `result / ${this.outputType}`),
+      new ClassicPreset.Output(reteSocket, `result / ${this.outputType}`)
     );
 
     const vars = this.func.split("{");
@@ -151,11 +151,11 @@ export class MathFunctionNode extends VPNode {
         expr[0],
         true,
         (value) => this.update(this.id),
-        (value) => this.updateControl(control),
+        (value) => this.updateControl(control)
       );
       this.variableControls.set(
         "{" + variable.split("}")[0] + "}/" + expr[5],
-        control,
+        control
       );
       this.addControl(expr[0], control);
     }
@@ -175,8 +175,8 @@ export class MathFunctionNode extends VPNode {
           ? (param[0].refId ?? param[0].value)
           : this.inputType == "any"
             ? "input2"
-            : typeToValueCode(this.inputType),
-      ),
+            : typeToValueCode(this.inputType)
+      )
     );
     for (let key of this.variableControls.keys()) {
       const k = key.split("/");
@@ -189,8 +189,8 @@ export class MathFunctionNode extends VPNode {
             control?.value ?? 0.0,
             control?.value ?? 0.0,
             control?.value ?? 0.0,
-            control?.value ?? 0.0,
-          ),
+            control?.value ?? 0.0
+          )
         );
       } else {
         funcCall = funcCall.replaceAll(
@@ -200,8 +200,8 @@ export class MathFunctionNode extends VPNode {
             control?.value ?? 0.0,
             control?.value ?? 0.0,
             control?.value ?? 0.0,
-            control?.value ?? 0.0,
-          ),
+            control?.value ?? 0.0
+          )
         );
       }
     }
