@@ -22,7 +22,7 @@ use reactive_graph::{
     },
 };
 use scene::SceneData;
-use virtual_model::{make_missing_shader, ShaderPipelines, VirtualModel};
+use virtual_model::{make_empty_texture, make_missing_shader, ShaderPipelines, VirtualModel};
 use wgpu_context::{create_profiler, SurfaceOrFallback, WgpuContext};
 use wgpu_profiler::GpuProfiler;
 
@@ -85,6 +85,8 @@ const MAX_PATCH_COUNT: u32 = 100_000;
 
 #[derive(Clone)]
 struct MissingShader(Arc<ShaderPipelines>);
+#[derive(Clone)]
+struct EmptyTexture(Arc<Texture>);
 
 impl GpuApplication {
     pub fn new(context: WgpuContext, surface: SurfaceOrFallback) -> Self {
@@ -100,6 +102,7 @@ impl GpuApplication {
         let models = SignalVec::new();
 
         provide_context(MissingShader(make_missing_shader(&context)));
+        provide_context(EmptyTexture(make_empty_texture(&context)));
         let shaders = RwSignal::new(HashMap::new());
         let textures = RwSignal::new(HashMap::new());
 
@@ -353,6 +356,7 @@ fn render_component(
                 model_component(
                     surface,
                     shaders,
+                    textures,
                     model.clone(),
                     threshold_factor,
                     compute_patches,
@@ -616,6 +620,7 @@ fn ground_plane_component(
 fn model_component(
     surface: RwSignal<SurfaceOrFallback>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
+    textures: RwSignal<HashMap<TextureId, Arc<Texture>>>,
     model: ArcReadSignal<ModelInfo>,
     threshold_factor: ReadSignal<f32>,
     compute_patches: StoredValue<ComputePatchesStep>,
@@ -647,6 +652,7 @@ fn model_component(
     let render_component = render_model_component(
         render_stage.render_bind_group_0,
         shaders,
+        textures,
         model.clone(),
         virtual_model,
         render_stage.meshes,
@@ -932,6 +938,7 @@ struct RenderInfo {
 fn render_model_component(
     render_bind_group_0: StoredValue<shader::bind_groups::BindGroup0>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
+    textures: RwSignal<HashMap<TextureId, Arc<Texture>>>,
     model: ArcReadSignal<ModelInfo>,
     virtual_model: Memo<VirtualModel>,
     meshes: StoredValue<Vec<Mesh>>,
@@ -943,6 +950,18 @@ fn render_model_component(
             let shaders_guard = shaders.read();
             let shader = shaders_guard.get(&model.shader_id).cloned();
             shader.unwrap_or_else(|| use_context::<MissingShader>().unwrap().0.clone())
+        }
+    });
+    let texture = Memo::new_computed({
+        let model = model.clone();
+        move |_| {
+            let model = model.read();
+            model
+                .material_info
+                .diffuse_texture
+                .as_ref()
+                .and_then(|id| textures.with(|t| t.get(&id).cloned()))
+                .unwrap_or_else(|| use_context::<EmptyTexture>().unwrap().0.clone())
         }
     });
 
@@ -973,6 +992,7 @@ fn render_model_component(
             let device = &context.device;
             let model_buffer = model_buffer.read();
             let material_buffer = material_buffer.read();
+            let t_diffuse = texture.read();
             virtual_model
                 .read()
                 .render_buffer
@@ -984,6 +1004,7 @@ fn render_model_component(
                             model: model_buffer.as_entire_buffer_binding(),
                             render_buffer: render.as_entire_buffer_binding(),
                             material: material_buffer.as_entire_buffer_binding(),
+                            t_diffuse: &t_diffuse.view,
                         },
                     )
                 })

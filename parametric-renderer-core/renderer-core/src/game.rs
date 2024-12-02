@@ -35,6 +35,7 @@ pub struct MaterialInfo {
     pub emissive: Vec3,
     pub roughness: f32,
     pub metallic: f32,
+    pub diffuse_texture: Option<TextureId>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]

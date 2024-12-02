@@ -183,14 +183,17 @@ struct Material {
     // emissive_metallic.rgb is the emissive color of the material
     // emissive_metallic.a is the metallicness of the material
     emissive_metallic: vec4<f32>,
+    // is a boolean
+    has_texture: u32
 }
 
 @group(0) @binding(3) var<uniform> camera: Camera;
 @group(0) @binding(4) var<storage, read> lights: Lights;
+@group(0) @binding(5) var linear_sampler: sampler;
 @group(1) @binding(1) var<uniform> model: Model;
 @group(1) @binding(2) var<storage, read> render_buffer: RenderBufferRead;
 @group(1) @binding(3) var<uniform> material: Material;
-
+@group(1) @binding(4) var t_diffuse: texture_2d<f32>;
 
 
 

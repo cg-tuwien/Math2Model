@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use renderer_core::game::TextureId;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 
@@ -50,6 +51,7 @@ pub struct WasmMaterialInfo {
     pub emissive: [f32; 3],
     pub roughness: f32,
     pub metallic: f32,
+    pub diffuse_texture: Option<String>,
 }
 
 impl From<WasmMaterialInfo> for renderer_core::game::MaterialInfo {
@@ -59,6 +61,7 @@ impl From<WasmMaterialInfo> for renderer_core::game::MaterialInfo {
             emissive: v.emissive.into(),
             roughness: v.roughness,
             metallic: v.metallic,
+            diffuse_texture: v.diffuse_texture.map(TextureId),
         }
     }
 }

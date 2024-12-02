@@ -2,7 +2,7 @@
 
 use crate::{
     buffer::TypedBuffer,
-    game::MaterialInfo,
+    game::{MaterialInfo, TextureInfo},
     mesh::Mesh,
     shaders::{compute_patches, copy_patches, shader},
     texture::Texture,
@@ -60,6 +60,17 @@ pub fn make_missing_shader(context: &WgpuContext) -> Arc<ShaderPipelines> {
         "Missing Shader",
         MISSING_SHADER,
         context,
+    ))
+}
+
+pub fn make_empty_texture(context: &WgpuContext) -> Arc<Texture> {
+    Arc::new(Texture::new_rgba(
+        &context.device,
+        &context.queue,
+        &TextureInfo {
+            width: 1,
+            data: vec![u8::MAX, u8::MAX, u8::MAX, u8::MAX],
+        },
     ))
 }
 
@@ -126,6 +137,7 @@ impl MaterialInfo {
                 self.emissive.z,
                 self.metallic,
             ),
+            has_texture: if self.diffuse_texture.is_some() { 1 } else { 0 },
         }
     }
 
@@ -135,6 +147,7 @@ impl MaterialInfo {
             emissive: Vec3::new(1.0, 0.0, 1.0),
             roughness: 0.7,
             metallic: 0.0,
+            diffuse_texture: None,
         }
     }
 }
@@ -145,6 +158,7 @@ impl Default for MaterialInfo {
             emissive: Vec3::new(0.0, 0.0, 0.0),
             roughness: 0.0,
             metallic: 0.0,
+            diffuse_texture: None,
         }
     }
 }

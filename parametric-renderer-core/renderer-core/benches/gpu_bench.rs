@@ -46,6 +46,7 @@ fn main() {
             emissive: Vec3::new(0.0, 0.0, 0.0),
             roughness: 0.7,
             metallic: 0.1,
+            diffuse_texture: None,
         },
         shader_id,
         instance_count: 1,

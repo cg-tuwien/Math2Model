@@ -9,6 +9,7 @@ pub struct SceneData {
     pub mouse_buffer: TypedBuffer<shader::Mouse>,
     pub camera_buffer: TypedBuffer<shader::Camera>,
     pub light_buffer: TypedBuffer<shader::Lights>,
+    pub linear_sampler: wgpu::Sampler,
 }
 
 impl SceneData {
@@ -65,6 +66,15 @@ impl SceneData {
                 },
                 wgpu::BufferUsages::COPY_DST,
             ),
+            linear_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
+                address_mode_u: wgpu::AddressMode::ClampToEdge,
+                address_mode_v: wgpu::AddressMode::ClampToEdge,
+                address_mode_w: wgpu::AddressMode::ClampToEdge,
+                mag_filter: wgpu::FilterMode::Linear,
+                min_filter: wgpu::FilterMode::Linear,
+                mipmap_filter: wgpu::FilterMode::Nearest,
+                ..Default::default()
+            }),
         }
     }
 
@@ -77,6 +87,7 @@ impl SceneData {
                 screen: self.screen_buffer.as_entire_buffer_binding(),
                 mouse: self.mouse_buffer.as_entire_buffer_binding(),
                 lights: self.light_buffer.as_entire_buffer_binding(),
+                linear_sampler: &self.linear_sampler,
             },
         )
     }
