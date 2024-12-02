@@ -14,6 +14,7 @@ import LodStageWgsl from "./lod_stage.wgsl?raw";
 import PrepVerticesStageWgsl from "./prep_vertices_stage.wgsl?raw";
 import OutputVerticesWgsl from "./vertices_stage.wgsl?raw";
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import * as THREE from 'three';
 
 const a = new THREE.Vector3( 0, 1, 0 );
@@ -108,27 +109,43 @@ function exportMesh(vertexStream: Float32Array) {
   let vertices = new Float32Array(arrayVertices.length*3);
   let inds = new Uint32Array(arrayVertices.length*6);
   index = 0;
+  let mexpstring = "o\n";
+  let vertcount = 0;
   for (const verticesKey in arrayVertices) {
     let v = arrayVertices[verticesKey].vert;
     vertices[verticesKey*3]=v.x;
     vertices[verticesKey*3+1]=v.y;
     vertices[verticesKey*3+2]=v.z;
+    if(!(v.x == 0 && v.y == 0 && v.z == 0)) {
+      mexpstring += "v " + v.x + " " + v.y + " " + v.z + "\n";
+      vertcount+=1;
+    }
   }
   for (let i = 0; i < arrayVertices.length; i+=4) {
+
+    if(i+4 > vertcount)
+      break;
     inds[index++] = i;
     inds[index++] = i+1;
     inds[index++] = i+2;
+    mexpstring+="f " + (i+1) + " " + (i+1+1) + " " + (i+2+1) + "\n";
 
     inds[index++] = i;
     inds[index++] = i+2;
     inds[index++] = i+3;
+
+    mexpstring+="f " + (i+1) + " " + (i+2+1) + " " + (i+3+1) + "\n";
   }
   geometry.setAttribute( 'position', new THREE.BufferAttribute( vertices, 3 ) );
   geometry.setIndex( inds );
   let mesh = new THREE.Mesh(geometry);
-  let exporter = new OBJExporter();
-  const data = exporter.parse( mesh );
-  saveFile( data,"wowcool3dmodel.obj" );
+  //let exporter = new GLTFExporter();
+  //const data = exporter.parse(mesh, function f(file) {
+    ///saveFile(f,"coolexport.gltf");
+  //}
+//  );
+  console.log(mexpstring);
+  saveFile( mexpstring,"wowcool3dmodel.obj" );
   console.log(mesh);
 }
 
@@ -353,7 +370,7 @@ async function main() {
   let startVertexOffset = 8;
   let padding = 8;
   const vertOutputBufferSize =
-    startVertexOffset + padding + oneVertexEntry * 1000;
+    startVertexOffset + padding + oneVertexEntry * 50_000;
   let vertOutputBuffer = device.createBuffer({
     label: "VertOutputBuffer",
     size: vertOutputBufferSize,
@@ -590,7 +607,7 @@ async function main() {
       ],
     });
 
-    const doubleNumberOfRounds = 2;
+    const doubleNumberOfRounds = 4;
     // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
     for (let i = 0; i < doubleNumberOfRounds; i++) {
       const isLastRound = i === doubleNumberOfRounds - 1;
