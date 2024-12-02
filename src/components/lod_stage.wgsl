@@ -195,7 +195,19 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
   let patch_bottom_right = patch_bottom_right_child(quad_encoded);
   let patch_bottom_left = patch_bottom_left_child(quad_encoded);
 
-  if (force_render.flag == 1u) {
+
+  let normala = calculateNormalOfPatch(patch_decode(patch_top_left));
+  let normalb = calculateNormalOfPatch(patch_decode(patch_top_right));
+  let normalc = calculateNormalOfPatch(patch_decode(patch_bottom_right));
+  let normald = calculateNormalOfPatch(patch_decode(patch_bottom_left));
+  let simab = cosinesim(normala,normalb);
+  let simcd = cosinesim(normalc,normald);
+
+
+
+    let isflat = simab+simcd > 1.8f;
+
+  if (force_render.flag == 1u || isflat) {
     force_render_internal(quad_encoded);
   } else {
     // Split all 4 ways
@@ -205,7 +217,7 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
     // |   |   |
     // +---+---+
     let write_index = atomicAdd(&patches_to_buffer.patches_length, 4u);
-    if write_index + 4 < patches_to_buffer.patches_capacity {
+    if(write_index + 4 < patches_to_buffer.patches_capacity) {
       atomicAdd(&dispatch_next.x, 4u);
       patches_to_buffer.patches[write_index + 0] = patch_top_left;
       patches_to_buffer.patches[write_index + 1] = patch_top_right;
@@ -213,6 +225,28 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
       patches_to_buffer.patches[write_index + 3] = patch_bottom_left;
     }
   }
+}
+
+fn cosinesim(v1: vec3<f32>, v2: vec3<f32>) -> f32
+{
+    return dot(v1,v2); //  /(length(v1)*length(v2)) // (length of both is always 1 because they are normalized) -;
+}
+
+fn calculateNormalOfPatch(p: Patch) -> vec3<f32> {
+    let quad = (p);
+
+    let quad_point_a = quad.min;
+    let quad_point_b = vec2f(quad.min.x, quad.max.y);
+    let quad_point_c = quad.max;
+    let quad_point_d = vec2f(quad.max.x, quad.min.y);
+    let cap = sampleObject(quad_point_a);
+    let cbp = sampleObject(quad_point_b);
+    let ccp = sampleObject(quad_point_c);
+    let cdp = sampleObject(quad_point_d);
+
+    let tnorma = normalize(cross((cbp-cap),(cdp-cap)));
+    let tnormc = -normalize(cross((cbp-ccp),(cdp-ccp)));
+    return normalize((tnorma+tnormc)/2.0f);
 }
 
 /// Gets a bitflag for the frustum sides of a point in clip space. 6 bits are used, 1 for each side.
@@ -289,6 +323,8 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
     v_lengths[2][0] + v_lengths[2][1] + v_lengths[2][2] + v_lengths[2][3] + v_lengths[2][4] + v_lengths[2][5] + v_lengths[2][6],
     v_lengths[3][0] + v_lengths[3][1] + v_lengths[3][2] + v_lengths[3][3] + v_lengths[3][4] + v_lengths[3][5] + v_lengths[3][6]
   );
+
+
 
   if(sample_index == 0) {
     split_patch(quad_encoded, quad, u_length, v_length);

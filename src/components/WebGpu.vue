@@ -103,7 +103,7 @@ function exportMesh(vertexStream: Float32Array) {
     });
 
 
-    console.log("Slice: " + section + " Slice 2: " + section2);
+    //console.log("Slice: " + section + " Slice 2: " + section2);
     index+=8;
   }
   let vertices = new Float32Array(arrayVertices.length*3);
@@ -111,12 +111,19 @@ function exportMesh(vertexStream: Float32Array) {
   index = 0;
   let mexpstring = "o\n";
   let vertcount = 0;
+  let zeros = 8;
   for (const verticesKey in arrayVertices) {
     let v = arrayVertices[verticesKey].vert;
     vertices[verticesKey*3]=v.x;
     vertices[verticesKey*3+1]=v.y;
     vertices[verticesKey*3+2]=v.z;
     if(!(v.x == 0 && v.y == 0 && v.z == 0)) {
+      mexpstring += "v " + v.x + " " + v.y + " " + v.z + "\n";
+      vertcount+=1;
+    }
+    else if(zeros > 0)
+    {
+      zeros--;
       mexpstring += "v " + v.x + " " + v.y + " " + v.z + "\n";
       vertcount+=1;
     }
@@ -144,7 +151,7 @@ function exportMesh(vertexStream: Float32Array) {
     ///saveFile(f,"coolexport.gltf");
   //}
 //  );
-  console.log(mexpstring);
+  //console.log(mexpstring);
   saveFile( mexpstring,"wowcool3dmodel.obj" );
   console.log(mesh);
 }
@@ -433,7 +440,7 @@ async function main() {
     }
   };
 
-  const MAX_PATCHES = 10_000;
+  const MAX_PATCHES = 100_000;
   const patchesBufferReset = createBufferWith(
     concatArrayBuffers([new Uint32Array([0, MAX_PATCHES])]),
     GPUBufferUsage.COPY_SRC
@@ -726,7 +733,7 @@ async function main() {
               .getMappedRange(0, vertReadableBuffer.size)
               .slice(0);
             const vertexStream = new Float32Array(arrayBuffer);
-            console.log("vertReadableBuffer Output:", vertexStream); // Only zeroes. Huh
+            //console.log("vertReadableBuffer Output:", vertexStream); // Only zeroes. Huh
             vertReadableBuffer.unmap();
             exportMesh(vertexStream);
           });
