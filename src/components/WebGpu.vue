@@ -725,6 +725,7 @@ async function main() {
         0,
         vertOutputBuffer.size
       );
+      debugPrintBuffer(dispatchVerticesStage,commandEncoder);
       setTimeout(() => {
         vertReadableBuffer
           .mapAsync(GPUMapMode.READ, 0, vertReadableBuffer.size)
@@ -733,6 +734,7 @@ async function main() {
               .getMappedRange(0, vertReadableBuffer.size)
               .slice(0);
             const vertexStream = new Float32Array(arrayBuffer);
+            console.log(vertexStream);
             //console.log("vertReadableBuffer Output:", vertexStream); // Only zeroes. Huh
             vertReadableBuffer.unmap();
             exportMesh(vertexStream);

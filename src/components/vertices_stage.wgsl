@@ -126,6 +126,21 @@ fn mouse_held(button: u32) -> bool {
 @group(0) @binding(1) var<uniform> screen : Screen;
 @group(0) @binding(2) var<uniform> mouse : Mouse;
 
+
+fn calculateWorldSpaceSizeOfPatch(quad: Patch) -> f32
+{
+    let quad_point_a = quad.min;
+    let quad_point_b = vec2f(quad.min.x, quad.max.y);
+    let quad_point_c = quad.max;
+    let quad_point_d = vec2f(quad.max.x, quad.min.y);
+    let cap = sampleObject(quad_point_a);
+    let cbp = sampleObject(quad_point_b);
+    let ccp = sampleObject(quad_point_c);
+    let cdp = sampleObject(quad_point_d);
+    return length(cross((cbp-cap),(cdp-cap)))/2f+
+        length(cross((cbp-ccp),(cdp-ccp)))/2f;
+}
+
 //// START sampleObject
 fn sampleObject(input: vec2f) -> vec3f { return vec3(input, 0.0); }
 //// END sampleObject
@@ -183,7 +198,8 @@ fn main(
     // Prepare output
     var out: VertexOutput;
     out.world_position = world_pos.xyz;
-    out.texture_coords = quad_point;
+    let size = calculateWorldSpaceSizeOfPatch(quad);
+    out.texture_coords = vec2(size,size);//quad_point;
 
     // Write to shared array and wait
     quad_vertices[local_invocation_id.x] = out;

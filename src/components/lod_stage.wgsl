@@ -202,10 +202,24 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
   let normald = calculateNormalOfPatch(patch_decode(patch_bottom_left));
   let simab = cosinesim(normala,normalb);
   let simcd = cosinesim(normalc,normald);
+  let size = calculateWorldSpaceSizeOfPatch(quad);
+
+    let quad_point_a = quad.min;
+    let quad_point_b = vec2f(quad.min.x, quad.max.y);
+    let quad_point_c = quad.max;
+    let quad_point_d = vec2f(quad.max.x, quad.min.y);
+    let cap = sampleObject(quad_point_a);
+    let cbp = sampleObject(quad_point_b);
+    let ccp = sampleObject(quad_point_c);
+    let cdp = sampleObject(quad_point_d);
 
 
+    let avg = (cap + cbp + ccp + cdp)/4f;
 
-    let isflat = simab+simcd > 1.8f;
+  let isflat = simab+simcd > 1.8f;
+
+
+  let acceptable_size = 0.00001f;
 
   if (force_render.flag == 1u || isflat) {
     force_render_internal(quad_encoded);
@@ -227,6 +241,20 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
   }
 }
 
+fn calculateWorldSpaceSizeOfPatch(quad: Patch) -> f32
+{
+    let quad_point_a = quad.min;
+    let quad_point_b = vec2f(quad.min.x, quad.max.y);
+    let quad_point_c = quad.max;
+    let quad_point_d = vec2f(quad.max.x, quad.min.y);
+    let cap = sampleObject(quad_point_a);
+    let cbp = sampleObject(quad_point_b);
+    let ccp = sampleObject(quad_point_c);
+    let cdp = sampleObject(quad_point_d);
+    return length(cross((cbp-cap),(cdp-cap)))/2f+
+        length(cross((cbp-ccp),(cdp-ccp)))/2f;
+}
+
 fn cosinesim(v1: vec3<f32>, v2: vec3<f32>) -> f32
 {
     return dot(v1,v2); //  /(length(v1)*length(v2)) // (length of both is always 1 because they are normalized) -;
@@ -239,6 +267,7 @@ fn calculateNormalOfPatch(p: Patch) -> vec3<f32> {
     let quad_point_b = vec2f(quad.min.x, quad.max.y);
     let quad_point_c = quad.max;
     let quad_point_d = vec2f(quad.max.x, quad.min.y);
+
     let cap = sampleObject(quad_point_a);
     let cbp = sampleObject(quad_point_b);
     let ccp = sampleObject(quad_point_c);
