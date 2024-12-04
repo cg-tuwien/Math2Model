@@ -8,8 +8,7 @@
 </template>
 
 <script setup lang="ts">
-import { AdjustSharp } from "@vicons/material";
-import { Outlet, SquareDot } from "@vicons/tabler";
+import SquareDot from "~icons/mdi/circle-box-outline";
 
 const props = defineProps<{
   data: {

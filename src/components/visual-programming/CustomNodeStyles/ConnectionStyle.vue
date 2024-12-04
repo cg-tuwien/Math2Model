@@ -5,7 +5,6 @@
 </template>
 
 <script lang="ts" setup>
-import { ArrowForwardIosFilled } from "@vicons/material";
 const props = defineProps<{
   data: any;
   start?: string;

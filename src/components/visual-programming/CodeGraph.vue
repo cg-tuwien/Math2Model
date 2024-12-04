@@ -55,8 +55,6 @@ import {
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import { showError, showInfo } from "@/notification";
 import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
-import Heart from "@/../parametric-renderer-core/graphs/Heart.graph?raw";
-import Sphere from "@/../parametric-renderer-core/graphs/Sphere.graph?raw";
 import HeartWGSL from "@/../parametric-renderer-core/graphs/Heart.graph.wgsl?raw";
 import SphereWGSL from "@/../parametric-renderer-core/graphs/Sphere.graph.wgsl?raw";
 import PlaneWGSL from "@/../parametric-renderer-core/graphs/Plane.graph.wgsl?raw";
@@ -78,12 +76,9 @@ import NodesDock from "@/components/visual-programming/NodesDock.vue";
 import type { UINode } from "@/vpnodes/ui/uinode";
 import { SliderControl } from "@/vpnodes/controls/slider";
 import SliderComponent from "@/vpnodes/components/SliderComponent.vue";
-import {
-  Heart24Regular,
-  Circle24Regular,
-  RectangleLandscape24Regular,
-  BracesVariable24Filled,
-} from "@vicons/fluent";
+import Heart24Regular from "~icons/mdi/cards-heart-outline";
+import Circle24Regular from "~icons/mdi/circle-outline";
+import RectangleLandscape24Regular from "~icons/mdi/rectangle-outline";
 import {
   WaveSawTool,
   WaveSine,
@@ -93,14 +88,15 @@ import {
   ArrowsJoin,
   Code,
 } from "@vicons/tabler";
-import { JoinFullRound, CategoryOutlined } from "@vicons/material";
-import { Category, Scale } from "@vicons/carbon";
+import JoinFullRound from "~icons/mdi/full-outer-join";
+import CategoryOutlined from "~icons/mdi/category-outline";
+import Scale from "~icons/mdi/resize";
 import ReturnNodeStyle from "@/components/visual-programming/CustomNodeStyles/ReturnNodeStyle.vue";
 import VariableOutNodeStyle from "@/components/visual-programming/CustomNodeStyles/VariableOutNodeStyle.vue";
 import DefaultNodeStyle from "@/components/visual-programming/CustomNodeStyles/DefaultNodeStyle.vue";
 import SocketStyle from "@/components/visual-programming/CustomNodeStyles/SocketStyle.vue";
 import ConnectionStyle from "@/components/visual-programming/CustomNodeStyles/ConnectionStyle.vue";
-import { sleep } from "seemly";
+
 const emit = defineEmits<{
   update: [content: string];
   save: [content: string];

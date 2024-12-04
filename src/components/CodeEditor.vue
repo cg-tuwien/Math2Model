@@ -4,7 +4,7 @@ import { computed, ref, shallowRef, watch, type DeepReadonly } from "vue";
 import { watchDebounced, useElementSize } from "@vueuse/core";
 import type { FilePath } from "@/filesystem/reactive-files";
 import { showInfo } from "@/notification";
-import { Connect } from "@vicons/carbon";
+import Connect from "~icons/mdi/transit-connection-variant";
 
 export type Marker = monaco.editor.IMarkerData;
 
