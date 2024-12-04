@@ -5,7 +5,7 @@ import {
   type VirtualModelState,
 } from "@/scenes/scene-state";
 import { computed, h, ref, watchEffect, type DeepReadonly } from "vue";
-import { NButton, NInput, NText } from "naive-ui";
+import { NButton, NInput, NText, type UploadFileInfo } from "naive-ui";
 import NumberInput from "@/components/input/NumberInput.vue";
 import VectorInput from "@/components/input/VectorInput.vue";
 import EulerInput from "@/components/input/EulerInput.vue";
@@ -445,6 +445,14 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
             @update="(v) => change(['material', 'emissive'], vector3Update(v))"
           ></VectorInput>
           <!-- TODO: String input for diffuse texture -->
+          <n-upload
+            action="https://www.mocky.io/v2/5e4bafc63100007100d8b70f"
+            @before-upload="
+              (file: UploadFileInfo, fileList: UploadFileInfo[]) => {}
+            "
+          >
+            <n-button>Upload PNG</n-button>
+          </n-upload>
         </div>
       </n-flex>
     </div>
