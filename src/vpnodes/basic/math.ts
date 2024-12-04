@@ -9,6 +9,7 @@ import {
   VPNode,
 } from "@/vpnodes/basic/nodes";
 import { type SerializedNode } from "@/vpnodes/serialization/node";
+import { valueToType } from "./functions";
 
 export class NumberNode extends VPNode {
   private valueControl: ClassicPreset.InputControl<"number", number>;
@@ -115,7 +116,7 @@ export class MathOpNode extends VPNode {
     let leftValue = this.leftControl.value ?? 0.0;
     let leftId = "";
     if (left) {
-      leftValue = parseFloat(left[0].value);
+      leftValue = left[0].value;
       leftId = left[0].refId ? left[0].refId : "";
 
       if (this.hasControl("left")) this.removeControl("left");
@@ -129,7 +130,7 @@ export class MathOpNode extends VPNode {
 
     let rightId = "";
     if (right) {
-      rightValue = parseFloat(right[0].value);
+      rightValue = right[0].value;
       rightId = right[0].refId ? right[0].refId : "";
 
       if (this.hasControl("right")) this.removeControl("right");
@@ -139,6 +140,9 @@ export class MathOpNode extends VPNode {
     }
 
     const value = applyOperator(leftValue, rightValue, this.operator);
+    console.log("LeftValue " + valueToType(leftValue));
+    console.log("RightValue " + valueToType(rightValue));
+    console.log("MathOp result " + valueToType(value));
     const code =
       nodeToVariableDeclaration(this) +
       " = " +

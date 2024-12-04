@@ -2,6 +2,8 @@ import { ClassicPreset } from "rete";
 import { Area, AreaPlugin } from "rete-area-plugin";
 import { type SerializedNode } from "@/vpnodes/serialization/node";
 
+import { vec2, vec3, vec4 } from "webgpu-matrix";
+
 export const reteSocket = new ClassicPreset.Socket("socket");
 
 export function nodeToVariableDeclaration(node: ClassicPreset.Node) {
@@ -25,11 +27,19 @@ export function opToName(op: "+" | "-" | "/" | "*" | "%"): string {
 }
 
 export function applyOperator(
-  left: number,
-  right: number,
-  op: "+" | "-" | "/" | "*" | "%",
-): number {
+  left: any,
+  right: any,
+  op: "+" | "-" | "/" | "*" | "%"
+): any {
   let result = left;
+
+  if (valueToType(left) !== "f32") {
+    return left;
+  }
+
+  if (valueToType(right) !== "f32") {
+    return right;
+  }
 
   if (op === "+") result += right;
   else if (op === "-") result -= right;
@@ -98,20 +108,20 @@ export class NodeReturn {
   constructor(
     public value: any,
     public code: string,
-    public refId?: string,
+    public refId?: string
   ) {}
 }
 
 export class ReturnNode extends VPNode {
   constructor(
     public def: any,
-    private customName?: string,
+    private customName?: string
   ) {
     super(customName ?? "Return");
 
     this.addInput(
       "returnIn",
-      new ClassicPreset.Input(reteSocket, "Return Value"),
+      new ClassicPreset.Input(reteSocket, "Return Value")
     );
   }
 
@@ -159,7 +169,7 @@ export class VariableOutNode extends VPNode {
   constructor(
     public value: any,
     private code: any,
-    public ref?: string,
+    public ref?: string
   ) {
     super(ref ?? "Variable");
 
@@ -217,7 +227,7 @@ export class VariableInNode extends VPNode {
     return {
       value: {
         value: value ? value[0].value : 0,
-        code: `${this.ref} = ${value ? value[0].refId ?? value[0].value : this.ref};`,
+        code: `${this.ref} = ${value ? (value[0].refId ?? value[0].value) : this.ref};`,
         refId: this.ref,
       },
     };
@@ -242,26 +252,26 @@ export class VariableInNode extends VPNode {
 export class FunctionCallNode extends VPNode {
   constructor(
     private functionName?: string,
-    private numParams?: 0 | 1 | 2 | 3 | 4,
+    private numParams?: 0 | 1 | 2 | 3 | 4
   ) {
     super(functionName ?? "Function Call");
 
     if (!functionName) {
       this.addControl(
         "functionName",
-        new ClassicPreset.InputControl("text", { initial: "abs" }),
+        new ClassicPreset.InputControl("text", { initial: "abs" })
       );
 
       this.addControl(
         "numParams",
-        new ClassicPreset.InputControl("number", { initial: 1 }),
+        new ClassicPreset.InputControl("number", { initial: 1 })
       );
     }
 
     for (let i = 1; i < (numParams ?? 0) + 1; i++) {
       this.addInput(
         "param" + i.toString(),
-        new ClassicPreset.Input(reteSocket, "Param " + i.toString()),
+        new ClassicPreset.Input(reteSocket, "Param " + i.toString())
       );
     }
 
@@ -286,19 +296,19 @@ export class FunctionCallNode extends VPNode {
     if (this.numParams) {
       if (this.numParams >= 1) {
         result.value.code +=
-          (param1 ? param1[0].refId ?? param1[0].value : "0.0") + ", ";
+          (param1 ? (param1[0].refId ?? param1[0].value) : "0.0") + ", ";
       }
       if (this.numParams >= 2) {
         result.value.code +=
-          (param2 ? param2[0].refId ?? param2[0].value : "0.0") + ", ";
+          (param2 ? (param2[0].refId ?? param2[0].value) : "0.0") + ", ";
       }
       if (this.numParams >= 3) {
         result.value.code +=
-          (param3 ? param3[0].refId ?? param3[0].value : "0.0") + ", ";
+          (param3 ? (param3[0].refId ?? param3[0].value) : "0.0") + ", ";
       }
       if (this.numParams === 4) {
         result.value.code +=
-          (param4 ? param4[0].refId ?? param4[0].value : "0.0") + ", ";
+          (param4 ? (param4[0].refId ?? param4[0].value) : "0.0") + ", ";
       }
     }
 
@@ -343,7 +353,7 @@ export class FunctionCallNode extends VPNode {
         if (!this.hasInput("param" + i.toString())) {
           this.addInput(
             "param" + i.toString(),
-            new ClassicPreset.Input(reteSocket, "Param " + i.toString()),
+            new ClassicPreset.Input(reteSocket, "Param " + i.toString())
           );
         }
       }
@@ -374,7 +384,7 @@ export class InitializeNode extends VPNode {
 
     this.addControl(
       "value",
-      new ClassicPreset.InputControl("text", { initial: "vec3f(0, 0, 0)" }),
+      new ClassicPreset.InputControl("text", { initial: "vec3f(0, 0, 0)" })
     );
     this.addOutput("value", new ClassicPreset.Output(reteSocket, "Value"));
   }
@@ -401,7 +411,7 @@ export class InitializeNode extends VPNode {
       {
         type: "text",
         value: valueCont
-          ? valueCont.value ?? "vec3f(0, 0, 0)"
+          ? (valueCont.value ?? "vec3f(0, 0, 0)")
           : "vec3f(0, 0, 0)",
         key: "value",
       },
@@ -419,5 +429,64 @@ export class InitializeNode extends VPNode {
       }
     }
     super.deserialize(sn);
+  }
+}
+
+export function typeToValueCode(
+  type: string,
+  valueX?: number,
+  valueY?: number,
+  valueZ?: number,
+  valueW?: number
+): string {
+  switch (type) {
+    case "i32":
+      return valueX?.toString() ?? "0";
+    case "f32":
+      return valueX?.toFixed(20) ?? "0.0";
+    case "vec2f":
+      return `vec2f(${valueX?.toFixed(20) ?? "0.0"}, ${valueY?.toFixed(20) ?? "0.0"})`;
+    case "vec3f":
+      return `vec3f(${valueX?.toFixed(20) ?? "0.0"}, ${valueY?.toFixed(20) ?? "0.0"}, ${valueZ?.toFixed(20) ?? "0.0"})`;
+    case "vec4f":
+      return `vec4f(${valueX?.toFixed(20) ?? "0.0"}, ${valueY?.toFixed(20) ?? "0.0"}, ${valueZ?.toFixed(20) ?? "0.0"}, ${valueW?.toFixed(20) ?? "0.0"})`;
+    default:
+      return "";
+  }
+}
+
+export function typeToValue(
+  type: string,
+  valueX?: number,
+  valueY?: number,
+  valueZ?: number,
+  valueW?: number
+) {
+  switch (type) {
+    case "i32":
+      return valueX ?? 0;
+    case "f32":
+      return valueX ?? 0.0;
+    case "vec2f":
+      return vec2.create(valueX ?? 0.0, valueY ?? 0.0);
+    case "vec3f":
+      return vec3.create(valueX ?? 0.0, valueY ?? 0.0, valueZ ?? 0.0);
+    case "vec4f":
+      return vec4.create(
+        valueX ?? 0.0,
+        valueY ?? 0.0,
+        valueZ ?? 0.0,
+        valueW ?? 0.0
+      );
+    default:
+      return undefined;
+  }
+}
+
+export function valueToType(value: number | Float32Array): string {
+  if (value instanceof Float32Array) {
+    return value.length == 2 ? "vec2f" : value.length == 3 ? "vec3f" : "vec4f";
+  } else {
+    return "f32";
   }
 }
