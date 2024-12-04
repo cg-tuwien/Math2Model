@@ -5,7 +5,7 @@ import {
   type VirtualModelState,
 } from "@/scenes/scene-state";
 import { computed, h, ref, watchEffect, type DeepReadonly } from "vue";
-import { NButton, NInput, NText } from "naive-ui";
+import { NButton, NInput, NText, type UploadFileInfo } from "naive-ui";
 import NumberInput from "@/components/input/NumberInput.vue";
 import VectorInput from "@/components/input/VectorInput.vue";
 import EulerInput from "@/components/input/EulerInput.vue";
@@ -26,6 +26,7 @@ import {
   type TreeSelection,
 } from "./node-tree/NodeTreeHelper";
 import { ObjectUpdate, type ObjectPathPart } from "./input/object-update";
+import { ArchiveRound } from "@vicons/material";
 
 const props = defineProps<{
   models: DeepReadonly<VirtualModelState>[];
@@ -288,6 +289,21 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
     node.isSelected = value;
   }
 }
+
+function uploadFile(data: {
+  file: UploadFileInfo;
+  fileList: UploadFileInfo[];
+}): boolean {
+  if (data.file.file) {
+    props.fs.writeBinaryFile(makeFilePath(data.file.file.name), data.file.file);
+    change(
+      ["material", "diffuseTexture"],
+      new ObjectUpdate([], () => data.file.file?.name ?? "")
+    );
+    return true;
+  }
+  return false;
+}
 </script>
 <template>
   <n-modal :show="isAdding" closable class="w-full sm:w-1/2 lg:w-1/3">
@@ -444,7 +460,24 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
             :step="0.1"
             @update="(v) => change(['material', 'emissive'], vector3Update(v))"
           ></VectorInput>
-          <!-- TODO: String input for diffuse texture -->
+          <n-text>Texture</n-text>
+          <n-upload
+            directory-dnd
+            accept="image/*"
+            :max="1"
+            v-on:before-upload="uploadFile"
+          >
+            <n-upload-dragger>
+              <div style="margin-bottom: 12px">
+                <n-icon size="48" :depth="3">
+                  <ArchiveRound />
+                </n-icon>
+              </div>
+              <n-text style="font-size: 16px">
+                Click or drag an image file to this area to upload a texture.
+              </n-text>
+            </n-upload-dragger>
+          </n-upload>
         </div>
       </n-flex>
     </div>

@@ -14,7 +14,7 @@ const props = defineProps<{
     :max="props.data.max"
     :min="props.data.min"
     v-on:update-value="(v) => props.data.updateValue(v)"
-    v-on:dragend="(v) => props.data.change(v)"
+    v-on:dragend="() => props.data.change()"
     v-on:pointerdown.stop=""
     tooltip
   ></n-slider>

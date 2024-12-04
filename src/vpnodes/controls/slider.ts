@@ -8,8 +8,8 @@ export class SliderControl extends ClassicPreset.Control {
     public step?: number,
     public label?: string,
     public showInput?: boolean,
-    public change?: (value: number) => void,
-    public updateValue?: (value: number) => void,
+    public change?: () => void,
+    public updateValue?: (value: number) => void
   ) {
     super();
     if (!this.value) this.value = 0;
@@ -19,7 +19,7 @@ export class SliderControl extends ClassicPreset.Control {
     if (!this.label) this.label = "";
     if (!this.showInput) this.showInput = false;
     if (!this.change)
-      this.change = (v) => {
+      this.change = () => {
         return;
       };
     if (!this.updateValue)
