@@ -26,7 +26,6 @@ import {
   type TreeSelection,
 } from "./node-tree/NodeTreeHelper";
 import { ObjectUpdate, type ObjectPathPart } from "./input/object-update";
-import { ArchiveRound } from "@vicons/material";
 
 const props = defineProps<{
   models: DeepReadonly<VirtualModelState>[];
@@ -516,7 +515,7 @@ function uploadFile(data: {
             <n-upload-dragger>
               <div style="margin-bottom: 12px">
                 <n-icon size="48" :depth="3">
-                  <ArchiveRound />
+                  <mdi-archive-arrow-down />
                 </n-icon>
               </div>
               <n-text style="font-size: 16px">
