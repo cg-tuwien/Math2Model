@@ -55,8 +55,6 @@ import {
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import { showError, showInfo } from "@/notification";
 import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
-import Heart from "@/../parametric-renderer-core/graphs/Heart.graph?raw";
-import Sphere from "@/../parametric-renderer-core/graphs/Sphere.graph?raw";
 import HeartWGSL from "@/../parametric-renderer-core/graphs/Heart.graph.wgsl?raw";
 import SphereWGSL from "@/../parametric-renderer-core/graphs/Sphere.graph.wgsl?raw";
 import PlaneWGSL from "@/../parametric-renderer-core/graphs/Plane.graph.wgsl?raw";
@@ -100,7 +98,7 @@ import VariableOutNodeStyle from "@/components/visual-programming/CustomNodeStyl
 import DefaultNodeStyle from "@/components/visual-programming/CustomNodeStyles/DefaultNodeStyle.vue";
 import SocketStyle from "@/components/visual-programming/CustomNodeStyles/SocketStyle.vue";
 import ConnectionStyle from "@/components/visual-programming/CustomNodeStyles/ConnectionStyle.vue";
-import { sleep } from "seemly";
+
 const emit = defineEmits<{
   update: [content: string];
   save: [content: string];

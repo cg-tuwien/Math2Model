@@ -30,7 +30,7 @@ export class CombineNode extends VPNode {
       0.01,
       "Combine Factor",
       false,
-      (value) => {
+      () => {
         this.update(this.id);
       },
       (value) => {
@@ -150,7 +150,7 @@ export class MathFunctionNode extends VPNode {
         parseFloat(expr[4]),
         expr[0],
         true,
-        (value) => this.update(this.id),
+        () => this.update(this.id),
         (value) => this.updateControl(control)
       );
       this.variableControls.set(
@@ -234,7 +234,11 @@ export class MathFunctionNode extends VPNode {
         value: this.variableControls.get(key)?.value ?? 0.0,
       });
     }
-    sn.inputs.push({ key: "isApply", value: this.isApply, type: "number" });
+    sn.inputs.push({
+      key: "isApply",
+      value: this.isApply ? 1 : 0,
+      type: "number",
+    });
     return super.serialize(sn);
   }
 
@@ -267,7 +271,7 @@ export class MathFunctionNode extends VPNode {
     }
     for (let input of sn.inputs) {
       if (input.type === "number" && input.key === "isApply") {
-        this.isApply = input.value;
+        this.isApply = input.value == 1;
       }
     }
     this.setup();
