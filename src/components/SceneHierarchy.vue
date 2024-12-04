@@ -170,18 +170,43 @@ function eulerAnglesUpdate(value: ObjectUpdate<number>) {
 }
 
 const isAdding = ref<boolean>(false);
-const fileNames = ref(new Set<FilePath>());
+const shaderFiles = ref(new Set<FilePath>());
 props.fs.watchFromStart((change) => {
   if (!change.key.endsWith(".wgsl")) return;
   if (change.type === "insert") {
-    fileNames.value.add(change.key);
+    shaderFiles.value.add(change.key);
   } else if (change.type === "remove") {
-    fileNames.value.delete(change.key);
+    shaderFiles.value.delete(change.key);
+  }
+});
+
+const textureFiles = ref(new Set<FilePath>());
+props.fs.watchFromStart((change) => {
+  console.log(change.key.substring(change.key.length - 6));
+  console.log(
+    change.key
+      .substring(change.key.length - 6)
+      .match(
+        "\.(xbm|tif|jfif|pjp|apng|jpeg|heif|ico|tiff|webp|svgz|jpg|heic|gif|svg|png|bmp|pjpeg|avif)"
+      )
+  );
+  if (
+    !change.key
+      .substring(change.key.length - 6)
+      .match(
+        "\.(xbm|tif|jfif|pjp|apng|jpeg|heif|ico|tiff|webp|svgz|jpg|heic|gif|svg|png|bmp|pjpeg|avif)"
+      )
+  )
+    return;
+  if (change.type === "insert") {
+    textureFiles.value.add(change.key);
+  } else if (change.type === "remove") {
+    textureFiles.value.delete(change.key);
   }
 });
 
 const shadersDropdown = computed<SelectMixedOption[]>(() => {
-  return [...fileNames.value]
+  return [...shaderFiles.value]
     .toSorted()
     .map(
       (fileName): SelectMixedOption => ({
@@ -196,6 +221,15 @@ const shadersDropdown = computed<SelectMixedOption[]>(() => {
       label: "New Shader...",
       value: undefined,
     });
+});
+
+const texturesDropdown = computed<SelectMixedOption[]>(() => {
+  return [...textureFiles.value].toSorted().map(
+    (fileName): SelectMixedOption => ({
+      label: fileName,
+      value: fileName,
+    })
+  );
 });
 
 function startAddModel() {
@@ -461,6 +495,18 @@ function uploadFile(data: {
             @update="(v) => change(['material', 'emissive'], vector3Update(v))"
           ></VectorInput>
           <n-text>Texture</n-text>
+          <n-select
+            placeholder="Select an existing texture or upload a new one for this model"
+            :options="texturesDropdown"
+            v-model:value="currentModel.material.diffuseTexture"
+            v-on:update-value="
+              (v) =>
+                change(
+                  ['material', 'diffuseTexture'],
+                  new ObjectUpdate([], () => v)
+                )
+            "
+          ></n-select>
           <n-upload
             directory-dnd
             accept="image/*"
