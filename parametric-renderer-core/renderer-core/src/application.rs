@@ -158,11 +158,6 @@ impl ApplicationHandler<AppCommand> for Application {
                 Some(ref mut window) => window.request_redraw(),
                 None => {}
             },
-            // TODO: I think I can get rid of this
-            winit::event::WindowEvent::CursorMoved { .. } => match self.window {
-                Some(ref mut window) => window.request_redraw(),
-                None => {}
-            },
             _ => {}
         }
     }

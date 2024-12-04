@@ -6,8 +6,6 @@ fn sampleObject(input: vec2f) -> vec3f {
   return vec3(input, 0.0); 
 }
 //// END sampleObject
-//// START getColor
-//// END getColor
 var<private> instance_id: u32;
 
 ////#include "./Common.wgsl"
