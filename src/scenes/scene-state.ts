@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, type Ref } from "vue";
+import { computed, ref, shallowRef, type ComputedRef, type Ref } from "vue";
 import {
   SceneFileSchemaUrl,
   type SerializedModel,
@@ -15,13 +15,13 @@ export class ReadonlyVector3 {
     public readonly z: number
   ) {}
 
-  static readonly zero = new ReadonlyVector3(0, 0, 0);
+  static readonly zero: ReadonlyVector3 = new ReadonlyVector3(0, 0, 0);
 
   serialize(): [number, number, number] {
     return [this.x, this.y, this.z];
   }
 
-  static fromSerialized(data: [number, number, number]) {
+  static fromSerialized(data: [number, number, number]): ReadonlyVector3 {
     return new ReadonlyVector3(data[0], data[1], data[2]);
   }
 }
@@ -32,13 +32,17 @@ export class ReadonlyEulerAngles {
     public readonly z: number
   ) {}
 
-  static readonly identity = new ReadonlyEulerAngles(0, 0, 0);
+  static readonly identity: ReadonlyEulerAngles = new ReadonlyEulerAngles(
+    0,
+    0,
+    0
+  );
 
   serialize(): [number, number, number] {
     return [this.x, this.y, this.z];
   }
 
-  static fromSerialized(data: [number, number, number]) {
+  static fromSerialized(data: [number, number, number]): ReadonlyEulerAngles {
     return new ReadonlyEulerAngles(data[0], data[1], data[2]);
   }
 }
@@ -50,26 +54,33 @@ export class ReadonlyQuaternion {
     public readonly w: number
   ) {}
 
-  static readonly identity = new ReadonlyQuaternion(0, 0, 0, 1);
+  static readonly identity: ReadonlyQuaternion = new ReadonlyQuaternion(
+    0,
+    0,
+    0,
+    1
+  );
 
   serialize(): [number, number, number, number] {
     return [this.x, this.y, this.z, this.w];
   }
 
-  static fromSerialized(data: [number, number, number, number]) {
+  static fromSerialized(
+    data: [number, number, number, number]
+  ): ReadonlyQuaternion {
     return new ReadonlyQuaternion(data[0], data[1], data[2], data[3]);
   }
 }
 
-export interface MaterialParameter {
+export type MaterialParameter = {
   color: ReadonlyVector3;
   roughness: number;
   metallic: number;
   emissive: ReadonlyVector3;
   diffuseTexture: string | null;
-}
+};
 
-export interface VirtualModelState {
+export type VirtualModelState = {
   id: string;
   name: string;
   code: FilePath;
@@ -78,7 +89,7 @@ export interface VirtualModelState {
   scale: number;
   material: MaterialParameter;
   instanceCount: number;
-}
+};
 
 export interface VirtualSceneState {
   models: VirtualModelState[];
@@ -87,18 +98,20 @@ export interface VirtualSceneState {
 export class VirtualScene {
   private state: Ref<VirtualSceneState>;
 
-  public readonly parametricShaders = computed(() => {
-    const shaders = new Set<FilePath>();
-    for (const model of this.state.value.models) {
-      shaders.add(model.code);
+  public readonly parametricShaders: ComputedRef<Set<FilePath>> = computed(
+    () => {
+      const shaders = new Set<FilePath>();
+      for (const model of this.state.value.models) {
+        shaders.add(model.code);
+      }
+      return shaders;
     }
-    return shaders;
-  });
+  );
   constructor(state: Ref<VirtualSceneState>) {
     this.state = state;
   }
 
-  clear() {
+  clear(): void {
     this.state.value.models = [];
   }
 
@@ -110,11 +123,11 @@ export class VirtualScene {
     };
   }
 
-  fromSerialized(data: SerializedScene) {
+  fromSerialized(data: SerializedScene): void {
     this.state.value.models = data.models.map(deserializeModel);
   }
 
-  addModel(model: VirtualModelState) {
+  addModel(model: VirtualModelState): void {
     this.state.value.models.push(model);
   }
 
@@ -129,7 +142,7 @@ export class VirtualScene {
     return false;
   }
 
-  updateModels(keys: string[], update: ObjectUpdate<any>) {
+  updateModels(keys: string[], update: ObjectUpdate<any>): void {
     const keysMap = new Set(keys);
     for (const model of this.state.value.models) {
       if (!keysMap.has(model.id)) {

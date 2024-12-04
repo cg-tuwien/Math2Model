@@ -29,7 +29,7 @@ export type FilePath = string & { __filePath: never };
 
 export class FileMetadata {
   constructor(public readonly version: number) {}
-  equals(other: FileMetadata) {
+  equals(other: FileMetadata): boolean {
     return this.version === other.version;
   }
 }

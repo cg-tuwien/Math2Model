@@ -33,6 +33,13 @@ const config: UserConfig = defineConfig({
   build: {
     target: "esnext",
   },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: "modern-compiler", // or "modern"
+      },
+    },
+  },
 });
 
 export default config;
