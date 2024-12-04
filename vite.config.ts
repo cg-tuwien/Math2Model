@@ -21,7 +21,6 @@ const config: UserConfig = defineConfig({
       ],
     }),
     checker({
-      typescript: true,
       vueTsc: true,
     }),
   ],

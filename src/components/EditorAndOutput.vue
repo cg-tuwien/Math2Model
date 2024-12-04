@@ -11,7 +11,6 @@ import { useDebounceFn, watchImmediate } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import {
   ReactiveFilesystem,
-  getFileExtension,
   makeFilePath,
   type FilePath,
 } from "@/filesystem/reactive-files";
@@ -22,7 +21,7 @@ import {
   useVirtualScene,
   type VirtualModelState,
 } from "@/scenes/scene-state";
-import { assert, assertUnreachable } from "@stefnotch/typestef/assert";
+import { assertUnreachable } from "@stefnotch/typestef/assert";
 import {
   deserializeScene,
   SceneFileName,
@@ -32,12 +31,8 @@ import type { WgpuEngine } from "@/engine/wgpu-engine";
 import HeartSphereCode from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
 import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
 import BasicGraphShader from "@/../parametric-renderer-core/graphs/BasicGraphShader.graph.wgsl?raw";
-import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import type { ObjectUpdate } from "./input/object-update";
 import CodeGraph from "@/components/visual-programming/CodeGraph.vue";
-import WebGpu from "@/components/WebGpu.vue";
-import { CodeCircle20Regular } from "@vicons/fluent";
-import { GraphicalDataFlow } from "@vicons/carbon";
 import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
 import { useErrorStore } from "@/stores/error-store";
 import { syncFilesystem } from "@/engine/sync-filesystem";
