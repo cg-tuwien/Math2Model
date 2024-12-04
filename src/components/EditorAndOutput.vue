@@ -11,6 +11,7 @@ import { useDebounceFn, watchImmediate } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import {
   ReactiveFilesystem,
+  getFileExtension,
   makeFilePath,
   type FilePath,
 } from "@/filesystem/reactive-files";
@@ -21,7 +22,7 @@ import {
   useVirtualScene,
   type VirtualModelState,
 } from "@/scenes/scene-state";
-import { assertUnreachable } from "@stefnotch/typestef/assert";
+import { assert, assertUnreachable } from "@stefnotch/typestef/assert";
 import {
   deserializeScene,
   SceneFileName,
@@ -95,36 +96,99 @@ watchEffect(() => {
 });
 
 {
-  // Watch for shader file changes
-  let shaderFiles = new Map<FilePath, Promise<string>>();
-  const readShaderAsync = (file: FilePath) => {
-    const promise = props.fs.readTextFile(file);
-    if (promise === null) return;
-    shaderFiles.set(file, promise);
-    promise.then((code) => {
-      if (shaderFiles.get(file) === promise) {
+  const opsSignals = new Map<FilePath, AbortController>();
+  const addSignal = (path: FilePath): AbortSignal => {
+    const controller = new AbortController();
+    opsSignals.set(path, controller);
+    return controller.signal;
+  };
+  const stopPending = (path: FilePath): void => {
+    opsSignals.get(path)?.abort();
+    opsSignals.delete(path);
+  };
+
+  const imageFileTypes = new Map<string, string>([
+    ["png", "image/png"],
+    ["avif", "image/avif"],
+    ["bmp", "image/bmp"],
+    ["gif", "image/gif"],
+    ["jpg", "image/jpeg"],
+    ["jpeg", "image/jpeg"],
+    ["jpe", "image/jpeg"],
+    ["jif", "image/jpeg"],
+    ["jfif", "image/jpeg"],
+    ["tif", "image/tiff"],
+    ["tiff", "image/tiff"],
+    ["webp", "image/webp"],
+  ]);
+
+  props.fs.watchFromStart((change) => {
+    const extension = getFileExtension(change.key);
+    if (extension === null) return;
+    if (extension === "wgsl") {
+      stopPending(change.key);
+      if (change.type === "insert") {
         props.engine.updateShader({
-          id: file,
-          label: file,
-          code,
+          id: change.key,
+          label: change.key,
+          code: DefaultShaderCode,
         });
       }
-    });
-  };
-  props.fs.watchFromStart((change) => {
-    if (!change.key.endsWith(".wgsl")) return;
-    if (change.type === "insert") {
-      props.engine.updateShader({
-        id: change.key,
-        label: change.key,
-        code: DefaultShaderCode,
-      });
-      readShaderAsync(change.key);
-    } else if (change.type === "update") {
-      readShaderAsync(change.key);
-    } else if (change.type === "remove") {
-      shaderFiles.delete(change.key);
-      props.engine.removeShader(change.key);
+
+      if (change.type === "insert" || change.type === "update") {
+        const file = change.key;
+        const signal = addSignal(file);
+        props.fs.readTextFile(file, { signal })?.then((code) => {
+          if (signal.aborted) return;
+          props.engine.updateShader({
+            id: file,
+            label: file,
+            code: code as string,
+          });
+        });
+      } else if (change.type === "remove") {
+        props.engine.removeShader(change.key);
+      }
+    } else if (imageFileTypes.has(extension)) {
+      stopPending(change.key);
+      if (change.type === "insert" || change.type === "update") {
+        const file = change.key;
+        const signal = addSignal(file);
+        props.fs
+          .readBinaryFile(file, { signal })
+          ?.then((data) => {
+            if (signal.aborted) return;
+            // Ugh, Typescript hasn't caught up
+            const imageDecoder = new ImageDecoder({
+              data,
+              type: imageFileTypes.get(extension)!,
+            });
+            return imageDecoder.decode();
+          })
+          .then(async ({ image }: { image: VideoFrame }) => {
+            if (signal.aborted) return;
+            const imageRect =
+              image.visibleRect ??
+              new DOMRectReadOnly(0, 0, image.codedWidth, image.codedHeight);
+            const options: VideoFrameCopyToOptions = {
+              rect: imageRect,
+              format: "RGBA",
+            };
+            const buffer = new ArrayBuffer(image.allocationSize(options));
+            await image.copyTo(buffer, options);
+
+            const data = new Uint8Array(buffer);
+            // TODO: Image decoding
+            props.engine.updateTexture({
+              id: file,
+              width: imageRect.width,
+              // Wow, inefficient
+              data: Array.from(data),
+            });
+          });
+      } else if (change.type === "remove") {
+        props.engine.removeTexture(change.key);
+      }
     }
   });
 }
@@ -147,6 +211,7 @@ watchEffect(() => {
         ],
         roughness: v.material.roughness,
         metallic: v.material.metallic,
+        diffuse_texture: v.material.diffuseTexture,
       },
       shader_id: v.code,
       instance_count: v.instanceCount,
@@ -369,6 +434,7 @@ function addModel(name: string, shaderName: string) {
         roughness: Math.random(),
         metallic: Math.random(),
         emissive: new ReadonlyVector3(0, 0, 0),
+        diffuseTexture: null,
       },
       instanceCount: 1,
     };

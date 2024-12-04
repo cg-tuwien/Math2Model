@@ -444,6 +444,7 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
             :step="0.1"
             @update="(v) => change(['material', 'emissive'], vector3Update(v))"
           ></VectorInput>
+          <!-- TODO: String input for diffuse texture -->
         </div>
       </n-flex>
     </div>

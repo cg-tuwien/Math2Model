@@ -66,6 +66,7 @@ export interface MaterialParameter {
   roughness: number;
   metallic: number;
   emissive: ReadonlyVector3;
+  diffuseTexture: string | null;
 }
 
 export interface VirtualModelState {
@@ -165,6 +166,7 @@ function serializeModel(model: VirtualModelState): SerializedModel {
       roughness: model.material.roughness,
       metallic: model.material.metallic,
       emissive: model.material.emissive.serialize(),
+      diffuseTexture: model.material.diffuseTexture ?? undefined,
     },
     instanceCount: model.instanceCount,
   };
@@ -184,6 +186,7 @@ function deserializeModel(data: SerializedModel): VirtualModelState {
       roughness: data.material.roughness,
       metallic: data.material.metallic,
       emissive: ReadonlyVector3.fromSerialized(data.material.emissive),
+      diffuseTexture: data.material.diffuseTexture ?? null,
     },
     instanceCount: data.instanceCount,
   };

@@ -6,6 +6,15 @@ fn sampleObject(input: vec2f) -> vec3f {
   return vec3(input, 0.0); 
 }
 //// END sampleObject
+//// START getColor
+fn getColor(input: vec2f) -> vec3f {
+  if material.has_texture != 0u {
+    return textureSample(t_diffuse, linear_sampler, input).rgb;
+  } else {
+    return material.color_roughness.rgb;
+  }
+}
+//// END getColor
 var<private> instance_id: u32;
 
 ////#include "./Common.wgsl"
@@ -578,7 +587,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let n = normalize(-cross(dpdxFine(in.world_position), dpdyFine(in.world_position)));
 
     var materialInfo = MaterialInfo(
-        material.color_roughness.rgb,
+        getColor(in.texture_coords),
         vec3f(0.04),
         vec3f(1.0),
         vec3f(0.0),

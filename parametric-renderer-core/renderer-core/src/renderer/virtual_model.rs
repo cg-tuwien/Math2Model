@@ -243,14 +243,22 @@ pub fn create_compute_patches_pipeline(
 
 fn replace_evaluate_image_code<'a>(source: &'a str, sample_object_code: &str) -> String {
     // TODO: use wgsl-parser instead of this
-    let start = source.find("//// START sampleObject").unwrap();
-    let end = source.find("//// END sampleObject").unwrap();
+    let start_1 = source.find("//// START sampleObject").unwrap();
+    let end_1 = source.find("//// END sampleObject").unwrap();
+    let start_2 = source.find("//// START getColor").unwrap();
+    let end_2 = source.find("//// END getColor").unwrap();
 
-    let mut result = String::with_capacity(
-        source[..start].len() + sample_object_code.len() + source[end..].len(),
-    );
-    result.push_str(&source[..start]);
+    let mut result = String::new();
+
+    result.push_str(&source[..start_1]);
     result.push_str(sample_object_code);
-    result.push_str(&source[end..]);
+    result.push_str(&source[end_1..start_2]);
+
+    if sample_object_code.contains("fn getColor") {
+        result.push_str(&source[end_2..]);
+    } else {
+        result.push_str(&source[start_2..]);
+    }
+
     result
 }

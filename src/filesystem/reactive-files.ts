@@ -3,8 +3,14 @@ import { type WatchStopHandle, type WatchOptions } from "vue";
 
 export interface ReadonlyFiles {
   listFiles(): FilePath[];
-  readTextFile(name: FilePath): Promise<string> | null;
-  readBinaryFile(name: FilePath): Promise<ArrayBuffer> | null;
+  readTextFile(
+    name: FilePath,
+    options?: { signal?: AbortSignal }
+  ): Promise<string> | null;
+  readBinaryFile(
+    name: FilePath,
+    options?: { signal?: AbortSignal }
+  ): Promise<ArrayBuffer> | null;
   hasFile(name: FilePath): boolean;
 }
 
@@ -164,7 +170,10 @@ export class ReactiveFilesystem implements WritableFiles {
    * Guarantees ordering of reads and writes.
    * If multiple reads are requested, they will resolve in the order they were requested.
    */
-  readTextFile(name: FilePath): Promise<string> | null {
+  readTextFile(
+    name: FilePath,
+    options?: { signal?: AbortSignal }
+  ): Promise<string> | null {
     if (!this._files.has(name)) return null;
 
     return this.addTask(async (sceneDirectory) => {
@@ -174,7 +183,10 @@ export class ReactiveFilesystem implements WritableFiles {
     });
   }
 
-  readBinaryFile(name: FilePath): Promise<ArrayBuffer> | null {
+  readBinaryFile(
+    name: FilePath,
+    options?: { signal?: AbortSignal }
+  ): Promise<ArrayBuffer> | null {
     if (!this._files.has(name)) return null;
 
     return this.addTask(async (sceneDirectory) => {
@@ -191,4 +203,12 @@ export class ReactiveFilesystem implements WritableFiles {
 
 function encodeFilePath(name: FilePath): FilePath {
   return name;
+}
+
+/**
+ *  filename CC BY SA-3.0 https://stackoverflow.com/a/190933/3492994
+ */
+export function getFileExtension(filename: string): string | null {
+  var ext = /^.+\.([^.]+)$/.exec(filename);
+  return ext == null ? null : ext[1];
 }

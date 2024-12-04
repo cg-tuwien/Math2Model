@@ -14,6 +14,7 @@ export const MaterialParameterSchema = z.object({
   roughness: z.number(),
   metallic: z.number(),
   emissive: z.tuple([z.number(), z.number(), z.number()]),
+  diffuseTexture: z.string().optional(),
 });
 
 export const ModelSchema = z.object({
