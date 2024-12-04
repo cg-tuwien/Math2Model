@@ -11,7 +11,6 @@ import { useDebounceFn, watchImmediate } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import {
   ReactiveFilesystem,
-  getFileExtension,
   makeFilePath,
   type FilePath,
 } from "@/filesystem/reactive-files";
@@ -22,7 +21,7 @@ import {
   useVirtualScene,
   type VirtualModelState,
 } from "@/scenes/scene-state";
-import { assert, assertUnreachable } from "@stefnotch/typestef/assert";
+import { assertUnreachable } from "@stefnotch/typestef/assert";
 import {
   deserializeScene,
   SceneFileName,
@@ -30,17 +29,13 @@ import {
 } from "@/filesystem/scene-file";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
 import HeartSphereCode from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
-import DefaultShaderCode from "@/../parametric-renderer-core/shaders/DefaultParametric.wgsl?raw";
 import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
 import BasicGraphShader from "@/../parametric-renderer-core/graphs/BasicGraphShader.graph.wgsl?raw";
-import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import type { ObjectUpdate } from "./input/object-update";
 import CodeGraph from "@/components/visual-programming/CodeGraph.vue";
-import WebGpu from "@/components/WebGpu.vue";
-import { CodeCircle20Regular } from "@vicons/fluent";
-import { GraphicalDataFlow } from "@vicons/carbon";
 import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
 import { useErrorStore } from "@/stores/error-store";
+import { syncFilesystem } from "@/engine/sync-filesystem";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -49,6 +44,8 @@ const props = defineProps<{
   engine: WgpuEngine;
   gpuDevice: GPUDevice;
 }>();
+
+syncFilesystem(props.fs, props.engine);
 
 const store = useStore();
 const errorsStore = useErrorStore();
@@ -94,104 +91,6 @@ const canvasContainer = ref<HTMLDivElement | null>(null);
 watchEffect(() => {
   canvasContainer.value?.appendChild(props.canvas);
 });
-
-{
-  const opsSignals = new Map<FilePath, AbortController>();
-  const addSignal = (path: FilePath): AbortSignal => {
-    const controller = new AbortController();
-    opsSignals.set(path, controller);
-    return controller.signal;
-  };
-  const stopPending = (path: FilePath): void => {
-    opsSignals.get(path)?.abort();
-    opsSignals.delete(path);
-  };
-
-  const imageFileTypes = new Map<string, string>([
-    ["png", "image/png"],
-    ["avif", "image/avif"],
-    ["bmp", "image/bmp"],
-    ["gif", "image/gif"],
-    ["jpg", "image/jpeg"],
-    ["jpeg", "image/jpeg"],
-    ["jpe", "image/jpeg"],
-    ["jif", "image/jpeg"],
-    ["jfif", "image/jpeg"],
-    ["tif", "image/tiff"],
-    ["tiff", "image/tiff"],
-    ["webp", "image/webp"],
-  ]);
-
-  props.fs.watchFromStart((change) => {
-    const extension = getFileExtension(change.key);
-    if (extension === null) return;
-    if (extension === "wgsl") {
-      stopPending(change.key);
-      if (change.type === "insert") {
-        props.engine.updateShader({
-          id: change.key,
-          label: change.key,
-          code: DefaultShaderCode,
-        });
-      }
-
-      if (change.type === "insert" || change.type === "update") {
-        const file = change.key;
-        const signal = addSignal(file);
-        props.fs.readTextFile(file, { signal })?.then((code) => {
-          if (signal.aborted) return;
-          props.engine.updateShader({
-            id: file,
-            label: file,
-            code: code as string,
-          });
-        });
-      } else if (change.type === "remove") {
-        props.engine.removeShader(change.key);
-      }
-    } else if (imageFileTypes.has(extension)) {
-      stopPending(change.key);
-      if (change.type === "insert" || change.type === "update") {
-        const file = change.key;
-        const signal = addSignal(file);
-        props.fs
-          .readBinaryFile(file, { signal })
-          ?.then((data) => {
-            if (signal.aborted) return;
-            // Ugh, Typescript hasn't caught up
-            const imageDecoder = new ImageDecoder({
-              data,
-              type: imageFileTypes.get(extension)!,
-            });
-            return imageDecoder.decode();
-          })
-          .then(async ({ image }: { image: VideoFrame }) => {
-            if (signal.aborted) return;
-            const imageRect =
-              image.visibleRect ??
-              new DOMRectReadOnly(0, 0, image.codedWidth, image.codedHeight);
-            const options: VideoFrameCopyToOptions = {
-              rect: imageRect,
-              format: "RGBA",
-            };
-            const buffer = new ArrayBuffer(image.allocationSize(options));
-            await image.copyTo(buffer, options);
-
-            const data = new Uint8Array(buffer);
-            // TODO: Image decoding
-            props.engine.updateTexture({
-              id: file,
-              width: imageRect.width,
-              // Wow, inefficient
-              data: Array.from(data),
-            });
-          });
-      } else if (change.type === "remove") {
-        props.engine.removeTexture(change.key);
-      }
-    }
-  });
-}
 
 watchEffect(() => {
   let models = scene.state.value.models.map((v) => {

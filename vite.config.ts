@@ -21,7 +21,6 @@ const config: UserConfig = defineConfig({
       ],
     }),
     checker({
-      typescript: true,
       vueTsc: true,
     }),
   ],
@@ -32,6 +31,13 @@ const config: UserConfig = defineConfig({
   },
   build: {
     target: "esnext",
+  },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        api: "modern-compiler", // or "modern"
+      },
+    },
   },
 });
 

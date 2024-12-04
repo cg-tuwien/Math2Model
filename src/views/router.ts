@@ -1,7 +1,7 @@
-import { createRouter, createWebHashHistory } from "vue-router";
+import { createRouter, createWebHashHistory, type Router } from "vue-router";
 import NotFoundView from "./NotFoundView.vue";
 
-const router = createRouter({
+const router: Router = createRouter({
   history: createWebHashHistory(),
   routes: [
     {

@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "@tsconfig/node20": "^20.1.4",
+    "@types/dom-webcodecs": "^0.1.13",
     "@types/node": "^20.17.6",
     "@vitejs/plugin-vue": "^5.1.5",
     "@vue/tsconfig": "^0.6.0",

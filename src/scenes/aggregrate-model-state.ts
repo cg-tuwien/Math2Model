@@ -21,7 +21,9 @@ export function commonModelState(
       roughness: 0,
       metallic: 0,
       emissive: ReadonlyVector3.zero,
+      diffuseTexture: null,
     },
+    instanceCount: 1,
   });
 }
 
@@ -33,13 +35,18 @@ type AggregatableValue =
   | ReadonlyEulerAngles
   | {
       [key: string]: AggregatableValue;
-    };
+    }
+  | null;
 
 function aggregrateValues<T extends AggregatableValue>(
   values: T[],
   defaultValue: T
 ): T {
-  if (typeof defaultValue === "number" || typeof defaultValue === "string") {
+  if (
+    typeof defaultValue === "number" ||
+    typeof defaultValue === "string" ||
+    defaultValue === null
+  ) {
     let base = values.length > 0 ? values[0] : defaultValue;
     for (let i = 1; i < values.length; i++) {
       if (values[i] !== base) {

@@ -171,7 +171,7 @@ fn create_render_pipeline(
     let device = &context.device;
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some(&format!("Render Shader {}", label)),
-        source: wgpu::ShaderSource::Wgsl(replace_evaluate_image_code(shader::SOURCE, code).into()),
+        source: wgpu::ShaderSource::Wgsl(replace_render_code(shader::SOURCE, code).into()),
     });
     (
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -223,7 +223,7 @@ pub fn create_compute_patches_pipeline(
     device: &wgpu::Device,
     code: &str,
 ) -> (wgpu::ComputePipeline, ShaderModule) {
-    let source = replace_evaluate_image_code(compute_patches::SOURCE, code);
+    let source = replace_compute_code(compute_patches::SOURCE, code);
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
         source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(source.as_ref())),
@@ -241,7 +241,7 @@ pub fn create_compute_patches_pipeline(
     )
 }
 
-fn replace_evaluate_image_code<'a>(source: &'a str, sample_object_code: &str) -> String {
+fn replace_render_code<'a>(source: &'a str, sample_object_code: &str) -> String {
     // TODO: use wgsl-parser instead of this
     let start_1 = source.find("//// START sampleObject").unwrap();
     let end_1 = source.find("//// END sampleObject").unwrap();
@@ -249,7 +249,6 @@ fn replace_evaluate_image_code<'a>(source: &'a str, sample_object_code: &str) ->
     let end_2 = source.find("//// END getColor").unwrap();
 
     let mut result = String::new();
-
     result.push_str(&source[..start_1]);
     result.push_str(sample_object_code);
     result.push_str(&source[end_1..start_2]);
@@ -260,5 +259,17 @@ fn replace_evaluate_image_code<'a>(source: &'a str, sample_object_code: &str) ->
         result.push_str(&source[start_2..]);
     }
 
+    result
+}
+
+fn replace_compute_code<'a>(source: &'a str, sample_object_code: &str) -> String {
+    // TODO: use wgsl-parser instead of this
+    let start_1 = source.find("//// START sampleObject").unwrap();
+    let end_1 = source.find("//// END sampleObject").unwrap();
+
+    let mut result = String::new();
+    result.push_str(&source[..start_1]);
+    result.push_str(sample_object_code);
+    result.push_str(&source[end_1..]);
     result
 }

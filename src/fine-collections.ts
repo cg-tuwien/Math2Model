@@ -15,7 +15,7 @@ export type MapChange<Key, Value> =
   | { type: "update"; key: Key; value: Value };
 
 /** A reactive map that only exposes fine grained reactivity info */
-export class FineMap<Key, Value> implements Map<Key, Value> {
+export class FineMap<Key, Value> {
   private changeTrackers: Array<ShallowRef<MapChange<Key, Value>[]>> = [];
   private map: Map<Key, Value>;
 
