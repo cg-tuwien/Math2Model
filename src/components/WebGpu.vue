@@ -8,16 +8,12 @@ import {
   type ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
 import type { LodStageBuffers } from "@/webgpu-hook";
-import { onUnmounted, ref } from "vue";
-import { mat4, vec3, vec2 } from "webgpu-matrix";
+import { ref } from "vue";
 import LodStageWgsl from "./lod_stage.wgsl?raw";
 import PrepVerticesStageWgsl from "./prep_vertices_stage.wgsl?raw";
 import OutputVerticesWgsl from "./vertices_stage.wgsl?raw";
-import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
-import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
-import * as THREE from 'three';
-
-const a = new THREE.Vector3( 0, 1, 0 );
+import * as THREE from "three";
+import { createHelpers } from "./webgpu-helpers";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -25,6 +21,8 @@ const props = defineProps<{
   engine: WgpuEngine;
   fs: ReactiveFilesystem;
 }>();
+
+const triggerDownload = ref(false);
 
 const compiledShaders = ref<
   Map<
@@ -42,40 +40,13 @@ const compiledShaders = ref<
   >
 >(new Map());
 
-function concatArrayBuffers(views: ArrayBufferView[]): Uint8Array {
-  let length = 0;
-  for (const v of views) length += v.byteLength;
+const { concatArrayBuffers, createBufferWith } = createHelpers(props.gpuDevice);
 
-  let buf = new Uint8Array(length);
-  let offset = 0;
-  for (const v of views) {
-    const uint8view = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
-    buf.set(uint8view, offset);
-    offset += uint8view.byteLength;
-  }
-
-  return buf;
+function saveFile(text: string, filename: string) {
+  save(new Blob([text], { type: "text/plain" }), filename);
 }
 
-function createBufferWith(
-  contents: Uint8Array,
-  usage: GPUBufferUsageFlags,
-  size?: number
-) {
-  const buffer = props.gpuDevice.createBuffer({
-    size: size ?? contents.byteLength,
-    usage,
-    mappedAtCreation: true,
-  });
-  new Uint8Array(buffer.getMappedRange()).set(contents);
-  buffer.unmap();
-  return buffer;
-}
-function saveFile( text: string, filename: string ) {
-  save( new Blob( [ text ], { type: 'text/plain' } ), filename );
-}
-
-function save( blob: Blob, filename: string ) {
+function save(blob: Blob, filename: string) {
   const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = blobUrl;
@@ -84,75 +55,65 @@ function save( blob: Blob, filename: string ) {
   URL.revokeObjectURL(blobUrl);
 }
 
-function exportMesh(vertexStream: Float32Array) {
-  const uintArray = new Uint32Array(vertexStream.buffer);
-
-  let capacity = uintArray[1];
-  console.log("Capacity: " + capacity);
-  let slicedStream = vertexStream.slice(4);
+function exportMesh(patches: Float32Array, patchCount: number) {
+  // TODO: Ferris: Finish the exporter
   let index = 0;
   let arrayVertices = [];
   let geometry = new THREE.BufferGeometry();
-  while (index < slicedStream.length)
-  {
-    let section = slicedStream.slice(index,index+3);
-    let section2 = slicedStream.slice(index+4,index+6);
+  while (index < slicedStream.length) {
+    let section = slicedStream.slice(index, index + 3);
+    let section2 = slicedStream.slice(index + 4, index + 6);
     arrayVertices.push({
-      vert: new THREE.Vector3(section[0],section[1],section[2]),
-      uv: new THREE.Vector2(section2[0],section2[1])
+      vert: new THREE.Vector3(section[0], section[1], section[2]),
+      uv: new THREE.Vector2(section2[0], section2[1]),
     });
 
-
     //console.log("Slice: " + section + " Slice 2: " + section2);
-    index+=8;
+    index += 8;
   }
-  let vertices = new Float32Array(arrayVertices.length*3);
-  let inds = new Uint32Array(arrayVertices.length*6);
+  let vertices = new Float32Array(arrayVertices.length * 3);
+  let inds = new Uint32Array(arrayVertices.length * 6);
   index = 0;
   let mexpstring = "o\n";
   let vertcount = 0;
   let zeros = 8;
   for (const verticesKey in arrayVertices) {
     let v = arrayVertices[verticesKey].vert;
-    vertices[verticesKey*3]=v.x;
-    vertices[verticesKey*3+1]=v.y;
-    vertices[verticesKey*3+2]=v.z;
-    if(!(v.x == 0 && v.y == 0 && v.z == 0)) {
+    vertices[verticesKey * 3] = v.x;
+    vertices[verticesKey * 3 + 1] = v.y;
+    vertices[verticesKey * 3 + 2] = v.z;
+    if (!(v.x == 0 && v.y == 0 && v.z == 0)) {
       mexpstring += "v " + v.x + " " + v.y + " " + v.z + "\n";
-      vertcount+=1;
-    }
-    else if(zeros > 0)
-    {
+      vertcount += 1;
+    } else if (zeros > 0) {
       zeros--;
       mexpstring += "v " + v.x + " " + v.y + " " + v.z + "\n";
-      vertcount+=1;
+      vertcount += 1;
     }
   }
-  for (let i = 0; i < arrayVertices.length; i+=4) {
-
-    if(i+4 > vertcount)
-      break;
+  for (let i = 0; i < arrayVertices.length; i += 4) {
+    if (i + 4 > vertcount) break;
     inds[index++] = i;
-    inds[index++] = i+1;
-    inds[index++] = i+2;
-    mexpstring+="f " + (i+1) + " " + (i+1+1) + " " + (i+2+1) + "\n";
+    inds[index++] = i + 1;
+    inds[index++] = i + 2;
+    mexpstring += "f " + (i + 1) + " " + (i + 1 + 1) + " " + (i + 2 + 1) + "\n";
 
     inds[index++] = i;
-    inds[index++] = i+2;
-    inds[index++] = i+3;
+    inds[index++] = i + 2;
+    inds[index++] = i + 3;
 
-    mexpstring+="f " + (i+1) + " " + (i+2+1) + " " + (i+3+1) + "\n";
+    mexpstring += "f " + (i + 1) + " " + (i + 2 + 1) + " " + (i + 3 + 1) + "\n";
   }
-  geometry.setAttribute( 'position', new THREE.BufferAttribute( vertices, 3 ) );
-  geometry.setIndex( inds );
+  geometry.setAttribute("position", new THREE.BufferAttribute(vertices, 3));
+  geometry.setIndex(inds);
   let mesh = new THREE.Mesh(geometry);
   //let exporter = new GLTFExporter();
   //const data = exporter.parse(mesh, function f(file) {
-    ///saveFile(f,"coolexport.gltf");
+  ///saveFile(f,"coolexport.gltf");
   //}
-//  );
+  //  );
   //console.log(mexpstring);
-  saveFile( mexpstring,"wowcool3dmodel.obj" );
+  saveFile(mexpstring, "wowcool3dmodel.obj");
   console.log(mesh);
 }
 
@@ -419,11 +380,11 @@ async function main() {
   let hasDebugInfo = false;
   const debugPrintBuffer = (
     buffer: GPUBuffer,
+    size: number,
     commandEncoder: GPUCommandEncoder
   ) => {
     if (!hasDebugInfo) {
       hasDebugInfo = true;
-      const size = Math.min(patchesBufferDebug.size, buffer.size);
       commandEncoder.copyBufferToBuffer(buffer, 0, patchesBufferDebug, 0, size);
       // Need to wait until *after* submit has happened to be able to call mapAsync
       setTimeout(() => {
@@ -642,8 +603,6 @@ async function main() {
       computePassPing.dispatchWorkgroupsIndirect(buffers.indirectDispatch0, 0);
       computePassPing.end();
 
-      // debugPrintBuffer(buffers.patches1, commandEncoder);
-
       // Pong
       if (isLastRound) {
         commandEncoder.copyBufferToBuffer(
@@ -716,8 +675,8 @@ async function main() {
     computePassVertices.dispatchWorkgroupsIndirect(dispatchVerticesStage, 0);
     computePassVertices.end();
 
-    counter--;
-    if (counter === 0) {
+    if (triggerDownload.value) {
+      triggerDownload.value = false;
       commandEncoder.copyBufferToBuffer(
         vertOutputBuffer,
         0,
@@ -725,19 +684,25 @@ async function main() {
         0,
         vertOutputBuffer.size
       );
-      debugPrintBuffer(dispatchVerticesStage,commandEncoder);
+      debugPrintBuffer(dispatchVerticesStage, 12, commandEncoder);
       setTimeout(() => {
         vertReadableBuffer
           .mapAsync(GPUMapMode.READ, 0, vertReadableBuffer.size)
           .then(() => {
-            const arrayBuffer = vertReadableBuffer
-              .getMappedRange(0, vertReadableBuffer.size)
-              .slice(0);
-            const vertexStream = new Float32Array(arrayBuffer);
-            console.log(vertexStream);
-            //console.log("vertReadableBuffer Output:", vertexStream); // Only zeroes. Huh
+            const patchCount = new Uint32Array(
+              vertReadableBuffer.getMappedRange(0, 16)
+            )[0];
+
+            const skipSizeCapacity = 16;
+            const patchBytes = 32;
+            const dataStream = new Float32Array(
+              vertReadableBuffer.getMappedRange(
+                skipSizeCapacity,
+                patchCount * patchBytes
+              )
+            );
+            exportMesh(dataStream, patchCount);
             vertReadableBuffer.unmap();
-            exportMesh(vertexStream);
           });
       }, 10);
     }
@@ -745,9 +710,10 @@ async function main() {
 
   props.engine.setLodStage(lodStageCallback);
 }
-let counter = 10;
 main();
 </script>
 <template>
-  <div></div>
+  <div class="absolute bg-red-100">
+    <button @click="triggerDownload = true">Download</button>
+  </div>
 </template>
