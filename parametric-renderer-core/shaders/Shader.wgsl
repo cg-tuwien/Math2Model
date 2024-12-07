@@ -553,7 +553,7 @@ fn vs_main(
     var out: VertexOutput;
     out.clip_position = camera.projection * camera.view * world_pos;
     out.world_position = world_pos.xyz;
-    out.texture_coords = in.uv;
+    out.texture_coords = quad_point;
     let normal = vec3<f32>(0.0, -1.0, 0.0); // TODO: We'll compute this later
     out.world_normal = (model.model_similarity * vec4<f32>(normal, 0.0)).xyz; // Only uniform scaling
 
