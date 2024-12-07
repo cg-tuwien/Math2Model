@@ -3,7 +3,6 @@ import init, {
   WasmApplication,
   type WasmModelInfo,
   type WasmShaderInfo,
-  type WasmTexture,
   type WasmCompilationMessage,
 } from "../../parametric-renderer-core/pkg";
 
@@ -25,8 +24,8 @@ export class WgpuEngine {
   async removeShader(id: string) {
     await this.engine.remove_shader(id);
   }
-  async updateTexture(texture_info: WasmTexture) {
-    await this.engine.update_texture(texture_info);
+  async updateTexture(texture_info: { id: string; bitmap: ImageBitmap }) {
+    await this.engine.update_texture(texture_info.id, texture_info.bitmap);
   }
   async removeTexture(id: string) {
     await this.engine.remove_texture(id);

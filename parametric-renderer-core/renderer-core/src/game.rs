@@ -52,14 +52,14 @@ pub struct TextureId(pub String);
 
 pub struct TextureInfo {
     pub width: u32,
+    pub height: u32,
     /// RGBA
-    pub data: Vec<u8>,
+    pub data: TextureData,
 }
 
-impl TextureInfo {
-    pub fn height(&self) -> u32 {
-        (self.data.len() / 4) as u32 / self.width
-    }
+pub enum TextureData {
+    Bytes(Vec<u8>),
+    Image(web_sys::ImageBitmap),
 }
 
 pub struct GameRes {

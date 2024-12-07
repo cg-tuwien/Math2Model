@@ -3,17 +3,15 @@ use log::error;
 use renderer_core::{
     application::{run_on_main, AppCommand, Application, WasmCanvas},
     camera::camera_controller::{self, CameraController},
-    game::{ModelInfo, ShaderId, ShaderInfo, TextureId, TextureInfo},
+    game::{ModelInfo, ShaderId, ShaderInfo, TextureData, TextureId, TextureInfo},
     input::WinitAppHelper,
 };
 use std::sync::Arc;
 use wasm_bindgen::{prelude::wasm_bindgen, JsError, JsValue};
-use web_sys::HtmlCanvasElement;
+use web_sys::{HtmlCanvasElement, ImageBitmap};
 use winit::event_loop::{EventLoop, EventLoopProxy};
 
-use crate::wasm_abi::{
-    WasmCompilationMessage, WasmFrameTime, WasmModelInfo, WasmShaderInfo, WasmTexture,
-};
+use crate::wasm_abi::{WasmCompilationMessage, WasmFrameTime, WasmModelInfo, WasmShaderInfo};
 
 #[wasm_bindgen]
 pub struct WasmApplication {
@@ -111,11 +109,12 @@ impl WasmApplication {
         .await;
     }
 
-    pub async fn update_texture(&self, texture: WasmTexture) {
-        let id = TextureId(texture.id);
+    pub async fn update_texture(&self, texture_id: String, image: ImageBitmap) {
+        let id = TextureId(texture_id);
         let info = TextureInfo {
-            width: texture.width,
-            data: texture.data,
+            width: image.width(),
+            height: image.height(),
+            data: TextureData::Image(image),
         };
 
         let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), {

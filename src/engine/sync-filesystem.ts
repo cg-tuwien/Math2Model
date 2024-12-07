@@ -68,41 +68,18 @@ export function syncFilesystem(fs: ReactiveFilesystem, engine: WgpuEngine) {
       if (change.type === "insert" || change.type === "update") {
         const file = change.key;
         const signal = addSignal(file);
-        fs
-          .readBinaryFile(file, { signal })
-          ?.then((data) => {
-            if (signal.aborted) return;
-            // Ugh, Typescript hasn't caught up
-            const imageDecoder = new ImageDecoder({
-              data,
-              type: imageFileTypes.get(extension)!,
-            });
-            return imageDecoder.decode();
-          })
-          .then(async (result) => {
-            if (signal.aborted) return;
-            if (result === undefined) return;
-            const image = result.image;
-            const imageRect =
-              image.visibleRect ??
-              new DOMRectReadOnly(0, 0, image.codedWidth, image.codedHeight);
-            const options = {
-              rect: imageRect,
-              // MDN says that this property is a thing
-              format: "RGBA",
-            };
-            const buffer = new ArrayBuffer(image.allocationSize(options));
-            await image.copyTo(buffer, options);
-
-            const data = new Uint8Array(buffer);
-            // TODO: Image decoding
-            engine.updateTexture({
-              id: file,
-              width: imageRect.width,
-              // Wow, inefficient
-              data: Array.from(data),
-            });
+        fs.readFile(file, { signal })?.then(async (blob) => {
+          if (signal.aborted) return;
+          const image = await globalThis.createImageBitmap(blob, {
+            premultiplyAlpha: "premultiply",
+            colorSpaceConversion: "none",
           });
+          if (signal.aborted) return;
+          engine.updateTexture({
+            id: file,
+            bitmap: image,
+          });
+        });
       } else if (change.type === "remove") {
         engine.removeTexture(change.key);
       }

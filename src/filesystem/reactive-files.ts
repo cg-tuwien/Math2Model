@@ -7,10 +7,10 @@ export interface ReadonlyFiles {
     name: FilePath,
     options?: { signal?: AbortSignal }
   ): Promise<string> | null;
-  readBinaryFile(
+  readFile(
     name: FilePath,
     options?: { signal?: AbortSignal }
-  ): Promise<ArrayBuffer> | null;
+  ): Promise<File> | null;
   hasFile(name: FilePath): boolean;
 }
 
@@ -183,16 +183,15 @@ export class ReactiveFilesystem implements WritableFiles {
     });
   }
 
-  readBinaryFile(
+  readFile(
     name: FilePath,
     options?: { signal?: AbortSignal }
-  ): Promise<ArrayBuffer> | null {
+  ): Promise<File> | null {
     if (!this._files.has(name)) return null;
 
     return this.addTask(async (sceneDirectory) => {
       const handle = await sceneDirectory.getFileHandle(encodeFilePath(name));
-      const file = await handle.getFile();
-      return file.arrayBuffer();
+      return await handle.getFile();
     });
   }
 

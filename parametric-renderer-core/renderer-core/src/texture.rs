@@ -13,7 +13,7 @@ impl Texture {
     pub fn new_rgba(device: &wgpu::Device, queue: &wgpu::Queue, info: &TextureInfo) -> Self {
         let size = wgpu::Extent3d {
             width: info.width,
-            height: info.height(),
+            height: info.height,
             depth_or_array_layers: 1,
         };
         let desc = wgpu::TextureDescriptor {
@@ -23,26 +23,44 @@ impl Texture {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::RENDER_ATTACHMENT,
             view_formats: &[],
         };
         let texture = device.create_texture(&desc);
 
-        queue.write_texture(
-            wgpu::ImageCopyTexture {
-                aspect: wgpu::TextureAspect::All,
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-            },
-            &info.data,
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(4 * size.width),
-                rows_per_image: Some(size.height),
-            },
-            size,
-        );
+        let copy_texture = wgpu::ImageCopyTexture {
+            aspect: wgpu::TextureAspect::All,
+            texture: &texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+        };
+
+        match &info.data {
+            crate::game::TextureData::Bytes(data) => queue.write_texture(
+                copy_texture,
+                data,
+                wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(4 * size.width),
+                    rows_per_image: Some(size.height),
+                },
+                size,
+            ),
+            crate::game::TextureData::Image(_image_bitmap) => {
+                #[cfg(target_arch = "wasm32")]
+                queue.copy_external_image_to_texture(
+                    &wgpu::ImageCopyExternalImage {
+                        source: wgpu::ExternalImageSource::ImageBitmap(_image_bitmap.clone()),
+                        origin: wgpu::Origin2d::ZERO,
+                        flip_y: false,
+                    },
+                    copy_texture.to_tagged(wgpu::PredefinedColorSpace::Srgb, true),
+                    size,
+                );
+            }
+        }
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
         Self { texture, view }

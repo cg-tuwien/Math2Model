@@ -2,7 +2,7 @@
 
 use crate::{
     buffer::TypedBuffer,
-    game::{MaterialInfo, TextureInfo},
+    game::{MaterialInfo, TextureData, TextureInfo},
     mesh::Mesh,
     shaders::{compute_patches, copy_patches, shader},
     texture::Texture,
@@ -69,7 +69,8 @@ pub fn make_empty_texture(context: &WgpuContext) -> Arc<Texture> {
         &context.queue,
         &TextureInfo {
             width: 1,
-            data: vec![u8::MAX, u8::MAX, u8::MAX, u8::MAX],
+            height: 1,
+            data: TextureData::Bytes(vec![u8::MAX, u8::MAX, u8::MAX, u8::MAX]),
         },
     ))
 }
