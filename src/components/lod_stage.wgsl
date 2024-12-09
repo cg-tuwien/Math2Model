@@ -216,12 +216,12 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
 
     let avg = (cap + cbp + ccp + cdp)/4f;
 
-  let isflat = simab+simcd > 0.5f;
+  let isflat = simab+simcd > 1.9f;
 
 
-  let acceptable_size = 0.00001f;
+  let acceptable_size = 0.01f;
 
-  if (force_render.flag == 1u ) {
+  if (force_render.flag == 1u || isflat) {
     force_render_internal(quad_encoded);
   } else {
     // Split all 4 ways
@@ -274,7 +274,7 @@ fn calculateNormalOfPatch(p: Patch) -> vec3<f32> {
     let cdp = sampleObject(quad_point_d);
 
     let tnorma = normalize(cross((cbp-cap),(cdp-cap)));
-    let tnormc = -normalize(cross((cbp-ccp),(cdp-ccp)));
+    let tnormc = normalize(cross((cbp-ccp),(cdp-ccp)));
     return normalize((tnorma+tnormc)/2.0f);
 }
 

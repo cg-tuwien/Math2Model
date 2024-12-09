@@ -16,6 +16,7 @@ import OutputVerticesWgsl from "./vertices_stage.wgsl?raw";
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import * as THREE from 'three';
+import { createHelpers } from "./webgpu-helpers";
 
 const a = new THREE.Vector3( 0, 1, 0 );
 
@@ -25,6 +26,8 @@ const props = defineProps<{
   engine: WgpuEngine;
   fs: ReactiveFilesystem;
 }>();
+
+const triggerDownload = ref(false);
 
 const compiledShaders = ref<
   Map<
@@ -53,6 +56,7 @@ function concatArrayBuffers(views: ArrayBufferView[]): Uint8Array {
     buf.set(uint8view, offset);
     offset += uint8view.byteLength;
   }
+  const { concatArrayBuffers, createBufferWith } = createHelpers(props.gpuDevice);
 
   return buf;
 }
@@ -116,11 +120,13 @@ function exportMesh(vertexStream: Float32Array) {
     let uv = arrayVertices[verticesKey].uv;
     if(!(v.x == 0 && v.y == 0 && v.z == 0)) {
       mexpstring += "v " + uv.x + " " + uv.y + " " + 0 + "\n";
+      //mexpstring += "v " + v.x + " " + v.y + " " + v.z + "\n";
       vertcount+=1;
     }
     else if(zeros > 0)
     {
       zeros--;
+      //mexpstring += "v " + v.x + " " + v.y + " " + v.z + "\n";
       mexpstring += "v " + uv.x + " " + uv.y + " " + 0 + "\n";
       vertcount+=1;
     }
@@ -702,8 +708,8 @@ async function main() {
     computePassVertices.dispatchWorkgroupsIndirect(dispatchVerticesStage, 0);
     computePassVertices.end();
 
-    counter--;
-    if (counter === 0) {
+    if (triggerDownload.value) {
+      triggerDownload.value = false;
       commandEncoder.copyBufferToBuffer(
         vertOutputBuffer,
         0,
@@ -729,9 +735,12 @@ async function main() {
 
   props.engine.setLodStage(lodStageCallback);
 }
-let counter = 10;
 main();
+
 </script>
 <template>
   <div></div>
+  <div class="absolute bg-red-100">
+    <button @click="triggerDownload = true">Download</button>
+  </div>
 </template>
