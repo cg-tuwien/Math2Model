@@ -216,12 +216,12 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
 
     let avg = (cap + cbp + ccp + cdp)/4f;
 
-  let isflat = simab+simcd > 1.8f;
+  let isflat = simab+simcd > 0.5f;
 
 
   let acceptable_size = 0.00001f;
 
-  if (force_render.flag == 1u || isflat) {
+  if (force_render.flag == 1u ) {
     force_render_internal(quad_encoded);
   } else {
     // Split all 4 ways

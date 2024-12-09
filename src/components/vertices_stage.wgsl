@@ -199,7 +199,7 @@ fn main(
     var out: VertexOutput;
     out.world_position = world_pos.xyz;
     let size = calculateWorldSpaceSizeOfPatch(quad);
-    out.texture_coords = vec2(size,size);//quad_point;
+    out.texture_coords = quad_point.xy;//quad_point;
 
     // Write to shared array and wait
     quad_vertices[local_invocation_id.x] = out;
