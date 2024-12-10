@@ -17,6 +17,7 @@ import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import * as THREE from 'three';
 import { createHelpers } from "./webgpu-helpers";
+import { string } from "zod";
 
 const a = new THREE.Vector3( 0, 1, 0 );
 
@@ -92,7 +93,8 @@ function exportMesh(vertexStream: Float32Array) {
   const uintArray = new Uint32Array(vertexStream.buffer);
 
   let capacity = uintArray[1];
-  console.log("Capacity: " + capacity);
+
+  alert("Capacity: " + capacity);
   let slicedStream = vertexStream.slice(4);
   let index = 0;
   let arrayVertices = [];
@@ -100,6 +102,21 @@ function exportMesh(vertexStream: Float32Array) {
   {
     let section = slicedStream.slice(index,index+3);
     let section2 = slicedStream.slice(index+4,index+6);
+    if(section[0] == 0 && section[1] == 0 && section[2] == 0)
+    {
+      let endofdata = true;
+      for(let x = 0; x < 10; x++)
+      {
+        if(slicedStream[index+x] != 0)
+        {
+          endofdata = false;
+        }
+      }
+      if(endofdata)
+      {
+        break;
+      }
+    }
     arrayVertices.push({
       vert: new THREE.Vector3(section[0],section[1],section[2]),
       uv: new THREE.Vector2(section2[0],section2[1])
@@ -115,29 +132,78 @@ function exportMesh(vertexStream: Float32Array) {
   let mexpstring = "o\n";
   let vertcount = 0;
   let zeros = 8;
+  let map_verts = new Map();
+  let vertices_remapping = new Array(arrayVertices.length);
+  let vertex_index = 0;
+  let output_uv_toggle: boolean = false;
   for (const verticesKey in arrayVertices) {
+    //debugger;
     let v = arrayVertices[verticesKey].vert;
     let uv = arrayVertices[verticesKey].uv;
-    if(!(v.x == 0 && v.y == 0 && v.z == 0)) {
-      mexpstring += "v " + uv.x + " " + uv.y + " " + 0 + "\n";
-      //mexpstring += "v " + v.x + " " + v.y + " " + v.z + "\n";
-      vertcount+=1;
-    }
-    else if(zeros > 0)
+    let v_str: string = (v.toArray()+"");
+    let uv_str: string = (uv.toArray()+"");
+    
+    if(map_verts.has(uv_str))
     {
-      zeros--;
-      //mexpstring += "v " + v.x + " " + v.y + " " + v.z + "\n";
-      mexpstring += "v " + uv.x + " " + uv.y + " " + 0 + "\n";
-      vertcount+=1;
+      if((v.x == 0 && v.y == 0 && v.z == 0))
+      {
+        zeros--;
+        if(zeros <= 0)
+        {
+          break;
+        }
+      }
+      vertices_remapping[vertex_index] = map_verts.get(uv_str);
     }
+    else if(map_verts.has(v_str))
+    {
+      if((v.x == 0 && v.y == 0 && v.z == 0))
+      {
+        zeros--;
+        if(zeros <= 0)
+        {
+          break;
+        }
+      }
+      vertices_remapping[vertex_index] = map_verts.get(v_str);
+    }
+    else 
+    {
+      if(!(v.x == 0 && v.y == 0 && v.z == 0)) {
+        if(output_uv_toggle)
+          mexpstring += "v " + uv.x + " " + uv.y + " " + 0 + "\n";
+        else
+          mexpstring += "v " + v.x + " " + v.y + " " + v.z + "\n";
+        vertcount+=1;
+      }
+      else if(zeros > 0)
+      {
+        zeros--;
+        if(output_uv_toggle)
+          mexpstring += "v " + uv.x + " " + uv.y + " " + 0 + "\n";
+        else
+          mexpstring += "v " + v.x + " " + v.y + " " + v.z + "\n";
+        vertcount+=1;
+      }
+      else
+      {
+        continue;
+      }
+      vertices_remapping[vertex_index] = vertcount-1;
+      map_verts.set(uv_str,vertcount-1);
+    }
+    vertex_index+=1;
   }
+  alert("Vertices: " + vertcount);
+  console.log(map_verts);
+  debugger;
   for (let i = 0; i < arrayVertices.length; i+=4) {
-
-    if(i+4 > vertcount)
+    if(isNaN(vertices_remapping[i+3]+1))
       break;
-    mexpstring+="f " + (i+1) + " " + (i+1+1) + " " + (i+2+1) + "\n";
+    let line = "f " + (vertices_remapping[i]+1) + " " + (vertices_remapping[i+1]+1) + " " + (vertices_remapping[i+2]+1) + "\n";
+    mexpstring+=line;
 
-    mexpstring+="f " + (i+1) + " " + (i+2+1) + " " + (i+3+1) + "\n";
+    mexpstring+="f " + (vertices_remapping[i]+1) + " " + (vertices_remapping[i+2]+1) + " " + (vertices_remapping[i+3]+1) + "\n";
   }
   //let exporter = new GLTFExporter();
   //const data = exporter.parse(mesh, function f(file) {
