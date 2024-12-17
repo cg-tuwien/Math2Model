@@ -216,7 +216,7 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
 
     let avg = (cap + cbp + ccp + cdp)/4f;
 
-  let isflat = simab+simcd > 1.99f;
+  let isflat = simab+simcd > 1.f;
 
 
   let acceptable_size = 0.01f;

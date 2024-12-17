@@ -17,7 +17,8 @@ import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import * as THREE from 'three';
 import { createHelpers } from "./webgpu-helpers";
-import { string } from "zod";
+import { array, number, string } from "zod";
+import { flatten } from "naive-ui/es/_utils";
 
 const a = new THREE.Vector3( 0, 1, 0 );
 
@@ -196,7 +197,7 @@ function exportMesh(vertexStream: Float32Array) {
   }
   alert("Vertices: " + vertcount);
   console.log(map_verts);
-  debugger;
+
   for (let i = 0; i < arrayVertices.length; i+=4) {
     if(isNaN(vertices_remapping[i+3]+1))
       break;
@@ -213,6 +214,64 @@ function exportMesh(vertexStream: Float32Array) {
   //console.log(mexpstring);
   saveFile( mexpstring,"wowcool3dmodel.obj" );
 }
+
+function exportMeshFromPatches(vertexStream: Float32Array) {
+  const uintArray = new Uint32Array(vertexStream.buffer);
+
+  let capacity = uintArray[1];
+
+  let slicedStream = vertexStream.slice(4);
+  let index = 0;
+  let arrayVertices = [];
+  let patch_verts = [];
+  let patches = [];
+  while (index < slicedStream.length)
+  {
+    let section = slicedStream.slice(index,index+3);
+    let section2 = slicedStream.slice(index+4,index+6);
+    if(section[0] == 0 && section[1] == 0 && section[2] == 0)
+    {
+      let endofdata = true;
+      for(let x = 0; x < 10; x++)
+      {
+        if(slicedStream[index+x] != 0)
+        {
+          endofdata = false;
+        }
+      }
+      if(endofdata)
+      {
+        break;
+      }
+    }
+    patch_verts.push({
+      vert: new THREE.Vector3(section[0],section[1],section[2]),
+      uv: new THREE.Vector2(section2[0],section2[1])
+    });
+    index+=8;
+    if(patch_verts.length != 4)
+    {
+      continue;
+    }
+    
+    patches.push({
+      patch_verts
+    });
+    patch_verts = [];
+  }
+  let matched_struct = new Map();
+  for(let patch in patches)
+  {
+    
+    //let lowerEdge = patch[0].uv.y;
+    //let upperEdge = patch[2].uv.y;
+    //let leftEdge = patch[0].uv.x;
+    //let rightEdge = patch[2].uv.x;
+    //if(matched_struct[])
+  }
+  console.log(patches);
+}
+
 
 async function main() {
   const _adapter = await navigator.gpu.requestAdapter(); // Wait for Rust backend to be in business
@@ -672,7 +731,7 @@ async function main() {
       ],
     });
 
-    const doubleNumberOfRounds = 4;
+    const doubleNumberOfRounds = 3;
     // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
     for (let i = 0; i < doubleNumberOfRounds; i++) {
       const isLastRound = i === doubleNumberOfRounds - 1;
