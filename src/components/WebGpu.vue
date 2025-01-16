@@ -127,20 +127,41 @@ function exportMesh(vertexStream: Float32Array) {
     //console.log("Slice: " + section + " Slice 2: " + section2);
     index+=8;
   }
+  exportArrayVertsStructureFromPatches(arrayVertices); // This doesnt work anymore
+}
+
+function exportArrayVertsStructureFromPatches(arrayVertices: any)
+{
   let vertices = new Float32Array(arrayVertices.length*3);
   let inds = new Uint32Array(arrayVertices.length*6);
-  index = 0;
+  let index = 0;
   let mexpstring = "o\n";
   let vertcount = 0;
   let zeros = 8;
-  let map_verts = new Map();
   let vertices_remapping = new Array(arrayVertices.length);
   let vertex_index = 0;
   let output_uv_toggle: boolean = false;
-  for (const verticesKey in arrayVertices) {
-    //debugger;
-    let v = arrayVertices[verticesKey].vert;
-    let uv = arrayVertices[verticesKey].uv;
+  // Remap vertices into tris
+  let arrayVertices2 = new Array();
+  debugger;
+  let map_verts = new Map();
+  console.log("AVLENGTH: " + arrayVertices.length);
+  for (const patch of arrayVertices) {
+    arrayVertices2.push(patch[0]);
+    arrayVertices2.push(patch[1]);
+    arrayVertices2.push(patch[2]);
+    arrayVertices2.push(patch[3]);
+    /*arrayVertices2.push(patch[0]);
+    arrayVertices2.push(patch[2]);
+    arrayVertices2.push(patch[3]);
+  */  }
+
+  for(const vert of arrayVertices2)
+  {
+    debugger;
+    let v = vert.vert;
+    let uv = vert.uv;
+    debugger;
     let v_str: string = (v.toArray()+"");
     let uv_str: string = (uv.toArray()+"");
     
@@ -198,7 +219,7 @@ function exportMesh(vertexStream: Float32Array) {
   alert("Vertices: " + vertcount);
   console.log(map_verts);
 
-  for (let i = 0; i < arrayVertices.length; i+=4) {
+  for (let i = 0; i < arrayVertices2.length; i+=4) {
     if(isNaN(vertices_remapping[i+3]+1))
       break;
     let line = "f " + (vertices_remapping[i]+1) + " " + (vertices_remapping[i+1]+1) + " " + (vertices_remapping[i+2]+1) + "\n";
@@ -224,7 +245,7 @@ function exportMeshFromPatches(vertexStream: Float32Array) {
   let index = 0;
   let arrayVertices = [];
   let patch_verts = [];
-  let patches = [];
+  let patches: any = [];
   while (index < slicedStream.length)
   {
     let section = slicedStream.slice(index,index+3);
@@ -248,29 +269,162 @@ function exportMeshFromPatches(vertexStream: Float32Array) {
       vert: new THREE.Vector3(section[0],section[1],section[2]),
       uv: new THREE.Vector2(section2[0],section2[1])
     });
+
     index+=8;
     if(patch_verts.length != 4)
     {
       continue;
     }
     
-    patches.push({
+    patches.push(
       patch_verts
-    });
+    );
+    //console.log(patches);
     patch_verts = [];
   }
-  let matched_struct = new Map();
-  for(let patch in patches)
+  
+  //console.log(JSON.stringify(patches) );
+  fixPatchSeams(patches);
+  //debugger;
+  for(let i = 0; i < patches.length; i++)
   {
-    
-    //let lowerEdge = patch[0].uv.y;
-    //let upperEdge = patch[2].uv.y;
-    //let leftEdge = patch[0].uv.x;
-    //let rightEdge = patch[2].uv.x;
-    //if(matched_struct[])
+    for(let j = 0; j < 4; j++)
+    {
+      let p = patches[i][j];
+      patches[i][j].vert = new THREE.Vector3(p.vert.x,p.vert.y,p.vert.z);
+      
+      patches[i][j].uv = new THREE.Vector2(p.uv.x,p.uv.y);
+    }
   }
-  console.log(patches);
+  exportArrayVertsStructureFromPatches(patches);
 }
+
+// QuadTree implementation for storing patches in TypeScript
+class QuadTree {
+  private boundary: Rectangle;
+  private capacity: number;
+  private patches: Patch[]; // Stores patches with UVs and world coordinates
+  private divided: boolean;
+  private northwest?: QuadTree;
+  private northeast?: QuadTree;
+  private southwest?: QuadTree;
+  private southeast?: QuadTree;
+
+  constructor(boundary: Rectangle, capacity: number) {
+    this.boundary = boundary; // Rectangle representing the boundary of this quad
+    this.capacity = capacity; // Maximum number of patches before splitting
+    this.patches = []; // Patches stored in this node
+    this.divided = false; // Whether the node has been subdivided
+  }
+
+  // Subdivide this quad tree into four children
+  private subdivide(): void {
+    const { x, y, w, h } = this.boundary;
+
+    const nw = new Rectangle(x, y, w / 2, h / 2);
+    const ne = new Rectangle(x + w / 2, y, w / 2, h / 2);
+    const sw = new Rectangle(x, y + h / 2, w / 2, h / 2);
+    const se = new Rectangle(x + w / 2, y + h / 2, w / 2, h / 2);
+
+    this.northwest = new QuadTree(nw, this.capacity);
+    this.northeast = new QuadTree(ne, this.capacity);
+    this.southwest = new QuadTree(sw, this.capacity);
+    this.southeast = new QuadTree(se, this.capacity);
+
+    this.divided = true;
+  }
+
+  // Insert a patch into the quad tree
+  public insert(patch: Patch): boolean {
+    for (let uv of patch.uvs) {
+      if (!this.boundary.contains(uv)) {
+        return false; // Patch is outside the boundary of this quad
+      }
+    }
+
+    // If the patch fits entirely within this node and this node is not subdivided
+    if (!this.divided) {
+      if (this.patches.length < this.capacity) {
+        this.patches.push(patch);
+        return true;
+      } else {
+        this.subdivide();
+      }
+    }
+
+    // Try to insert the patch into a child node
+    if (this.northwest?.insert(patch)) return true;
+    if (this.northeast?.insert(patch)) return true;
+    if (this.southwest?.insert(patch)) return true;
+    if (this.southeast?.insert(patch)) return true;
+
+    // If no child node can take the patch, it stays here
+    this.patches.push(patch);
+    return true;
+  }
+
+  // Query for patches within a specific range
+  public query(range: Rectangle, found: Patch[] = []): Patch[] {
+    if (!this.boundary.intersects(range)) {
+      return found; // No intersection, return empty list
+    }
+
+    for (let patch of this.patches) {
+      if (patch.uvs.some(uv => range.contains(uv))) {
+        found.push(patch);
+      }
+    }
+
+    if (this.divided) {
+      this.northwest?.query(range, found);
+      this.northeast?.query(range, found);
+      this.southwest?.query(range, found);
+      this.southeast?.query(range, found);
+    }
+
+    return found;
+  }
+}
+
+// Helper class to represent a rectangle boundary
+class Rectangle {
+  public x: number;
+  public y: number;
+  public w: number;
+  public h: number;
+
+  constructor(x: number, y: number, w: number, h: number) {
+    this.x = x; // Top-left x
+    this.y = y; // Top-left y
+    this.w = w; // Width
+    this.h = h; // Height
+  }
+
+  public contains(point: { x: number; y: number }): boolean {
+    return (
+      point.x >= this.x &&
+      point.x < this.x + this.w &&
+      point.y >= this.y &&
+      point.y < this.y + this.h
+    );
+  }
+
+  public intersects(range: Rectangle): boolean {
+    return !(
+      range.x > this.x + this.w ||
+      range.x + range.w < this.x ||
+      range.y > this.y + this.h ||
+      range.y + range.h < this.y
+    );
+  }
+}
+
+// Patch structure
+interface Patch {
+  uvs: { x: number; y: number }[]; // Array of 4 UV coordinates
+  worldCoords: { x: number; y: number; z: number }[]; // Corresponding world coordinates
+}
+
 
 
 async function main() {
@@ -481,6 +635,8 @@ async function main() {
         );
       result.lodStage = replaceWithCode(result.lodStage);
       result.verticesStage = replaceWithCode(result.verticesStage);
+      console.log("LOD STAGE: " + result.lodStage);
+      console.log("VERTICES STAGE: " + result.verticesStage);
     }
     return result;
   }
@@ -514,6 +670,8 @@ async function main() {
     if (change.type === "insert" || change.type === "update") {
       getShaderCode(props.fs, change.key).then(
         ({ lodStage, verticesStage }) => {
+          console.log("LSTAGE 2: " + lodStage);
+          console.log("VSTAGE 2: " + lodStage);
           compiledShaders.value.set(change.key, {
             lodStage: makeShaderFromCodeAndPipeline(lodStage, pipelineLayout),
             verticesStage: makeShaderFromCodeAndPipeline(
@@ -852,7 +1010,7 @@ async function main() {
             const vertexStream = new Float32Array(arrayBuffer);
             //console.log("vertReadableBuffer Output:", vertexStream); // Only zeroes. Huh
             vertReadableBuffer.unmap();
-            exportMesh(vertexStream);
+            exportMeshFromPatches(vertexStream);
           });
       }, 10);
     }
@@ -860,6 +1018,150 @@ async function main() {
 
   props.engine.setLodStage(lodStageCallback);
 }
+
+// Define a type for a single vertex
+interface Vertex {
+    vert: { x: number; y: number; z: number };
+    uv: { x: number; y: number };
+}
+
+// Define a type for a single range
+interface VertexRange {
+    start: number;
+    end: number;
+    startVert: number;
+    endVert: number;
+    ipi: number;
+}
+
+// Helper function to insert ranges in sorted order
+function insertSorted(rangeList: VertexRange[], range: VertexRange): void {
+    const index = rangeList.findIndex(r => r.start >= range.start);
+    if (index === -1) {
+        rangeList.push(range);
+    } else {
+        rangeList.splice(index, 0, range);
+    }
+}
+
+// Helper function to create a VertexRange object
+function createVertexRange(
+    start: number,
+    end: number,
+    startVert: number,
+    endVert: number,
+    ipi: number
+): VertexRange {
+    return { start, end, startVert, endVert, ipi };
+}
+
+// Helper function to check if a range contains another range
+function checkContains(range: VertexRange, other: VertexRange): boolean {
+    return other.start >= range.start && other.end <= range.end;
+}
+
+// Helper function to calculate interpolation value
+function getInterpolationValue(range: VertexRange, value: number): number {
+    return (value - range.start) / (range.end - range.start);
+}
+
+// Helper function to interpolate between vertices
+function interpolate(range: VertexRange, value: number, patches: Vertex[][]): THREE.Vector3 {
+    const ip = getInterpolationValue(range, value);
+
+    const startVec = new THREE.Vector3(
+        patches[range.ipi][range.startVert].vert.x,
+        patches[range.ipi][range.startVert].vert.y,
+        patches[range.ipi][range.startVert].vert.z
+    );
+
+    const endVec = new THREE.Vector3(
+        patches[range.ipi][range.endVert].vert.x,
+        patches[range.ipi][range.endVert].vert.y,
+        patches[range.ipi][range.endVert].vert.z
+    );
+
+    return startVec.multiplyScalar(1 - ip).add(endVec.multiplyScalar(ip));
+}
+
+// Main function
+function fixPatchSeams(patches: Vertex[][]): Vertex[][] {
+    const rangesHorizontal: { top: Record<number, VertexRange[]>; bottom: Record<number, VertexRange[]> } = {
+        top: {},
+        bottom: {},
+    };
+
+    const rangesVertical: { left: Record<number, VertexRange[]>; right: Record<number, VertexRange[]> } = {
+        left: {},
+        right: {},
+    };
+
+    const topRanges = rangesHorizontal["top"];
+    const botRanges = rangesHorizontal["bottom"];
+    const leftRanges = rangesVertical["left"];
+    const rightRanges = rangesVertical["right"];
+
+    let inpInd = 0;
+
+    for (const patch of patches) {
+        const v1 = patch[0], v2 = patch[1], v3 = patch[2], v4 = patch[3];
+        const upper = v2.uv.y;
+        const lower = v1.uv.y;
+        const left = v1.uv.x;
+        const right = v3.uv.x;
+
+        const hedgeTop = createVertexRange(left, right, 1, 2, inpInd);
+        const hedgeBottom = createVertexRange(left, right, 0, 3, inpInd);
+        const vedgeLeft = createVertexRange(lower, upper, 0, 1, inpInd);
+        const vedgeRight = createVertexRange(lower, upper, 3, 2, inpInd);
+
+        inpInd++;
+
+        if (!topRanges[upper]) topRanges[upper] = [];
+        insertSorted(topRanges[upper], hedgeTop);
+
+        if (!botRanges[lower]) botRanges[lower] = [];
+        insertSorted(botRanges[lower], hedgeBottom);
+
+        if (!leftRanges[left]) leftRanges[left] = [];
+        insertSorted(leftRanges[left], vedgeLeft);
+
+        if (!rightRanges[right]) rightRanges[right] = [];
+        insertSorted(rightRanges[right], vedgeRight);
+    }
+
+    for (const edge of Object.keys(topRanges).map(Number)) {
+        if (botRanges[edge]) {
+            const topRange = topRanges[edge];
+            const botRange = botRanges[edge];
+            for (const uvr of topRange) {
+                for (const uvrBot of botRange) {
+                    if (checkContains(uvrBot, uvr)) {
+                        if (uvr.start !== uvrBot.start) {
+                            const interpolatedStart = interpolate(uvrBot, uvr.start, patches);
+                            patches[uvr.ipi][uvr.startVert].vert = {
+                                x: interpolatedStart.x,
+                                y: interpolatedStart.y,
+                                z: interpolatedStart.z
+                            };
+                        }
+                        if (uvr.end !== uvrBot.end) {
+                            const interpolatedEnd = interpolate(uvrBot, uvr.end, patches);
+                            patches[uvr.ipi][uvr.endVert].vert = {
+                                x: interpolatedEnd.x,
+                                y: interpolatedEnd.y,
+                                z: interpolatedEnd.z
+                            };
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return patches;
+}
+
 main();
 
 </script>
