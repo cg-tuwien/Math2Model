@@ -7,9 +7,8 @@
   "scripts": {
     "start": "vite",
     "dev": "vite --open",
-    "build": "run-s build-only type-check",
     "preview": "vite preview",
-    "build-only": "vite build"
+    "build": "vite build"
   },
   "dependencies": {
     "@iconify-json/mdi": "^1.2.1",
