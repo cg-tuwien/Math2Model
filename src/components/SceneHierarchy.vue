@@ -499,7 +499,7 @@ function uploadFile(data: {
             :options="texturesDropdown"
             v-model:value="currentModel.material.diffuseTexture"
             v-on:update-value="
-              (v) =>
+              (v: string) =>
                 change(
                   ['material', 'diffuseTexture'],
                   new ObjectUpdate([], () => v)

@@ -393,12 +393,16 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
             <SceneHierarchy
               :models="scene.state.value.models"
               :fs="props.fs"
-              @update="(keys, update) => updateModels(keys, update)"
-              @addModel="
-                (modelName, shaderName) => addModel(modelName, shaderName)
+              @update="
+                (keys: string[], update: ObjectUpdate<any>) =>
+                  updateModels(keys, update)
               "
-              @select="(vertex) => openFile.openFile(vertex)"
-              @removeModel="(ids) => removeModel(ids)"
+              @addModel="
+                (modelName: string, shaderName: string) =>
+                  addModel(modelName, shaderName)
+              "
+              @select="(vertex: FilePath) => openFile.openFile(vertex)"
+              @removeModel="(ids: string[]) => removeModel(ids)"
             ></SceneHierarchy>
           </div>
           <div v-else-if="tabs.selectedTab.value === 'filebrowser'">
@@ -407,7 +411,8 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
               @open-file="openFile.openFile($event)"
               @add-files="openFile.addFiles($event)"
               @rename-file="
-                (oldName, newName) => openFile.renameFile(oldName, newName)
+                (oldName: FilePath, newName: FilePath) =>
+                  openFile.renameFile(oldName, newName)
               "
               @delete-files="openFile.deleteFiles($event)"
             ></FileBrowser>

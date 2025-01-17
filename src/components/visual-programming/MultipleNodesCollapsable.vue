@@ -21,9 +21,11 @@ const props = defineProps<{
           :onclick="() => node.create(node)"
           :draggable="node.draggable"
           v-on:dragstart="
-            (ev) => {
-              ev.dataTransfer.setData('text/plain', JSON.stringify(node));
-              ev.dataTransfer.effectAllowed = 'copy';
+            (ev: DragEvent) => {
+              if (ev.dataTransfer) {
+                ev.dataTransfer.setData('text/plain', JSON.stringify(node));
+                ev.dataTransfer.effectAllowed = 'copy';
+              }
             }
           "
         >

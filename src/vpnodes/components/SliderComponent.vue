@@ -13,7 +13,7 @@ const props = defineProps<{
     :step="props.data.step"
     :max="props.data.max"
     :min="props.data.min"
-    v-on:update-value="(v) => props.data.updateValue(v)"
+    v-on:update-value="(v: number) => props.data.updateValue(v)"
     v-on:dragend="() => props.data.change()"
     v-on:pointerdown.stop=""
     tooltip
@@ -24,7 +24,7 @@ const props = defineProps<{
     :step="props.data.step"
     :min="props.data.min"
     :max="props.data.max"
-    v-on:change="(v) => props.data.change(v)"
+    v-on:change="(v: number | null) => props.data.change(v)"
     v-on:pointerdown.stop=""
   >
   </n-input-number>

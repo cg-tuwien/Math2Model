@@ -12,7 +12,7 @@ const props = defineProps<{
     :options="props.data.options"
     v-model:value="props.data.selected"
     :placeholder="props.data.placeholder"
-    v-on:update-value="(v) => props.data.change(v, props.data.label)"
+    v-on:update-value="(v: any) => props.data.change(v, props.data.label)"
     v-on:pointerdown.stop=""
   ></n-select>
 </template>
