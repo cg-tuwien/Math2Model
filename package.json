@@ -47,7 +47,6 @@
     "@vue/tsconfig": "^0.6.0",
     "@webgpu/types": "^0.1.51",
     "autoprefixer": "^10.4.20",
-    "npm-run-all2": "^7.0.1",
     "postcss": "^8.4.49",
     "prettier": "3.3.3",
     "sass-embedded": "^1.80.6",
