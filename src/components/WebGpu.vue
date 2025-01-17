@@ -284,7 +284,7 @@ function exportMeshFromPatches(vertexStream: Float32Array) {
   }
   
   //console.log(JSON.stringify(patches) );
-  fixPatchSeams(patches);
+  patches = fixPatchSeams(patches);
   //debugger;
   for(let i = 0; i < patches.length; i++)
   {
@@ -889,7 +889,7 @@ async function main() {
       ],
     });
 
-    const doubleNumberOfRounds = 3;
+    const doubleNumberOfRounds = 4;
     // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
     for (let i = 0; i < doubleNumberOfRounds; i++) {
       const isLastRound = i === doubleNumberOfRounds - 1;
@@ -1083,7 +1083,6 @@ function interpolate(range: VertexRange, value: number, patches: Vertex[][]): TH
 
     return startVec.multiplyScalar(1 - ip).add(endVec.multiplyScalar(ip));
 }
-
 // Main function
 function fixPatchSeams(patches: Vertex[][]): Vertex[][] {
     const rangesHorizontal: { top: Record<number, VertexRange[]>; bottom: Record<number, VertexRange[]> } = {
@@ -1130,37 +1129,61 @@ function fixPatchSeams(patches: Vertex[][]): Vertex[][] {
         insertSorted(rightRanges[right], vedgeRight);
     }
 
+    // Horizontal interpolation (top-to-bottom and bottom-to-top)
     for (const edge of Object.keys(topRanges).map(Number)) {
         if (botRanges[edge]) {
             const topRange = topRanges[edge];
             const botRange = botRanges[edge];
-            for (const uvr of topRange) {
-                for (const uvrBot of botRange) {
-                    if (checkContains(uvrBot, uvr)) {
-                        if (uvr.start !== uvrBot.start) {
-                            const interpolatedStart = interpolate(uvrBot, uvr.start, patches);
-                            patches[uvr.ipi][uvr.startVert].vert = {
-                                x: interpolatedStart.x,
-                                y: interpolatedStart.y,
-                                z: interpolatedStart.z
-                            };
-                        }
-                        if (uvr.end !== uvrBot.end) {
-                            const interpolatedEnd = interpolate(uvrBot, uvr.end, patches);
-                            patches[uvr.ipi][uvr.endVert].vert = {
-                                x: interpolatedEnd.x,
-                                y: interpolatedEnd.y,
-                                z: interpolatedEnd.z
-                            };
-                        }
-                    }
+            interpolateRanges(topRange, botRange, patches);
+        }
+    }
+
+    // Vertical interpolation (left-to-right and right-to-left)
+    for (const edge of Object.keys(leftRanges).map(Number)) {
+        if (rightRanges[edge]) {
+            const leftRange = leftRanges[edge];
+            const rightRange = rightRanges[edge];
+            interpolateRanges(leftRange, rightRange, patches);
+        }
+    }
+
+    console.log("PATCHED: ");
+    console.log(patches);
+
+    return patches;
+}
+
+function interpolateRanges(
+    range1: VertexRange[],
+    range2: VertexRange[],
+    patches: Vertex[][]
+) {
+    for (const uvr of range1) {
+        for (const uvrOther of range2) {
+            if (checkContains(uvrOther, uvr)) {
+                if (uvr.start !== uvrOther.start) {
+                    const interpolatedStart = interpolate(uvrOther, uvr.start, patches);
+                    console.log("Interpolated start! Previously " + JSON.stringify(patches[uvr.ipi][uvr.startVert].vert) + " Now " + JSON.stringify(interpolatedStart));
+                    patches[uvr.ipi][uvr.startVert].vert = {
+                        x: interpolatedStart.x,
+                        y: interpolatedStart.y,
+                        z: interpolatedStart.z,
+                    };
+                }
+                if (uvr.end !== uvrOther.end) {
+                    const interpolatedEnd = interpolate(uvrOther, uvr.end, patches);
+                    console.log("Interpolated end");
+                    patches[uvr.ipi][uvr.endVert].vert = {
+                        x: interpolatedEnd.x,
+                        y: interpolatedEnd.y,
+                        z: interpolatedEnd.z,
+                    };
                 }
             }
         }
     }
-
-    return patches;
 }
+
 
 main();
 
