@@ -5,7 +5,8 @@ import {
   ArrowsSplit,
   ArrowsJoin,
   MathFunction,
-} from "@vicons/tabler";
+} from "@vicons/tabler"; // Replace @vicons with  ~icons/mdi https://icon-sets.iconify.design/mdi/
+// TODO: Also remove the vicons dependency (package.json)
 import { MathOpNode, NumberNode } from "./basic/math";
 import {
   FunctionCallNode,
@@ -100,69 +101,64 @@ export function useUiNodes(
     addNode(uiNode.get());
   }
 
+  function makeMap(nodes: UINode[]): Map<string, UINode> {
+    return new Map<string, UINode>(
+      nodes.map((node) => [node.name, node] as const)
+    );
+  }
+
+  // Could be shrunk down a bit I think
   const uiNodes: Map<string, Map<string, UINode>> = new Map([
     [
       "Shapes",
-      new Map<string, UINode>([
-        [
-          "Heart",
-          {
-            name: "Heart",
-            type: "SHAPE",
-            prefix: "parametric",
-            image: Heart24Regular,
-            get: () => {
-              //addNode(n);
-              return newHeartShape();
-            },
-            create: createUINode,
-            draggable: true,
+      makeMap([
+        {
+          name: "Heart",
+          type: "SHAPE",
+          prefix: "parametric",
+          image: Heart24Regular,
+          get: () => {
+            //addNode(n);
+            return newHeartShape();
           },
-        ],
-        [
-          "Sphere",
-          {
-            name: "Sphere",
-            type: "SHAPE",
-            prefix: "parametric",
-            image: Circle24Regular,
-            get: () => {
-              //addNode(n);
-              return newSphereShape();
-            },
-            create: createUINode,
-            draggable: true,
+          create: createUINode,
+          draggable: true,
+        },
+        {
+          name: "Sphere",
+          type: "SHAPE",
+          prefix: "parametric",
+          image: Circle24Regular,
+          get: () => {
+            //addNode(n);
+            return newSphereShape();
           },
-        ],
-        [
-          "Plane",
-          {
-            name: "Plane",
-            type: "SHAPE",
-            prefix: "parametric",
-            image: RectangleLandscape24Regular,
-            get: () => {
-              //addNode(n);
-              return newPlaneShape();
-            },
-            create: createUINode,
-            draggable: true,
+          create: createUINode,
+          draggable: true,
+        },
+        {
+          name: "Plane",
+          type: "SHAPE",
+          prefix: "parametric",
+          image: RectangleLandscape24Regular,
+          get: () => {
+            //addNode(n);
+            return newPlaneShape();
           },
-        ],
-        [
-          "Cylinder",
-          {
-            name: "Cylinder",
-            type: "SHAPE",
-            prefix: "parametric",
-            image: CategoryOutlined,
-            get: () => {
-              return newCylinderShape();
-            },
-            create: createUINode,
-            draggable: true,
+          create: createUINode,
+          draggable: true,
+        },
+        {
+          name: "Cylinder",
+          type: "SHAPE",
+          prefix: "parametric",
+          image: CategoryOutlined,
+          get: () => {
+            return newCylinderShape();
           },
-        ],
+          create: createUINode,
+          draggable: true,
+        },
       ]),
     ],
     [

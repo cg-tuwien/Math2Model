@@ -305,7 +305,10 @@ async function checkForUnsafeConnections(
 
   if (removeFlag) {
     await editor.removeConnection(connection.id);
-    showInfo("This connection is not allowed, since it would create a cycle!");
+    showError(
+      "This connection is not allowed, since it would create a cycle!",
+      { title: "Invalid Connection" }
+    );
     return;
   }
 
