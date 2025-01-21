@@ -142,22 +142,41 @@ const graphsDropdown = computed<SelectMixedOption[]>(() => {
 
 const container = ref<HTMLElement | null>(null);
 
-onMounted(() => {
-  createEditor();
+const editor = new NodeEditor<Schemes>();
+const engine = new DataflowEngine<Schemes>();
+const arrange = new AutoArrangePlugin<Schemes>();
+const area: AreaPlugin<Schemes, AreaExtra> = new AreaPlugin<Schemes, AreaExtra>(
+  document.createElement("div")
+);
+area.container.classList.add("flex-1");
+const scopes = new ScopesPlugin<Schemes>();
+const history = new HistoryPlugin<Schemes, HistoryActions<Schemes>>();
+const applier = new ArrangeAppliers.TransitionApplier<Schemes, never>({
+  duration: 100,
+  timingFunction: (t) => t,
+  async onTick() {
+    // called on every frame update
+  },
 });
+
+AreaExtensions.selectableNodes(area, AreaExtensions.selector(), {
+  accumulating: AreaExtensions.accumulateOnCtrl(),
+});
+
+const nodes = useUiNodes(editor, area);
+let uiNodes: Map<string, Map<string, UINode>> = nodes.uiNodes;
+let shouldUpdate = true;
+
+let loading = ref<boolean>(false);
+let loadName = ref<string>("no file selected");
 
 watch(container, (container) => {
   container?.append(area.container);
 });
 
-const editor = new NodeEditor<Schemes>();
-const engine = new DataflowEngine<Schemes>();
-const arrange = new AutoArrangePlugin<Schemes>();
-
-let shouldUpdate = true;
-
-let loading = ref<boolean>(false);
-let loadName = ref<string>("no file selected");
+onMounted(() => {
+  createEditor();
+});
 
 watch(
   () => props.keyedGraph?.id,
@@ -256,17 +275,6 @@ async function rearrange() {
   return new NothingNode();
 }
 
-let area: AreaPlugin<Schemes, AreaExtra>;
-const scopes = new ScopesPlugin<Schemes>();
-const history = new HistoryPlugin<Schemes, HistoryActions<Schemes>>();
-const applier = new ArrangeAppliers.TransitionApplier<Schemes, never>({
-  duration: 100,
-  timingFunction: (t) => t,
-  async onTick() {
-    // called on every frame update
-  },
-});
-
 async function checkForUnsafeConnections(
   connection: ClassicPreset.Connection<Nodes, Nodes>
 ) {
@@ -303,16 +311,6 @@ async function checkForUnsafeConnections(
 
   await editor.addNode(new NothingNode());
 }
-
-let uiNodes: Map<string, Map<string, UINode>>;
-
-area = new AreaPlugin<Schemes, AreaExtra>(document.createElement("div"));
-AreaExtensions.selectableNodes(area, AreaExtensions.selector(), {
-  accumulating: AreaExtensions.accumulateOnCtrl(),
-});
-
-const nodes = useUiNodes(editor, area);
-uiNodes = nodes.uiNodes;
 
 async function createEditor() {
   //AreaExtensions.snapGrid(area, {
@@ -983,7 +981,7 @@ function addTemplate(name: string, json: string) {
         style="width: 25%"
       ></NodesDock>
       <div
-        class="rete flex-1"
+        class="flex flex-1"
         ref="container"
         v-on:dragover="
           (ev) => {
