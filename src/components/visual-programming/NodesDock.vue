@@ -6,7 +6,7 @@ import type { UINode } from "@/vpnodes/ui/uinode";
 import SingleNodeDisplay from "@/components/visual-programming/SingleNodeDisplay.vue";
 import { NodeEditor } from "rete";
 import MultipleNodesCollapsable from "@/components/visual-programming/MultipleNodesCollapsable.vue";
-import type { Schemes } from "./CodeGraph.vue";
+import type { Schemes } from "@/vpnodes/nodes-list";
 
 const props = defineProps<{
   displayNodes: Map<string, Map<string, UINode>>;

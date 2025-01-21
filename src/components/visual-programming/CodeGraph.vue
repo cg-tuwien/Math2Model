@@ -76,9 +76,6 @@ import NodesDock from "@/components/visual-programming/NodesDock.vue";
 import type { UINode } from "@/vpnodes/ui/uinode";
 import { SliderControl } from "@/vpnodes/controls/slider";
 import SliderComponent from "@/vpnodes/components/SliderComponent.vue";
-import Heart24Regular from "~icons/mdi/cards-heart-outline";
-import Circle24Regular from "~icons/mdi/circle-outline";
-import RectangleLandscape24Regular from "~icons/mdi/rectangle-outline";
 import {
   WaveSawTool,
   WaveSine,
@@ -88,14 +85,19 @@ import {
   ArrowsJoin,
   Code,
 } from "@vicons/tabler";
-import JoinFullRound from "~icons/mdi/full-outer-join";
-import CategoryOutlined from "~icons/mdi/category-outline";
-import Scale from "~icons/mdi/resize";
 import ReturnNodeStyle from "@/components/visual-programming/CustomNodeStyles/ReturnNodeStyle.vue";
 import VariableOutNodeStyle from "@/components/visual-programming/CustomNodeStyles/VariableOutNodeStyle.vue";
 import DefaultNodeStyle from "@/components/visual-programming/CustomNodeStyles/DefaultNodeStyle.vue";
 import SocketStyle from "@/components/visual-programming/CustomNodeStyles/SocketStyle.vue";
 import ConnectionStyle from "@/components/visual-programming/CustomNodeStyles/ConnectionStyle.vue";
+import {
+  Connection,
+  useUiNodes,
+  type AreaExtra,
+  type Conns,
+  type Nodes,
+  type Schemes,
+} from "@/vpnodes/nodes-list";
 
 const emit = defineEmits<{
   update: [content: string];
@@ -138,569 +140,15 @@ const graphsDropdown = computed<SelectMixedOption[]>(() => {
     );
 });
 
-const loadingPercentage = ref(0);
-
-function createUINode(uiNode: UINode) {
-  addNode(uiNode.get());
-}
-
-const uiNodes: Map<string, Map<string, UINode>> = new Map([
-  [
-    "Shapes",
-    new Map<string, UINode>([
-      [
-        "Heart",
-        {
-          name: "Heart",
-          type: "SHAPE",
-          prefix: "parametric",
-          image: Heart24Regular,
-          get: () => {
-            //addNode(n);
-            return newHeartShape();
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Sphere",
-        {
-          name: "Sphere",
-          type: "SHAPE",
-          prefix: "parametric",
-          image: Circle24Regular,
-          get: () => {
-            //addNode(n);
-            return newSphereShape();
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Plane",
-        {
-          name: "Plane",
-          type: "SHAPE",
-          prefix: "parametric",
-          image: RectangleLandscape24Regular,
-          get: () => {
-            //addNode(n);
-            return newPlaneShape();
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Cylinder",
-        {
-          name: "Cylinder",
-          type: "SHAPE",
-          prefix: "parametric",
-          image: CategoryOutlined,
-          get: () => {
-            return newCylinderShape();
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-    ]),
-  ],
-  [
-    "Apply",
-    new Map<string, UINode>([
-      [
-        "Combine",
-        {
-          name: "Combine",
-          type: "APPLY",
-          prefix: "",
-          image: JoinFullRound,
-          get: () => {
-            //addNode(n);
-            return new CombineNode(
-              (id: string) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => area.update("control", c.id)
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Scale",
-        {
-          name: "Scale",
-          type: "APPLY",
-          prefix: "",
-          image: Scale,
-          get: () => {
-            return new MathFunctionNode(
-              "Scale",
-              "mat3x3(vec3f({scale x,1,100,-100,0.1,f32},0.0,0.0), vec3f(0.0,{scale y,1,100,-100,0.1,f32},0.0), vec3f(0.0,0.0,{scale z,1,100,-100,0.1,f32})) * input2",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "vec3f",
-              "vec3f"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Sine",
-        {
-          name: "Sine",
-          type: "APPLY",
-          prefix: "",
-          image: WaveSine,
-          get: () => {
-            return new MathFunctionNode(
-              "Sine",
-              "sin({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Cosine",
-        {
-          name: "Cosine",
-          type: "APPLY",
-          prefix: "",
-          image: WaveSine,
-          get: () => {
-            return new MathFunctionNode(
-              "Cosine",
-              "cos({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Sawtooth",
-        {
-          name: "Sawtooth",
-          type: "APPLY",
-          prefix: "",
-          image: WaveSawTool,
-          get: () => {
-            return new MathFunctionNode(
-              "Sawtooth",
-              "(({sawtooth count,0,10,-10,0.1,f32} * input2) - floor({sawtooth count,0,10,-10,0.1,f32} * input2))",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "POW",
-        {
-          name: "POW",
-          type: "APPLY",
-          prefix: "",
-          image: WaveSine,
-          get: () => {
-            return new MathFunctionNode(
-              "Pow",
-              "pow(input2, {x1,0,10,-10,0.1,same})",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Square",
-        {
-          name: "Square",
-          type: "APPLY",
-          prefix: "",
-          image: WaveSquare,
-          get: () => {
-            return new MathFunctionNode(
-              "Square",
-              "sign(sin(input2*{frequency,1,10,-10,0.1,f32}))",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Step",
-        {
-          name: "Step",
-          type: "APPLY",
-          prefix: "",
-          image: WaveSquare,
-          get: () => {
-            return new MathFunctionNode(
-              "Step",
-              "step({edge,1,10,-10,1,same}, input2)",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-    ]),
-  ],
-  [
-    "Parameters",
-    new Map<string, UINode>([
-      [
-        "Split",
-        {
-          name: "Split",
-          type: "ARRANGE",
-          prefix: "vec->x,y,z",
-          image: ArrowsSplit,
-          get: () => {
-            return new SeparateNode((n) => area.update("node", n.id));
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Join",
-        {
-          name: "Join",
-          type: "ARRANGE",
-          prefix: "x,y,z->vec",
-          image: ArrowsJoin,
-          get: () => {
-            return new JoinNode((n) => area.update("node", n.id));
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-    ]),
-  ],
-  [
-    "Maths",
-    new Map<string, UINode>([
-      [
-        "Add",
-        {
-          name: "Add",
-          type: "CALCULATE",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new MathOpNode("+", (node, control) => {
-              area.update("node", node.id);
-              area.update("control", control.id);
-            });
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Subtract",
-        {
-          name: "Subtract",
-          type: "CALCULATE",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new MathOpNode("-", (n, c) => {
-              area.update("node", n.id);
-              area.update("control", c.id);
-            });
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Multiply",
-        {
-          name: "Multiply",
-          type: "CALCULATE",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new MathOpNode("*", (node, control) => {
-              area.update("node", node.id);
-              area.update("control", control.id);
-            });
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Divide",
-        {
-          name: "Divide",
-          type: "CALCULATE",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new MathOpNode("/", (n, c) => {
-              area.update("node", n.id);
-              area.update("control", c.id);
-            });
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-    ]),
-  ],
-  [
-    "Constants",
-    new Map<string, UINode>([
-      [
-        "PI",
-        {
-          name: "PI",
-          type: "CONSTANT",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new VariableOutNode(0.0, "var PI = 3.14159265359;", "PI");
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "TWO PI",
-        {
-          name: "TWO PI",
-          type: "CONSTANT",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new VariableOutNode(
-              0.0,
-              "var TWO_PI = 3.14159265359 * 2.0;",
-              "TWO_PI"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "HALF PI",
-        {
-          name: "HALF PI",
-          type: "CONSTANT",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new VariableOutNode(
-              0.0,
-              "var HALF_PI = 3.14159265359 / 2.0;",
-              "HALF_PI"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Elapsed Time",
-        {
-          name: "Elapsed Time",
-          type: "CONSTANT",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new VariableOutNode(0.0, "", "time.elapsed");
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Delta Time",
-        {
-          name: "Delta Time",
-          type: "CONSTANT",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new VariableOutNode(0.0, "", "time.delta");
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Frame",
-        {
-          name: "Frame",
-          type: "CONSTANT",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new VariableOutNode(
-              0.0,
-              "var frame = f32(time.frame);",
-              "frame"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Instance ID",
-        {
-          name: "Instance ID",
-          type: "CONSTANT",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new VariableOutNode(
-              0.0,
-              "var instanceId = f32(instance_id);",
-              "instanceId"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-    ]),
-  ],
-]);
-
 const container = ref<HTMLElement | null>(null);
 
 onMounted(() => {
-  if (container.value === null) return;
-
   createEditor();
 });
 
-export type Nodes =
-  | NumberNode
-  | MathOpNode
-  | VectorNode
-  | SeparateNode
-  | JoinNode
-  | ConditionNode
-  | LogicScopeNode
-  | ReturnNode
-  | FunctionCallNode
-  | VariableOutNode
-  | VariableInNode
-  | InitializeNode
-  | NothingNode
-  | CustomFunctionNode
-  | CallCustomFunctionNode
-  | FunctionScopeNode
-  | ShapeNode
-  | MathFunctionNode;
-
-class Connection<
-  A extends Nodes,
-  B extends Nodes,
-> extends ClassicPreset.Connection<A, B> {}
-
-type Conns =
-  | Connection<NumberNode, MathOpNode>
-  | Connection<MathOpNode, MathOpNode>
-  | Connection<VectorNode, SeparateNode>
-  | Connection<SeparateNode, MathOpNode>
-  | Connection<SeparateNode, JoinNode>
-  | Connection<JoinNode, SeparateNode>
-  | Connection<NumberNode, JoinNode>
-  | Connection<ConditionNode, JoinNode>
-  | Connection<ConditionNode, NumberNode>
-  | Connection<ConditionNode, SeparateNode>
-  | Connection<ConditionNode, MathOpNode>
-  | Connection<ReturnNode, VectorNode>
-  | Connection<NumberNode, FunctionCallNode>
-  | Connection<InitializeNode, LogicScopeNode>;
-
-export type Schemes = GetSchemes<Nodes, Conns>;
+watch(container, (container) => {
+  container?.append(area.container);
+});
 
 const editor = new NodeEditor<Schemes>();
 const engine = new DataflowEngine<Schemes>();
@@ -729,8 +177,7 @@ async function newFunctionNode(area: AreaPlugin<Schemes, AreaExtra>) {
     (n) => area.update("node", n.id),
     (n) => editor.addNode(n),
     (n) => editor.removeNode(n.id),
-    (nA, kA, nB, kB) =>
-      editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB))
+    (nA, kA, nB, kB) => editor.addConnection(new Connection(nA, kA, nB, kB))
   );
   await editor.addNode(cfn);
   cfn.functionScope.retNode.parent = cfn.functionScope.id;
@@ -779,17 +226,11 @@ async function newConditionNode(
   return new NothingNode();
 }
 
-async function addNode(node: Nodes) {
-  await editor.addNode(node);
-}
-
 async function addNodeAtMousePosition(node: Nodes, x: number, y: number) {
   console.log("Adding", node, "at", x, ",", y);
   await editor.addNode(node);
   void area.translate(node.id, { x: x, y: y });
 }
-
-type AreaExtra = VueArea2D<Schemes> | ContextMenuExtra;
 
 const endNode = new ReturnNode("vec3f(input2.x, 0, input2.y)", "Output Vertex");
 const startNode = new VariableOutNode(vec2.create(1, 1), "", "input2");
@@ -863,13 +304,17 @@ async function checkForUnsafeConnections(
   await editor.addNode(new NothingNode());
 }
 
+let uiNodes: Map<string, Map<string, UINode>>;
+
+area = new AreaPlugin<Schemes, AreaExtra>(document.createElement("div"));
+AreaExtensions.selectableNodes(area, AreaExtensions.selector(), {
+  accumulating: AreaExtensions.accumulateOnCtrl(),
+});
+
+const nodes = useUiNodes(editor, area);
+uiNodes = nodes.uiNodes;
+
 async function createEditor() {
-  area = new AreaPlugin<Schemes, AreaExtra>(
-    container.value ?? new HTMLElement()
-  );
-  AreaExtensions.selectableNodes(area, AreaExtensions.selector(), {
-    accumulating: AreaExtensions.accumulateOnCtrl(),
-  });
   //AreaExtensions.snapGrid(area, {
   //  size: 20,
   //});
@@ -1300,8 +745,7 @@ async function replaceOrAddDeserialize(
       (n) => area.update("node", n.id),
       (n) => editor.addNode(n),
       (n) => editor.removeNode(n.id),
-      (nA, kA, nB, kB) =>
-        editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB)),
+      (nA, kA, nB, kB) => editor.addConnection(new Connection(nA, kA, nB, kB)),
       true
     );
     func.nControl.setValue(1);
@@ -1376,12 +820,6 @@ async function deserialize(json: string, parent?: string) {
   shouldUpdate = true;
   await editor.addNode(new NothingNode());
   // await rearrange();
-}
-
-async function loadingBar() {
-  while (loadingPercentage.value < 100) {
-    loadingPercentage.value += 1;
-  }
 }
 
 function serializedNodeToNode(
@@ -1608,14 +1046,6 @@ function addTemplate(name: string, json: string) {
           }
         "
       >
-        <n-space>
-          <n-progress
-            v-if="loadingPercentage < 0"
-            type="circle"
-            :percentage="loadingPercentage"
-            :status="loadingPercentage < 100 ? 'info' : 'success'"
-          ></n-progress>
-        </n-space>
         <n-button
           quaternary
           circle
