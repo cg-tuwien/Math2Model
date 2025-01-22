@@ -1,12 +1,9 @@
-import {
-  WaveSine,
-  WaveSawTool,
-  WaveSquare,
-  ArrowsSplit,
-  ArrowsJoin,
-  MathFunction,
-} from "@vicons/tabler"; // Replace @vicons with  ~icons/mdi https://icon-sets.iconify.design/mdi/
-// TODO: Also remove the vicons dependency (package.json)
+import WaveSine from "~icons/mdi/sine-wave";
+import WaveSawTool from "~icons/mdi/sawtooth-wave";
+import WaveSquare from "~icons/mdi/square-wave";
+import ArrowsSplit from "~icons/mdi/set-split";
+import MathFunction from "~icons/mdi/function-variant";
+import ArrowsJoin from "~icons/mdi/arrow-collapse-right";
 import { MathOpNode, NumberNode } from "./basic/math";
 import {
   FunctionCallNode,

@@ -74,9 +74,8 @@ export class CombineNode extends VPNode {
       this.addControl("cfactor", this.cfControl);
     }
 
-    if (this.update) this.update(this.id);
+    // if (this.update) this.update(this.id);
 
-    console.log(this.cfControl.value);
     return {
       value: {
         value: vec3.zero(),
