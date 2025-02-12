@@ -89,6 +89,7 @@ fn watch_shader(path: &str, output_name: &str) -> ShaderModule {
             derive_serde: false,
             matrix_vector_types: MatrixVectorTypes::Glam,
             rustfmt: false,
+            validate: None,
         },
     )
     .unwrap();

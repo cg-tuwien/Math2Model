@@ -16,15 +16,15 @@ futures-channel = "0.3.31"
 glam = { workspace = true }
 indexmap = { workspace = true }
 log = { workspace = true }
-notify-debouncer-full = { version = "0.4.0", optional = true }
+notify-debouncer-full = { version = "0.5.0", optional = true }
 reactive_graph = { workspace = true }
 uuid = { workspace = true }
-web-sys = { version = "0.3.74", optional = true, features = [
+web-sys = { version = "0.3.77", optional = true, features = [
     "HtmlCanvasElement",
 ] }
 web-time = "1.1.0"
 wgpu = { workspace = true }
-wgpu-profiler = "0.19.0"
+wgpu-profiler = "0.21.0"
 winit = { workspace = true }
 
 [dev-dependencies]
@@ -37,7 +37,7 @@ harness = false
 name = "gpu_bench"
 
 [build-dependencies]
-wgsl_to_wgpu = { version = "0.11.1" }
+wgsl_to_wgpu = { version = "0.13.0" }
 
 [features]
 default = []

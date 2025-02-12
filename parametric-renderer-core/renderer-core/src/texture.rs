@@ -30,7 +30,7 @@ impl Texture {
         };
         let texture = device.create_texture(&desc);
 
-        let copy_texture = wgpu::ImageCopyTexture {
+        let copy_texture = wgpu::TexelCopyTextureInfo {
             aspect: wgpu::TextureAspect::All,
             texture: &texture,
             mip_level: 0,
@@ -41,7 +41,7 @@ impl Texture {
             crate::game::TextureData::Bytes(data) => queue.write_texture(
                 copy_texture,
                 data,
-                wgpu::ImageDataLayout {
+                wgpu::TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(4 * size.width),
                     rows_per_image: Some(size.height),
