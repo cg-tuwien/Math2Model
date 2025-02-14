@@ -761,6 +761,7 @@ async function main() {
     commandEncoder: GPUCommandEncoder
   ) {
     //console.log(compiledShaders);
+    debugger;
     const compiledShader = compiledShaders.value.get(makeFilePath(shaderPath));
     if (!compiledShader) {
       console.error("Shader not found: ", shaderPath);

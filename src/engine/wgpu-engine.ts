@@ -36,6 +36,7 @@ export class WgpuEngine {
       this.engine.set_lod_stage();
     } else {
       this.engine.set_lod_stage((shaderPath: string, buffersIndex: number) => {
+
         if (renderEncoder === null) {
           console.error("renderEncoder is null");
         } else {
