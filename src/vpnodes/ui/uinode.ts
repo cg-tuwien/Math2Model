@@ -1,5 +1,5 @@
-import type { Nodes } from "@/components/visual-programming/CodeGraph.vue";
 import type { Component } from "vue";
+import type { Nodes } from "../nodes-list";
 
 export interface UINode {
   name: string;

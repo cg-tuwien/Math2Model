@@ -1,6 +1,18 @@
 <script setup lang="ts">
 const props = defineProps<{
-  data: any;
+  data: {
+    value: number;
+    step: number;
+    max: number;
+    min: number;
+    label: string;
+    updateValue: (v: number) => void;
+    change: (v?: number | null) => void;
+    showInput: boolean;
+    width?: number;
+    height?: number;
+  };
+  seed?: number;
 }>();
 
 // console.log(props.data.options);

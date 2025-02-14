@@ -19,16 +19,16 @@ import {
   typeOptions,
 } from "@/vpnodes/controls/dropdown-options";
 import { BlockNode } from "@/vpnodes/basic/logic";
-import type { Nodes } from "@/components/visual-programming/CodeGraph.vue";
 import { vec2, vec3, vec4 } from "webgpu-matrix";
 import { type SerializedNode } from "@/vpnodes/serialization/node";
+import type { Nodes } from "../nodes-list";
 
 export class FunctionScopeNode extends BlockNode {
   public retNode: ReturnNode = new ReturnNode(0);
   public paramNodes: VariableOutNode[] = [];
   constructor(
     private name: string,
-    private update?: (node: ClassicPreset.Node) => void,
+    private update?: (node: ClassicPreset.Node) => void
   ) {
     super(name);
 
@@ -94,9 +94,9 @@ export class CustomFunctionNode extends VPNode {
       nodeA: Nodes,
       keyA: string,
       nodeB: Nodes,
-      keyB: string,
+      keyB: string
     ) => void,
-    private addNodeSelf?: boolean,
+    private addNodeSelf?: boolean
   ) {
     super("Custom Function");
     this.label = "func" + idToVariableName(this.id);
@@ -122,7 +122,7 @@ export class CustomFunctionNode extends VPNode {
             if (this.hasControl("arg" + i.toString())) continue;
             this.addControl(
               this.paramControls[i].key,
-              this.paramControls[i].cont,
+              this.paramControls[i].cont
             );
             this.functionScope.paramNodes[i].parent = this.functionScope.id;
             if (this.addNode) this.addNode(this.functionScope.paramNodes[i]);
@@ -150,7 +150,7 @@ export class CustomFunctionNode extends VPNode {
       (s, l) => {
         this.functionScope.retNode.def = typeToValueCode(s);
         if (this.update) this.update(this);
-      },
+      }
     );
     this.addControl("name", this.nameControl);
     this.addControl("n", this.nControl);
@@ -164,7 +164,7 @@ export class CustomFunctionNode extends VPNode {
       this.addNode(this.functionScope);
       this.addConnection(this, "value", this.functionScope, "context");
       this.functionScope.retNode.def = typeToValueCode(
-        this.retControl.selected ?? "i32",
+        this.retControl.selected ?? "i32"
       );
     }
 
@@ -184,7 +184,7 @@ export class CustomFunctionNode extends VPNode {
                 return;
               }
             }
-          },
+          }
         ),
       });
 
@@ -295,7 +295,7 @@ export class CallCustomFunctionNode extends VPNode {
 
     for (let i = 0; i < 9; i++) {
       this.argInputs.push(
-        new ClassicPreset.Input(reteSocket, "arg" + i.toString()),
+        new ClassicPreset.Input(reteSocket, "arg" + i.toString())
       );
     }
 
@@ -304,7 +304,7 @@ export class CallCustomFunctionNode extends VPNode {
       undefined,
       "Select custom function",
       "Function to call",
-      (select) => this.updateInputs(select),
+      (select) => this.updateInputs(select)
     );
 
     subscribe((change) => {
@@ -315,7 +315,7 @@ export class CallCustomFunctionNode extends VPNode {
     this.addControl("func", this.funcControl);
     this.addOutput(
       "value",
-      new ClassicPreset.Output(reteSocket, "Function return"),
+      new ClassicPreset.Output(reteSocket, "Function return")
     );
     this.updateInputs(this.funcControl.selected ?? "");
   }
@@ -370,7 +370,7 @@ export class CallCustomFunctionNode extends VPNode {
           result.value.code += arg[0].refId ?? arg[0].value;
         } else {
           result.value.code += typeToValueCode(
-            func.paramControls[i].cont.selected ?? "i32",
+            func.paramControls[i].cont.selected ?? "i32"
           );
         }
 
@@ -409,7 +409,7 @@ export function typeToValueCode(
   valueX?: number,
   valueY?: number,
   valueZ?: number,
-  valueW?: number,
+  valueW?: number
 ): string {
   switch (type) {
     case "i32":
@@ -432,7 +432,7 @@ export function typeToValue(
   valueX?: number,
   valueY?: number,
   valueZ?: number,
-  valueW?: number,
+  valueW?: number
 ) {
   switch (type) {
     case "i32":
@@ -448,7 +448,7 @@ export function typeToValue(
         valueX ?? 0.0,
         valueY ?? 0.0,
         valueZ ?? 0.0,
-        valueW ?? 0.0,
+        valueW ?? 0.0
       );
     default:
       return undefined;

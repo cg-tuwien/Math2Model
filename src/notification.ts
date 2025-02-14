@@ -26,7 +26,7 @@ export function showError(
   console.trace(msg, opts.error);
   Notification.error({
     title: opts.title ?? "Error",
-    content: msg,
+    content: msg.toString(),
   });
 }
 

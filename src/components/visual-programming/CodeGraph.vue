@@ -1,18 +1,13 @@
 <script setup lang="ts">
 import { AreaExtensions, AreaPlugin } from "rete-area-plugin";
-import {
-  Presets as VuePresets,
-  type VueArea2D,
-  VuePlugin,
-} from "rete-vue-plugin";
-import { ClassicPreset, type GetSchemes, NodeEditor } from "rete";
+import { Presets as VuePresets, VuePlugin } from "rete-vue-plugin";
+import { ClassicPreset, NodeEditor } from "rete";
 import { computed, type DeepReadonly, onMounted, ref, watch } from "vue";
 import {
   ConnectionPlugin,
   Presets as ConnectionPresets,
 } from "rete-connection-plugin";
 import {
-  type ContextMenuExtra,
   ContextMenuPlugin,
   Presets as ContextMenuPresets,
 } from "rete-context-menu-plugin";
@@ -53,7 +48,7 @@ import {
   type ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
-import { showError, showInfo } from "@/notification";
+import { showError } from "@/notification";
 import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
 import HeartWGSL from "@/../parametric-renderer-core/graphs/Heart.graph.wgsl?raw";
 import SphereWGSL from "@/../parametric-renderer-core/graphs/Sphere.graph.wgsl?raw";
@@ -65,7 +60,6 @@ import {
   Presets as HistoryPresets,
 } from "rete-history-plugin";
 import {
-  newCylinderShape,
   newHeartShape,
   newPlaneShape,
   newSphereShape,
@@ -76,26 +70,20 @@ import NodesDock from "@/components/visual-programming/NodesDock.vue";
 import type { UINode } from "@/vpnodes/ui/uinode";
 import { SliderControl } from "@/vpnodes/controls/slider";
 import SliderComponent from "@/vpnodes/components/SliderComponent.vue";
-import Heart24Regular from "~icons/mdi/cards-heart-outline";
-import Circle24Regular from "~icons/mdi/circle-outline";
-import RectangleLandscape24Regular from "~icons/mdi/rectangle-outline";
-import {
-  WaveSawTool,
-  WaveSine,
-  MathFunction,
-  WaveSquare,
-  ArrowsSplit,
-  ArrowsJoin,
-  Code,
-} from "@vicons/tabler";
-import JoinFullRound from "~icons/mdi/full-outer-join";
-import CategoryOutlined from "~icons/mdi/category-outline";
-import Scale from "~icons/mdi/resize";
+import Code from "~icons/mdi/code";
 import ReturnNodeStyle from "@/components/visual-programming/CustomNodeStyles/ReturnNodeStyle.vue";
 import VariableOutNodeStyle from "@/components/visual-programming/CustomNodeStyles/VariableOutNodeStyle.vue";
 import DefaultNodeStyle from "@/components/visual-programming/CustomNodeStyles/DefaultNodeStyle.vue";
 import SocketStyle from "@/components/visual-programming/CustomNodeStyles/SocketStyle.vue";
 import ConnectionStyle from "@/components/visual-programming/CustomNodeStyles/ConnectionStyle.vue";
+import {
+  Connection,
+  useUiNodes,
+  type AreaExtra,
+  type Conns,
+  type Nodes,
+  type Schemes,
+} from "@/vpnodes/nodes-list";
 
 const emit = defineEmits<{
   update: [content: string];
@@ -138,578 +126,43 @@ const graphsDropdown = computed<SelectMixedOption[]>(() => {
     );
 });
 
-const loadingPercentage = ref(0);
-
-function createUINode(uiNode: UINode) {
-  addNode(uiNode.get());
-}
-
-const uiNodes: Map<string, Map<string, UINode>> = new Map([
-  [
-    "Shapes",
-    new Map<string, UINode>([
-      [
-        "Heart",
-        {
-          name: "Heart",
-          type: "SHAPE",
-          prefix: "parametric",
-          image: Heart24Regular,
-          get: () => {
-            //addNode(n);
-            return newHeartShape();
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Sphere",
-        {
-          name: "Sphere",
-          type: "SHAPE",
-          prefix: "parametric",
-          image: Circle24Regular,
-          get: () => {
-            //addNode(n);
-            return newSphereShape();
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Plane",
-        {
-          name: "Plane",
-          type: "SHAPE",
-          prefix: "parametric",
-          image: RectangleLandscape24Regular,
-          get: () => {
-            //addNode(n);
-            return newPlaneShape();
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Cylinder",
-        {
-          name: "Cylinder",
-          type: "SHAPE",
-          prefix: "parametric",
-          image: CategoryOutlined,
-          get: () => {
-            return newCylinderShape();
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-    ]),
-  ],
-  [
-    "Apply",
-    new Map<string, UINode>([
-      [
-        "Combine",
-        {
-          name: "Combine",
-          type: "APPLY",
-          prefix: "",
-          image: JoinFullRound,
-          get: () => {
-            //addNode(n);
-            return new CombineNode(
-              (id: string) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => area.update("control", c.id)
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Scale",
-        {
-          name: "Scale",
-          type: "APPLY",
-          prefix: "",
-          image: Scale,
-          get: () => {
-            return new MathFunctionNode(
-              "Scale",
-              "mat3x3(vec3f({scale x,1,100,-100,0.1,f32},0.0,0.0), vec3f(0.0,{scale y,1,100,-100,0.1,f32},0.0), vec3f(0.0,0.0,{scale z,1,100,-100,0.1,f32})) * input2",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "vec3f",
-              "vec3f"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Sine",
-        {
-          name: "Sine",
-          type: "APPLY",
-          prefix: "",
-          image: WaveSine,
-          get: () => {
-            return new MathFunctionNode(
-              "Sine",
-              "sin({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Cosine",
-        {
-          name: "Cosine",
-          type: "APPLY",
-          prefix: "",
-          image: WaveSine,
-          get: () => {
-            return new MathFunctionNode(
-              "Cosine",
-              "cos({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Sawtooth",
-        {
-          name: "Sawtooth",
-          type: "APPLY",
-          prefix: "",
-          image: WaveSawTool,
-          get: () => {
-            return new MathFunctionNode(
-              "Sawtooth",
-              "(({sawtooth count,0,10,-10,0.1,f32} * input2) - floor({sawtooth count,0,10,-10,0.1,f32} * input2))",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "POW",
-        {
-          name: "POW",
-          type: "APPLY",
-          prefix: "",
-          image: WaveSine,
-          get: () => {
-            return new MathFunctionNode(
-              "Pow",
-              "pow(input2, {x1,0,10,-10,0.1,same})",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Square",
-        {
-          name: "Square",
-          type: "APPLY",
-          prefix: "",
-          image: WaveSquare,
-          get: () => {
-            return new MathFunctionNode(
-              "Square",
-              "sign(sin(input2*{frequency,1,10,-10,0.1,f32}))",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Step",
-        {
-          name: "Step",
-          type: "APPLY",
-          prefix: "",
-          image: WaveSquare,
-          get: () => {
-            return new MathFunctionNode(
-              "Step",
-              "step({edge,1,10,-10,1,same}, input2)",
-              (id) => {
-                area.update("node", id);
-                editor.addNode(new NothingNode());
-              },
-              (c) => {
-                area.update("control", c.id);
-              },
-              false,
-              "any",
-              "any"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-    ]),
-  ],
-  [
-    "Parameters",
-    new Map<string, UINode>([
-      [
-        "Split",
-        {
-          name: "Split",
-          type: "ARRANGE",
-          prefix: "vec->x,y,z",
-          image: ArrowsSplit,
-          get: () => {
-            return new SeparateNode((n) => area.update("node", n.id));
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Join",
-        {
-          name: "Join",
-          type: "ARRANGE",
-          prefix: "x,y,z->vec",
-          image: ArrowsJoin,
-          get: () => {
-            return new JoinNode((n) => area.update("node", n.id));
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-    ]),
-  ],
-  [
-    "Maths",
-    new Map<string, UINode>([
-      [
-        "Add",
-        {
-          name: "Add",
-          type: "CALCULATE",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new MathOpNode("+", (node, control) => {
-              area.update("node", node.id);
-              area.update("control", control.id);
-            });
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Subtract",
-        {
-          name: "Subtract",
-          type: "CALCULATE",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new MathOpNode("-", (n, c) => {
-              area.update("node", n.id);
-              area.update("control", c.id);
-            });
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Multiply",
-        {
-          name: "Multiply",
-          type: "CALCULATE",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new MathOpNode("*", (node, control) => {
-              area.update("node", node.id);
-              area.update("control", control.id);
-            });
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Divide",
-        {
-          name: "Divide",
-          type: "CALCULATE",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new MathOpNode("/", (n, c) => {
-              area.update("node", n.id);
-              area.update("control", c.id);
-            });
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-    ]),
-  ],
-  [
-    "Constants",
-    new Map<string, UINode>([
-      [
-        "PI",
-        {
-          name: "PI",
-          type: "CONSTANT",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new VariableOutNode(0.0, "var PI = 3.14159265359;", "PI");
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "TWO PI",
-        {
-          name: "TWO PI",
-          type: "CONSTANT",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new VariableOutNode(
-              0.0,
-              "var TWO_PI = 3.14159265359 * 2.0;",
-              "TWO_PI"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "HALF PI",
-        {
-          name: "HALF PI",
-          type: "CONSTANT",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new VariableOutNode(
-              0.0,
-              "var HALF_PI = 3.14159265359 / 2.0;",
-              "HALF_PI"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Elapsed Time",
-        {
-          name: "Elapsed Time",
-          type: "CONSTANT",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new VariableOutNode(0.0, "", "time.elapsed");
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Delta Time",
-        {
-          name: "Delta Time",
-          type: "CONSTANT",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new VariableOutNode(0.0, "", "time.delta");
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Frame",
-        {
-          name: "Frame",
-          type: "CONSTANT",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new VariableOutNode(
-              0.0,
-              "var frame = f32(time.frame);",
-              "frame"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-      [
-        "Instance ID",
-        {
-          name: "Instance ID",
-          type: "CONSTANT",
-          prefix: "",
-          image: MathFunction,
-          get: () => {
-            return new VariableOutNode(
-              0.0,
-              "var instanceId = f32(instance_id);",
-              "instanceId"
-            );
-          },
-          create: createUINode,
-          draggable: true,
-        },
-      ],
-    ]),
-  ],
-]);
-
 const container = ref<HTMLElement | null>(null);
-
-onMounted(() => {
-  if (container.value === null) return;
-
-  createEditor();
-});
-
-export type Nodes =
-  | NumberNode
-  | MathOpNode
-  | VectorNode
-  | SeparateNode
-  | JoinNode
-  | ConditionNode
-  | LogicScopeNode
-  | ReturnNode
-  | FunctionCallNode
-  | VariableOutNode
-  | VariableInNode
-  | InitializeNode
-  | NothingNode
-  | CustomFunctionNode
-  | CallCustomFunctionNode
-  | FunctionScopeNode
-  | ShapeNode
-  | MathFunctionNode;
-
-class Connection<
-  A extends Nodes,
-  B extends Nodes,
-> extends ClassicPreset.Connection<A, B> {}
-
-type Conns =
-  | Connection<NumberNode, MathOpNode>
-  | Connection<MathOpNode, MathOpNode>
-  | Connection<VectorNode, SeparateNode>
-  | Connection<SeparateNode, MathOpNode>
-  | Connection<SeparateNode, JoinNode>
-  | Connection<JoinNode, SeparateNode>
-  | Connection<NumberNode, JoinNode>
-  | Connection<ConditionNode, JoinNode>
-  | Connection<ConditionNode, NumberNode>
-  | Connection<ConditionNode, SeparateNode>
-  | Connection<ConditionNode, MathOpNode>
-  | Connection<ReturnNode, VectorNode>
-  | Connection<NumberNode, FunctionCallNode>
-  | Connection<InitializeNode, LogicScopeNode>;
-
-export type Schemes = GetSchemes<Nodes, Conns>;
 
 const editor = new NodeEditor<Schemes>();
 const engine = new DataflowEngine<Schemes>();
 const arrange = new AutoArrangePlugin<Schemes>();
+const area: AreaPlugin<Schemes, AreaExtra> = new AreaPlugin<Schemes, AreaExtra>(
+  document.createElement("div")
+);
+area.container.classList.add("flex-1");
+const scopes = new ScopesPlugin<Schemes>();
+const history = new HistoryPlugin<Schemes, HistoryActions<Schemes>>();
+const applier = new ArrangeAppliers.TransitionApplier<Schemes, never>({
+  duration: 100,
+  timingFunction: (t) => t,
+  async onTick() {
+    // called on every frame update
+  },
+});
 
+AreaExtensions.selectableNodes(area, AreaExtensions.selector(), {
+  accumulating: AreaExtensions.accumulateOnCtrl(),
+});
+
+const nodes = useUiNodes(editor, area);
+let uiNodes: Map<string, Map<string, UINode>> = nodes.uiNodes;
 let shouldUpdate = true;
 
 let loading = ref<boolean>(false);
 let loadName = ref<string>("no file selected");
+
+watch(container, (container) => {
+  container?.append(area.container);
+});
+
+onMounted(() => {
+  createEditor();
+});
 
 watch(
   () => props.keyedGraph?.id,
@@ -729,8 +182,7 @@ async function newFunctionNode(area: AreaPlugin<Schemes, AreaExtra>) {
     (n) => area.update("node", n.id),
     (n) => editor.addNode(n),
     (n) => editor.removeNode(n.id),
-    (nA, kA, nB, kB) =>
-      editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB))
+    (nA, kA, nB, kB) => editor.addConnection(new Connection(nA, kA, nB, kB))
   );
   await editor.addNode(cfn);
   cfn.functionScope.retNode.parent = cfn.functionScope.id;
@@ -779,35 +231,11 @@ async function newConditionNode(
   return new NothingNode();
 }
 
-async function addNode(node: Nodes) {
-  await editor.addNode(node);
-}
-
 async function addNodeAtMousePosition(node: Nodes, x: number, y: number) {
   console.log("Adding", node, "at", x, ",", y);
   await editor.addNode(node);
   void area.translate(node.id, { x: x, y: y });
 }
-
-type AreaExtra = VueArea2D<Schemes> | ContextMenuExtra;
-
-const endNode = new ReturnNode("vec3f(input2.x, 0, input2.y)", "Output Vertex");
-const startNode = new VariableOutNode(vec2.create(1, 1), "", "input2");
-const piNode = new VariableOutNode(
-  3.14159265359,
-  "var PI = 3.14159265359;",
-  "PI"
-);
-const halfPiNode = new VariableOutNode(
-  3.14159265359 / 2,
-  "var HALF_PI = 3.14159265359 / 2.0;",
-  "HALF_PI"
-);
-const twoPiNode = new VariableOutNode(
-  3.14159265359 * 2,
-  "var TWO_PI = 3.14159265359 * 2.0;",
-  "TWO_PI"
-);
 
 async function rearrange() {
   await arrange.layout({ applier });
@@ -815,21 +243,9 @@ async function rearrange() {
   return new NothingNode();
 }
 
-let area: AreaPlugin<Schemes, AreaExtra>;
-const scopes = new ScopesPlugin<Schemes>();
-const history = new HistoryPlugin<Schemes, HistoryActions<Schemes>>();
-const applier = new ArrangeAppliers.TransitionApplier<Schemes, never>({
-  duration: 100,
-  timingFunction: (t) => t,
-  async onTick() {
-    // called on every frame update
-  },
-});
-
 async function checkForUnsafeConnections(
   connection: ClassicPreset.Connection<Nodes, Nodes>
 ) {
-  console.log("Called checkForUnsafeConnection()");
   const start = connection.source;
   const end = connection.target;
   let removeFlag = false;
@@ -856,92 +272,25 @@ async function checkForUnsafeConnections(
 
   if (removeFlag) {
     await editor.removeConnection(connection.id);
-    showInfo("This connection is not allowed, since it would create a cycle!");
+    showError(
+      "This connection is not allowed, since it would create a cycle!",
+      { title: "Invalid Connection" }
+    );
     return;
   }
 
   await editor.addNode(new NothingNode());
 }
 
-async function createEditor() {
-  area = new AreaPlugin<Schemes, AreaExtra>(
-    container.value ?? new HTMLElement()
-  );
-  AreaExtensions.selectableNodes(area, AreaExtensions.selector(), {
-    accumulating: AreaExtensions.accumulateOnCtrl(),
-  });
-  //AreaExtensions.snapGrid(area, {
-  //  size: 20,
-  //});
+const endNode = new ReturnNode("vec3f(input2.x, 0, input2.y)", "Output Vertex");
 
+async function createEditor() {
   const contextMenu = new ContextMenuPlugin<Schemes>({
     items: ContextMenuPresets.classic.setup([
       ["Rearrange", () => rearrange()],
       ["Initialize", () => new InitializeNode()],
       [
-        "Math",
-        [
-          ["Number", () => new NumberNode()],
-          [
-            "Add",
-            () => new MathOpNode("+", (c) => area.update("control", c.id)),
-          ],
-          [
-            "Subtract",
-            () => new MathOpNode("-", (c) => area.update("control", c.id)),
-          ],
-          [
-            "Multiply",
-            () => new MathOpNode("*", (c) => area.update("control", c.id)),
-          ],
-          [
-            "Divide",
-            () => new MathOpNode("/", (c) => area.update("control", c.id)),
-          ],
-          [
-            "Modulo",
-            () => new MathOpNode("%", (c) => area.update("control", c.id)),
-          ],
-        ],
-      ],
-      [
-        "Vectors",
-        [
-          [
-            "Vector2",
-            () => new VectorNode(2, (c) => area.update("control", c.id)),
-          ],
-          [
-            "Vector3",
-            () => new VectorNode(3, (c) => area.update("control", c.id)),
-          ],
-          [
-            "Vector4",
-            () => new VectorNode(4, (c) => area.update("control", c.id)),
-          ],
-          [
-            "Separate",
-            () => new SeparateNode((c) => area.update("control", c.id)),
-          ],
-          ["Join", () => new JoinNode((n) => area.update("node", n.id))],
-        ],
-      ],
-      [
-        "Functions",
-        [
-          ["Sin", () => new FunctionCallNode("sin", 1)],
-          ["Cos", () => new FunctionCallNode("cos", 1)],
-          ["Tan", () => new FunctionCallNode("tan", 1)],
-          ["Sqrt", () => new FunctionCallNode("sqrt", 1)],
-          ["Abs", () => new FunctionCallNode("abs", 1)],
-          ["Exp", () => new FunctionCallNode("exp", 1)],
-          ["Round", () => new FunctionCallNode("round", 1)],
-          ["Pow", () => new FunctionCallNode("pow", 2)],
-          ["Mix", () => new FunctionCallNode("mix", 3)],
-        ],
-      ],
-      [
-        "Logic",
+        "Advanced",
         [
           ["Equals", () => newConditionNode("True", "False", area, "==")],
           ["Not Equals", () => newConditionNode("True", "False", area, "!=")],
@@ -949,19 +298,6 @@ async function createEditor() {
           ["Le", () => newConditionNode("True", "False", area, "<=")],
           ["Gt", () => newConditionNode("True", "False", area, ">")],
           ["Ge", () => newConditionNode("True", "False", area, ">=")],
-        ],
-      ],
-      [
-        "Templates",
-        [
-          ["Heart", () => newHeartShape()],
-          ["Plane", () => newPlaneShape()],
-          ["Sphere", () => newSphereShape()],
-        ],
-      ],
-      [
-        "Custom",
-        [
           ["New Function", () => newFunctionNode(area)],
           [
             "Call Custom Function",
@@ -974,8 +310,6 @@ async function createEditor() {
 
   arrange.addPreset(ArrangePresets.classic.setup());
   history.addPreset(HistoryPresets.classic.setup());
-
-  // HistoryExtensions.keyboard(history);
 
   document.addEventListener("keydown", (e) => {
     if (!e.ctrlKey && !e.metaKey) return;
@@ -1004,6 +338,7 @@ async function createEditor() {
 
   const render = new VuePlugin<Schemes, AreaExtra>();
 
+  // Setup custom Components for Nodes, Connections and Sockets
   render.addPreset(
     VuePresets.classic.setup({
       customize: {
@@ -1027,15 +362,16 @@ async function createEditor() {
           }
           return DefaultNodeStyle;
         },
-        socket(context) {
+        socket() {
           return SocketStyle;
         },
-        connection(context) {
+        connection() {
           return ConnectionStyle;
         },
       },
     })
   );
+
   render.addPreset(VuePresets.contextMenu.setup());
   scopes.addPreset(ScopesPresets.classic.setup());
 
@@ -1047,15 +383,10 @@ async function createEditor() {
   area.use(arrange);
   area.use(history);
 
-  //console.log("loading graph", props.keyedGraph?.id);
   await deserialize(props.keyedGraph?.code ?? "");
-  //await editor.addConnection(
-  //  new ClassicPreset.Connection(startNode, "out", endNode, "returnIn"),
-  //);
   await arrange.layout({ applier });
 
   editor.addPipe((context) => {
-    //console.log("should update", context.type, shouldUpdate);
     if (context.type === "connectioncreated") {
       if (shouldUpdate) {
         checkForUnsafeConnections(
@@ -1081,9 +412,9 @@ async function createEditor() {
 }
 
 function update() {
-  engine.reset();
   if (!shouldUpdate) return;
-  // arrange.layout();
+  engine.reset();
+
   editor
     .getNodes()
     .filter(
@@ -1113,9 +444,9 @@ async function getNodesCode(
     fullCode += nodeData.z.code !== "" ? indent + nodeData.z.code + "\n" : "";
     fullCode += nodeData.w.code !== "" ? indent + nodeData.w.code + "\n" : "";
   } else if (node instanceof ConditionNode) {
+    // TODO Decide if ConditionNodes are to be removed
     let trueCode = "";
     let falseCode = "";
-    // fullCode += "\t" + nodeData.true.code + "\n";
 
     const blockContent = graph.outgoers(node.id).nodes();
     for (let content of blockContent) {
@@ -1194,7 +525,7 @@ async function getScopeCode(
 ) {
   if (scopeChildren.length <= 0) return;
 
-  return orderedCode(scopeChildren, visited, prevIndent + "\t");
+  return await orderedCode(scopeChildren, visited, prevIndent + "\t");
 }
 
 async function logCode() {
@@ -1210,6 +541,12 @@ async function logCode() {
   if (allNodes.length <= 0) return;
 
   let visited: string[] = [];
+  /**
+   * Order of code assembling
+   *  1. Write all custom function blocks outside of main (sampleObject) method
+   *  2. Write template functions (Heart, Sphere, Plane, Cylinder) outside of main method
+   *  3. Write code into main method in correct order (e.g. all needed variables for a line are declared before that line)
+   */
   let fullCode =
     (await orderedCode(customFunctionNodes, visited)) +
     "\n" +
@@ -1223,7 +560,6 @@ async function logCode() {
     "\n\nfn sampleObject(input2: vec2f) -> vec3f {\n" +
     (await orderedCode(allNodes, visited, "\t"));
 
-  // fullCode += (await getNodesCode(endNode, [], graph, "\t")) + "}";
   fullCode += "\n}";
   console.log(fullCode);
   emit("update", fullCode);
@@ -1248,6 +584,7 @@ async function orderedCode(
       continue;
     }
     const incomers = graph.incomers(node.id).nodes();
+    // Check if any incomers of current node weren't visited yet and ignore this node for now if so
     if (
       incomers.some((inc) => !visited.includes(inc.id)) ||
       (node instanceof ReturnNode && nodeQueue.length > 0)
@@ -1295,13 +632,13 @@ async function replaceOrAddDeserialize(
     await editor.clear();
     await deserialize(json);
   } else {
+    // TODO this is currently unused. Logic for loading another code graph into this one as a custom callable function
     shouldUpdate = false;
     const func = new CustomFunctionNode(
       (n) => area.update("node", n.id),
       (n) => editor.addNode(n),
       (n) => editor.removeNode(n.id),
-      (nA, kA, nB, kB) =>
-        editor.addConnection(new ClassicPreset.Connection(nA, kA, nB, kB)),
+      (nA, kA, nB, kB) => editor.addConnection(new Connection(nA, kA, nB, kB)),
       true
     );
     func.nControl.setValue(1);
@@ -1378,12 +715,6 @@ async function deserialize(json: string, parent?: string) {
   // await rearrange();
 }
 
-async function loadingBar() {
-  while (loadingPercentage.value < 100) {
-    loadingPercentage.value += 1;
-  }
-}
-
 function serializedNodeToNode(
   sn: SerializedNode,
   idMap: Map<string, string>
@@ -1394,7 +725,7 @@ function serializedNodeToNode(
       node = new NumberNode((n) => area.update("node", n.id));
       break;
     case "Math":
-      node = new MathOpNode("+", (n, c) => area.update("node", n.id));
+      node = new MathOpNode("+", (n) => area.update("node", n.id));
       break;
     case "Vector":
       node = new VectorNode(4, (n) => area.update("node", n.id));
@@ -1479,10 +810,6 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
     )
     .catch((reason) => showError("Could not load graph " + filePath, reason));
 }
-
-function addTemplate(name: string, json: string) {
-  replaceOrAddDeserialize(name, json, true);
-}
 </script>
 
 <template>
@@ -1545,7 +872,7 @@ function addTemplate(name: string, json: string) {
         style="width: 25%"
       ></NodesDock>
       <div
-        class="rete flex-1"
+        class="flex flex-1"
         ref="container"
         v-on:dragover="
           (ev) => {
@@ -1608,14 +935,6 @@ function addTemplate(name: string, json: string) {
           }
         "
       >
-        <n-space>
-          <n-progress
-            v-if="loadingPercentage < 0"
-            type="circle"
-            :percentage="loadingPercentage"
-            :status="loadingPercentage < 100 ? 'info' : 'success'"
-          ></n-progress>
-        </n-space>
         <n-button
           quaternary
           circle
@@ -1624,7 +943,7 @@ function addTemplate(name: string, json: string) {
           v-on:click="emit('code')"
         >
           <template #icon>
-            <n-icon :component="Code"></n-icon>
+            <n-icon :component="Code" size="32px"></n-icon>
           </template>
         </n-button>
       </div>

@@ -6,9 +6,6 @@
 
 <script lang="ts" setup>
 const props = defineProps<{
-  data: any;
-  start?: string;
-  end?: string;
   path: string;
 }>();
 </script>

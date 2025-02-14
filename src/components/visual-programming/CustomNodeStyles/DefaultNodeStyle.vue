@@ -76,7 +76,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineComponent, type DeepReadonly } from "vue";
 import { Ref } from "rete-vue-plugin";
 
 function sortByIndex(entries: any) {

@@ -6,13 +6,13 @@ import {
   VariableInNode,
   VariableOutNode,
 } from "@/vpnodes/basic/nodes";
-import { type Nodes } from "@/components/visual-programming/CodeGraph.vue";
 import { type SerializedNode } from "@/vpnodes/serialization/node";
+import type { Nodes } from "../nodes-list";
 
 function applyLogic(
   left: any,
   right: any,
-  op: "==" | "!=" | ">" | "<" | ">=" | "<=",
+  op: "==" | "!=" | ">" | "<" | ">=" | "<="
 ): boolean {
   switch (op) {
     case "==":
@@ -39,19 +39,19 @@ export class LogicScopeNode extends BlockNode {
     private name: string,
     private update?: (node: ClassicPreset.Node) => void,
     private addNode?: (node: Nodes) => void,
-    private removeNode?: (node: Nodes) => void,
+    private removeNode?: (node: Nodes) => void
   ) {
     super(name);
 
     this.addInput("context", new ClassicPreset.Input(reteSocket, "Context"));
     this.addInput(
       "reference",
-      new ClassicPreset.Input(reteSocket, "Outside Variable"),
+      new ClassicPreset.Input(reteSocket, "Outside Variable")
     );
 
     this.addOutput(
       "value",
-      new ClassicPreset.Output(reteSocket, "Outside Variable Result"),
+      new ClassicPreset.Output(reteSocket, "Outside Variable Result")
     );
 
     this.varOutNode.parent = this.id;
@@ -130,7 +130,7 @@ export class LogicScopeNode extends BlockNode {
 export class ConditionNode extends VPNode {
   constructor(
     private name: string,
-    private operator: "==" | "!=" | ">" | "<" | ">=" | "<=",
+    private operator: "==" | "!=" | ">" | "<" | ">=" | "<="
   ) {
     super(name);
 
@@ -154,15 +154,15 @@ export class ConditionNode extends VPNode {
         value: applyLogic(
           left ? left[0].value : 0,
           right ? right[0].value : 0,
-          this.operator,
+          this.operator
         ),
-        code: `if(${left ? left[0].refId ?? left[0].value : 0} ${this.operator} ${right ? right[0].refId ?? right[0].value : 0}) {`,
+        code: `if(${left ? (left[0].refId ?? left[0].value) : 0} ${this.operator} ${right ? (right[0].refId ?? right[0].value) : 0}) {`,
       },
       false: {
         value: applyLogic(
           left ? left[0].value : 0,
           right ? right[0].value : 0,
-          this.operator,
+          this.operator
         ),
         code: `else {`,
       },

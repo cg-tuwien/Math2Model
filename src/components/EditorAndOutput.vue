@@ -460,7 +460,6 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
               </CodeEditor>
               <CodeGraph
                 v-if="openFile.editorType.value === 'graph'"
-                class="self-stretch overflow-hidden flex-1"
                 :fs="props.fs"
                 :keyedGraph="openFile.code.value"
                 @update="
