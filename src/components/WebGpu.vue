@@ -90,47 +90,10 @@ function save( blob: Blob, filename: string ) {
   URL.revokeObjectURL(blobUrl);
 }
 
-function exportMesh(vertexStream: Float32Array) {
-  const uintArray = new Uint32Array(vertexStream.buffer);
-
-  let capacity = uintArray[1];
-
-  alert("Capacity: " + capacity);
-  let slicedStream = vertexStream.slice(4);
-  let index = 0;
-  let arrayVertices = [];
-  while (index < slicedStream.length)
-  {
-    let section = slicedStream.slice(index,index+3);
-    let section2 = slicedStream.slice(index+4,index+6);
-    if(section[0] == 0 && section[1] == 0 && section[2] == 0)
-    {
-      let endofdata = true;
-      for(let x = 0; x < 10; x++)
-      {
-        if(slicedStream[index+x] != 0)
-        {
-          endofdata = false;
-        }
-      }
-      if(endofdata)
-      {
-        break;
-      }
-    }
-    arrayVertices.push({
-      vert: new THREE.Vector3(section[0],section[1],section[2]),
-      uv: new THREE.Vector2(section2[0],section2[1])
-    });
 
 
-    //console.log("Slice: " + section + " Slice 2: " + section2);
-    index+=8;
-  }
-  exportArrayVertsStructureFromPatches(arrayVertices); // This doesnt work anymore
-}
 
-function exportArrayVertsStructureFromPatches(arrayVertices: any)
+function exportMeshEarClipping(arrayVertices: any)
 {
   let vertices = new Float32Array(arrayVertices.length*3);
   let inds = new Uint32Array(arrayVertices.length*6);
@@ -143,97 +106,143 @@ function exportArrayVertsStructureFromPatches(arrayVertices: any)
   let output_uv_toggle: boolean = false;
   // Remap vertices into tris
   let arrayVertices2 = new Array();
-  debugger;
   let map_verts = new Map();
+  
+  // Prebake 
+  
+  
+  let edgeInformation = analyzeEdges(arrayVertices); 
+  // console.log("EDGE INFO: ");
+  // console.log(edgeInformation);
+  let outvertices = [];
+  let outtriangles = [];
+  let vertoffset = 0;
   console.log("AVLENGTH: " + arrayVertices.length);
+
+  console.log("Unity stuff: ");
+  console.log(JSON.stringify(arrayVertices));
+  console.log(JSON.stringify(edgeInformation));
   for (const patch of arrayVertices) {
-    arrayVertices2.push(patch[0]);
-    arrayVertices2.push(patch[1]);
-    arrayVertices2.push(patch[2]);
-    arrayVertices2.push(patch[3]);
-    /*arrayVertices2.push(patch[0]);
-    arrayVertices2.push(patch[2]);
-    arrayVertices2.push(patch[3]);
-  */  }
-
-  for(const vert of arrayVertices2)
-  {
-    debugger;
-    let v = vert.vert;
-    let uv = vert.uv;
-    debugger;
-    let v_str: string = (v.toArray()+"");
-    let uv_str: string = (uv.toArray()+"");
+    let v1 = patch[0], v2 = patch[1], v3 = patch[2], v4 = patch[3];
+    const upper: number = v2.uv.y;
+    const lower: number = v1.uv.y;
+    const left : number= v1.uv.x;
+    const right: number = v3.uv.x;
     
-    if(map_verts.has(uv_str))
+    let leftEdge = new Array();
+    let rightEdge = new Array();
+    let bottomEdge = new Array();
+    let topEdge = new Array();
+
+    v1 = {side: 3, vert: v1};
+    v2 = {side: 0, vert: v2};
+    v3 = {side: 1, vert: v3};
+    v4 = {side: 2, vert: v4};
+    
+    leftEdge.push(v1);
+    topEdge.push(v2);
+    rightEdge.push(v3);
+    bottomEdge.push(v4);
+    //debugger;
+    
+    
+    let leftEdgeInfo = edgeInformation.vertical.right[left];
+    let rightEdgeInfo = edgeInformation.vertical.left[right];
+    let upperEdgeInfo = edgeInformation.horizontal.bottom[upper];
+    let lowerEdgeInfo = edgeInformation.horizontal.top[lower];
+    
+    
+    processEdges(leftEdgeInfo,lower,upper,leftEdge,arrayVertices,0);
+    
+    processEdges2(rightEdgeInfo,lower,upper,rightEdge,arrayVertices,1);
+    
+    processEdges(upperEdgeInfo,left,right,topEdge,arrayVertices,2);
+    
+    //debugger;
+    processEdges2(lowerEdgeInfo,left,right,bottomEdge,arrayVertices,3);
+    bottomEdge = bottomEdge.reverse();
+    rightEdge = rightEdge.reverse();
+    let vertices : THREE.Vector3[]= [];
+    let square_edges = leftEdge.concat(topEdge).concat(rightEdge).concat(bottomEdge);
+    let square_edge_indices : number[] = [];
+    let index = 0;
+
+    
+    if(square_edges.length !== 4)
+      continue;
+    for(let vert of square_edges)
     {
-      if((v.x == 0 && v.y == 0 && v.z == 0))
+//      console.log(vert);
+      mexpstring += "v " + vert.vert.uv.x + " " + vert.vert.uv.y + " " + 0 + "\n";
+      vertices.push(vert.vertex);
+      square_edge_indices.push(index++);
+    }
+    let triangles: Array<number> = [];
+    
+    while(square_edges.length > 2)
+    {
+      for(let i = 0; i < square_edges.length; i++)
       {
-        zeros--;
-        if(zeros <= 0)
-        {
+        let sideC: number = square_edges[i].side;
+        let sideB: number = square_edges[(i+1)%square_edges.length].side;
+        let sideA: number = square_edges[(i+2)%square_edges.length].side;
+        if (!(sideC === sideB && sideB === sideA)) {
+          let v1 = square_edge_indices[i]+vertoffset;
+          let v2 = square_edge_indices[(i+1)%square_edges.length]+vertoffset;
+          let v3 = square_edge_indices[(i+2)%square_edges.length]+vertoffset;
+          let line = "f " + (v1+1) + " " + (v2+1) + " " + (v3+1) + "\n";
+          mexpstring+=line;
+          triangles.push(v1,v2,v3);
+          square_edges.splice(i+1,1);
+          square_edge_indices.splice(i+1,1);
           break;
         }
-      }
-      vertices_remapping[vertex_index] = map_verts.get(uv_str);
-    }
-    else if(map_verts.has(v_str))
-    {
-      if((v.x == 0 && v.y == 0 && v.z == 0))
-      {
-        zeros--;
-        if(zeros <= 0)
+        else
         {
-          break;
+          continue;
         }
       }
-      vertices_remapping[vertex_index] = map_verts.get(v_str);
     }
-    else 
-    {
-      if(!(v.x == 0 && v.y == 0 && v.z == 0)) {
-        if(output_uv_toggle)
-          mexpstring += "v " + uv.x + " " + uv.y + " " + 0 + "\n";
-        else
-          mexpstring += "v " + v.x + " " + v.y + " " + v.z + "\n";
-        vertcount+=1;
-      }
-      else if(zeros > 0)
-      {
-        zeros--;
-        if(output_uv_toggle)
-          mexpstring += "v " + uv.x + " " + uv.y + " " + 0 + "\n";
-        else
-          mexpstring += "v " + v.x + " " + v.y + " " + v.z + "\n";
-        vertcount+=1;
-      }
-      else
-      {
-        continue;
-      }
-      vertices_remapping[vertex_index] = vertcount-1;
-      map_verts.set(uv_str,vertcount-1);
-    }
-    vertex_index+=1;
-  }
-  alert("Vertices: " + vertcount);
-  console.log(map_verts);
+    vertoffset += square_edge_indices.length;
 
-  for (let i = 0; i < arrayVertices2.length; i+=4) {
-    if(isNaN(vertices_remapping[i+3]+1))
-      break;
-    let line = "f " + (vertices_remapping[i]+1) + " " + (vertices_remapping[i+1]+1) + " " + (vertices_remapping[i+2]+1) + "\n";
-    mexpstring+=line;
-
-    mexpstring+="f " + (vertices_remapping[i]+1) + " " + (vertices_remapping[i+2]+1) + " " + (vertices_remapping[i+3]+1) + "\n";
   }
-  //let exporter = new GLTFExporter();
-  //const data = exporter.parse(mesh, function f(file) {
-    ///saveFile(f,"coolexport.gltf");
-  //}
-//  );
-  //console.log(mexpstring);
-  saveFile( mexpstring,"wowcool3dmodel.obj" );
+  saveFile( mexpstring,"wowcool3dmodel_earclip.obj" );
+}
+
+/**
+ * Processes edge information and populates the targetEdges array within a specified range.
+ * @param {Array} edgeInfoList - Array of edge information objects (VertexRange).
+ * @param {number} lowerBound - The lower threshold value for filtering edges.
+ * @param {number} upperBound - The upper threshold value for filtering edges.
+ * @param {Array} targetEdges - The array to be populated with vertices.
+ * @param {Array} vertexArray - Array of vertex data indexed by ipi and endVert.
+ */
+ function processEdges(edgeInfoList: Array<VertexRange>, lowerBound: number, upperBound: number, targetEdges: any, patches:any,side:number) {
+  if(!edgeInfoList)
+  {
+    return;
+  }
+  for (let i = 0; i < edgeInfoList.length; i++) {
+      let edgeInfo = edgeInfoList[i]; // VertexRange object
+      if (edgeInfo.end > lowerBound && edgeInfo.end < upperBound) {
+          // Push the appropriate vertex to targetEdges
+          targetEdges.push({vert: patches[edgeInfo.ipi][edgeInfo.endVert],side:side});
+      }
+  }
+}
+
+function processEdges2(edgeInfoList: Array<VertexRange>, lowerBound: number, upperBound: number, targetEdges: any, patches:any,side:number) {
+  if(!edgeInfoList)
+  {
+    return;
+  }
+  for (let i = 0; i < edgeInfoList.length; i++) {
+      let edgeInfo = edgeInfoList[i]; // VertexRange object
+      if (edgeInfo.start > lowerBound && edgeInfo.start < upperBound) {
+          // Push the appropriate vertex to targetEdges
+          targetEdges.push({vert: patches[edgeInfo.ipi][edgeInfo.startVert],side:side});
+      }
+  }
 }
 
 function exportMeshFromPatches(vertexStream: Float32Array) {
@@ -284,7 +293,7 @@ function exportMeshFromPatches(vertexStream: Float32Array) {
   }
   
   //console.log(JSON.stringify(patches) );
-  patches = fixPatchSeams(patches);
+  //patches = fixPatchSeams(patches);
   //debugger;
   for(let i = 0; i < patches.length; i++)
   {
@@ -296,7 +305,7 @@ function exportMeshFromPatches(vertexStream: Float32Array) {
       patches[i][j].uv = new THREE.Vector2(p.uv.x,p.uv.y);
     }
   }
-  exportArrayVertsStructureFromPatches(patches);
+  exportMeshEarClipping(patches);
 }
 
 // QuadTree implementation for storing patches in TypeScript
@@ -635,8 +644,8 @@ async function main() {
         );
       result.lodStage = replaceWithCode(result.lodStage);
       result.verticesStage = replaceWithCode(result.verticesStage);
-      console.log("LOD STAGE: " + result.lodStage);
-      console.log("VERTICES STAGE: " + result.verticesStage);
+      ///console.log("LOD STAGE: " + result.lodStage);
+      //console.log("VERTICES STAGE: " + result.verticesStage);
     }
     return result;
   }
@@ -889,7 +898,7 @@ async function main() {
       ],
     });
 
-    const doubleNumberOfRounds = 4;
+    const doubleNumberOfRounds = 3;
     // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
     for (let i = 0; i < doubleNumberOfRounds; i++) {
       const isLastRound = i === doubleNumberOfRounds - 1;
@@ -1083,6 +1092,60 @@ function interpolate(range: VertexRange, value: number, patches: Vertex[][]): TH
 
     return startVec.multiplyScalar(1 - ip).add(endVec.multiplyScalar(ip));
 }
+
+
+type VRL =  Record<number, VertexRange[]>;
+
+// Main function
+function analyzeEdges(patches: Vertex[][]): any {
+    const rangesHorizontal: { top: Record<number, VertexRange[]>; bottom: Record<number, VertexRange[]> } = {
+        top: {},
+        bottom: {},
+    };
+
+    const rangesVertical: { left: Record<number, VertexRange[]>; right: Record<number, VertexRange[]> } = {
+        left: {},
+        right: {},
+    };
+
+    const ranges = {horizontal: rangesHorizontal, vertical: rangesVertical};
+    const topRanges = rangesHorizontal["top"];
+    const botRanges = rangesHorizontal["bottom"];
+    const leftRanges = rangesVertical["left"];
+    const rightRanges = rangesVertical["right"];
+
+    let inpInd = 0;
+
+    for (const patch of patches) {
+        const v1 = patch[0], v2 = patch[1], v3 = patch[2], v4 = patch[3];
+        const upper = v2.uv.y;
+        const lower = v1.uv.y;
+        const left = v1.uv.x;
+        const right = v3.uv.x;
+
+        const hedgeTop = createVertexRange(left, right, 1, 2, inpInd);
+        const hedgeBottom = createVertexRange(left, right, 0, 3, inpInd);
+        const vedgeLeft = createVertexRange(lower, upper, 0, 1, inpInd);
+        const vedgeRight = createVertexRange(lower, upper, 3, 2, inpInd);
+
+        inpInd++;
+
+        if (!topRanges[upper]) topRanges[upper] = [];
+        insertSorted(topRanges[upper], hedgeTop);
+
+        if (!botRanges[lower]) botRanges[lower] = [];
+        insertSorted(botRanges[lower], hedgeBottom);
+
+        if (!leftRanges[left]) leftRanges[left] = [];
+        insertSorted(leftRanges[left], vedgeLeft);
+
+        if (!rightRanges[right]) rightRanges[right] = [];
+        insertSorted(rightRanges[right], vedgeRight);
+    }
+
+    return ranges;
+}
+
 // Main function
 function fixPatchSeams(patches: Vertex[][]): Vertex[][] {
     const rangesHorizontal: { top: Record<number, VertexRange[]>; bottom: Record<number, VertexRange[]> } = {
@@ -1163,7 +1226,7 @@ function interpolateRanges(
             if (checkContains(uvrOther, uvr)) {
                 if (uvr.start !== uvrOther.start) {
                     const interpolatedStart = interpolate(uvrOther, uvr.start, patches);
-                    console.log("Interpolated start! Previously " + JSON.stringify(patches[uvr.ipi][uvr.startVert].vert) + " Now " + JSON.stringify(interpolatedStart));
+                    //console.log("Interpolated start! Previously " + JSON.stringify(patches[uvr.ipi][uvr.startVert].vert) + " Now " + JSON.stringify(interpolatedStart));
                     patches[uvr.ipi][uvr.startVert].vert = {
                         x: interpolatedStart.x,
                         y: interpolatedStart.y,
@@ -1172,7 +1235,7 @@ function interpolateRanges(
                 }
                 if (uvr.end !== uvrOther.end) {
                     const interpolatedEnd = interpolate(uvrOther, uvr.end, patches);
-                    console.log("Interpolated end");
+                    //console.log("Interpolated end");
                     patches[uvr.ipi][uvr.endVert].vert = {
                         x: interpolatedEnd.x,
                         y: interpolatedEnd.y,

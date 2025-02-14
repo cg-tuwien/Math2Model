@@ -204,24 +204,24 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
   let simcd = cosinesim(normalc,normald);
   let size = calculateWorldSpaceSizeOfPatch(quad);
 
-    let quad_point_a = quad.min;
-    let quad_point_b = vec2f(quad.min.x, quad.max.y);
-    let quad_point_c = quad.max;
-    let quad_point_d = vec2f(quad.max.x, quad.min.y);
-    let cap = sampleObject(quad_point_a);
-    let cbp = sampleObject(quad_point_b);
-    let ccp = sampleObject(quad_point_c);
-    let cdp = sampleObject(quad_point_d);
+  let quad_point_a = quad.min;
+  let quad_point_b = vec2f(quad.min.x, quad.max.y);
+  let quad_point_c = quad.max;
+  let quad_point_d = vec2f(quad.max.x, quad.min.y);
+
+  let cap = sampleObject(quad_point_a);
+  let cbp = sampleObject(quad_point_b);
+  let ccp = sampleObject(quad_point_c);
+  let cdp = sampleObject(quad_point_d);
+
+  let avg = (cap + cbp + ccp + cdp)/4f;
+  let isflat = simab+simcd > 1.8f;
 
 
-    let avg = (cap + cbp + ccp + cdp)/4f;
-
-  let isflat = simab+simcd > 1.f;
-
-
-  let acceptable_size = 0.01f;
+  let acceptable_size = 0.1f;
 
   if (force_render.flag == 1u || isflat) {
+//  if (force_render.flag == 1u || size < acceptable_size) {
     force_render_internal(quad_encoded);
   } else {
     // Split all 4 ways
