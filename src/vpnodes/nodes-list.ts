@@ -210,6 +210,33 @@ export function useUiNodes(
           },
         ],
         [
+          "Abs",
+          {
+            name: "Abs",
+            type: "APPLY",
+            prefix: "",
+            image: Scale,
+            get: () => {
+              return new MathFunctionNode(
+                "Abs",
+                "abs(input2)",
+                (id) => {
+                  area.update("node", id);
+                  editor.addNode(new NothingNode());
+                },
+                (c) => {
+                  area.update("control", c.id);
+                },
+                false,
+                "vec3f",
+                "vec3f"
+              );
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
+        [
           "Sine",
           {
             name: "Sine",
@@ -410,6 +437,20 @@ export function useUiNodes(
       "Maths",
       new Map<string, UINode>([
         [
+          "Number",
+          {
+            name: "Number",
+            type: "CALCULATE",
+            prefix: "",
+            image: MathFunction,
+            get: () => {
+              return new NumberNode((n) => area.update("node", n.id));
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
+        [
           "Add",
           {
             name: "Add",
@@ -469,6 +510,23 @@ export function useUiNodes(
             image: MathFunction,
             get: () => {
               return new MathOpNode("/", (n, c) => {
+                area.update("node", n.id);
+                area.update("control", c.id);
+              });
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
+        [
+          "Modulo",
+          {
+            name: "Modulo",
+            type: "CALCULATE",
+            prefix: "",
+            image: MathFunction,
+            get: () => {
+              return new MathOpNode("%", (n, c) => {
                 area.update("node", n.id);
                 area.update("control", c.id);
               });

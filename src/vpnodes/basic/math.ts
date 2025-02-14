@@ -13,9 +13,14 @@ import { valueToType } from "./functions";
 
 export class NumberNode extends VPNode {
   private valueControl: ClassicPreset.InputControl<"number", number>;
+  private nameControl: ClassicPreset.InputControl<"text", string>;
   constructor(private update?: (node: ClassicPreset.Node) => void) {
     super("Number");
 
+    this.nameControl = new ClassicPreset.InputControl("text", {
+      initial: idToVariableName(this.id),
+    });
+    this.addControl("variable name", this.nameControl);
     this.valueControl = new ClassicPreset.InputControl("number", {
       initial: 0.0,
     });
@@ -32,11 +37,12 @@ export class NumberNode extends VPNode {
       value: {
         value: parseFloat(control?.value?.toFixed(20) ?? "0.0"),
         code:
-          nodeToVariableDeclaration(this) +
+          "var " +
+          this.nameControl.value +
           " = " +
           (control?.value?.toFixed(20) ?? "0.0") +
           ";",
-        refId: idToVariableName(this.id),
+        refId: this.nameControl.value,
       },
     };
 
@@ -51,7 +57,14 @@ export class NumberNode extends VPNode {
       this.valueControl;
 
     if (control) {
-      sn.inputs = [{ type: "number", value: control.value ?? 0, key: "value" }];
+      sn.inputs = [
+        { type: "number", value: control.value ?? 0, key: "value" },
+        {
+          type: "text",
+          value: this.nameControl.value ?? idToVariableName(this.id),
+          key: "name",
+        },
+      ];
     }
 
     return super.serialize(sn);
@@ -61,6 +74,9 @@ export class NumberNode extends VPNode {
     for (let input of sn.inputs) {
       if (input.type === "number" && input.key === "value") {
         this.valueControl.value = input.value;
+      }
+      if (input.type === "text" && input.key === "name") {
+        this.nameControl.value = input.value;
       }
     }
 

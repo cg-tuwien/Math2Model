@@ -883,47 +883,18 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
         v-on:drop="
           (ev) => {
             ev.preventDefault();
+            console.log(ev);
             if (ev.dataTransfer == null) return;
             const node = JSON.parse(
               ev.dataTransfer.getData('text/plain')
             ) as UINode;
             let toCreate: Nodes | null = null;
-            for (let category of uiNodes.values()) {
-              if (category && category.has(node.name)) {
-                const uiNode = category.get(node.name);
+            uiNodes.forEach((value: Map<string, UINode>, key: string) => {
+              if (value && value.has(node.name)) {
+                const uiNode = value.get(node.name);
                 toCreate = uiNode ? uiNode.get() : null;
               }
-            }
-            //area.area.setPointerFrom(ev);
-            //void area.translate(toCreate.id, area.area.pointer);
-            //return;
-            if (toCreate === null && node.type === 'SHAPE') {
-              switch (node.name) {
-                case 'Heart':
-                  toCreate = newHeartShape();
-                  break;
-                case 'Sphere':
-                  toCreate = newSphereShape();
-                  break;
-                case 'Plane':
-                  toCreate = newPlaneShape();
-                  break;
-              }
-            } else if (node.type === 'APPLY') {
-              switch (node.name) {
-                case 'Combine':
-                  toCreate = new CombineNode(
-                    (id) => {
-                      area.update('node', id);
-                      editor.addNode(new NothingNode());
-                    },
-                    (c) => {
-                      area.update('control', c.id);
-                    }
-                  );
-                  break;
-              }
-            }
+            });
             if (toCreate) {
               area.area.setPointerFrom(ev);
               addNodeAtMousePosition(
