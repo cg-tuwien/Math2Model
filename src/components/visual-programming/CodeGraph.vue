@@ -54,6 +54,7 @@ import HeartWGSL from "@/../parametric-renderer-core/graphs/Heart.graph.wgsl?raw
 import SphereWGSL from "@/../parametric-renderer-core/graphs/Sphere.graph.wgsl?raw";
 import PlaneWGSL from "@/../parametric-renderer-core/graphs/Plane.graph.wgsl?raw";
 import CylinderWGSL from "@/../parametric-renderer-core/graphs/Cylinder.graph.wgsl?raw";
+import NoiseFunction from "@/../parametric-renderer-core/graphs/NoiseFunction.wgsl?raw";
 import {
   type HistoryActions,
   HistoryPlugin,
@@ -557,6 +558,8 @@ async function logCode() {
     PlaneWGSL +
     "\n" +
     CylinderWGSL +
+    "\n" +
+    NoiseFunction +
     "\n\nfn sampleObject(input2: vec2f) -> vec3f {\n" +
     (await orderedCode(allNodes, visited, "\t"));
 

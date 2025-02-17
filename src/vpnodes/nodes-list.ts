@@ -291,6 +291,60 @@ export function useUiNodes(
           },
         ],
         [
+          "Arcus Sine",
+          {
+            name: "Arcus Sine",
+            type: "APPLY",
+            prefix: "",
+            image: WaveSine,
+            get: () => {
+              return new MathFunctionNode(
+                "asin",
+                "asin({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
+                (id) => {
+                  area.update("node", id);
+                  editor.addNode(new NothingNode());
+                },
+                (c) => {
+                  area.update("control", c.id);
+                },
+                false,
+                "any",
+                "any"
+              );
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
+        [
+          "Arcus Cosine",
+          {
+            name: "Arcus Cosine",
+            type: "APPLY",
+            prefix: "",
+            image: WaveSine,
+            get: () => {
+              return new MathFunctionNode(
+                "acos",
+                "acos({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
+                (id) => {
+                  area.update("node", id);
+                  editor.addNode(new NothingNode());
+                },
+                (c) => {
+                  area.update("control", c.id);
+                },
+                false,
+                "any",
+                "any"
+              );
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
+        [
           "Sawtooth",
           {
             name: "Sawtooth",
@@ -392,6 +446,60 @@ export function useUiNodes(
                 false,
                 "any",
                 "any"
+              );
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
+        [
+          "Normalize",
+          {
+            name: "Normalize",
+            type: "APPLY",
+            prefix: "",
+            image: WaveSquare,
+            get: () => {
+              return new MathFunctionNode(
+                "Normalize",
+                "normalize(input2)",
+                (id) => {
+                  area.update("node", id);
+                  editor.addNode(new NothingNode());
+                },
+                (c) => {
+                  area.update("control", c.id);
+                },
+                false,
+                "any",
+                "any"
+              );
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
+        [
+          "Perlin Noise",
+          {
+            name: "Perlin Noise",
+            type: "APPLY",
+            prefix: "",
+            image: WaveSquare,
+            get: () => {
+              return new MathFunctionNode(
+                "Perlin Noise",
+                "cnoise(input2)",
+                (id) => {
+                  area.update("node", id);
+                  editor.addNode(new NothingNode());
+                },
+                (c) => {
+                  area.update("control", c.id);
+                },
+                false,
+                "vec2f",
+                "f32"
               );
             },
             create: createUINode,
@@ -530,6 +638,114 @@ export function useUiNodes(
                 area.update("node", n.id);
                 area.update("control", c.id);
               });
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
+        [
+          "Square Root",
+          {
+            name: "Square Root",
+            type: "CALCULATE",
+            prefix: "",
+            image: MathFunction,
+            get: () => {
+              return new MathFunctionNode(
+                "Square Root",
+                "sqrt(input2)",
+                (id) => {
+                  area.update("node", id);
+                  editor.addNode(new NothingNode());
+                },
+                (c) => {
+                  area.update("control", c.id);
+                },
+                false,
+                "any",
+                "any"
+              );
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
+        [
+          "Floor",
+          {
+            name: "Floor",
+            type: "CALCULATE",
+            prefix: "",
+            image: MathFunction,
+            get: () => {
+              return new MathFunctionNode(
+                "Floor",
+                "floor(input2)",
+                (id) => {
+                  area.update("node", id);
+                  editor.addNode(new NothingNode());
+                },
+                (c) => {
+                  area.update("control", c.id);
+                },
+                false,
+                "any",
+                "any"
+              );
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
+        [
+          "Ceil",
+          {
+            name: "Ceil",
+            type: "CALCULATE",
+            prefix: "",
+            image: MathFunction,
+            get: () => {
+              return new MathFunctionNode(
+                "Ceil",
+                "ceil(input2)",
+                (id) => {
+                  area.update("node", id);
+                  editor.addNode(new NothingNode());
+                },
+                (c) => {
+                  area.update("control", c.id);
+                },
+                false,
+                "any",
+                "any"
+              );
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
+        [
+          "Exp",
+          {
+            name: "Exp",
+            type: "CALCULATE",
+            prefix: "",
+            image: MathFunction,
+            get: () => {
+              return new MathFunctionNode(
+                "Exp",
+                "exp(input2)",
+                (id) => {
+                  area.update("node", id);
+                  editor.addNode(new NothingNode());
+                },
+                (c) => {
+                  area.update("control", c.id);
+                },
+                false,
+                "any",
+                "any"
+              );
             },
             create: createUINode,
             draggable: true,
