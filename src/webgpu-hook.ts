@@ -3,31 +3,6 @@ import { assert } from "@stefnotch/typestef/assert";
 const gpuDevicePromise = Promise.withResolvers<GPUDevice>();
 let hasDevice = false;
 
-type BufferLabel = string;
-type WgpuBuffers<
-  T extends {
-    [key: string]: BufferLabel;
-  },
-> = {
-  [Key in keyof T]: GPUBuffer[] | (GPUBuffer | null);
-};
-function makeRelevantBuffers<
-  T extends {
-    [key: string]: BufferLabel;
-  },
->(
-  values: T
-): { buffers: WgpuBuffers<T>; lookupBuffer: Map<BufferLabel, keyof T> } {
-  const lookupBuffer = new Map();
-  for (const [key, label] of Object.entries(values)) {
-    lookupBuffer.set(label, key);
-  }
-  const buffers = Object.fromEntries(
-    Object.entries(values).map(([key, _]) => [key, null])
-  ) as any;
-  return { buffers, lookupBuffer };
-}
-
 export type LodStageBuffers = Record<BufferId, GPUBuffer>;
 
 type BufferId =
@@ -64,29 +39,13 @@ const bufferNameToId: Record<string, BufferId> = {
 };
 
 type BufferUUID = string;
-const createdBuffers = new Map<BufferUUID, LodStageBuffers>();
-
-const { buffers, lookupBuffer } = makeRelevantBuffers({
-  time: "Time Buffer",
-  screen: "Screen Buffer",
-  mouse: "Mouse Buffer",
-  computePatchesInput: "Compute Patches Input Buffer",
-  finalPatches2: "Render Buffer 2",
-  finalPatches4: "Render Buffer 4",
-  finalPatches8: "Render Buffer 8",
-  finalPatches16: "Render Buffer 16",
-  finalPatches32: "Render Buffer 32",
-  indirectDispatch0: "Indirect Compute Dispatch Buffer 0",
-  indirectDispatch1: "Indirect Compute Dispatch Buffer 1",
-  patches0: "Patches Buffer 0",
-  patches1: "Patches Buffer 1",
-  forceRender: "Force Render Uniform",
-});
+const createdBuffers = new Map<BufferUUID, Partial<LodStageBuffers>>();
+const createdBuffersWithoutUuid: Partial<LodStageBuffers> = {};
 
 export function getBuffers(buffersUUID: BufferUUID): LodStageBuffers {
   const buffers = createdBuffers.get(buffersUUID);
   assert(buffers !== undefined);
-  return buffers;
+  return { ...buffers, ...createdBuffersWithoutUuid } as any as LodStageBuffers;
 }
 
 export let renderEncoder: GPUCommandEncoder | null = null;
@@ -114,7 +73,7 @@ if (globalThis.navigator.gpu !== undefined) {
       } else {
         // the buffer only had a name
         const bufferName = descriptor.label;
-        buffers[bufferNameToId[bufferName]] = buffer;
+        createdBuffersWithoutUuid[bufferNameToId[bufferName]] = buffer;
       }
     }
     return buffer;
