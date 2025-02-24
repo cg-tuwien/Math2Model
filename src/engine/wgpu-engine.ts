@@ -47,12 +47,11 @@ export class WgpuEngine {
     if (callback === null) {
       this.engine.set_lod_stage();
     } else {
-      this.engine.set_lod_stage((shaderPath: string, buffersIndex: number) => {
-
+      this.engine.set_lod_stage((shaderPath: string, buffersUUID: string) => {
         if (renderEncoder === null) {
           console.error("renderEncoder is null");
         } else {
-          callback(shaderPath, getBuffers(+buffersIndex), renderEncoder);
+          callback(shaderPath, getBuffers(buffersUUID), renderEncoder);
         }
       });
     }
