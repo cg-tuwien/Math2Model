@@ -1,14 +1,14 @@
 ////#include "./Common.wgsl"
-//// AUTOGEN a3e9ed29815a874bd85200dd8dcf0acab01cd6236e68b912d7e96522fbd9fd21
-// Encoded patch contains x and y coordinates to describe the patch, the bits of u and v
-// describe a binary subdivision pattern of the full 1x1 square
+//// AUTOGEN 6de14edf9918265eb2e1232f93b94c84430d0069898214379635e51c3d4c9550
 struct EncodedPatch {
   u: u32,
   v: u32,
+  instance: u32
 };
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
+  instance: u32
 };
 struct Patches {
   patches_length: atomic<u32>,
@@ -41,16 +41,16 @@ fn patch_u_child(u: u32, child_bit: u32) -> u32 {
   return (u << 1) | (child_bit & 1);
 }
 fn patch_top_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 0u));
+  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 0u), encoded.instance);
 }
 fn patch_bottom_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 1u));
+  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 1u), encoded.instance);
 }
 fn patch_left_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(patch_u_child(encoded.u, 0u), encoded.v);
+  return EncodedPatch(patch_u_child(encoded.u, 0u), encoded.v, encoded.instance);
 }
 fn patch_right_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(patch_u_child(encoded.u, 1u), encoded.v);
+  return EncodedPatch(patch_u_child(encoded.u, 1u), encoded.v, encoded.instance);
 }
 fn patch_top_left_child(encoded: EncodedPatch) -> EncodedPatch {
   return patch_top_child(patch_left_child(encoded));
@@ -90,14 +90,14 @@ fn patch_decode(encoded: EncodedPatch) -> Patch {
     f32(u_max_bits) / f32(1u << (31u - leading_zeroes_u)),
     f32(v_max_bits) / f32(1u << (31u - leading_zeroes_v))
   );
-
+  
   // The size of the patch is 1 / 2^(31 - leading_zeroes)
   // let u_size = 1.0 / f32(2 << (31 - leading_zeroes_u));
   // let v_size = 1.0 / f32(2 << (31 - leading_zeroes_v));
-  // But we care about this_patch.max == next_patch.min,
+  // But we care about this_patch.max == next_patch.min, 
   // so we need to do the floating point calculations more carefully
-
-  return Patch(min_value, max_value);
+  
+  return Patch(min_value, max_value, encoded.instance);
 }
 
 fn assert(condition: bool) {

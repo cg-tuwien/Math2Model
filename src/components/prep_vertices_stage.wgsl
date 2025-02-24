@@ -1,6 +1,7 @@
 struct EncodedPatch {
   u: u32,
   v: u32,
+  instance: u32
 };
 
 struct RenderBufferRead {
