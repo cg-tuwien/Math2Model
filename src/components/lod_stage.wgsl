@@ -127,6 +127,7 @@ fn mouse_held(button: u32) -> bool {
 @group(0) @binding(0) var<uniform> time : Time;
 @group(0) @binding(1) var<uniform> screen : Screen;
 @group(0) @binding(2) var<uniform> mouse : Mouse;
+var<private> instance_id: u32;
 
 //// START sampleObject
 fn sampleObject(input: vec2f) -> vec3f { return vec3(input, 0.0); }
