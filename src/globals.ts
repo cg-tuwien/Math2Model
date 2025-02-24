@@ -1,8 +1,7 @@
 import { ReactiveFilesystem, makeFilePath } from "./filesystem/reactive-files";
 
-export const sceneFilesPromise = ReactiveFilesystem.create(
-  makeFilePath("some-key")
-);
+export const sceneFilesPromise: Promise<ReactiveFilesystem> =
+  ReactiveFilesystem.create(makeFilePath("some-key"));
 const canvasElement = document.createElement("canvas");
 canvasElement.style.width = "100%";
 canvasElement.style.height = "100%";
@@ -18,7 +17,7 @@ canvasElement.addEventListener(
 );
 let isCanvasTaken = false;
 
-export const takeCanvas = () => {
+export const takeCanvas = (): HTMLCanvasElement | null => {
   if (isCanvasTaken) {
     return null;
   }

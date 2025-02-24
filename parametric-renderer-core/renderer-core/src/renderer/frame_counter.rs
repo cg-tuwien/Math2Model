@@ -1,6 +1,6 @@
 use web_time::Instant;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Seconds(pub f32);
 
 pub struct FrameTime {

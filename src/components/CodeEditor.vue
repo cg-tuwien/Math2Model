@@ -4,6 +4,9 @@ import { computed, ref, shallowRef, watch, type DeepReadonly } from "vue";
 import { watchDebounced, useElementSize } from "@vueuse/core";
 import type { FilePath } from "@/filesystem/reactive-files";
 import { showInfo } from "@/notification";
+import Connect from "~icons/mdi/transit-connection-variant";
+
+export type Marker = monaco.editor.IMarkerData;
 
 const monacoMount = ref<HTMLDivElement | null>(null);
 
@@ -16,8 +19,10 @@ export interface KeyedCode {
 const props = defineProps<{
   keyedCode: DeepReadonly<KeyedCode> | null;
   isDark: boolean;
+  markers: monaco.editor.IMarkerData[];
+  isReadonly: boolean;
 }>();
-const emit = defineEmits<{ update: [code: () => string] }>();
+const emit = defineEmits<{ update: [code: () => string]; graph: [] }>();
 
 const editor = shallowRef<monaco.editor.IStandaloneCodeEditor | null>(null);
 
@@ -36,7 +41,7 @@ watch(
   }
 );
 
-const isReadonly = computed(() => props.keyedCode === null);
+const isReadonly = computed(() => props.keyedCode === null || props.isReadonly);
 watch(isReadonly, (v) => {
   editor.value?.updateOptions({ readOnly: v });
 });
@@ -45,6 +50,16 @@ const themeName = computed(() => (props.isDark ? "vs-dark" : "vs"));
 watch(themeName, (v) => {
   monaco.editor.setTheme(v);
 });
+
+watch(
+  () => props.markers,
+  (v) => {
+    const model = editor.value?.getModel();
+    if (!model) return;
+    monaco.editor.setModelMarkers(model, "owner", v);
+  },
+  { deep: true }
+);
 
 watch(
   () => props.keyedCode?.name,
@@ -96,7 +111,20 @@ watch(monacoMount, (element) => {
       ref="monacoMount"
       class="border border-gray-500 self-stretch flex-1 overflow-hidden"
       :class="{ 'bg-gray-800': isReadonly }"
-    ></div>
+    >
+      <n-button
+        v-if="props.keyedCode?.name.includes('.graph')"
+        quaternary
+        circle
+        class="float-right m-2 z-10"
+        type="primary"
+        v-on:click="emit('graph')"
+      >
+        <template #icon>
+          <n-icon :component="Connect"></n-icon>
+        </template>
+      </n-button>
+    </div>
   </div>
 </template>
 <style scoped></style>

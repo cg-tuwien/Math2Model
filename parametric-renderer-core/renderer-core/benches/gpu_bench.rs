@@ -36,6 +36,7 @@ fn main() {
     );
 
     app.update_models(vec![renderer_core::game::ModelInfo {
+        id: "0659dcb1-6229-46bd-a306-6ceebfcf2e42".into(),
         transform: renderer_core::transform::Transform {
             position: Vec3::new(0.0, 0.0, 0.0),
             ..Default::default()
@@ -45,8 +46,10 @@ fn main() {
             emissive: Vec3::new(0.0, 0.0, 0.0),
             roughness: 0.7,
             metallic: 0.1,
+            diffuse_texture: None,
         },
         shader_id,
+        instance_count: 1,
     }]);
 
     // TODO: Why is this needed for benchmarking?
@@ -66,8 +69,11 @@ fn main() {
     let mut renderer = GpuApplicationBuilder::new(WindowOrFallback::Window(window))
         .block_on()
         .unwrap()
-        .build()
-        .unwrap();
+        .build();
+
+    for (shader_id, shader_info) in &app.shaders {
+        renderer.set_shader(shader_id.clone(), shader_info, None);
+    }
 
     let mut group = c.benchmark_group("render");
     // group.throughput(throughput);
@@ -99,9 +105,9 @@ fn main() {
                 new_scale_factor: Default::default(),
                 close_requested: Default::default(),
             });
-            renderer.render(&app).unwrap();
             renderer.force_wait();
-            timer.increment_query(renderer.get_profiling_data().unwrap());
+            let render_results = renderer.render(&app).unwrap();
+            timer.increment_query(render_results.profiler_results.unwrap());
         })
     });
     group.finish();

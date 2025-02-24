@@ -1,7 +1,7 @@
 use crate::{buffer::TypedBuffer, camera::Camera, shaders::shader};
 use glam::{Mat4, UVec2, Vec2, Vec4};
 
-use super::RenderData;
+use super::{frame_counter::FrameTime, FrameData};
 
 pub struct SceneData {
     pub time_buffer: TypedBuffer<shader::Time>,
@@ -9,6 +9,7 @@ pub struct SceneData {
     pub mouse_buffer: TypedBuffer<shader::Mouse>,
     pub camera_buffer: TypedBuffer<shader::Camera>,
     pub light_buffer: TypedBuffer<shader::Lights>,
+    pub linear_sampler: wgpu::Sampler,
 }
 
 impl SceneData {
@@ -65,6 +66,15 @@ impl SceneData {
                 },
                 wgpu::BufferUsages::COPY_DST,
             ),
+            linear_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
+                address_mode_u: wgpu::AddressMode::ClampToEdge,
+                address_mode_v: wgpu::AddressMode::ClampToEdge,
+                address_mode_w: wgpu::AddressMode::ClampToEdge,
+                mag_filter: wgpu::FilterMode::Linear,
+                min_filter: wgpu::FilterMode::Linear,
+                mipmap_filter: wgpu::FilterMode::Nearest,
+                ..Default::default()
+            }),
         }
     }
 
@@ -77,13 +87,26 @@ impl SceneData {
                 screen: self.screen_buffer.as_entire_buffer_binding(),
                 mouse: self.mouse_buffer.as_entire_buffer_binding(),
                 lights: self.light_buffer.as_entire_buffer_binding(),
+                linear_sampler: &self.linear_sampler,
             },
         )
     }
 
-    pub fn write_buffers(&self, render_data: &RenderData, queue: &wgpu::Queue) {
-        self.time_buffer.write_buffer(queue, &render_data.time_data);
-        let size = render_data.size;
+    pub fn write_buffers(
+        &self,
+        size: UVec2,
+        render_data: &FrameData,
+        frame_time: &FrameTime,
+        queue: &wgpu::Queue,
+    ) {
+        self.time_buffer.write_buffer(
+            queue,
+            &shader::Time {
+                elapsed: frame_time.elapsed.0,
+                delta: frame_time.delta.0,
+                frame: frame_time.frame as u32,
+            },
+        );
         self.screen_buffer.write_buffer(
             queue,
             &shader::Screen {
@@ -91,14 +114,20 @@ impl SceneData {
                 inv_resolution: Vec2::new(1.0 / (size.x as f32), 1.0 / (size.y as f32)),
             },
         );
-        self.mouse_buffer
-            .write_buffer(queue, &render_data.mouse_data);
-        self.camera_buffer.write_buffer(queue, &render_data.camera);
+        self.mouse_buffer.write_buffer(
+            queue,
+            &shader::Mouse {
+                pos: render_data.mouse_pos,
+                buttons: if render_data.mouse_held { 1 } else { 0 },
+            },
+        );
+        self.camera_buffer
+            .write_buffer(queue, &render_data.camera.to_shader(size));
     }
 }
 
 impl Camera {
-    pub fn to_shader(&self, size: UVec2) -> shader::Camera {
+    fn to_shader(&self, size: UVec2) -> shader::Camera {
         shader::Camera {
             view: self.view_matrix(),
             projection: self.projection_matrix(size),

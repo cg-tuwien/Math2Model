@@ -1,12 +1,24 @@
+//// START sampleObject
+fn sampleObject(input: vec2f) -> vec3f {
+  let a = time;
+  let b = screen;
+  let c = mouse;
+  return vec3(input, 0.0); 
+}
+//// END sampleObject
+var<private> instance_id: u32;
+
 ////#include "./Common.wgsl"
-//// AUTOGEN a3e9ed29815a874bd85200dd8dcf0acab01cd6236e68b912d7e96522fbd9fd21
+//// AUTOGEN 6de14edf9918265eb2e1232f93b94c84430d0069898214379635e51c3d4c9550
 struct EncodedPatch {
   u: u32,
   v: u32,
+  instance: u32
 };
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
+  instance: u32
 };
 struct Patches {
   patches_length: atomic<u32>,
@@ -39,16 +51,16 @@ fn patch_u_child(u: u32, child_bit: u32) -> u32 {
   return (u << 1) | (child_bit & 1);
 }
 fn patch_top_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 0u));
+  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 0u), encoded.instance);
 }
 fn patch_bottom_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 1u));
+  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 1u), encoded.instance);
 }
 fn patch_left_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(patch_u_child(encoded.u, 0u), encoded.v);
+  return EncodedPatch(patch_u_child(encoded.u, 0u), encoded.v, encoded.instance);
 }
 fn patch_right_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(patch_u_child(encoded.u, 1u), encoded.v);
+  return EncodedPatch(patch_u_child(encoded.u, 1u), encoded.v, encoded.instance);
 }
 fn patch_top_left_child(encoded: EncodedPatch) -> EncodedPatch {
   return patch_top_child(patch_left_child(encoded));
@@ -95,7 +107,7 @@ fn patch_decode(encoded: EncodedPatch) -> Patch {
   // But we care about this_patch.max == next_patch.min, 
   // so we need to do the floating point calculations more carefully
   
-  return Patch(min_value, max_value);
+  return Patch(min_value, max_value, encoded.instance);
 }
 
 fn assert(condition: bool) {
@@ -104,7 +116,7 @@ fn assert(condition: bool) {
 //// END OF AUTOGEN
 
 ////#include "./EvaluateImage.wgsl"
-//// AUTOGEN 026c5fd0ec94098b53d2549d4f92f2c2ffb569eb1f84c0d3e800e02ecebbaa63
+//// AUTOGEN 961c21364e8c69d94e53b62808c484d25210f06c0cbf6045824e429da62423c4
 struct Time {
   elapsed: f32,
   delta: f32,
@@ -126,11 +138,7 @@ fn mouse_held(button: u32) -> bool {
 @group(0) @binding(1) var<uniform> screen : Screen;
 @group(0) @binding(2) var<uniform> mouse : Mouse;
 
-//// START sampleObject
-fn sampleObject(input: vec2f) -> vec3f { return vec3(input, 0.0); }
-//// END sampleObject
 //// END OF AUTOGEN
-
 
 struct InputBuffer {
     threshold_factor: f32,
@@ -177,7 +185,7 @@ var<workgroup> v_lengths: array<array<f32, U_LENGTHS_X>, U_Y>;
 var<workgroup> frustum_sides: array<u32, 25>;
 
 /// Split the patch and write it to the output buffers
-fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>) {
+fn split_patch(quad_encoded: EncodedPatch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>) {
   // We use threshold_32, because after that, we don't need to split anymore.
   // Instead, we need to compute the correct render buffer to write to.
   let threshold_32 = (32.0 * screen.inv_resolution) * input_buffer.threshold_factor;
@@ -390,6 +398,7 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
     (quad_size.x / 4.0) * f32(extra_sample_index.x),
     (quad_size.y / 4.0) * f32(extra_sample_index.y)
   );
+  instance_id = quad_encoded.instance;
   if (sample_index < 25) {
     let extra_sample = sampleObject(extra_sample_location);
     let extra_clip_space = input_buffer.model_view_projection * vec4f(extra_sample.xyz, 1.0);
@@ -459,7 +468,7 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
   );
 
   if(sample_index == 0) {
-    split_patch(quad_encoded, quad, u_length, v_length);
+    split_patch(quad_encoded, u_length, v_length);
   }
 
 

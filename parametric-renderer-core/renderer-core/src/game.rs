@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use glam::{Vec2, Vec3};
 use web_time::Instant;
@@ -20,19 +20,22 @@ pub struct ProfilerSettings {
     pub gpu: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ModelInfo {
+    pub id: String,
     pub transform: Transform,
     pub material_info: MaterialInfo,
     pub shader_id: ShaderId,
+    pub instance_count: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MaterialInfo {
     pub color: Vec3,
     pub emissive: Vec3,
     pub roughness: f32,
     pub metallic: f32,
+    pub diffuse_texture: Option<TextureId>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -44,17 +47,33 @@ pub struct ShaderInfo {
     pub code: String,
 }
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct TextureId(pub String);
+
+pub struct TextureInfo {
+    pub width: u32,
+    pub height: u32,
+    /// RGBA
+    pub data: TextureData,
+}
+
+pub enum TextureData {
+    Bytes(Vec<u8>),
+    Image(web_sys::ImageBitmap),
+}
+
 pub struct GameRes {
     pub camera_controller: CameraController,
     pub models: Vec<ModelInfo>,
     pub shaders: HashMap<ShaderId, ShaderInfo>,
+    pub textures: HashMap<TextureId, TextureInfo>,
     last_update_instant: Option<Instant>,
     pub camera: Camera,
     pub mouse: Vec2,
     pub mouse_held: bool,
     pub cursor_capture: WindowCursorCapture,
     pub profiler_settings: ProfilerSettings,
-    pub lod_stage: Option<Box<dyn Fn(&ShaderId, u32) + 'static>>,
+    pub lod_stage: Option<Arc<dyn Fn(&ShaderId, &str) + 'static>>,
 }
 
 impl GameRes {
@@ -79,6 +98,7 @@ impl GameRes {
             camera_controller,
             models: vec![],
             shaders: HashMap::new(),
+            textures: Default::default(),
             last_update_instant: None,
             mouse: Vec2::ZERO,
             mouse_held: false,
@@ -93,11 +113,19 @@ impl GameRes {
     }
 
     pub fn set_shader(&mut self, shader_id: ShaderId, info: ShaderInfo) {
-        self.shaders.insert(shader_id.clone(), info);
+        self.shaders.insert(shader_id, info);
     }
 
     pub fn remove_shader(&mut self, shader_id: &ShaderId) {
         self.shaders.remove(shader_id);
+    }
+
+    pub fn set_texture(&mut self, id: TextureId, info: TextureInfo) {
+        self.textures.insert(id, info);
+    }
+
+    pub fn remove_texture(&mut self, id: &TextureId) {
+        self.textures.remove(id);
     }
 
     pub fn update(&mut self, inputs: &WindowInputs) {

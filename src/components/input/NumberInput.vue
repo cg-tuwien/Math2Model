@@ -72,7 +72,7 @@ function onPointerUp(event: PointerEvent) {
       type="number"
       :value="showValue"
       @update:value="
-        (newValue: number) =>
+        (newValue: number | null) =>
           emit('update', new ObjectUpdate([], () => newValue ?? 0))
       "
       :update-value-on-input="false"

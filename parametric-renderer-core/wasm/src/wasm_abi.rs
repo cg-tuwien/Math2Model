@@ -1,14 +1,17 @@
 #![allow(non_snake_case)]
 
+use renderer_core::game::TextureId;
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 
 #[derive(Tsify, Serialize, Deserialize)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmModelInfo {
+    pub id: String,
     pub transform: WasmTransform,
     pub material_info: WasmMaterialInfo,
     pub shader_id: String,
+    pub instance_count: u32,
 }
 
 #[derive(Tsify, Serialize, Deserialize)]
@@ -17,6 +20,13 @@ pub struct WasmTransform {
     pub position: [f32; 3],
     pub rotation: [f32; 3],
     pub scale: f32,
+}
+
+#[derive(Tsify, Serialize, Deserialize)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct WasmFrameTime {
+    pub avg_delta_time: f32,
+    pub avg_gpu_time: f32,
 }
 
 impl From<WasmTransform> for renderer_core::transform::Transform {
@@ -41,6 +51,7 @@ pub struct WasmMaterialInfo {
     pub emissive: [f32; 3],
     pub roughness: f32,
     pub metallic: f32,
+    pub diffuse_texture: Option<String>,
 }
 
 impl From<WasmMaterialInfo> for renderer_core::game::MaterialInfo {
@@ -50,6 +61,7 @@ impl From<WasmMaterialInfo> for renderer_core::game::MaterialInfo {
             emissive: v.emissive.into(),
             roughness: v.roughness,
             metallic: v.metallic,
+            diffuse_texture: v.diffuse_texture.map(TextureId),
         }
     }
 }
@@ -60,19 +72,6 @@ pub struct WasmShaderInfo {
     pub id: String,
     pub label: String,
     pub code: String,
-}
-
-#[derive(Tsify, Serialize, Deserialize)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
-pub struct WasmCompilationResults {
-    pub results: Vec<WasmCompilationResult>,
-}
-
-#[derive(Tsify, Serialize, Deserialize)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
-pub struct WasmCompilationResult {
-    pub shader_id: String,
-    pub messages: Vec<WasmCompilationMessage>,
 }
 
 #[derive(Tsify, Serialize, Deserialize)]

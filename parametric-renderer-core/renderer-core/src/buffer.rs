@@ -113,11 +113,8 @@ where
             TypedBufferVariant::Uniform => write_uniform_buffer(data),
             TypedBufferVariant::Storage => write_storage_buffer(data),
         };
+        // TODO: Use https://docs.rs/wgpu/23.0.0/wgpu/struct.Queue.html#method.write_buffer_with instead
         queue.write_buffer(&self.buffer, 0, contents.as_slice());
-    }
-
-    pub fn copy_all_from(&self, other: &Self, commands: &mut wgpu::CommandEncoder) {
-        commands.copy_buffer_to_buffer(&other.buffer, 0, &self.buffer, 0, other.buffer.size());
     }
 
     pub fn as_entire_buffer_binding(&self) -> wgpu::BufferBinding<'_> {
@@ -126,6 +123,14 @@ where
 
     pub fn buffer(&self) -> &wgpu::Buffer {
         &self.buffer
+    }
+}
+pub trait CommandEncoderExt<T> {
+    fn copy_tbuffer_to_tbuffer(&mut self, buffer: &TypedBuffer<T>, other: &TypedBuffer<T>);
+}
+impl<T> CommandEncoderExt<T> for wgpu::CommandEncoder {
+    fn copy_tbuffer_to_tbuffer(&mut self, buffer: &TypedBuffer<T>, other: &TypedBuffer<T>) {
+        self.copy_buffer_to_buffer(&buffer, 0, &other, 0, buffer.size());
     }
 }
 

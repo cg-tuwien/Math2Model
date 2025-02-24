@@ -1,32 +1,32 @@
 [package]
+edition = "2021"
 name = "web"
 version = "0.2.0"
-edition = "2021"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
+any_spawner = { version = "0.2.0", features = ["wasm-bindgen"] }
 anyhow = "1.0"
 console_error_panic_hook = "0.1.7"
+console_log = "1.0"
+# Needed for the UUID crate that the renderer-core uses
 glam = { workspace = true }
-pinky-swear = "6.2.0"
-renderer-core = { path = "../renderer-core" }
+log = { workspace = true }
+renderer-core = { path = "../renderer-core", features = ["wasm-bindgen"] }
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = "0.6.5"
-time = { version = "0.3.36", features = ["wasm-bindgen"] }
-tracing = { workspace = true }
-tracing-subscriber = { version = "0.3.18", default-features = false, features = [
-  "smallvec",
-  "fmt",
-  "std",
-  "time",
-  "json",
+tsify-next = "0.5.5"
+uuid = { workspace = true, features = ["js"] }
+wasm-bindgen = "0.2.100"
+wasm-bindgen-futures = "0.4.50"
+web-sys = { version = "0.3.77", features = [
+  "HtmlCanvasElement",
+  "ImageBitmap",
 ] }
-tracing-web = "0.1.3"
-tsify-next = "0.5.4"
-wasm-bindgen = "0.2.93"
-wasm-bindgen-futures = "0.4.43"
-web-sys = { version = "0.3.70", features = ["HtmlCanvasElement"] }
-wgpu = { workspace = true }
+wgpu = { workspace = true, features = [
+  "webgpu",
+  "fragile-send-sync-non-atomic-wasm",
+] }
 winit = { workspace = true }

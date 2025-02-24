@@ -3,25 +3,37 @@ import init, {
   WasmApplication,
   type WasmModelInfo,
   type WasmShaderInfo,
+  type WasmCompilationMessage,
 } from "../../parametric-renderer-core/pkg";
 
 await init();
 
 export class WgpuEngine {
   private constructor(private engine: WasmApplication) {}
-  static async createEngine(canvasElement: HTMLCanvasElement) {
+  static createEngine(canvasElement: HTMLCanvasElement) {
     const engine = new WasmApplication();
-    await engine.run(canvasElement);
+    engine.run(canvasElement);
     return new WgpuEngine(engine);
   }
-  updateModels(js_models: WasmModelInfo[]) {
-    this.engine.update_models(js_models);
+  async updateModels(js_models: WasmModelInfo[]) {
+    await this.engine.update_models(js_models);
   }
-  updateShader(shader_info: WasmShaderInfo) {
-    this.engine.update_shader(shader_info);
+  async updateShader(shader_info: WasmShaderInfo) {
+    await this.engine.update_shader(shader_info);
   }
-  removeShader(id: string) {
-    this.engine.remove_shader(id);
+  async removeShader(id: string) {
+    await this.engine.remove_shader(id);
+  }
+  async updateTexture(texture_info: { id: string; bitmap: ImageBitmap }) {
+    await this.engine.update_texture(texture_info.id, texture_info.bitmap);
+  }
+  async removeTexture(id: string) {
+    await this.engine.remove_texture(id);
+  }
+  setOnShaderCompiled(
+    callback: (shaderId: string, messages: WasmCompilationMessage[]) => void
+  ) {
+    setTimeout(() => this.engine.set_on_shader_compiled(callback), 0);
   }
   setLodStage(
     callback:

@@ -67,9 +67,9 @@ export const useFsStore = defineStore("fs-store", () => {
 
       await Promise.all(
         sceneFiles.listFiles().map(async (filePath) => {
-          const file = await sceneFiles.readBinaryFile(filePath);
+          const file = await sceneFiles.readFile(filePath);
           if (file === null) return;
-          await zip.add(filePath, new Blob([file]).stream());
+          await zip.add(filePath, file.stream());
         })
       );
 

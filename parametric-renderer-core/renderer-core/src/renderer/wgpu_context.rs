@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use glam::UVec2;
-use tracing::info;
+use log::info;
 use wgpu_profiler::{GpuProfiler, GpuProfilerSettings};
 use winit::window::Window;
 
@@ -9,20 +9,16 @@ use super::WindowOrFallback;
 
 pub struct WgpuContext {
     pub instance: wgpu::Instance,
-    pub surface: SurfaceOrFallback,
     pub _adapter: wgpu::Adapter,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    pub profiler: GpuProfiler,
-    is_profiling_enabled: bool,
-    size: UVec2,
     pub view_format: wgpu::TextureFormat,
 }
 
 impl WgpuContext {
-    pub async fn new(window: WindowOrFallback) -> anyhow::Result<Self> {
+    pub async fn new(window: WindowOrFallback) -> anyhow::Result<(Self, SurfaceOrFallback)> {
         let size = window.size().max(UVec2::ONE);
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             ..Default::default()
         });
@@ -35,7 +31,8 @@ impl WgpuContext {
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::HighPerformance,
-                compatible_surface: surface.as_ref(),
+                // Setting this is only needed for a fallback adapter. Which we don't want.
+                compatible_surface: None,
                 force_fallback_adapter: false,
             })
             .await
@@ -95,109 +92,55 @@ impl WgpuContext {
                     window: window
                         .as_window()
                         .expect("Expected window if there is a surface"),
+                    size,
                 }
             }
             None => SurfaceOrFallback::Fallback {
-                texture: Self::create_fallback_texture(&device, size, view_format),
+                texture: create_fallback_texture(&device, size, view_format),
+                size,
             },
         };
 
-        let gpu_profiler_settings = GpuProfilerSettings {
-            enable_timer_queries: false, // Disabled by default
-            ..GpuProfilerSettings::default()
-        };
-
-        #[cfg(feature = "tracy")]
-        let profiler = GpuProfiler::new_with_tracy_client(
-            gpu_profiler_settings.clone(),
-            adapter.get_info().backend,
-            &device,
-            &queue,
-        )
-        .unwrap_or_else(|e| match e {
-            wgpu_profiler::CreationError::TracyClientNotRunning
-            | wgpu_profiler::CreationError::TracyGpuContextCreationError(_) => {
-                warn!("Failed to connect to Tracy. Continuing without Tracy integration.");
-                GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler")
-            }
-            _ => {
-                panic!("Failed to create profiler: {}", e);
-            }
-        });
-
-        #[cfg(not(feature = "tracy"))]
-        let profiler = GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler");
-        let is_profiling_enabled = false;
-
-        Ok(WgpuContext {
-            instance,
-            surface: surface_or_fallback,
-            _adapter: adapter,
-            device,
-            queue,
-            profiler,
-            is_profiling_enabled,
-            size,
-            view_format,
-        })
-    }
-
-    pub fn set_profiling(&mut self, enabled: bool) {
-        if self.is_profiling_enabled == enabled {
-            return;
-        }
-        self.is_profiling_enabled = enabled;
-        self.profiler
-            .change_settings(GpuProfilerSettings {
-                enable_timer_queries: enabled,
-                ..GpuProfilerSettings::default()
-            })
-            .unwrap();
-    }
-
-    pub fn resize(&mut self, new_size: UVec2) {
-        let new_size = new_size.max(UVec2::new(1, 1));
-        if new_size == self.size {
-            return;
-        }
-        self.size = new_size;
-        match &mut self.surface {
-            SurfaceOrFallback::Surface {
-                surface, config, ..
-            } => {
-                config.width = new_size.x;
-                config.height = new_size.y;
-                surface.configure(&self.device, config);
-            }
-            SurfaceOrFallback::Fallback { texture } => {
-                *texture = Self::create_fallback_texture(&self.device, new_size, self.view_format);
-            }
-        }
-    }
-
-    pub fn size(&self) -> UVec2 {
-        self.size
-    }
-
-    fn create_fallback_texture(
-        device: &wgpu::Device,
-        size: UVec2,
-        format: wgpu::TextureFormat,
-    ) -> wgpu::Texture {
-        device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("Fallback surface"),
-            size: wgpu::Extent3d {
-                width: size.x,
-                height: size.y,
-                depth_or_array_layers: 1,
+        Ok((
+            WgpuContext {
+                instance,
+                _adapter: adapter,
+                device,
+                queue,
+                view_format,
             },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            view_formats: &[],
+            surface_or_fallback,
+        ))
+    }
+
+    fn create_view(&self, texture: &wgpu::Texture) -> wgpu::TextureView {
+        texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(self.view_format),
+            ..Default::default()
         })
+    }
+}
+
+pub enum SurfaceTexture {
+    Surface(wgpu::SurfaceTexture, wgpu::TextureView),
+    Fallback(wgpu::TextureView),
+}
+
+impl SurfaceTexture {
+    pub fn texture_view(&self) -> &wgpu::TextureView {
+        match self {
+            SurfaceTexture::Surface(_, view) => &view,
+            SurfaceTexture::Fallback(view) => &view,
+        }
+    }
+
+    pub fn present(self) {
+        match self {
+            SurfaceTexture::Surface(surface_texture, _) => {
+                surface_texture.present();
+            }
+            SurfaceTexture::Fallback(_) => {}
+        }
     }
 }
 
@@ -206,8 +149,108 @@ pub enum SurfaceOrFallback {
         surface: wgpu::Surface<'static>,
         config: wgpu::SurfaceConfiguration,
         window: Arc<Window>,
+        size: UVec2,
     },
     Fallback {
         texture: wgpu::Texture,
+        size: UVec2,
     },
+}
+
+impl SurfaceOrFallback {
+    pub fn size(&self) -> UVec2 {
+        match self {
+            SurfaceOrFallback::Surface { size, .. } => *size,
+            SurfaceOrFallback::Fallback { size, .. } => *size,
+        }
+    }
+
+    /// Tries to resize the swapchain to the new size.
+    /// Returns the actual size of the swapchain if it was resized.
+    pub fn try_resize(&mut self, context: &WgpuContext, new_size: UVec2) -> Option<UVec2> {
+        let new_size = new_size.max(UVec2::new(1, 1));
+        if new_size == self.size() {
+            return None;
+        }
+        match self {
+            SurfaceOrFallback::Surface {
+                surface,
+                config,
+                size,
+                ..
+            } => {
+                config.width = new_size.x;
+                config.height = new_size.y;
+                surface.configure(&context.device, config);
+                *size = new_size;
+                Some(new_size)
+            }
+            SurfaceOrFallback::Fallback { texture, size } => {
+                *texture = create_fallback_texture(&context.device, new_size, context.view_format);
+                *size = new_size;
+                Some(new_size)
+            }
+        }
+    }
+
+    pub fn recreate_swapchain(&self, context: &WgpuContext) {
+        match self {
+            SurfaceOrFallback::Surface {
+                surface, config, ..
+            } => {
+                surface.configure(&context.device, config);
+            }
+            SurfaceOrFallback::Fallback { .. } => {
+                // No-op
+            }
+        }
+    }
+
+    pub fn surface_texture(
+        &self,
+        context: &WgpuContext,
+    ) -> Result<SurfaceTexture, wgpu::SurfaceError> {
+        match self {
+            SurfaceOrFallback::Surface { surface, .. } => {
+                surface.get_current_texture().map(|surface_texture| {
+                    let view = context.create_view(&surface_texture.texture);
+                    SurfaceTexture::Surface(surface_texture, view)
+                })
+            }
+            SurfaceOrFallback::Fallback { texture, .. } => {
+                Ok(SurfaceTexture::Fallback(context.create_view(&texture)))
+            }
+        }
+    }
+}
+
+fn create_fallback_texture(
+    device: &wgpu::Device,
+    size: UVec2,
+    format: wgpu::TextureFormat,
+) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("Fallback surface"),
+        size: wgpu::Extent3d {
+            width: size.x,
+            height: size.y,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        view_formats: &[],
+    })
+}
+
+pub fn create_profiler(_context: &WgpuContext) -> GpuProfiler {
+    let gpu_profiler_settings = GpuProfilerSettings {
+        enable_timer_queries: false, // Disabled by default
+        ..GpuProfilerSettings::default()
+    };
+
+    let profiler = GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler");
+    profiler
 }

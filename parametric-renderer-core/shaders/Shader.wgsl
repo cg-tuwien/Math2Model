@@ -1,12 +1,33 @@
+//// START sampleObject
+fn sampleObject(input: vec2f) -> vec3f {
+  let a = time;
+  let b = screen;
+  let c = mouse;
+  return vec3(input, 0.0); 
+}
+//// END sampleObject
+//// START getColor
+fn getColor(input: vec2f) -> vec3f {
+  if material.has_texture != 0u {
+    return textureSample(t_diffuse, linear_sampler, input).rgb;
+  } else {
+    return material.color_roughness.rgb;
+  }
+}
+//// END getColor
+var<private> instance_id: u32;
+
 ////#include "./Common.wgsl"
-//// AUTOGEN a3e9ed29815a874bd85200dd8dcf0acab01cd6236e68b912d7e96522fbd9fd21
+//// AUTOGEN 6de14edf9918265eb2e1232f93b94c84430d0069898214379635e51c3d4c9550
 struct EncodedPatch {
   u: u32,
   v: u32,
+  instance: u32
 };
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
+  instance: u32
 };
 struct Patches {
   patches_length: atomic<u32>,
@@ -39,16 +60,16 @@ fn patch_u_child(u: u32, child_bit: u32) -> u32 {
   return (u << 1) | (child_bit & 1);
 }
 fn patch_top_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 0u));
+  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 0u), encoded.instance);
 }
 fn patch_bottom_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 1u));
+  return EncodedPatch(encoded.u, patch_u_child(encoded.v, 1u), encoded.instance);
 }
 fn patch_left_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(patch_u_child(encoded.u, 0u), encoded.v);
+  return EncodedPatch(patch_u_child(encoded.u, 0u), encoded.v, encoded.instance);
 }
 fn patch_right_child(encoded: EncodedPatch) -> EncodedPatch {
-  return EncodedPatch(patch_u_child(encoded.u, 1u), encoded.v);
+  return EncodedPatch(patch_u_child(encoded.u, 1u), encoded.v, encoded.instance);
 }
 fn patch_top_left_child(encoded: EncodedPatch) -> EncodedPatch {
   return patch_top_child(patch_left_child(encoded));
@@ -95,7 +116,7 @@ fn patch_decode(encoded: EncodedPatch) -> Patch {
   // But we care about this_patch.max == next_patch.min, 
   // so we need to do the floating point calculations more carefully
   
-  return Patch(min_value, max_value);
+  return Patch(min_value, max_value, encoded.instance);
 }
 
 fn assert(condition: bool) {
@@ -104,7 +125,7 @@ fn assert(condition: bool) {
 //// END OF AUTOGEN
 
 ////#include "./EvaluateImage.wgsl"
-//// AUTOGEN 026c5fd0ec94098b53d2549d4f92f2c2ffb569eb1f84c0d3e800e02ecebbaa63
+//// AUTOGEN 961c21364e8c69d94e53b62808c484d25210f06c0cbf6045824e429da62423c4
 struct Time {
   elapsed: f32,
   delta: f32,
@@ -126,11 +147,7 @@ fn mouse_held(button: u32) -> bool {
 @group(0) @binding(1) var<uniform> screen : Screen;
 @group(0) @binding(2) var<uniform> mouse : Mouse;
 
-//// START sampleObject
-fn sampleObject(input: vec2f) -> vec3f { return vec3(input, 0.0); }
-//// END sampleObject
 //// END OF AUTOGEN
-
 
 
 alias Vec3Padded = vec4<f32>;
@@ -175,14 +192,17 @@ struct Material {
     // emissive_metallic.rgb is the emissive color of the material
     // emissive_metallic.a is the metallicness of the material
     emissive_metallic: vec4<f32>,
+    // is a boolean
+    has_texture: u32
 }
 
 @group(0) @binding(3) var<uniform> camera: Camera;
 @group(0) @binding(4) var<storage, read> lights: Lights;
+@group(0) @binding(5) var linear_sampler: sampler;
 @group(1) @binding(1) var<uniform> model: Model;
 @group(1) @binding(2) var<storage, read> render_buffer: RenderBufferRead;
 @group(1) @binding(3) var<uniform> material: Material;
-
+@group(1) @binding(4) var t_diffuse: texture_2d<f32>;
 
 
 
@@ -525,6 +545,7 @@ fn vs_main(
 ) -> VertexOutput {
     let quad = patch_decode(render_buffer.patches[in.instance_index]);
     let quad_point = mix(quad.min, quad.max, in.uv);
+    instance_id = quad.instance;
     let pos = sampleObject(quad_point);
     let world_pos = model.model_similarity * vec4<f32>(pos, 1.0);
 
@@ -532,7 +553,7 @@ fn vs_main(
     var out: VertexOutput;
     out.clip_position = camera.projection * camera.view * world_pos;
     out.world_position = world_pos.xyz;
-    out.texture_coords = in.uv;
+    out.texture_coords = quad_point;
     let normal = vec3<f32>(0.0, -1.0, 0.0); // TODO: We'll compute this later
     out.world_normal = (model.model_similarity * vec4<f32>(normal, 0.0)).xyz; // Only uniform scaling
 
@@ -566,7 +587,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let n = normalize(-cross(dpdxFine(in.world_position), dpdyFine(in.world_position)));
 
     var materialInfo = MaterialInfo(
-        material.color_roughness.rgb,
+        getColor(in.texture_coords),
         vec3f(0.04),
         vec3f(1.0),
         vec3f(0.0),

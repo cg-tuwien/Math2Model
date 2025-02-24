@@ -1,22 +1,32 @@
-import { createDiscreteApi } from "naive-ui";
+import {
+  createDiscreteApi,
+  type DialogApi,
+  type NotificationApi,
+} from "naive-ui";
 import type { FilePath } from "./filesystem/reactive-files";
+import type { MessageApiInjection } from "naive-ui/es/message/src/MessageProvider";
+import type { LoadingBarInst } from "naive-ui/es/loading-bar/src/LoadingBarProvider";
 
-const { message, notification, dialog, loadingBar } = createDiscreteApi([
+const dest = createDiscreteApi([
   "message",
   "dialog",
   "notification",
   "loadingBar",
 ]);
+export const Message: MessageApiInjection = dest.message;
+export const Notification: NotificationApi = dest.notification;
+export const Dialog: DialogApi = dest.dialog;
+export const LoadingBar: LoadingBarInst = dest.loadingBar;
 
 export function showError(
   msg: string,
   opts: { error?: any; title?: string } = {}
-) {
+): void {
   // TODO: show the entire error on request
-  console.error(msg, opts.error);
-  notification.error({
+  console.trace(msg, opts.error);
+  Notification.error({
     title: opts.title ?? "Error",
-    content: msg,
+    content: msg.toString(),
   });
 }
 
@@ -24,23 +34,16 @@ export function showFileError(
   msg: string,
   file: FilePath,
   opts: { error?: any; title?: string } = {}
-) {
+): void {
   // TODO: Show the file path in the error message. And make it clickable to open the file.
-  console.error(msg, opts.error);
-  notification.error({
+  console.trace(msg, opts.error);
+  Notification.error({
     title: `Error in ${file}`,
     content: msg,
   });
 }
 
-export function showInfo(msg: string) {
+export function showInfo(msg: string): void {
   console.info(msg);
-  message.info(msg);
+  Message.info(msg);
 }
-
-export {
-  message as Message,
-  notification as Notification,
-  dialog as Dialog,
-  loadingBar as LoadingBar,
-};

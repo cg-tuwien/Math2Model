@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import CodeEditor, { type KeyedCode } from "@/components/CodeEditor.vue";
+import CodeEditor, {
+  type KeyedCode,
+  type Marker,
+} from "@/components/CodeEditor.vue";
+import { MarkerSeverity } from "monaco-editor/esm/vs/editor/editor.api";
 import IconFolderMultipleOutline from "~icons/mdi/folder-multiple-outline";
 import IconFileTreeOutline from "~icons/mdi/file-tree-outline";
 import { ref, watchEffect, computed, h } from "vue";
@@ -25,10 +29,13 @@ import {
 } from "@/filesystem/scene-file";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
 import HeartSphereCode from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
-import DefaultShaderCode from "@/../parametric-renderer-core/shaders/DefaultParametric.wgsl?raw";
+import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
+import BasicGraphShader from "@/../parametric-renderer-core/graphs/BasicGraphShader.graph.wgsl?raw";
 import type { ObjectUpdate } from "./input/object-update";
-import WebGpu from "@/components/WebGpu.vue";
+import CodeGraph from "@/components/visual-programming/CodeGraph.vue";
 import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
+import { useErrorStore } from "@/stores/error-store";
+import { syncFilesystem } from "@/engine/sync-filesystem";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -38,7 +45,13 @@ const props = defineProps<{
   gpuDevice: GPUDevice;
 }>();
 
+syncFilesystem(props.fs, props.engine);
+
 const store = useStore();
+const errorsStore = useErrorStore();
+props.engine.setOnShaderCompiled((shader, messages) => {
+  errorsStore.setErrors(makeFilePath(shader), messages);
+});
 
 // The underlying data
 const sceneFile = ref<string | null>(null);
@@ -79,44 +92,10 @@ watchEffect(() => {
   canvasContainer.value?.appendChild(props.canvas);
 });
 
-{
-  // Watch for shader file changes
-  let shaderFiles = new Map<FilePath, Promise<string>>();
-  const readShaderAsync = (file: FilePath) => {
-    const promise = props.fs.readTextFile(file);
-    if (promise === null) return;
-    shaderFiles.set(file, promise);
-    promise.then((code) => {
-      if (shaderFiles.get(file) === promise) {
-        props.engine.updateShader({
-          id: file,
-          label: file,
-          code,
-        });
-      }
-    });
-  };
-  props.fs.watchFromStart((change) => {
-    if (!change.key.endsWith(".wgsl")) return;
-    if (change.type === "insert") {
-      props.engine.updateShader({
-        id: change.key,
-        label: change.key,
-        code: DefaultShaderCode,
-      });
-      readShaderAsync(change.key);
-    } else if (change.type === "update") {
-      readShaderAsync(change.key);
-    } else if (change.type === "remove") {
-      shaderFiles.delete(change.key);
-      props.engine.removeShader(change.key);
-    }
-  });
-}
-
 watchEffect(() => {
   let models = scene.state.value.models.map((v) => {
     let model: WasmModelInfo = {
+      id: v.id,
       transform: {
         position: [v.position.x, v.position.y, v.position.z],
         rotation: [v.rotation.x, v.rotation.y, v.rotation.z],
@@ -131,17 +110,46 @@ watchEffect(() => {
         ],
         roughness: v.material.roughness,
         metallic: v.material.metallic,
+        diffuse_texture: v.material.diffuseTexture,
       },
       shader_id: v.code,
+      instance_count: v.instanceCount,
     };
     return model;
   });
   props.engine.updateModels(models);
 });
 
+type EditorType = "shader" | "graph";
+
 function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
   const openedFileName = ref<FilePath | null>(startFile);
   const keyedCode = ref<KeyedCode | null>(null);
+  const editorType = ref<EditorType>("shader");
+  const markers = computed<Marker[]>(() => {
+    if (openedFileName.value === null) return [];
+    const messages = errorsStore.errors.get(openedFileName.value) ?? [];
+
+    return messages.map((message: any) => {
+      const startColumn = message.location?.line_position ?? 1;
+      const endColumn = startColumn + (message.location?.length ?? 1);
+      // TODO: Translate to UTF-16 ^^^
+      const lineNumber = message.location?.line_number ?? 1;
+      return {
+        message: message.message,
+        startLineNumber: lineNumber,
+        startColumn,
+        endColumn,
+        endLineNumber: lineNumber,
+        severity:
+          message.message_type === "Error"
+            ? MarkerSeverity.Error
+            : message.message_type === "Warning"
+              ? MarkerSeverity.Warning
+              : MarkerSeverity.Info,
+      } satisfies Marker;
+    });
+  });
 
   watchImmediate(openedFileName, (fileName) => {
     if (fileName === null) {
@@ -155,6 +163,14 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
       code: "",
       name: fileName,
     };
+
+    if (fileName.endsWith(".wgsl")) {
+      editorType.value = "shader";
+    } else if (fileName.endsWith(".graph")) {
+      editorType.value = "graph";
+    } else {
+      editorType.value = "shader";
+    }
 
     // And now asynchronously load the file
     let file = fs.readTextFile(fileName);
@@ -175,6 +191,13 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
     });
   });
 
+  const isReadonly = computed(() => {
+    if (keyedCode.value === null) {
+      return true;
+    }
+    return keyedCode.value.name.endsWith(".graph.wgsl");
+  });
+
   function openFile(v: FilePath) {
     openedFileName.value = v;
   }
@@ -191,6 +214,7 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
       openFile(newName);
     }
   }
+
   function deleteFiles(files: Set<FilePath>) {
     files.forEach((file) => {
       fs.deleteFile(file);
@@ -216,7 +240,11 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
   }, 500);
 
   return {
+    path: computed(() => openedFileName.value),
+    editorType: computed(() => editorType.value),
+    isReadonly,
     code: computed(() => keyedCode.value),
+    markers,
     openFile,
     addFiles,
     renameFile,
@@ -227,13 +255,14 @@ function useOpenFile(startFile: FilePath | null, fs: ReactiveFilesystem) {
 
 type TabName = "filebrowser" | "sceneview";
 function useTabs() {
-  const splitSize = ref(0.2);
-  const selectedTab = ref<TabName>("filebrowser");
+  const defaultSplitSize = 0.1;
+  const splitSize = ref(defaultSplitSize);
+  const selectedTab = ref<TabName>("sceneview");
   function renderTabIcon(name: TabName) {
-    if (name === "filebrowser") {
-      return h(IconFolderMultipleOutline);
-    } else if (name === "sceneview") {
+    if (name === "sceneview") {
       return h(IconFileTreeOutline);
+    } else if (name === "filebrowser") {
+      return h(IconFolderMultipleOutline);
     } else {
       assertUnreachable(name);
     }
@@ -243,7 +272,7 @@ function useTabs() {
   function toggleTabSize() {
     const isTabBig = splitSize.value > 0.01;
     if (!isTabBig) {
-      splitSize.value = 0.2;
+      splitSize.value = defaultSplitSize;
     } else if (isTabBig && lastSelectedTab.value === selectedTab.value) {
       splitSize.value = 0.0;
     }
@@ -277,10 +306,18 @@ function updateModels(ids: string[], update: ObjectUpdate<any>) {
 
 function addModel(name: string, shaderName: string) {
   if (shaderName) {
-    const vertexSource = makeFilePath(shaderName);
+    let vertexSource = makeFilePath(shaderName);
 
     if (!props.fs.hasFile(vertexSource)) {
-      props.fs.writeTextFile(vertexSource, HeartSphereCode);
+      if (vertexSource.endsWith(".wgsl"))
+        props.fs.writeTextFile(vertexSource, HeartSphereCode);
+      else if (vertexSource.endsWith(".graph")) {
+        props.fs.writeTextFile(vertexSource, BasicGraph);
+        vertexSource = makeFilePath(
+          vertexSource.replace(".graph", ".graph.wgsl")
+        );
+        props.fs.writeTextFile(vertexSource, BasicGraphShader);
+      }
     }
 
     const newModel: VirtualModelState = {
@@ -296,7 +333,9 @@ function addModel(name: string, shaderName: string) {
         roughness: Math.random(),
         metallic: Math.random(),
         emissive: new ReadonlyVector3(0, 0, 0),
+        diffuseTexture: null,
       },
+      instanceCount: 1,
     };
 
     scene.api.value.addModel(newModel);
@@ -313,10 +352,16 @@ function removeModel(ids: string[]) {
 
   saveScene();
 }
+
+function saveGraphWgsl(filePath: FilePath, content: string) {
+  // Extension should be ".graph.wgsl"
+  filePath = makeFilePath(filePath.replace(".graph", ".graph.wgsl"));
+  props.fs.writeTextFile(filePath, content);
+}
 </script>
 
 <template>
-  <main class="flex h-full">
+  <main class="flex flex-1 min-h-0">
     <n-tabs
       type="line"
       animated
@@ -326,13 +371,13 @@ function removeModel(ids: string[]) {
       v-model:value="tabs.selectedTab.value"
     >
       <n-tab
-        name="filebrowser"
-        :tab="tabs.renderTabIcon('filebrowser')"
+        name="sceneview"
+        :tab="tabs.renderTabIcon('sceneview')"
         @click="tabs.toggleTabSize()"
       ></n-tab>
       <n-tab
-        name="sceneview"
-        :tab="tabs.renderTabIcon('sceneview')"
+        name="filebrowser"
+        :tab="tabs.renderTabIcon('filebrowser')"
         @click="tabs.toggleTabSize()"
       ></n-tab>
     </n-tabs>
@@ -340,33 +385,37 @@ function removeModel(ids: string[]) {
       direction="horizontal"
       :max="0.75"
       :min="0"
-      :default-size="0.2"
       v-model:size="tabs.splitSize.value"
     >
       <template #1>
         <div class="pt-2 h-full w-full overflow-y-auto">
-          <div v-if="tabs.selectedTab.value === 'filebrowser'">
+          <div v-if="tabs.selectedTab.value === 'sceneview'">
+            <SceneHierarchy
+              :models="scene.state.value.models"
+              :fs="props.fs"
+              @update="
+                (keys: string[], update: ObjectUpdate<any>) =>
+                  updateModels(keys, update)
+              "
+              @addModel="
+                (modelName: string, shaderName: string) =>
+                  addModel(modelName, shaderName)
+              "
+              @select="(vertex: FilePath) => openFile.openFile(vertex)"
+              @removeModel="(ids: string[]) => removeModel(ids)"
+            ></SceneHierarchy>
+          </div>
+          <div v-else-if="tabs.selectedTab.value === 'filebrowser'">
             <FileBrowser
               :fs="props.fs"
               @open-file="openFile.openFile($event)"
               @add-files="openFile.addFiles($event)"
               @rename-file="
-                (oldName, newName) => openFile.renameFile(oldName, newName)
+                (oldName: FilePath, newName: FilePath) =>
+                  openFile.renameFile(oldName, newName)
               "
               @delete-files="openFile.deleteFiles($event)"
             ></FileBrowser>
-          </div>
-          <div v-else-if="tabs.selectedTab.value === 'sceneview'">
-            <SceneHierarchy
-              :models="scene.state.value.models"
-              :fs="props.fs"
-              @update="(keys, update) => updateModels(keys, update)"
-              @addModel="
-                (modelName, shaderName) => addModel(modelName, shaderName)
-              "
-              @select="(vertex) => openFile.openFile(vertex)"
-              @removeModel="(ids) => removeModel(ids)"
-            ></SceneHierarchy>
           </div>
           <div v-else>
             <p>Unknown tab</p>
@@ -374,26 +423,75 @@ function removeModel(ids: string[]) {
         </div>
       </template>
       <template #2>
-        <div class="flex h-full w-full">
-          <WebGpu
-            :gpuDevice="props.gpuDevice"
-            :engine="props.engine"
-            :fs="props.fs"
-          ></WebGpu>
-          <div
-            ref="canvasContainer"
-            class="self-stretch overflow-hidden flex-1"
-          >
-            <div v-if="sceneFile == null">Missing scene.json</div>
-          </div>
-          <CodeEditor
-            class="self-stretch overflow-hidden flex-1"
-            :keyed-code="openFile.code.value"
-            :is-dark="store.isDark"
-            @update="openFile.setNewCode($event)"
-          >
-          </CodeEditor>
-        </div>
+        <n-split
+          direction="horizontal"
+          :max="0.75"
+          :min="0.15"
+          :default-size="0.5"
+        >
+          <template #1>
+            <div class="flex h-full w-full">
+              <div
+                ref="canvasContainer"
+                class="self-stretch overflow-hidden flex-1"
+              >
+                <div v-if="sceneFile == null">Missing scene.json</div>
+              </div>
+            </div>
+          </template>
+          <template #2>
+            <div class="flex h-full w-full">
+              <CodeEditor
+                v-if="openFile.editorType.value === 'shader'"
+                class="self-stretch overflow-hidden flex-1"
+                :keyed-code="openFile.code.value"
+                :is-readonly="openFile.isReadonly.value"
+                :is-dark="store.isDark"
+                :markers="openFile.markers.value"
+                @update="openFile.setNewCode($event)"
+                @graph="
+                  openFile.openFile(
+                    makeFilePath(
+                      openFile.path.value?.replace('.wgsl', '') ?? ''
+                    )
+                  )
+                "
+              >
+              </CodeEditor>
+              <CodeGraph
+                v-if="openFile.editorType.value === 'graph'"
+                :fs="props.fs"
+                :keyedGraph="openFile.code.value"
+                @update="
+                  (content) => {
+                    if (openFile.path.value !== null) {
+                      saveGraphWgsl(openFile.path.value, content);
+                    } else {
+                      console.error('Invalid state!');
+                    }
+                  }
+                "
+                @save="
+                  (content) => {
+                    if (openFile.path.value !== null) {
+                      props.fs.writeTextFile(openFile.path.value, content);
+                    } else {
+                      console.error('Invalid state!');
+                    }
+                  }
+                "
+                @code="
+                  () => {
+                    openFile.openFile(
+                      makeFilePath(openFile.path.value + '.wgsl')
+                    );
+                  }
+                "
+                ref="graphRef"
+              ></CodeGraph>
+            </div>
+          </template>
+        </n-split>
       </template>
     </n-split>
   </main>
