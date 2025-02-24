@@ -761,7 +761,7 @@ async function main() {
     commandEncoder: GPUCommandEncoder
   ) {
     //console.log(compiledShaders);
-    debugger;
+    //debugger;
     const compiledShader = compiledShaders.value.get(makeFilePath(shaderPath));
     if (!compiledShader) {
       console.error("Shader not found: ", shaderPath);
@@ -1018,7 +1018,6 @@ async function main() {
               .getMappedRange(0, vertReadableBuffer.size)
               .slice(0);
             const vertexStream = new Float32Array(arrayBuffer);
-            //console.log("vertReadableBuffer Output:", vertexStream); // Only zeroes. Huh
             vertReadableBuffer.unmap();
             exportMeshFromPatches(vertexStream);
           });

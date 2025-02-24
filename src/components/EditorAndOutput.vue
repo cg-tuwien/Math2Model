@@ -37,6 +37,9 @@ import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
 import { useErrorStore } from "@/stores/error-store";
 import { syncFilesystem } from "@/engine/sync-filesystem";
 
+
+import WebGpu from "@/components/WebGpu.vue";
+
 // Unchanging props! No need to watch them.
 const props = defineProps<{
   fs: ReactiveFilesystem;
@@ -430,6 +433,12 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
           :default-size="0.5"
         >
           <template #1>
+          
+            <WebGpu
+            :gpuDevice="props.gpuDevice"
+            :engine="props.engine"
+            :fs="props.fs"
+          ></WebGpu>
             <div class="flex h-full w-full">
               <div
                 ref="canvasContainer"
