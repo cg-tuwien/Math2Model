@@ -180,6 +180,7 @@ export const useFsStore = defineStore("fs-store", () => {
     importProjectDialog: computed(() => importProjectDialog.value),
     importFilesOrProject,
     importInMemoryProject,
+    importFiles,
     finishImport,
     exportToZip,
   };

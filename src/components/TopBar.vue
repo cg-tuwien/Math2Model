@@ -7,15 +7,30 @@ import IconSun from "~icons/mdi/white-balance-sunny";
 import IconGithub from "~icons/mdi/github";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { homepage, version } from "@/../package.json";
-import { useFsStore } from "@/stores/fs-store";
+import { useFsStore, type ImportFilesList } from "@/stores/fs-store";
+import { makeFilePath } from "@/filesystem/reactive-files";
+import { ZipReader } from "@zip.js/zip.js";
 
 const store = useStore();
 const fsStore = useFsStore();
 
 const examplesModule = () => import("@/scenes/example-scenes");
 
+const heartSphereMorphExamplePath = "./HeartSphereMorph.zip";
+const templeExamplePath = "./TempleExample.zip";
+const towerExamplePath = "./TowerExample.zip";
+const treesAndTerrainExamplePath = "./TreesAndTerrainExample.zip";
+
 type FileDropdownOption = DropdownOption & {
-  key: "open" | "save-as" | "examples" | "example-scene" | "heart-sphere-scene";
+  key:
+    | "open"
+    | "save-as"
+    | "examples"
+    | "example-scene"
+    | "heart-sphere-scene"
+    | "temple-scene"
+    | "tower-scene"
+    | "terrain-trees-scene";
 };
 
 const inputFileElement = ref<HTMLInputElement | null>(null);
@@ -41,6 +56,18 @@ const fileOptions = computed((): FileDropdownOption[] => {
           label: "Heart Sphere Scene",
           key: "heart-sphere-scene",
         },
+        {
+          label: "Temple Scene",
+          key: "temple-scene",
+        },
+        {
+          label: "Tower Scene",
+          key: "tower-scene",
+        },
+        {
+          label: "Terrain and Trees",
+          key: "terrain-trees-scene",
+        },
       ] as FileDropdownOption[],
     },
   ];
@@ -57,7 +84,52 @@ async function handleFile(key: FileDropdownOption["key"]) {
     fsStore.importInMemoryProject(module.createDefaultProject().files);
   } else if (key === "heart-sphere-scene") {
     const module = await examplesModule();
-    fsStore.importInMemoryProject(module.createHeartSphereProject().files);
+    const heartSphereScene = await module.getZipExample(
+      makeFilePath(heartSphereMorphExamplePath)
+    );
+    if (heartSphereScene) {
+      const data: ImportFilesList = {
+        type: "zip",
+        value: new ZipReader(heartSphereScene.stream()),
+      };
+      fsStore.importFiles(data);
+    }
+  } else if (key === "temple-scene") {
+    const module = await examplesModule();
+    const templeScene = await module.getZipExample(
+      makeFilePath(templeExamplePath)
+    );
+    if (templeScene) {
+      const data: ImportFilesList = {
+        type: "zip",
+        value: new ZipReader(templeScene.stream()),
+      };
+      fsStore.importFiles(data);
+    }
+  } else if (key === "terrain-trees-scene") {
+    const module = await examplesModule();
+    const treesAndTerrainScene = await module.getZipExample(
+      makeFilePath(treesAndTerrainExamplePath)
+    );
+    if (treesAndTerrainScene) {
+      const data: ImportFilesList = {
+        type: "zip",
+        value: new ZipReader(treesAndTerrainScene.stream()),
+      };
+      fsStore.importFiles(data);
+    }
+  } else if (key === "tower-scene") {
+    const module = await examplesModule();
+    const towerScene = await module.getZipExample(
+      makeFilePath(towerExamplePath)
+    );
+    if (towerScene) {
+      const data: ImportFilesList = {
+        type: "zip",
+        value: new ZipReader(towerScene.stream()),
+      };
+      fsStore.importFiles(data);
+    }
   } else {
     assertUnreachable(key);
   }

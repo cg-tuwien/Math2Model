@@ -1,5 +1,5 @@
 import { SceneFileName, SceneFileSchemaUrl } from "@/filesystem/scene-file";
-import { makeFilePath } from "@/filesystem/reactive-files";
+import { makeFilePath, type FilePath } from "@/filesystem/reactive-files";
 import DefaultParametric from "@/../parametric-renderer-core/shaders/DefaultParametric.wgsl?raw";
 import HeartSphere from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
 import { ReadonlyEulerAngles } from "./scene-state";
@@ -93,3 +93,28 @@ export const createHeartSphereProject = (): ExampleProject => {
     ],
   };
 };
+
+export async function getZipExample(path: FilePath): Promise<File | undefined> {
+  try {
+    // Fetch the file from the public directory
+    const response = await fetch(path);
+
+    // Check if the response is valid
+    if (!response.ok) {
+      throw new Error("Failed to fetch the zip file: " + path);
+    }
+
+    // Convert the response to a Blob
+    const blob = await response.blob();
+
+    // Create a File object from the Blob
+    const zipFile = new File([blob], path.substring(1), {
+      type: "application/zip",
+    });
+
+    console.log("Zip file loaded:", zipFile);
+    return zipFile;
+  } catch (error) {
+    console.error("Error loading zip file:", error);
+  }
+}
