@@ -3,6 +3,7 @@ import { makeFilePath, type FilePath } from "@/filesystem/reactive-files";
 import DefaultParametric from "@/../parametric-renderer-core/shaders/DefaultParametric.wgsl?raw";
 import HeartSphere from "@/../parametric-renderer-core/shaders/HeartSphere.wgsl?raw";
 import { ReadonlyEulerAngles } from "./scene-state";
+import { showError, showInfo } from "@/notification";
 
 type ExampleProject = {
   name: string;
@@ -101,7 +102,12 @@ export async function getZipExample(path: FilePath): Promise<File | undefined> {
 
     // Check if the response is valid
     if (!response.ok) {
-      throw new Error("Failed to fetch the zip file: " + path);
+      showError(
+        "Could not load example " +
+          path +
+          "\nServer responded with " +
+          response.statusText
+      );
     }
 
     // Convert the response to a Blob
@@ -115,6 +121,6 @@ export async function getZipExample(path: FilePath): Promise<File | undefined> {
     console.log("Zip file loaded:", zipFile);
     return zipFile;
   } catch (error) {
-    console.error("Error loading zip file:", error);
+    showError("Could not load example " + path, { error: error });
   }
 }

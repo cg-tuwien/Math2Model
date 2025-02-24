@@ -165,15 +165,19 @@ export const useFsStore = defineStore("fs-store", () => {
       await importFiles(dialog.data);
     } else if (importAs === "project") {
       // Clear the current project before importing the new one
-      await filesystemCommands.add((sceneFiles) =>
-        Promise.all(
-          sceneFiles.listFiles().map((file) => sceneFiles.deleteFile(file))
-        )
-      );
+      await clearFiles();
       await importFiles(dialog.data);
     } else {
       assertUnreachable(importAs);
     }
+  }
+
+  async function clearFiles() {
+    await filesystemCommands.add((sceneFiles) =>
+      Promise.all(
+        sceneFiles.listFiles().map((file) => sceneFiles.deleteFile(file))
+      )
+    );
   }
 
   return {
@@ -183,6 +187,7 @@ export const useFsStore = defineStore("fs-store", () => {
     importFiles,
     finishImport,
     exportToZip,
+    clearFiles,
   };
 });
 

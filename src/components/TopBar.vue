@@ -92,6 +92,7 @@ async function handleFile(key: FileDropdownOption["key"]) {
         type: "zip",
         value: new ZipReader(heartSphereScene.stream()),
       };
+      await fsStore.clearFiles();
       fsStore.importFiles(data);
     }
   } else if (key === "temple-scene") {
@@ -104,6 +105,7 @@ async function handleFile(key: FileDropdownOption["key"]) {
         type: "zip",
         value: new ZipReader(templeScene.stream()),
       };
+      await fsStore.clearFiles();
       fsStore.importFiles(data);
     }
   } else if (key === "terrain-trees-scene") {
@@ -116,6 +118,7 @@ async function handleFile(key: FileDropdownOption["key"]) {
         type: "zip",
         value: new ZipReader(treesAndTerrainScene.stream()),
       };
+      await fsStore.clearFiles();
       fsStore.importFiles(data);
     }
   } else if (key === "tower-scene") {
@@ -128,6 +131,7 @@ async function handleFile(key: FileDropdownOption["key"]) {
         type: "zip",
         value: new ZipReader(towerScene.stream()),
       };
+      await fsStore.clearFiles();
       fsStore.importFiles(data);
     }
   } else {
