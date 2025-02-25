@@ -13,11 +13,10 @@ import LodStageWgsl from "./lod_stage.wgsl?raw";
 import PrepVerticesStageWgsl from "./prep_vertices_stage.wgsl?raw";
 import OutputVerticesWgsl from "./vertices_stage.wgsl?raw";
 
-import * as THREE from 'three';
 import { createHelpers } from "./webgpu-helpers";
 import {ExporterInstance} from "./exporter/Exporter"
-
-const a = new THREE.Vector3( 0, 1, 0 );
+import { Vector2, Vector3 } from "./exporter/VectorTypes";
+const a = new Vector3( 0, 1, 0 );
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -203,8 +202,8 @@ function exportMeshFromPatches(vertexStream: Float32Array) {
       }
     }
     patch_verts.push({
-      vert: new THREE.Vector3(section[0],section[1],section[2]),
-      uv: new THREE.Vector2(section2[0],section2[1])
+      vert: new Vector3(section[0],section[1],section[2]),
+      uv: new Vector2(section2[0],section2[1])
     });
 
     index+=8;
@@ -228,9 +227,9 @@ function exportMeshFromPatches(vertexStream: Float32Array) {
     for(let j = 0; j < 4; j++)
     {
       let p = patches[i][j];
-      patches[i][j].vert = new THREE.Vector3(p.vert.x,p.vert.y,p.vert.z);
+      patches[i][j].vert = new Vector3(p.vert.x,p.vert.y,p.vert.z);
       
-      patches[i][j].uv = new THREE.Vector2(p.uv.x,p.uv.y);
+      patches[i][j].uv = new Vector2(p.uv.x,p.uv.y);
       patches[i][j].globalIndex = -1;
     }
   }
@@ -1014,16 +1013,16 @@ function getInterpolationValue(range: VertexRange, value: number): number {
 }
 
 // Helper function to interpolate between vertices
-function interpolate(range: VertexRange, value: number, patches: Vertex[][]): THREE.Vector3 {
+function interpolate(range: VertexRange, value: number, patches: Vertex[][]): Vector3 {
     const ip = getInterpolationValue(range, value);
 
-    const startVec = new THREE.Vector3(
+    const startVec = new Vector3(
         patches[range.ipi][range.startVert].vert.x,
         patches[range.ipi][range.startVert].vert.y,
         patches[range.ipi][range.startVert].vert.z
     );
 
-    const endVec = new THREE.Vector3(
+    const endVec = new Vector3(
         patches[range.ipi][range.endVert].vert.x,
         patches[range.ipi][range.endVert].vert.y,
         patches[range.ipi][range.endVert].vert.z
