@@ -10,7 +10,7 @@ import { Vector2, Vector3 } from "./exporter/VectorTypes";
 import {mainExport} from "./exporter/GPUInteractionExport";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
 import type {Vertex, VertexRange} from "./exporter/VertexType";
-import { analyzeEdges } from "./exporter/EdgeAnalysis";
+import { analyzeEdges } from "./exporter/EdgeAnalysis"; 
 import {save, saveFile} from "./exporter/FileDownload"; 
 
 const props = defineProps<{
@@ -20,6 +20,8 @@ const props = defineProps<{
   }>();
 
 const triggerDownload = ref(false);
+const minSize = ref(30.0);
+const maxCurvature = ref(20.0);
 
 function exportMeshEarClipping(arrayVertices: any) {
   let mexpstring = "o\n";
@@ -90,14 +92,15 @@ function exportMeshFromPatches(vertexStream: Float32Array) {
 
 // Main function
 async function main() {
-  mainExport(triggerDownload, exportMeshFromPatches, props);
+  mainExport(triggerDownload, exportMeshFromPatches, props,{minSize:minSize ,maxCurvature:maxCurvature});
 }
 
 main();
 </script>
 <template>
   <div></div>
-  <div class="absolute bg-red-100">
-    <button @click="triggerDownload = true">Download</button>
-  </div>
+  <div class="absolute bg-red-100 p-2">
+  <label>Min Size: <input type="range" v-model="minSize" min="0" max="30" step="0.1"></label>
+  <label>Max Curvature: <input type="range" v-model="maxCurvature" min="0" max="10" step="0.1"></label>
+  <button @click="triggerDownload = true">Download</button></div>
 </template>

@@ -35,6 +35,12 @@ struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/stru
   y: u32,
   z: u32,
 };
+
+struct LODConfigParameters {
+  earlyExitMinSize: f32,
+  earlyExitMaxCurvature: f32
+}
+
 fn ceil_div(a: u32, b: u32) -> u32 { return (a + b - 1u) / b; }
 // Inspired from https://onrendering.com/data/papers/isubd/isubd.pdf
 fn patch_u_child(u: u32, child_bit: u32) -> u32 {
@@ -153,6 +159,8 @@ struct ForceRenderFlag {
 @group(1) @binding(3) var<storage, read_write> render_buffer_8 : RenderBuffer;
 @group(1) @binding(4) var<storage, read_write> render_buffer_16 : RenderBuffer;
 @group(1) @binding(5) var<storage, read_write> render_buffer_32 : RenderBuffer;
+@group(1) @binding(6) var<uniform> export_config: LODConfigParameters;
+
 // Group 2 is for things that change multiple times per model
 @group(2) @binding(0) var<storage, read_write> dispatch_next : DispatchIndirectArgs;
 @group(2) @binding(1) var<storage, read> patches_from_buffer : PatchesRead;
@@ -170,7 +178,7 @@ const U_Y = 4u;
 const WORKGROUP_SIZE = U_X * U_Y;
 
 // A vec2 with screen space coordinates
-alias vec2Screen = vec2<f32>;
+alias vec2Screen = vec3<f32>;
 
 
 // Storage in workgroup to combine our 32 samples
@@ -215,13 +223,15 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
   let ccp = sampleObject(quad_point_c);
   let cdp = sampleObject(quad_point_d);
 
+  let totalVLength = v_length[0] + v_length[1] + v_length[2] + v_length[3];
+  let totalULength = u_length[0] + u_length[1] + u_length[2] + u_length[3];
   let avg = (cap + cbp + ccp + cdp)/4f;
   let isflat = simab+simcd > 1.8f;
-
+  let isSmall = totalULength + totalVLength < export_config.earlyExitMinSize;//time.elapsed;
 
   let acceptable_size = 0.1f;
 
-  if (force_render.flag == 1u || isflat) {
+  if (force_render.flag == 1u || isSmall) {
 //  if (force_render.flag == 1u || size < acceptable_size) {
     force_render_internal(quad_encoded);
   } else {
@@ -279,19 +289,6 @@ fn calculateNormalOfPatch(p: Patch) -> vec3<f32> {
     return normalize((tnorma+tnormc)/2.0f);
 }
 
-/// Gets a bitflag for the frustum sides of a point in clip space. 6 bits are used, 1 for each side.
-/// Based on the equations in https://carmencincotti.com/2022-05-02/homogeneous-coordinates-clip-space-ndc/#clip-space
-fn get_frustum_side(point_clip_space: vec4f) -> u32 {
-  return u32(
-    (u32(point_clip_space.x < -point_clip_space.w) << 5u) |
-    (u32(point_clip_space.x >  point_clip_space.w) << 4u) |
-    (u32(point_clip_space.y < -point_clip_space.w) << 3u) |
-    (u32(point_clip_space.y >  point_clip_space.w) << 2u) |
-    (u32(point_clip_space.z < -point_clip_space.w) << 1u) |
-    (u32(point_clip_space.z >  point_clip_space.w) << 0u)
-  );
-}
-
 // assume a single work group
 @compute @workgroup_size(WORKGROUP_SIZE, 1, 1)
 fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
@@ -313,9 +310,9 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
     + (quad_size.y / f32(U_Y)) * f32(u_v_sample_index.y)
   );
   let u_sample = sampleObject(u_sample_location);
-  let u_clip_space = input_buffer.model_view_projection * vec4f(u_sample.xyz, 1.0);
-  let u_screen_space = u_clip_space.xy / u_clip_space.w;
-  u_samples[u_v_sample_index.y][u_v_sample_index.x] = u_screen_space;
+//  let u_clip_space = input_buffer.model_view_projection * vec4f(u_sample.xyz, 1.0);
+//  let u_screen_space = u_clip_space.xy / u_clip_space.w;
+  u_samples[u_v_sample_index.y][u_v_sample_index.x] = u_sample;//u_screen_space;
 
   // 4*8 = 32 V samples
   let v_sample_location = quad.min + vec2(
@@ -326,7 +323,7 @@ fn main(@builtin(workgroup_id) workgroup_id : vec3<u32>,
   let v_sample = sampleObject(v_sample_location);
   let v_clip_space = input_buffer.model_view_projection * vec4f(v_sample.xyz, 1.0);
   let v_screen_space = v_clip_space.xy / v_clip_space.w;
-  v_samples[u_v_sample_index.y][u_v_sample_index.x] = v_screen_space;
+  v_samples[u_v_sample_index.y][u_v_sample_index.x] = v_sample;//v_screen_space;
 
 
   workgroupBarrier(); // wait for u_samples and v_samples

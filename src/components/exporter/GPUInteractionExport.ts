@@ -64,7 +64,7 @@ function concatArrayBuffers(    props: any,views: ArrayBufferView[]): Uint8Array
 
 
 // Main function
-export async function mainExport(triggerDownload: any, exportMeshFromPatches: any, props: any) {
+export async function mainExport(triggerDownload: any, exportMeshFromPatches: any, props: any, lodExportParametersRefs: any) {
     const _adapter = await navigator.gpu.requestAdapter(); // Wait for Rust backend to be in business
     const device = props.gpuDevice;
   
@@ -135,6 +135,13 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
           visibility: GPUShaderStage.COMPUTE,
           buffer: {
             type: "storage",
+          },
+        },
+        {
+          binding: 6,
+          visibility: GPUShaderStage.COMPUTE,
+          buffer: {
+            type: "uniform",
           },
         },
       ],
@@ -356,8 +363,11 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       GPUBufferUsage.COPY_SRC
     );
   
+    let reset = new Uint32Array(vertOutputBufferSize/32);
+    reset[0] = 0;
+    reset[1] = vertOutputBufferSize;
     const vertOutputBufferReset = createBufferWith(props,
-      concatArrayBuffers(props,[new Uint32Array([0, vertOutputBufferSize])]),
+      concatArrayBuffers(props,[reset]),
       GPUBufferUsage.COPY_SRC
     );
   
@@ -380,8 +390,19 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       concatArrayBuffers(props,[new Uint32Array([1, 1, 1])]),
       GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT
     );
+
+    let lodStageParameters = new Float32Array([lodExportParametersRefs.minSize.value, lodExportParametersRefs.maxCurvature]);
+    const lodStageParametersBuffer = createBufferWith(props, 
+      concatArrayBuffers(props,[lodStageParameters]),
+      GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM
+    )
+
+    const lodStageParametersStagingBuffer = createBufferWith(props,
+      concatArrayBuffers(props,[lodStageParameters]),
+      GPUBufferUsage.MAP_WRITE | GPUBufferUsage.COPY_SRC
+    )
   
-    function lodStageCallback(
+    async function lodStageCallback(
       shaderPath: string,
       buffers: LodStageBuffers,
       commandEncoder: GPUCommandEncoder
@@ -438,6 +459,10 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
           {
             binding: 5,
             resource: { buffer: buffers.finalPatches32 },
+          },
+          {
+            binding: 6,
+            resource: { buffer: lodStageParametersBuffer },
           },
         ],
       });
@@ -518,7 +543,15 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
           },
         ],
       });
-  
+      lodStageParameters = new Float32Array([lodExportParametersRefs.minSize.value, lodExportParametersRefs.maxCurvature.value]);
+      device.queue.writeBuffer(lodStageParametersBuffer,0,lodStageParameters,0,lodStageParameters.length);
+      /*commandEncoder.copyBufferToBuffer(
+        lodStageParametersStagingBuffer,
+        0,
+        lodStageParametersBuffer,
+        0,
+        lodStageParametersBuffer.size
+      )*/
       const doubleNumberOfRounds = 3;
       // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
       for (let i = 0; i < doubleNumberOfRounds; i++) {
