@@ -8,17 +8,14 @@ import {
   type ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
 import type { LodStageBuffers } from "@/webgpu-hook";
-import { onUnmounted, ref } from "vue";
-import { mat4, vec3, vec2 } from "webgpu-matrix";
+import { ref } from "vue";
 import LodStageWgsl from "./lod_stage.wgsl?raw";
 import PrepVerticesStageWgsl from "./prep_vertices_stage.wgsl?raw";
 import OutputVerticesWgsl from "./vertices_stage.wgsl?raw";
-import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
-import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
 import * as THREE from 'three';
 import { createHelpers } from "./webgpu-helpers";
-import { array, number, string } from "zod";
-import { flatten } from "naive-ui/es/_utils";
+
 
 const a = new THREE.Vector3( 0, 1, 0 );
 
@@ -120,92 +117,23 @@ function exportMeshEarClipping(arrayVertices: any)
   console.log("AVLENGTH: " + arrayVertices.length);
 
   console.log("Unity stuff: ");
+  let exporterInstance : ExporterInstance = new ExporterInstance(arrayVertices, edgeInformation);
+  exporterInstance.Run();
   console.log(JSON.stringify(arrayVertices));
   console.log(JSON.stringify(edgeInformation));
-  for (const patch of arrayVertices) {
-    let v1 = patch[0], v2 = patch[1], v3 = patch[2], v4 = patch[3];
-    const upper: number = v2.uv.y;
-    const lower: number = v1.uv.y;
-    const left : number= v1.uv.x;
-    const right: number = v3.uv.x;
-    
-    let leftEdge = new Array();
-    let rightEdge = new Array();
-    let bottomEdge = new Array();
-    let topEdge = new Array();
-
-    v1 = {side: 3, vert: v1};
-    v2 = {side: 0, vert: v2};
-    v3 = {side: 1, vert: v3};
-    v4 = {side: 2, vert: v4};
-    
-    leftEdge.push(v1);
-    topEdge.push(v2);
-    rightEdge.push(v3);
-    bottomEdge.push(v4);
-    //debugger;
-    
-    
-    let leftEdgeInfo = edgeInformation.vertical.right[left];
-    let rightEdgeInfo = edgeInformation.vertical.left[right];
-    let upperEdgeInfo = edgeInformation.horizontal.bottom[upper];
-    let lowerEdgeInfo = edgeInformation.horizontal.top[lower];
-    
-    
-    processEdges(leftEdgeInfo,lower,upper,leftEdge,arrayVertices,0);
-    
-    processEdges2(rightEdgeInfo,lower,upper,rightEdge,arrayVertices,1);
-    
-    processEdges(upperEdgeInfo,left,right,topEdge,arrayVertices,2);
-    
-    //debugger;
-    processEdges2(lowerEdgeInfo,left,right,bottomEdge,arrayVertices,3);
-    bottomEdge = bottomEdge.reverse();
-    rightEdge = rightEdge.reverse();
-    let vertices : THREE.Vector3[]= [];
-    let square_edges = leftEdge.concat(topEdge).concat(rightEdge).concat(bottomEdge);
-    let square_edge_indices : number[] = [];
-    let index = 0;
-
-    
-    if(square_edges.length !== 4)
-      continue;
-    for(let vert of square_edges)
-    {
-//      console.log(vert);
-      mexpstring += "v " + vert.vert.uv.x + " " + vert.vert.uv.y + " " + 0 + "\n";
-      vertices.push(vert.vertex);
-      square_edge_indices.push(index++);
-    }
-    let triangles: Array<number> = [];
-    
-    while(square_edges.length > 2)
-    {
-      for(let i = 0; i < square_edges.length; i++)
-      {
-        let sideC: number = square_edges[i].side;
-        let sideB: number = square_edges[(i+1)%square_edges.length].side;
-        let sideA: number = square_edges[(i+2)%square_edges.length].side;
-        if (!(sideC === sideB && sideB === sideA)) {
-          let v1 = square_edge_indices[i]+vertoffset;
-          let v2 = square_edge_indices[(i+1)%square_edges.length]+vertoffset;
-          let v3 = square_edge_indices[(i+2)%square_edges.length]+vertoffset;
-          let line = "f " + (v1+1) + " " + (v2+1) + " " + (v3+1) + "\n";
-          mexpstring+=line;
-          triangles.push(v1,v2,v3);
-          square_edges.splice(i+1,1);
-          square_edge_indices.splice(i+1,1);
-          break;
-        }
-        else
-        {
-          continue;
-        }
-      }
-    }
-    vertoffset += square_edge_indices.length;
-
+  debugger;
+  for(let vert of exporterInstance.vertPositions)
+  {
+    mexpstring += "v " + vert.x + " " + vert.y + " " + vert.z + "\n";
   }
+  let triangles: Array<number> = [];
+  
+  let t = exporterInstance.tris;
+  for(let i = 0; i < t.length; i+=3)
+  {
+    mexpstring+="f " + (t[i]+1) + " " + (t[i+1]+1) + " " + (t[i+2]+1) + "\n";
+  }
+//  vertoffset += square_edge_indices.length;
   saveFile( mexpstring,"wowcool3dmodel_earclip.obj" );
 }
 
@@ -292,7 +220,7 @@ function exportMeshFromPatches(vertexStream: Float32Array) {
     patch_verts = [];
   }
   
-  //console.log(JSON.stringify(patches) );
+  //console.log(JSON.stringify(patches) ); // Insert code ported back from unity here
   //patches = fixPatchSeams(patches);
   //debugger;
   for(let i = 0; i < patches.length; i++)
@@ -303,6 +231,7 @@ function exportMeshFromPatches(vertexStream: Float32Array) {
       patches[i][j].vert = new THREE.Vector3(p.vert.x,p.vert.y,p.vert.z);
       
       patches[i][j].uv = new THREE.Vector2(p.uv.x,p.uv.y);
+      patches[i][j].globalIndex = -1;
     }
   }
   exportMeshEarClipping(patches);
@@ -435,7 +364,7 @@ interface Patch {
 }
 
 
-
+// Main function
 async function main() {
   const _adapter = await navigator.gpu.requestAdapter(); // Wait for Rust backend to be in business
   const device = props.gpuDevice;
@@ -679,8 +608,8 @@ async function main() {
     if (change.type === "insert" || change.type === "update") {
       getShaderCode(props.fs, change.key).then(
         ({ lodStage, verticesStage }) => {
-          console.log("LSTAGE 2: " + lodStage);
-          console.log("VSTAGE 2: " + lodStage);
+          //console.log("LSTAGE 2: " + lodStage);
+          //console.log("VSTAGE 2: " + lodStage);
           compiledShaders.value.set(change.key, {
             lodStage: makeShaderFromCodeAndPipeline(lodStage, pipelineLayout),
             verticesStage: makeShaderFromCodeAndPipeline(
@@ -1032,6 +961,10 @@ async function main() {
 interface Vertex {
     vert: { x: number; y: number; z: number };
     uv: { x: number; y: number };
+    corner: boolean;
+    globalIndex: number;
+    tempIdx: number;
+    side: number;    
 }
 
 // Define a type for a single range
@@ -1041,6 +974,12 @@ interface VertexRange {
     startVert: number;
     endVert: number;
     ipi: number;
+}
+
+
+function finalExport(): string
+{
+  return "";
 }
 
 // Helper function to insert ranges in sorted order
@@ -1096,7 +1035,6 @@ function interpolate(range: VertexRange, value: number, patches: Vertex[][]): TH
 
 type VRL =  Record<number, VertexRange[]>;
 
-// Main function
 function analyzeEdges(patches: Vertex[][]): any {
     const rangesHorizontal: { top: Record<number, VertexRange[]>; bottom: Record<number, VertexRange[]> } = {
         top: {},
@@ -1246,6 +1184,145 @@ function interpolateRanges(
         }
     }
 }
+
+
+class ExporterInstance {
+    public vertPositions: { x: number; y: number; z: number }[] = [];
+    public tris: number[] = [];
+    private colors: string[] = [];
+    private uvs: { x: number; y: number }[] = [];
+
+    private patches: any;
+    private edges: any;
+    private loopMeshX: boolean = false;
+    private loopMeshY: boolean = false;
+    private mapUv: boolean = false;
+
+    constructor(patches: any, edges: any, loopMeshX = false, loopMeshY = false, mapUv = false) {
+        this.patches = patches;
+        this.edges = edges;
+        this.loopMeshX = loopMeshX;
+        this.loopMeshY = loopMeshY;
+        this.mapUv = mapUv;
+    }
+
+    public Run(): void {
+        this.GenerateMesh();
+    }
+
+    private GenerateMesh(): void {
+        this.vertPositions = [];
+        this.tris = [];
+        this.uvs = [];
+
+        const vertCount = this.patches.reduce((count: number, patch: any[]) => count + patch.length, 0);
+        const bools: boolean[] = new Array(vertCount).fill(false);
+
+        for (const patch of this.patches) {
+            for (const vert of patch) {
+                if (!bools[vert.globalIndex]) {
+                    this.vertPositions[vert.globalIndex] = { x: vert.vert.x, y: vert.vert.y, z: vert.vert.z };
+                    this.uvs.push({ x: vert.uv.x, y: vert.uv.y });
+                    bools[vert.globalIndex] = true;
+                }
+            }
+        }
+
+        for (const patch of this.patches) {
+            this.processPatch(patch);
+        }
+    }
+
+    private processPatch(patch: any[]): void {
+        const [v0, v1, v2, v3] = patch;
+        v0.side = 3; v1.side = 2; v2.side = 1; v3.side = 0;
+
+        let left = v0.uv.x;
+        let right = v2.uv.x;
+        let lower = v0.uv.y;
+        let upper = v1.uv.y;
+
+        if (this.loopMeshX && left === 0.0) left = 1;
+        if (this.loopMeshX && right === 1.0) right = 0;
+        if (this.loopMeshY && upper === 1.0) upper = 0;
+        if (this.loopMeshY && lower === 0.0) lower = 1;
+
+        let verticesPatch: any[] = [v0];
+        verticesPatch = [...verticesPatch, ...this.getEdgeVertices("right", left, lower, upper, 0)];
+        verticesPatch.push(v1);
+        verticesPatch = [...verticesPatch, ...this.getEdgeVertices("bottom", upper, left, right, 1)];
+        verticesPatch.push(v2);
+        verticesPatch = [...verticesPatch, ...this.getEdgeVertices("left", right, upper, lower, 2).reverse()];
+        verticesPatch.push(v3);
+        verticesPatch = [...verticesPatch, ...this.getEdgeVertices("top", lower, right, left, 3).reverse()];
+
+        this.EarClipping(verticesPatch);
+    }
+
+    private getEdgeVertices(direction: string, ref: number, min: number, max: number, side: number): any[] {
+        const edgeData = this.edges[direction]?.[ref.toString()];
+        if (!edgeData) return [];
+
+        return edgeData.filter((ledge: any) => ledge.end > min && ledge.end < max)
+            .map((ledge: any) => {
+                const vert = this.patches[ledge.ipi][ledge.endVert];
+                vert.side = side;
+                return vert;
+            });
+    }
+
+    private EarClipping(vp: any[]): void {
+      let baseIndex = this.vertPositions.length;
+      let indexMapping: number[] = new Array(vp.length).fill(-1);
+      let j = 0;
+
+      for (let i = 0; i < vp.length; i++) {
+          const vert = vp[i];
+          if (vert.globalIndex === -1) {
+              vert.globalIndex = baseIndex + j++;
+              this.vertPositions.push(this.mapUv
+                  ? { x: vert.uv.x, y: Math.sin(vert.uv.y * Math.PI * 1.9), z: Math.cos(vert.uv.y * Math.PI * 1.9) }
+                  : { x: vert.vert.x, y: vert.vert.y, z: vert.vert.z });
+          }
+          indexMapping[i] = vert.globalIndex;
+      }
+
+      let loopDetection = 0;
+      let offset = 0;
+      let i = 0;
+
+      while (vp.length > 2) {
+          i++;
+          const v1 = vp[(i + offset) % vp.length];
+          const v2 = vp[(i + 1 + offset) % vp.length];
+          const v3 = vp[(i + 2 + offset) % vp.length];
+
+          loopDetection++;
+          if (vp.length === 3 && loopDetection > vp.length) {
+              vp.length = 0; // Clear array
+              break;
+          }
+
+          // Collinearity check (skip if all x or all y are the same)
+          if ((v1.uv.x === v2.uv.x && v2.uv.x === v3.uv.x) ||
+              (v1.uv.y === v2.uv.y && v2.uv.y === v3.uv.y)) {
+              if (loopDetection > 1000) {
+                  vp.length = 0; // Clear array to prevent infinite loops
+                  break;
+              }
+              continue;
+          }
+
+          vp.splice((i + 1 + offset) % vp.length, 1); // Remove ear vertex
+          this.tris.push(v1.globalIndex, v3.globalIndex, v2.globalIndex);
+          loopDetection = 0;
+
+          i++;
+    }
+  }
+
+}
+
 
 
 main();
