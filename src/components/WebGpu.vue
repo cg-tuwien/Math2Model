@@ -2,8 +2,6 @@
 // Taken from https://webgpu.github.io/webgpu-samples/?sample=rotatingCube#main.ts
 // TODO: Either add attribution, or remove this file.
 import {
-  makeFilePath,
-  type FilePath,
   type ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
 import { ref } from "vue";
@@ -11,43 +9,17 @@ import { ExporterInstance } from "./exporter/Exporter";
 import { Vector2, Vector3 } from "./exporter/VectorTypes";
 import {mainExport} from "./exporter/GPUInteractionExport";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
+import type {Vertex, VertexRange} from "./exporter/VertexType";
+import { analyzeEdges } from "./exporter/EdgeAnalysis";
+import {save, saveFile} from "./exporter/FileDownload"; 
 
 const props = defineProps<{
     gpuDevice: GPUDevice;
     engine: WgpuEngine;
     fs: ReactiveFilesystem;
   }>();
-const a = new Vector3(0, 1, 0);
-
 
 const triggerDownload = ref(false);
-
-const compiledShaders = ref<
-  Map<
-    FilePath,
-    {
-      lodStage: {
-        shader: GPUShaderModule;
-        pipeline: GPUComputePipeline;
-      };
-      verticesStage: {
-        shader: GPUShaderModule;
-        pipeline: GPUComputePipeline;
-      };
-    }
-  >
->(new Map());
-
-
-
-function save(blob: Blob, filename: string) {
-  const blobUrl = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = blobUrl;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(blobUrl);
-}
 
 function exportMeshEarClipping(arrayVertices: any) {
   let mexpstring = "o\n";
@@ -59,10 +31,7 @@ function exportMeshEarClipping(arrayVertices: any) {
   );
   exporterInstance.Run();
 
-  //  console.log(JSON.stringify(arrayVertices));
-//  console.log(JSON.stringify(edgeInformation));
-
-for (let vert of exporterInstance.vertPositions) {
+  for (let vert of exporterInstance.vertPositions) {
     mexpstring += "v " + vert.x + " " + vert.y + " " + vert.z + "\n";
   }
 
@@ -72,9 +41,6 @@ for (let vert of exporterInstance.vertPositions) {
   }
   saveFile(mexpstring, "wowcool3dmodel_earclip.obj");
 }
-function saveFile(text: string, filename: string) {
-    save(new Blob([text], { type: "text/plain" }), filename);
-  }
 
 function exportMeshFromPatches(vertexStream: Float32Array) {
   let slicedStream = vertexStream.slice(4);
@@ -125,136 +91,6 @@ function exportMeshFromPatches(vertexStream: Float32Array) {
 // Main function
 async function main() {
   mainExport(triggerDownload, exportMeshFromPatches, props);
-}
-
-// Define a type for a single vertex
-interface Vertex {
-  vert: { x: number; y: number; z: number };
-  uv: { x: number; y: number };
-  corner: boolean;
-  globalIndex: number;
-  tempIdx: number;
-  side: number;
-}
-
-// Define a type for a single range
-interface VertexRange {
-  start: number;
-  end: number;
-  startVert: number;
-  endVert: number;
-  ipi: number;
-}
-
-// Helper function to insert ranges in sorted order
-function insertSorted(rangeList: VertexRange[], range: VertexRange): void {
-  const index = rangeList.findIndex((r) => r.start >= range.start);
-  if (index === -1) {
-    rangeList.push(range);
-  } else {
-    rangeList.splice(index, 0, range);
-  }
-}
-
-// Helper function to create a VertexRange object
-function createVertexRange(
-  start: number,
-  end: number,
-  startVert: number,
-  endVert: number,
-  ipi: number
-): VertexRange {
-  return { start, end, startVert, endVert, ipi };
-}
-
-// Helper function to check if a range contains another range
-function checkContains(range: VertexRange, other: VertexRange): boolean {
-  return other.start >= range.start && other.end <= range.end;
-}
-
-// Helper function to calculate interpolation value
-function getInterpolationValue(range: VertexRange, value: number): number {
-  return (value - range.start) / (range.end - range.start);
-}
-
-// Helper function to interpolate between vertices
-function interpolate(
-  range: VertexRange,
-  value: number,
-  patches: Vertex[][]
-): Vector3 {
-  const ip = getInterpolationValue(range, value);
-
-  const startVec = new Vector3(
-    patches[range.ipi][range.startVert].vert.x,
-    patches[range.ipi][range.startVert].vert.y,
-    patches[range.ipi][range.startVert].vert.z
-  );
-
-  const endVec = new Vector3(
-    patches[range.ipi][range.endVert].vert.x,
-    patches[range.ipi][range.endVert].vert.y,
-    patches[range.ipi][range.endVert].vert.z
-  );
-
-  return startVec.multiplyScalar(1 - ip).add(endVec.multiplyScalar(ip));
-}
-
-function analyzeEdges(patches: Vertex[][]): any {
-  const rangesHorizontal: {
-    top: Record<number, VertexRange[]>;
-    bottom: Record<number, VertexRange[]>;
-  } = {
-    top: {},
-    bottom: {},
-  };
-
-  const rangesVertical: {
-    left: Record<number, VertexRange[]>;
-    right: Record<number, VertexRange[]>;
-  } = {
-    left: {},
-    right: {},
-  };
-
-  const ranges = { horizontal: rangesHorizontal, vertical: rangesVertical };
-  const topRanges = rangesHorizontal["top"];
-  const botRanges = rangesHorizontal["bottom"];
-  const leftRanges = rangesVertical["left"];
-  const rightRanges = rangesVertical["right"];
-
-  let inpInd = 0;
-
-  for (const patch of patches) {
-    const v1 = patch[0],
-      v2 = patch[1],
-      v3 = patch[2],
-      v4 = patch[3];
-    const upper = v2.uv.y;
-    const lower = v1.uv.y;
-    const left = v1.uv.x;
-    const right = v3.uv.x;
-
-    const hedgeTop = createVertexRange(left, right, 1, 2, inpInd);
-    const hedgeBottom = createVertexRange(left, right, 0, 3, inpInd);
-    const vedgeLeft = createVertexRange(lower, upper, 0, 1, inpInd);
-    const vedgeRight = createVertexRange(lower, upper, 3, 2, inpInd);
-
-    inpInd++;
-
-    if (!topRanges[upper]) topRanges[upper] = [];
-    insertSorted(topRanges[upper], hedgeTop);
-
-    if (!botRanges[lower]) botRanges[lower] = [];
-    insertSorted(botRanges[lower], hedgeBottom);
-
-    if (!leftRanges[left]) leftRanges[left] = [];
-    insertSorted(leftRanges[left], vedgeLeft);
-
-    if (!rightRanges[right]) rightRanges[right] = [];
-    insertSorted(rightRanges[right], vedgeRight);
-  }
-  return ranges;
 }
 
 main();
