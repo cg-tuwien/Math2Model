@@ -8,7 +8,9 @@ import init, {
 
 await init();
 
+/** Wraps the Rust engine in fire-and-forget functions. They will always be execude in-order */
 export class WgpuEngine {
+  private taskQueue: Promise<void> = Promise.resolve();
   private constructor(private engine: WasmApplication) {}
   static createEngine(canvasElement: HTMLCanvasElement) {
     const engine = new WasmApplication();
@@ -16,24 +18,38 @@ export class WgpuEngine {
     return new WgpuEngine(engine);
   }
   async updateModels(js_models: WasmModelInfo[]) {
-    await this.engine.update_models(js_models);
+    this.taskQueue = this.taskQueue.then(() =>
+      this.engine.update_models(js_models)
+    );
+    await this.taskQueue;
   }
   async updateShader(shader_info: WasmShaderInfo) {
-    await this.engine.update_shader(shader_info);
+    this.taskQueue = this.taskQueue.then(() =>
+      this.engine.update_shader(shader_info)
+    );
+    await this.taskQueue;
   }
   async removeShader(id: string) {
-    await this.engine.remove_shader(id);
+    this.taskQueue = this.taskQueue.then(() => this.engine.remove_shader(id));
+    await this.taskQueue;
   }
   async updateTexture(texture_info: { id: string; bitmap: ImageBitmap }) {
-    await this.engine.update_texture(texture_info.id, texture_info.bitmap);
+    this.taskQueue = this.taskQueue.then(() =>
+      this.engine.update_texture(texture_info.id, texture_info.bitmap)
+    );
+    await this.taskQueue;
   }
   async removeTexture(id: string) {
-    await this.engine.remove_texture(id);
+    this.taskQueue = this.taskQueue.then(() => this.engine.remove_texture(id));
+    await this.taskQueue;
   }
-  setOnShaderCompiled(
+  async setOnShaderCompiled(
     callback: (shaderId: string, messages: WasmCompilationMessage[]) => void
   ) {
-    setTimeout(() => this.engine.set_on_shader_compiled(callback), 0);
+    this.taskQueue = this.taskQueue.then(() =>
+      this.engine.set_on_shader_compiled(callback)
+    );
+    await this.taskQueue;
   }
   async setLodStage(
     callback:
@@ -45,15 +61,18 @@ export class WgpuEngine {
         ) => void)
   ) {
     if (callback === null) {
-      await this.engine.set_lod_stage();
+      this.taskQueue = this.taskQueue.then(() => this.engine.set_lod_stage());
     } else {
-      await this.engine.set_lod_stage((shaderPath: string, buffersUUID: string) => {
-        if (renderEncoder === null) {
-          console.error("renderEncoder is null");
-        } else {
-          callback(shaderPath, getBuffers(buffersUUID), renderEncoder);
-        }
-      });
+      this.taskQueue = this.taskQueue.then(() =>
+        this.engine.set_lod_stage((shaderPath: string, buffersUUID: string) => {
+          if (renderEncoder === null) {
+            console.error("renderEncoder is null");
+          } else {
+            callback(shaderPath, getBuffers(buffersUUID), renderEncoder);
+          }
+        })
+      );
     }
+    await this.taskQueue;
   }
 }

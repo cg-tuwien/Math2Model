@@ -197,25 +197,21 @@ function exportMeshFromPatches(
 }
 
 // Main function
-async function main() {
-  mainExport(
-    triggerDownload,
-    exportMeshFromPatches,
-    props,
-    {
-      minSize: minSize,
-      maxCurvature: maxCurvature,
-      acceptablePlanarity: acceptablePlanarity,
-      includeUVs: includeUVs,
-      models: models,
-      downloadTarget: downloadTarget,
-      bufferedNames: bufferedNames,
-    },
-    onFrame
-  );
-}
-
-main();
+mainExport(
+  triggerDownload,
+  exportMeshFromPatches,
+  props,
+  {
+    minSize: minSize,
+    maxCurvature: maxCurvature,
+    acceptablePlanarity: acceptablePlanarity,
+    includeUVs: includeUVs,
+    models: models,
+    downloadTarget: downloadTarget,
+    bufferedNames: bufferedNames,
+  },
+  onFrame
+);
 </script>
 <template>
   <div class="absolute bg-red-100 p-2">

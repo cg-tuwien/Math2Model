@@ -262,7 +262,7 @@ export async function mainExport(
     GPUBufferUsage.MAP_WRITE | GPUBufferUsage.COPY_SRC
   );
 
-  async function lodStageCallback(
+  function lodStageCallback(
     shaderPath: string,
     buffers: LodStageBuffers,
     commandEncoder: GPUCommandEncoder
@@ -471,5 +471,5 @@ export async function mainExport(
       }, 1);
     }
   }
-  props.engine.setLodStage(lodStageCallback);
+  await props.engine.setLodStage(lodStageCallback);
 }
