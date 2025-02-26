@@ -94,6 +94,7 @@ export function makeShaderFromCodeAndPipeline(
   ): {
     pipeline: GPUComputePipeline;
     shader: GPUShaderModule;
+    
   } {
     const shader = device.createShaderModule({
       code,

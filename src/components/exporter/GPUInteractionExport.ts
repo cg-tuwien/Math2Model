@@ -6,7 +6,7 @@ import {
 import LodStageWgsl from "../lod_stage.wgsl?raw";
 import PrepVerticesStageWgsl from "../prep_vertices_stage.wgsl?raw";
 import OutputVerticesWgsl from "../vertices_stage.wgsl?raw";
-import { ref } from "vue";
+import { ref,type Ref  } from "vue";
 import type { LodStageBuffers } from "@/webgpu-hook";
 import {simpleB2BSameSize, simpleBindGroupLayout, createSimpleBindGroup, createBufferWith, concatArrayBuffers, makeShaderFromCodeAndPipeline} from "./GPUUtils";
 // Unchanging props! No need to watch them.
@@ -125,10 +125,11 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
         getShaderCode(props.fs, change.key).then(
           ({ lodStage, verticesStage, code }) => {
             compiledShaders.value.set(change.key, {
-              lodStage: makeShaderFromCodeAndPipeline(lodStage, pipelineLayout),
+              lodStage: makeShaderFromCodeAndPipeline(lodStage, pipelineLayout,device),
               verticesStage: makeShaderFromCodeAndPipeline(
                 verticesStage,
-                outputVerticesLayout
+                outputVerticesLayout,
+                device
               ),
             });
           }
@@ -217,6 +218,25 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       buffers: LodStageBuffers,
       commandEncoder: GPUCommandEncoder
     ) {
+      let name = shaderPath;
+
+      var re = /\.wgsl$/;
+      name = name.replace(re, "");
+      let models: Ref<any[]> = lodExportParametersRefs.models;
+      let registered = false;
+      models.value.forEach(model => {
+        if(model.path == shaderPath)
+        {
+          registered = true;
+        }
+      });
+      if(!registered)
+      {
+        models.value.push({
+          path: shaderPath,
+          name: name
+        });
+      }
       const compiledShader = compiledShaders.value.get(makeFilePath(shaderPath));
       if (!compiledShader) {
         console.error("Shader not found: ", shaderPath);
@@ -250,7 +270,7 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       
       lodStageParameters = new Float32Array([lodExportParametersRefs.minSize.value, lodExportParametersRefs.maxCurvature.value, lodExportParametersRefs.acceptablePlanarity.value]);
       device.queue.writeBuffer(lodStageParametersBuffer,0,lodStageParameters,0,lodStageParameters.length);
-      const doubleNumberOfRounds = 4;
+      const doubleNumberOfRounds = 5;
       // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
       for (let i = 0; i < doubleNumberOfRounds; i++) {
         const isLastRound = i === doubleNumberOfRounds - 1;
@@ -309,9 +329,15 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       computePassVertices.dispatchWorkgroupsIndirect(dispatchVerticesStage, 0);
       computePassVertices.end();
   
+      console.log("SHADER OF THIS OBJECT IS: " + shaderPath);
       //console.log("Hi from " + buffers.computePatchesInput.label);
-      if (triggerDownload.value) {
-        triggerDownload.value = false;
+      let downloadTarget = lodExportParametersRefs.downloadTarget.value;
+      let downloadAll = downloadTarget == "";
+      let isRightDownloadTarget = downloadAll || downloadTarget == shaderPath;
+
+      if (triggerDownload.value && isRightDownloadTarget) {
+        if(!downloadAll)
+          triggerDownload.value = false;
         simpleB2BSameSize(vertOutputBuffer, vertReadableBuffer, commandEncoder);
         setTimeout(() => {
           vertReadableBuffer
@@ -322,7 +348,7 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
                 .slice(0);
               const vertexStream = new Float32Array(arrayBuffer);
               vertReadableBuffer.unmap();
-              exportMeshFromPatches(vertexStream,  lodExportParametersRefs.includeUVs.value);
+              exportMeshFromPatches(vertexStream,  lodExportParametersRefs.includeUVs.value, name, downloadAll);
             });
         }, 10);
       }

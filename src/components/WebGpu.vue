@@ -4,7 +4,7 @@
 import {
   type ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
-import { ref } from "vue";
+import { ref, type Ref } from "vue";
 import { ExporterInstance } from "./exporter/Exporter";
 import { Vector2, Vector3 } from "./exporter/VectorTypes";
 import { mainExport } from "./exporter/GPUInteractionExport";
@@ -25,17 +25,50 @@ const maxCurvature = ref(20.0);
 const acceptablePlanarity = ref(1.0);
 const includeUVs = ref(false);
 const fileFormat = ref("obj");
+const models: Ref<any[]> = ref([
+  {
+    path:"",
+    name:"all"
+  }
+]);
+const downloadTarget = ref("");
+const mergeModels = ref(false);
 
-async function exportMeshEarClipping(arrayVertices: any, includeUVs: boolean) {
-  // Prebake
-  let edgeInformation = analyzeEdges(arrayVertices);
-  let exporterInstance: ExporterInstance = new ExporterInstance(
-    arrayVertices,
-    edgeInformation
-  );
-  exporterInstance.useUvs = includeUVs;
-  exporterInstance.Run();
-  let modelExporter = new MeshExporter3DFormats(exporterInstance.vertPositions, exporterInstance.tris, exporterInstance.uvs);
+let meshBuffer: any[] = [];
+let bufferedNames: string[] = [];
+async function exportMeshEarClipping(arrayVertices: any, includeUVs: boolean, name: string, buffer: boolean) {
+  let looped = false;
+  if(bufferedNames.includes(name))
+  {
+    buffer = false;
+    looped = true;  
+  }
+  if(buffer)
+  {
+    bufferedNames.push(name);
+  }
+  if(!looped)
+  {
+    // Prebake
+    let edgeInformation = analyzeEdges(arrayVertices);
+    let exporterInstance: ExporterInstance = new ExporterInstance(
+      arrayVertices,
+      edgeInformation
+    );
+    exporterInstance.useUvs = includeUVs;
+    exporterInstance.Run();
+
+    meshBuffer.push(
+        {
+          name: name,
+          verts: exporterInstance.vertPositions,
+          tris: exporterInstance.tris,
+          uvs: exporterInstance.uvs
+        }
+      );
+    }
+  if(buffer) return;
+  let modelExporter = new MeshExporter3DFormats(meshBuffer,true);
   modelExporter.useUvs = includeUVs;
   let format = fileFormat.value;
   let fileContent = await modelExporter.exportModel(format);
@@ -44,7 +77,7 @@ async function exportMeshEarClipping(arrayVertices: any, includeUVs: boolean) {
     console.log("Error during exporting, format did not match any known");
     return;
   }
-  let filename = "wowcool3dmodel_earclip." + format;
+  let filename = name + format;
   let binary = fileContent.binary;
   let data = fileContent.data;
   if(!binary)
@@ -53,7 +86,7 @@ async function exportMeshEarClipping(arrayVertices: any, includeUVs: boolean) {
     saveFileBinary(data, filename);
 }
 
-function exportMeshFromPatches(vertexStream: Float32Array, includeUVs: boolean) {
+function exportMeshFromPatches(vertexStream: Float32Array, includeUVs: boolean, name: string, buffer: boolean) {
   let slicedStream = vertexStream.slice(4);
   let index = 0;
   let patch_verts = [];
@@ -96,7 +129,7 @@ function exportMeshFromPatches(vertexStream: Float32Array, includeUVs: boolean) 
       patches[i][j].globalIndex = -1;
     }
   }
-  exportMeshEarClipping(patches, includeUVs);
+  exportMeshEarClipping(patches, includeUVs,name, buffer);
 }
 
 // Main function
@@ -105,7 +138,9 @@ async function main() {
     minSize: minSize,
     maxCurvature: maxCurvature,
     acceptablePlanarity: acceptablePlanarity,
-    includeUVs: includeUVs
+    includeUVs: includeUVs,
+    models: models,
+    downloadTarget: downloadTarget
   });
 }
 
@@ -125,6 +160,11 @@ main();
       <option value="obj">obj</option>
       <option value="glb">glb</option>
     </select></label>
+
+    <label>Target Model: <select v-model="downloadTarget">
+      <option v-for="model in models" :value="model.path" v-bind:key="model.path">{{model.name}}</option>
+    </select></label> 
+    <label v-if="downloadTarget==''">Merge Models<input type="checkbox" v-model="mergeModels"></label>
     
     <div></div>
     <label>Include UVs: <input type="checkbox" v-model="includeUVs"> </label>

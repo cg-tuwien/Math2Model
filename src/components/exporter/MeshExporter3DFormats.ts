@@ -2,26 +2,22 @@
 import { Document, WebIO } from '@gltf-transform/core';
 
 export class MeshExporter3DFormats {
-    vertices: any[];
-    tris: number[];
-    uvs: any[];
+    meshBuffer: any[];
     public useUvs = false;
+    public merge: boolean = false;
     constructor(
-        vertices: any[],
-        tris: any[],
-        uvs: any[]
+        meshBuffer: any[], merge: boolean
     ) {
-        this.vertices = vertices;
-        this.tris = tris;
-        this.uvs = uvs;
+        this.meshBuffer = meshBuffer;
+        this.merge = merge;
     }
 
     public async exportModel(format: string) : Promise<any> {
         if (format == "obj") {
-            return {data: this.objExport(), binary: false};
+            return {data: this.objExport(this.meshBuffer), binary: false};
         }
         if(format == "glb") {
-            return await {data: await this.gltfExport(false), binary: false};
+            return await {data: await this.gltfExport(this.meshBuffer,false), binary: false};
         }
         return "error";
     }
@@ -29,20 +25,29 @@ export class MeshExporter3DFormats {
     /**
      * objExport
      */
-    public objExport() : string {
-        let mexpstring = "o\n";
+    public objExport(meshes: any[]) : string {
 
-        for (let vert of this.vertices) {
-            mexpstring += "v " + vert.x + " " + vert.y + " " + vert.z + "\n";
-        }
-        if (this.useUvs) {
-            for (let uv of this.uvs) {
-                mexpstring += "vt " + uv.x + " " + uv.y + "\n";
+        let mexpstring = "";
+        let offset = 1;
+
+        for(let i = 0; i < meshes.length; i++)
+        {
+            let buf = this.meshBuffer[i];
+         
+            let mexpstring = "o" + buf.name + "\n";
+            for (let vert of buf.verts) {
+                mexpstring += "v " + vert.x + " " + vert.y + " " + vert.z + "\n";
             }
-        }
-        let t = this.tris;
-        for (let i = 0; i < t.length; i += 3) {
-            mexpstring += "f " + (t[i] + 1) + " " + (t[i + 1] + 1) + " " + (t[i + 2] + 1) + "\n";
+            if (this.useUvs) {
+                for (let uv of buf.uvs) {
+                    mexpstring += "vt " + uv.x + " " + uv.y + "\n";
+                }
+            }
+            let t = buf.tris;
+            for (let i = 0; i < t.length; i += 3) {
+                mexpstring += "f " + (t[i] + offset) + " " + (t[i + 1] + offset) + " " + (t[i + 2] + offset) + "\n";
+            }
+            offset+=buf.verts.length;
         }
         return mexpstring;
     }
@@ -50,37 +55,41 @@ export class MeshExporter3DFormats {
     /**
      * gltfExport
      */
-    public async gltfExport(binary: boolean) : Promise<Uint8Array> {
-                
+    public async gltfExport(meshes: any[], binary: boolean) : Promise<Uint8Array> {
         const doc = new Document(); 
 
-        const buffer = doc.createBuffer();
-
-        let transformedVerts = new Float32Array(this.vertices.length*3);
-        for(let i = 0; i < this.vertices.length; i++)
+        const scene = doc.createScene();
+        for(let x = 0; x < meshes.length; x++)
         {
-            let v = this.vertices[i];
-            transformedVerts[i*3] = v.x;
-            transformedVerts[i*3+1] = v.y;
-            transformedVerts[i*3+2] = v.z;
+            let meshBuf = meshes[x];
+            const buffer = doc.createBuffer();
+
+            let transformedVerts = new Float32Array(meshBuf.verts.length*3);
+            for(let i = 0; i < meshBuf.verts.length; i++)
+            {
+                let v = meshBuf.verts[i];
+                transformedVerts[i*3] = v.x;
+                transformedVerts[i*3+1] = v.y;
+                transformedVerts[i*3+2] = v.z;
+            }
+            const position = doc.createAccessor()
+            .setType('VEC3')
+            .setArray(new Float32Array(transformedVerts))
+            .setBuffer(buffer);
+            const indices = doc.createAccessor()
+            .setType('SCALAR')
+            .setArray(new Uint32Array(meshBuf.tris))
+            .setBuffer(buffer);
+
+            const prim = doc.createPrimitive()
+            .setAttribute('POSITION', position)
+            .setIndices(indices);
+
+            const mesh = doc.createMesh().addPrimitive(prim);
+            mesh.setName(meshBuf.name);
+            const node = doc.createNode().setMesh(mesh);
+            scene.addChild(node);
         }
-        const position = doc.createAccessor()
-        .setType('VEC3')
-        .setArray(new Float32Array(transformedVerts))
-        .setBuffer(buffer);
-        const indices = doc.createAccessor()
-        .setType('SCALAR')
-        .setArray(new Uint32Array(this.tris))
-        .setBuffer(buffer);
-
-        const prim = doc.createPrimitive()
-        .setAttribute('POSITION', position)
-        .setIndices(indices);
-
-        const mesh = doc.createMesh().addPrimitive(prim);
-        const node = doc.createNode().setMesh(mesh);
-        const scene = doc.createScene().addChild(node);
-
         const glb = await new WebIO().writeBinary(doc); 
         return glb;
     }
