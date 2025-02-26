@@ -217,7 +217,7 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
   let acceptable_size = 0.1f;
   let planarityThreshold =export_config.acceptablePlanarity;
   let shouldRender = 
-            isflat || 
+            isflat ||
             isSmall ||
             planarity > planarityThreshold;
   if (force_render.flag == 1u || shouldRender) {
