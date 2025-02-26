@@ -35,7 +35,7 @@ export class WgpuEngine {
   ) {
     setTimeout(() => this.engine.set_on_shader_compiled(callback), 0);
   }
-  setLodStage(
+  async setLodStage(
     callback:
       | null
       | ((
@@ -45,9 +45,9 @@ export class WgpuEngine {
         ) => void)
   ) {
     if (callback === null) {
-      this.engine.set_lod_stage();
+      await this.engine.set_lod_stage();
     } else {
-      this.engine.set_lod_stage((shaderPath: string, buffersUUID: string) => {
+      await this.engine.set_lod_stage((shaderPath: string, buffersUUID: string) => {
         if (renderEncoder === null) {
           console.error("renderEncoder is null");
         } else {
