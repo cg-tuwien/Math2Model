@@ -7,9 +7,8 @@ import LodStageWgsl from "../lod_stage.wgsl?raw";
 import PrepVerticesStageWgsl from "../prep_vertices_stage.wgsl?raw";
 import OutputVerticesWgsl from "../vertices_stage.wgsl?raw";
 import { ref } from "vue";
-import { createHelpers } from "../webgpu-helpers";
 import type { LodStageBuffers } from "@/webgpu-hook";
-
+import {simpleB2BSameSize, simpleBindGroupLayout, createSimpleBindGroup, createBufferWith, concatArrayBuffers, makeShaderFromCodeAndPipeline} from "./GPUUtils";
 // Unchanging props! No need to watch them.
 
 const compiledShaders = ref<
@@ -28,201 +27,30 @@ const compiledShaders = ref<
   >
 >(new Map());
 
-function concatArrayBuffers(    props: any,views: ArrayBufferView[]): Uint8Array {
-    let length = 0;
-    for (const v of views) length += v.byteLength;
-  
-    let buf = new Uint8Array(length);
-    let offset = 0;
-    for (const v of views) {
-      const uint8view = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
-      buf.set(uint8view, offset);
-      offset += uint8view.byteLength;
-    }
-    const { concatArrayBuffers, createBufferWith } = createHelpers(
-      props.gpuDevice
-    );
-  
-    return buf;
-  }
-  
-  function createBufferWith(
-    props: any,
-    contents: Uint8Array,
-    usage: GPUBufferUsageFlags,
-    size?: number,
-  ) {
-    const buffer = props.gpuDevice.createBuffer({
-      size: size ?? contents.byteLength,
-      usage,
-      mappedAtCreation: true,
-    });
-    new Uint8Array(buffer.getMappedRange()).set(contents);
-    buffer.unmap();
-    return buffer;
-  }
 
 
 // Main function
 export async function mainExport(triggerDownload: any, exportMeshFromPatches: any, props: any, lodExportParametersRefs: any) {
     const _adapter = await navigator.gpu.requestAdapter(); // Wait for Rust backend to be in business
     const device = props.gpuDevice;
-  
-    const sceneUniformsLayout = device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "uniform",
-          },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "uniform",
-          },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "uniform",
-          },
-        },
-      ],
-    });
-    const layout1 = device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "uniform",
-          },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "storage",
-          },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "storage",
-          },
-        },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "storage",
-          },
-        },
-        {
-          binding: 4,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "storage",
-          },
-        },
-        {
-          binding: 5,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "storage",
-          },
-        },
-        {
-          binding: 6,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "uniform",
-          },
-        },
-      ],
-    });
-    const layout2 = device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "storage",
-          },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "read-only-storage",
-          },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "storage",
-          },
-        },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "uniform",
-          },
-        },
-      ],
-    });
-  
-    const prepVerticesBinding0 = device.createBindGroupLayout({
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "read-only-storage",
-          },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "storage",
-          },
-        },
-      ],
-    });
-  
-    const vertexOutputLayout = device.createBindGroupLayout({
-      entries: [
-        //{
-        //  binding: 0,
-        //  visibility: GPUShaderStage.COMPUTE,
-        //  buffer: {
-        //    type: "uniform",
-        //  },
-        //},
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "read-only-storage",
-          },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: {
-            type: "storage",
-          },
-        },
-      ],
-    });
+    const sceneUniformsLayout = simpleBindGroupLayout(
+      GPUShaderStage.COMPUTE,
+      ["uniform","uniform","uniform"],device, "scene uniforms"
+    );
+    const layout1 = simpleBindGroupLayout(
+      GPUShaderStage.COMPUTE,
+      ["uniform","storage","storage", "storage","storage","storage", "uniform"],device, "layout1"
+    );
+    const layout2 = simpleBindGroupLayout(
+      GPUShaderStage.COMPUTE,
+      ["storage", "read-only-storage", "storage", "uniform"], device, "layout2"
+    )
+    
+    const prepVerticesBinding0 = simpleBindGroupLayout(GPUShaderStage.COMPUTE,
+      ["read-only-storage", "storage"], device, "prep vertices"
+    );
+
+    const vertexOutputLayout = simpleBindGroupLayout(GPUShaderStage.COMPUTE,["read-only-storage","storage"],device, "patch output");
   
     const pipelineLayout = device.createPipelineLayout({
       bindGroupLayouts: [sceneUniformsLayout, layout1, layout2],
@@ -235,34 +63,14 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       bindGroupLayouts: [sceneUniformsLayout, vertexOutputLayout],
     });
   
-    function makeShaderFromCodeAndPipeline(
-      code: string,
-      shaderPipelineLayout: GPUPipelineLayout
-    ): {
-      pipeline: GPUComputePipeline;
-      shader: GPUShaderModule;
-    } {
-      const shader = props.gpuDevice.createShaderModule({
-        code,
-      });
-      shader.getCompilationInfo().then((info : any) => {
-        console.log("Shader compilation resulted in ", info);
-      });
-      const pipeline = props.gpuDevice.createComputePipeline({
-        layout: shaderPipelineLayout,
-        compute: {
-          module: shader,
-        },
-      });
-      return { shader, pipeline };
-    }
-  
+    
     async function getShaderCode(
       fs: ReactiveFilesystem,
       key: FilePath
     ): Promise<{
       lodStage: string;
       verticesStage: string;
+      code: string|null;
     }> {
       // Race condition free, because the fs resolves read requests in order
       const code = await fs.readTextFile(key);
@@ -270,6 +78,7 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       const result = {
         lodStage: LodStageWgsl,
         verticesStage: OutputVerticesWgsl,
+        code: code
       };
       if (code !== null) {
         const replaceWithCode = (v: string) =>
@@ -287,7 +96,8 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
   
     let prepVerticesStageShaderAndPipeline = makeShaderFromCodeAndPipeline(
       PrepVerticesStageWgsl,
-      prepVerticesStageLayout
+      prepVerticesStageLayout,
+      device
     );
   
     let oneVertexEntry = 32;
@@ -313,7 +123,7 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       if (!change.key.endsWith(".wgsl")) return;
       if (change.type === "insert" || change.type === "update") {
         getShaderCode(props.fs, change.key).then(
-          ({ lodStage, verticesStage }) => {
+          ({ lodStage, verticesStage, code }) => {
             compiledShaders.value.set(change.key, {
               lodStage: makeShaderFromCodeAndPipeline(lodStage, pipelineLayout),
               verticesStage: makeShaderFromCodeAndPipeline(
@@ -415,162 +225,38 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       const pipeline = compiledShader.lodStage.pipeline;
   
       // We inefficiently recreate the bind groups every time.
-      const userInputBindGroup = device.createBindGroup({
-        layout: sceneUniformsLayout,
-        entries: [
-          {
-            binding: 0,
-            resource: { buffer: buffers.time },
-          },
-          {
-            binding: 1,
-            resource: { buffer: buffers.screen },
-          },
-          {
-            binding: 2,
-            resource: { buffer: buffers.mouse },
-          },
-        ],
-      });
+      const userInputBindGroup = createSimpleBindGroup(
+        [buffers.time,buffers.screen,buffers.mouse],sceneUniformsLayout,device
+      );
   
-      const toRenderPatchesBindGroup = device.createBindGroup({
-        layout: layout1,
-        entries: [
-          {
-            binding: 0,
-            resource: { buffer: buffers.computePatchesInput },
-          },
-          {
-            binding: 1,
-            resource: { buffer: buffers.finalPatches2 },
-          },
-          {
-            binding: 2,
-            resource: { buffer: buffers.finalPatches4 },
-          },
-          {
-            binding: 3,
-            resource: { buffer: buffers.finalPatches8 },
-          },
-          {
-            binding: 4,
-            resource: { buffer: buffers.finalPatches16 },
-          },
-          {
-            binding: 5,
-            resource: { buffer: buffers.finalPatches32 },
-          },
-          {
-            binding: 6,
-            resource: { buffer: lodStageParametersBuffer },
-          },
-        ],
-      });
-  
+
+      const toRenderPatchesBindGroup = createSimpleBindGroup(
+        [buffers.computePatchesInput, buffers.finalPatches2, buffers.finalPatches4, buffers.finalPatches8,
+           buffers.finalPatches16, buffers.finalPatches32, lodStageParametersBuffer], layout1, device
+      );  
+
       const pingPongPatchesBindGroup = [
-        device.createBindGroup({
-          layout: layout2,
-          entries: [
-            {
-              binding: 0,
-              resource: { buffer: buffers.indirectDispatch1 },
-            },
-            {
-              binding: 1,
-              resource: { buffer: buffers.patches0 },
-            },
-            {
-              binding: 2,
-              resource: { buffer: buffers.patches1 },
-            },
-            {
-              binding: 3,
-              resource: { buffer: buffers.forceRender },
-            },
-          ],
-        }),
-        device.createBindGroup({
-          layout: layout2,
-          entries: [
-            {
-              binding: 0,
-              resource: { buffer: buffers.indirectDispatch0 },
-            },
-            {
-              binding: 1,
-              resource: { buffer: buffers.patches1 },
-            },
-            {
-              binding: 2,
-              resource: { buffer: buffers.patches0 },
-            },
-            {
-              binding: 3,
-              resource: { buffer: buffers.forceRender },
-            },
-          ],
-        }),
+        createSimpleBindGroup(
+          [buffers.indirectDispatch1, buffers.patches0, buffers.patches1, buffers.forceRender], layout2, device
+        ),
+        createSimpleBindGroup(
+          [buffers.indirectDispatch0, buffers.patches1, buffers.patches0, buffers.forceRender], layout2, device
+        ),
       ];
   
-      let bindGroupVertPrep = device.createBindGroup({
-        layout: prepVerticesBinding0,
-        entries: [
-          {
-            binding: 0,
-            resource: { buffer: buffers.finalPatches2 },
-          },
-          {
-            binding: 1,
-            resource: { buffer: dispatchVerticesStage },
-          },
-        ],
-      });
+      let bindGroupVertPrep = createSimpleBindGroup([buffers.finalPatches2, dispatchVerticesStage], prepVerticesBinding0, device);
   
-      // @group(1) @binding(0) var<uniform> model: Model;
-      // @group(1) @binding(1) var<storage, read> render_buffer: RenderBufferRead;
-      // @group(1) @binding(2) var<storage, read_write> output_buffer: OutputBuffer;
-  
-      let outputVerticesBindGroup = device.createBindGroup({
-        layout: vertexOutputLayout,
-        entries: [
-          {
-            binding: 1,
-            resource: { buffer: buffers.finalPatches2 },
-          },
-          {
-            binding: 2,
-            resource: { buffer: vertOutputBuffer },
-          },
-        ],
-      });
+      let outputVerticesBindGroup = createSimpleBindGroup([buffers.finalPatches2, vertOutputBuffer],vertexOutputLayout,device);
+      
       lodStageParameters = new Float32Array([lodExportParametersRefs.minSize.value, lodExportParametersRefs.maxCurvature.value, lodExportParametersRefs.acceptablePlanarity.value]);
       device.queue.writeBuffer(lodStageParametersBuffer,0,lodStageParameters,0,lodStageParameters.length);
-      /*commandEncoder.copyBufferToBuffer(
-        lodStageParametersStagingBuffer,
-        0,
-        lodStageParametersBuffer,
-        0,
-        lodStageParametersBuffer.size
-      )*/
       const doubleNumberOfRounds = 4;
       // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
       for (let i = 0; i < doubleNumberOfRounds; i++) {
         const isLastRound = i === doubleNumberOfRounds - 1;
         // Ping
-        commandEncoder.copyBufferToBuffer(
-          patchesBufferReset,
-          0,
-          buffers.patches1,
-          0,
-          patchesBufferReset.size
-        );
-        commandEncoder.copyBufferToBuffer(
-          indirectComputeBufferReset,
-          0,
-          buffers.indirectDispatch1,
-          0,
-          indirectComputeBufferReset.size
-        );
+        simpleB2BSameSize(patchesBufferReset, buffers.patches1,commandEncoder);
+        simpleB2BSameSize(indirectComputeBufferReset, buffers.indirectDispatch1,commandEncoder);
   
         let computePassPing = commandEncoder.beginComputePass();
         computePassPing.setPipeline(pipeline);
@@ -584,30 +270,11 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
   
         // Pong
         if (isLastRound) {
-          commandEncoder.copyBufferToBuffer(
-            forceRenderTrue,
-            0,
-            buffers.forceRender,
-            0,
-            forceRenderTrue.size
-          );
+          simpleB2BSameSize(forceRenderTrue,buffers.forceRender,commandEncoder);
         }
-  
-        commandEncoder.copyBufferToBuffer(
-          patchesBufferReset,
-          0,
-          buffers.patches0,
-          0,
-          patchesBufferReset.size
-        );
-        commandEncoder.copyBufferToBuffer(
-          indirectComputeBufferReset,
-          0,
-          buffers.indirectDispatch0,
-          0,
-          indirectComputeBufferReset.size
-        );
-  
+        simpleB2BSameSize(patchesBufferReset,buffers.patches0,commandEncoder);
+        simpleB2BSameSize(indirectComputeBufferReset,buffers.indirectDispatch0,commandEncoder);
+
         let computePassPong = commandEncoder.beginComputePass({ label: "Pong" });
         computePassPong.setPipeline(pipeline);
         computePassPong.setBindGroup(0, userInputBindGroup);
@@ -617,13 +284,7 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
         computePassPong.end();
   
         if (isLastRound) {
-          commandEncoder.copyBufferToBuffer(
-            forceRenderFalse,
-            0,
-            buffers.forceRender,
-            0,
-            forceRenderFalse.size
-          );
+          simpleB2BSameSize(forceRenderFalse, buffers.forceRender, commandEncoder);
         }
       }
   
@@ -636,14 +297,8 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       computePassPrep.dispatchWorkgroups(1);
       computePassPrep.end();
   
-      commandEncoder.copyBufferToBuffer(
-        vertOutputBufferReset,
-        0,
-        vertOutputBuffer,
-        0,
-        vertOutputBufferReset.size
-      );
-  
+      simpleB2BSameSize(vertOutputBufferReset, vertOutputBuffer, commandEncoder);
+
       // Run vertex output shader
       let computePassVertices = commandEncoder.beginComputePass({
         label: "vertexOutputStage",
@@ -654,15 +309,10 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       computePassVertices.dispatchWorkgroupsIndirect(dispatchVerticesStage, 0);
       computePassVertices.end();
   
+      //console.log("Hi from " + buffers.computePatchesInput.label);
       if (triggerDownload.value) {
         triggerDownload.value = false;
-        commandEncoder.copyBufferToBuffer(
-          vertOutputBuffer,
-          0,
-          vertReadableBuffer,
-          0,
-          vertOutputBuffer.size
-        );
+        simpleB2BSameSize(vertOutputBuffer, vertReadableBuffer, commandEncoder);
         setTimeout(() => {
           vertReadableBuffer
             .mapAsync(GPUMapMode.READ, 0, vertReadableBuffer.size)

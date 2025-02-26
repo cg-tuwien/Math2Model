@@ -161,8 +161,8 @@ struct OutputBuffer {
 }
 
 //@group(1) @binding(0) var<uniform> model: Model;
-@group(1) @binding(1) var<storage, read> render_buffer: RenderBufferRead;
-@group(1) @binding(2) var<storage, read_write> output_buffer: OutputBuffer;
+@group(1) @binding(0) var<storage, read> render_buffer: RenderBufferRead;
+@group(1) @binding(1) var<storage, read_write> output_buffer: OutputBuffer;
 
 struct VertexOutput {
    // TODO: Compute normal vectors

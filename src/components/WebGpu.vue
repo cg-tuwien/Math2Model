@@ -9,7 +9,6 @@ import { ExporterInstance } from "./exporter/Exporter";
 import { Vector2, Vector3 } from "./exporter/VectorTypes";
 import { mainExport } from "./exporter/GPUInteractionExport";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
-import type { Vertex, VertexRange } from "./exporter/VertexType";
 import { analyzeEdges } from "./exporter/EdgeAnalysis";
 import { save, saveFile, saveFileBinary } from "./exporter/FileDownload";
 import { MeshExporter3DFormats } from "./exporter/MeshExporter3DFormats";
