@@ -30,7 +30,7 @@ const compiledShaders = ref<
 
 
 // Main function
-export async function mainExport(triggerDownload: any, exportMeshFromPatches: any, props: any, lodExportParametersRefs: any) {
+export async function mainExport(triggerDownload: any, exportMeshFromPatches: any, props: any, lodExportParametersRefs: any, onFrame: any) {
     const _adapter = await navigator.gpu.requestAdapter(); // Wait for Rust backend to be in business
     const device = props.gpuDevice;
     const sceneUniformsLayout = simpleBindGroupLayout(
@@ -104,7 +104,7 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
     let startVertexOffset = 8;
     let padding = 8;
     const vertOutputBufferSize =
-      startVertexOffset + padding + oneVertexEntry * 200_000;
+      startVertexOffset + padding + oneVertexEntry * 500_000;
     let vertOutputBuffer = device.createBuffer({
       label: "VertOutputBuffer",
       size: vertOutputBufferSize,
@@ -168,7 +168,7 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       }
     };
   
-    const MAX_PATCHES = 100_000;
+    const MAX_PATCHES = 500_000;
     const patchesBufferReset = createBufferWith(props,
       concatArrayBuffers(props,[new Uint32Array([0, MAX_PATCHES])]),
       GPUBufferUsage.COPY_SRC
@@ -219,7 +219,7 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       commandEncoder: GPUCommandEncoder
     ) {
       let name = shaderPath;
-
+      let uuid = buffers.computePatchesInput.label.split(" ")[0];
       var re = /\.wgsl$/;
       name = name.replace(re, "");
       let models: Ref<any[]> = lodExportParametersRefs.models;
@@ -234,7 +234,8 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       {
         models.value.push({
           path: shaderPath,
-          name: name
+          name: name,
+          uuid: uuid
         });
       }
       const compiledShader = compiledShaders.value.get(makeFilePath(shaderPath));
@@ -329,13 +330,20 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       computePassVertices.dispatchWorkgroupsIndirect(dispatchVerticesStage, 0);
       computePassVertices.end();
   
-      console.log("SHADER OF THIS OBJECT IS: " + shaderPath);
+//      console.log("SHADER OF THIS OBJECT IS: " + shaderPath);
       //console.log("Hi from " + buffers.computePatchesInput.label);
+
       let downloadTarget = lodExportParametersRefs.downloadTarget.value;
       let downloadAll = downloadTarget == "";
       let isRightDownloadTarget = downloadAll || downloadTarget == shaderPath;
-
-      if (triggerDownload.value && isRightDownloadTarget) {
+      if(triggerDownload.value)
+      {
+//        debugger;
+      }
+      onFrame();
+      if (triggerDownload.value && isRightDownloadTarget && !lodExportParametersRefs.bufferedNames.value.includes(name)) {
+        console.log("Exporting " + name);
+        triggerDownload.value = false;
         if(!downloadAll)
           triggerDownload.value = false;
         simpleB2BSameSize(vertOutputBuffer, vertReadableBuffer, commandEncoder);
@@ -343,16 +351,18 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
           vertReadableBuffer
             .mapAsync(GPUMapMode.READ, 0, vertReadableBuffer.size)
             .then(() => {
+              console.log("Memory mapped the buffer for " + name);
               const arrayBuffer = vertReadableBuffer
                 .getMappedRange(0, vertReadableBuffer.size)
                 .slice(0);
               const vertexStream = new Float32Array(arrayBuffer);
               vertReadableBuffer.unmap();
+              if(downloadAll)
+                triggerDownload.value = true;
               exportMeshFromPatches(vertexStream,  lodExportParametersRefs.includeUVs.value, name, downloadAll);
             });
-        }, 10);
+        }, 1);
       }
     }
-  
     props.engine.setLodStage(lodStageCallback);
   }

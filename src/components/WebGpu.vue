@@ -12,6 +12,10 @@ import type { WgpuEngine } from "@/engine/wgpu-engine";
 import { analyzeEdges } from "./exporter/EdgeAnalysis";
 import { save, saveFile, saveFileBinary } from "./exporter/FileDownload";
 import { MeshExporter3DFormats } from "./exporter/MeshExporter3DFormats";
+import { SceneFileName, deserializeScene } from "@/filesystem/scene-file";
+import { assert } from "@stefnotch/typestef/assert";
+
+
 
 const props = defineProps<{
   gpuDevice: GPUDevice;
@@ -27,28 +31,82 @@ const includeUVs = ref(false);
 const fileFormat = ref("obj");
 const models: Ref<any[]> = ref([
   {
-    path:"",
-    name:"all"
+    path: "",
+    name: "all"
   }
 ]);
 const downloadTarget = ref("");
 const mergeModels = ref(false);
 
 let meshBuffer: any[] = [];
-let bufferedNames: string[] = [];
+let bufferedNames: Ref<string[]> = ref([]);
+let lastMeshBufferUpdate = 0;
+
+let frameCount = 0;
+function onFrame() {
+
+  frameCount++;
+  if (meshBuffer.length > 0) {
+    //  debugger;
+    if (lastMeshBufferUpdate < frameCount - 5) {
+      exportMeshBuffer(models.value.at(-1).name);
+      triggerDownload.value = false;
+    }
+  }
+}
+
+async function exportMeshBuffer(name: string) {
+  let modelExporter = new MeshExporter3DFormats(meshBuffer, true);
+  modelExporter.useUvs = includeUVs.value;
+  let format = fileFormat.value;
+  modelExporter.name = name;
+  let fileContent = await modelExporter.exportModel(format);
+
+  let error = fileContent == "error";
+  if (error) {
+    console.log("Error during exporting, format did not match any known");
+    return;
+  }
+  //  alert(name+format);
+  let filename = name + "." + format;
+  let binary = fileContent.binary;
+  let data = fileContent.data;
+  if (!binary)
+    saveFile(data, filename);
+  else
+    saveFileBinary(data, filename);
+  let extraFile = fileContent.extraFile;
+  if(extraFile)
+  {
+    saveFile(extraFile.data,name+"."+extraFile.fileExtension);
+  }
+  meshBuffer = [];
+  bufferedNames.value = [];
+  lastMeshBufferUpdate = frameCount;
+}
+
+async function readSceneFile(): Promise<string> {
+  let f: File | null = await props.fs.readFile(SceneFileName);
+  let text: string | undefined = await (f?.text());
+  assert(text !== undefined);
+  return text as string;
+}
 async function exportMeshEarClipping(arrayVertices: any, includeUVs: boolean, name: string, buffer: boolean) {
+  console.log("ExportMeshEarClipping called");
   let looped = false;
-  if(bufferedNames.includes(name))
-  {
+  if (bufferedNames.value.includes(name)) {
     buffer = false;
-    looped = true;  
+    looped = true;
+    triggerDownload.value = false;
   }
-  if(buffer)
-  {
-    bufferedNames.push(name);
+
+  let sceneFile = readSceneFile();
+  if (buffer) {
+    bufferedNames.value.push(name);
+    console.log(bufferedNames);
   }
-  if(!looped)
-  {
+  lastMeshBufferUpdate = frameCount;
+  if (!looped) {
     // Prebake
     let edgeInformation = analyzeEdges(arrayVertices);
     let exporterInstance: ExporterInstance = new ExporterInstance(
@@ -58,32 +116,38 @@ async function exportMeshEarClipping(arrayVertices: any, includeUVs: boolean, na
     exporterInstance.useUvs = includeUVs;
     exporterInstance.Run();
 
+    let scene = deserializeScene(await sceneFile);
+    let sceneModel: any = null;
+    models.value.forEach(localModel => {
+      if (localModel.name == name) {
+        scene.models.forEach(model => {
+          if (model.id == localModel.uuid) {
+            // console.log("Found info on model!")
+            sceneModel = model;
+            //console.log(sceneModel);
+            // console.log("Equal to");
+            // console.log(localModel);
+          }
+        });
+      }
+    });
+    assert(sceneModel != null);
     meshBuffer.push(
-        {
-          name: name,
-          verts: exporterInstance.vertPositions,
-          tris: exporterInstance.tris,
-          uvs: exporterInstance.uvs
-        }
-      );
-    }
-  if(buffer) return;
-  let modelExporter = new MeshExporter3DFormats(meshBuffer,true);
-  modelExporter.useUvs = includeUVs;
-  let format = fileFormat.value;
-  let fileContent = await modelExporter.exportModel(format);
-  let error = fileContent == "error";
-  if (error) {
-    console.log("Error during exporting, format did not match any known");
-    return;
+      {
+        name: name,
+        verts: exporterInstance.vertPositions,
+        tris: exporterInstance.tris,
+        uvs: exporterInstance.uvs,
+        material: sceneModel.material,
+        position: sceneModel.position,
+        rotation: sceneModel.rotation,
+        scale: sceneModel.scale,
+        instanceCount: sceneModel.instance_count
+      }
+    );
   }
-  let filename = name + format;
-  let binary = fileContent.binary;
-  let data = fileContent.data;
-  if(!binary)
-    saveFile(data, filename);
-  else
-    saveFileBinary(data, filename);
+  if (buffer) return;
+  exportMeshBuffer(name);
 }
 
 function exportMeshFromPatches(vertexStream: Float32Array, includeUVs: boolean, name: string, buffer: boolean) {
@@ -129,7 +193,7 @@ function exportMeshFromPatches(vertexStream: Float32Array, includeUVs: boolean, 
       patches[i][j].globalIndex = -1;
     }
   }
-  exportMeshEarClipping(patches, includeUVs,name, buffer);
+  exportMeshEarClipping(patches, includeUVs, name, buffer);
 }
 
 // Main function
@@ -140,8 +204,9 @@ async function main() {
     acceptablePlanarity: acceptablePlanarity,
     includeUVs: includeUVs,
     models: models,
-    downloadTarget: downloadTarget
-  });
+    downloadTarget: downloadTarget,
+    bufferedNames: bufferedNames
+  }, onFrame);
 }
 
 main();
@@ -153,19 +218,20 @@ main();
     <label>Max Curvature: <input type="range" v-model="maxCurvature" min="0" max="5" step="0.01"></label>
 
     <div></div>
-    <label>Planarity Criterium: <input type="range" v-model="acceptablePlanarity" min="0.85" max="1" step="0.001"></label>
+    <label>Planarity Criterium: <input type="range" v-model="acceptablePlanarity" min="0.85" max="1"
+        step="0.001"></label>
 
     <div></div>
-    <label>File Format: <select v-model="fileFormat"> 
-      <option value="obj">obj</option>
-      <option value="glb">glb</option>
-    </select></label>
+    <label>File Format: <select v-model="fileFormat">
+        <option value="obj">obj</option>
+        <option value="glb">glb</option>
+      </select></label>
 
     <label>Target Model: <select v-model="downloadTarget">
-      <option v-for="model in models" :value="model.path" v-bind:key="model.path">{{model.name}}</option>
-    </select></label> 
-    <label v-if="downloadTarget==''">Merge Models<input type="checkbox" v-model="mergeModels"></label>
-    
+        <option v-for="model in models" :value="model.path" v-bind:key="model.path">{{ model.name }}</option>
+      </select></label>
+    <label v-if="downloadTarget == ''">Merge Models<input type="checkbox" v-model="mergeModels"></label>
+
     <div></div>
     <label>Include UVs: <input type="checkbox" v-model="includeUVs"> </label>
     <div></div>
