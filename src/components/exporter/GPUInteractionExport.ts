@@ -672,7 +672,7 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
                 .slice(0);
               const vertexStream = new Float32Array(arrayBuffer);
               vertReadableBuffer.unmap();
-              exportMeshFromPatches(vertexStream);
+              exportMeshFromPatches(vertexStream,  lodExportParametersRefs.includeUVs.value);
             });
         }, 10);
       }

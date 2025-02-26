@@ -11,6 +11,7 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@gltf-transform/core": "^4.1.1",
     "@iconify-json/mdi": "^1.2.1",
     "@stefnotch/typestef": "^1.0.3",
     "@vueuse/core": "^11.2.0",

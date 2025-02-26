@@ -7,45 +7,54 @@ import {
 import { ref } from "vue";
 import { ExporterInstance } from "./exporter/Exporter";
 import { Vector2, Vector3 } from "./exporter/VectorTypes";
-import {mainExport} from "./exporter/GPUInteractionExport";
+import { mainExport } from "./exporter/GPUInteractionExport";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
-import type {Vertex, VertexRange} from "./exporter/VertexType";
-import { analyzeEdges } from "./exporter/EdgeAnalysis"; 
-import {save, saveFile} from "./exporter/FileDownload"; 
+import type { Vertex, VertexRange } from "./exporter/VertexType";
+import { analyzeEdges } from "./exporter/EdgeAnalysis";
+import { save, saveFile, saveFileBinary } from "./exporter/FileDownload";
+import { MeshExporter3DFormats } from "./exporter/MeshExporter3DFormats";
 
 const props = defineProps<{
-    gpuDevice: GPUDevice;
-    engine: WgpuEngine;
-    fs: ReactiveFilesystem;
-  }>();
+  gpuDevice: GPUDevice;
+  engine: WgpuEngine;
+  fs: ReactiveFilesystem;
+}>();
 
 const triggerDownload = ref(false);
 const minSize = ref(30.0);
 const maxCurvature = ref(20.0);
 const acceptablePlanarity = ref(1.0);
+const includeUVs = ref(false);
+const fileFormat = ref("obj");
 
-function exportMeshEarClipping(arrayVertices: any) {
-  let mexpstring = "o\n";
+async function exportMeshEarClipping(arrayVertices: any, includeUVs: boolean) {
   // Prebake
   let edgeInformation = analyzeEdges(arrayVertices);
   let exporterInstance: ExporterInstance = new ExporterInstance(
     arrayVertices,
     edgeInformation
   );
+  exporterInstance.useUvs = includeUVs;
   exporterInstance.Run();
-
-  for (let vert of exporterInstance.vertPositions) {
-    mexpstring += "v " + vert.x + " " + vert.y + " " + vert.z + "\n";
+  let modelExporter = new MeshExporter3DFormats(exporterInstance.vertPositions, exporterInstance.tris, exporterInstance.uvs);
+  modelExporter.useUvs = includeUVs;
+  let format = fileFormat.value;
+  let fileContent = await modelExporter.exportModel(format);
+  let error = fileContent == "error";
+  if (error) {
+    console.log("Error during exporting, format did not match any known");
+    return;
   }
-
-  let t = exporterInstance.tris;
-  for (let i = 0; i < t.length; i += 3) {
-    mexpstring += "f " + (t[i] + 1) + " " + (t[i + 1] + 1) + " " + (t[i + 2] + 1) + "\n";
-  }
-  saveFile(mexpstring, "wowcool3dmodel_earclip.obj");
+  let filename = "wowcool3dmodel_earclip." + format;
+  let binary = fileContent.binary;
+  let data = fileContent.data;
+  if(!binary)
+    saveFile(data, filename);
+  else
+    saveFileBinary(data, filename);
 }
 
-function exportMeshFromPatches(vertexStream: Float32Array) {
+function exportMeshFromPatches(vertexStream: Float32Array, includeUVs: boolean) {
   let slicedStream = vertexStream.slice(4);
   let index = 0;
   let patch_verts = [];
@@ -88,21 +97,39 @@ function exportMeshFromPatches(vertexStream: Float32Array) {
       patches[i][j].globalIndex = -1;
     }
   }
-  exportMeshEarClipping(patches);
+  exportMeshEarClipping(patches, includeUVs);
 }
 
 // Main function
 async function main() {
-  mainExport(triggerDownload, exportMeshFromPatches, props,{minSize:minSize ,maxCurvature:maxCurvature, acceptablePlanarity: acceptablePlanarity});
+  mainExport(triggerDownload, exportMeshFromPatches, props, {
+    minSize: minSize,
+    maxCurvature: maxCurvature,
+    acceptablePlanarity: acceptablePlanarity,
+    includeUVs: includeUVs
+  });
 }
 
 main();
 </script>
 <template>
-  <div></div>
   <div class="absolute bg-red-100 p-2">
-  <label>Min Size: <input type="range" v-model="minSize" min="0" max="30" step="0.01"></label>
-  <label>Max Curvature: <input type="range" v-model="maxCurvature" min="0" max="5" step="0.01"></label>
-  <label>Planarity Criterium: <input type="range" v-model="acceptablePlanarity" min="0" max="1" step="0.001"></label>
-  <button @click="triggerDownload = true">Download</button></div>
+    <label>Min Size: <input type="range" v-model="minSize" min="0" max="30" step="0.01"></label>
+    <div></div>
+    <label>Max Curvature: <input type="range" v-model="maxCurvature" min="0" max="5" step="0.01"></label>
+
+    <div></div>
+    <label>Planarity Criterium: <input type="range" v-model="acceptablePlanarity" min="0.85" max="1" step="0.001"></label>
+
+    <div></div>
+    <label>File Format: <select v-model="fileFormat"> 
+      <option value="obj">obj</option>
+      <option value="glb">glb</option>
+    </select></label>
+    
+    <div></div>
+    <label>Include UVs: <input type="checkbox" v-model="includeUVs"> </label>
+    <div></div>
+    <button @click="triggerDownload = true">Download</button>
+  </div>
 </template>
