@@ -391,7 +391,7 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
       GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT
     );
 
-    let lodStageParameters = new Float32Array([lodExportParametersRefs.minSize.value, lodExportParametersRefs.maxCurvature]);
+    let lodStageParameters = new Float32Array([lodExportParametersRefs.minSize.value, lodExportParametersRefs.maxCurvature, lodExportParametersRefs.acceptablePlanarity.value]);
     const lodStageParametersBuffer = createBufferWith(props, 
       concatArrayBuffers(props,[lodStageParameters]),
       GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM
@@ -543,7 +543,7 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
           },
         ],
       });
-      lodStageParameters = new Float32Array([lodExportParametersRefs.minSize.value, lodExportParametersRefs.maxCurvature.value]);
+      lodStageParameters = new Float32Array([lodExportParametersRefs.minSize.value, lodExportParametersRefs.maxCurvature.value, lodExportParametersRefs.acceptablePlanarity.value]);
       device.queue.writeBuffer(lodStageParametersBuffer,0,lodStageParameters,0,lodStageParameters.length);
       /*commandEncoder.copyBufferToBuffer(
         lodStageParametersStagingBuffer,
@@ -552,7 +552,7 @@ export async function mainExport(triggerDownload: any, exportMeshFromPatches: an
         0,
         lodStageParametersBuffer.size
       )*/
-      const doubleNumberOfRounds = 3;
+      const doubleNumberOfRounds = 4;
       // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
       for (let i = 0; i < doubleNumberOfRounds; i++) {
         const isLastRound = i === doubleNumberOfRounds - 1;

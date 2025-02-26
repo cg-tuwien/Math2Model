@@ -22,6 +22,7 @@ const props = defineProps<{
 const triggerDownload = ref(false);
 const minSize = ref(30.0);
 const maxCurvature = ref(20.0);
+const acceptablePlanarity = ref(1.0);
 
 function exportMeshEarClipping(arrayVertices: any) {
   let mexpstring = "o\n";
@@ -92,7 +93,7 @@ function exportMeshFromPatches(vertexStream: Float32Array) {
 
 // Main function
 async function main() {
-  mainExport(triggerDownload, exportMeshFromPatches, props,{minSize:minSize ,maxCurvature:maxCurvature});
+  mainExport(triggerDownload, exportMeshFromPatches, props,{minSize:minSize ,maxCurvature:maxCurvature, acceptablePlanarity: acceptablePlanarity});
 }
 
 main();
@@ -100,7 +101,8 @@ main();
 <template>
   <div></div>
   <div class="absolute bg-red-100 p-2">
-  <label>Min Size: <input type="range" v-model="minSize" min="0" max="30" step="0.1"></label>
-  <label>Max Curvature: <input type="range" v-model="maxCurvature" min="0" max="10" step="0.1"></label>
+  <label>Min Size: <input type="range" v-model="minSize" min="0" max="30" step="0.01"></label>
+  <label>Max Curvature: <input type="range" v-model="maxCurvature" min="0" max="5" step="0.01"></label>
+  <label>Planarity Criterium: <input type="range" v-model="acceptablePlanarity" min="0" max="1" step="0.001"></label>
   <button @click="triggerDownload = true">Download</button></div>
 </template>
