@@ -2,7 +2,7 @@ export class ExporterInstance {
   public vertPositions: { x: number; y: number; z: number }[] = [];
   public tris: number[] = [];
   private colors: string[] = [];
-  public useUvs: boolean = false; 
+  public useUvs: boolean = false;
   public uvs: { x: number; y: number }[] = [];
 
   private patches: any;
@@ -218,8 +218,7 @@ export class ExporterInstance {
               }
             : { x: vert.vert.x, y: vert.vert.y, z: vert.vert.z }
         );
-        if(this.useUvs)
-          this.uvs.push(vert.uv);
+        if (this.useUvs) this.uvs.push(vert.uv);
       }
       indexMapping[i] = vert.globalIndex;
     }
