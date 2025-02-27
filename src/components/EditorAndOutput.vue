@@ -36,6 +36,7 @@ import CodeGraph from "@/components/visual-programming/CodeGraph.vue";
 import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
 import { useErrorStore } from "@/stores/error-store";
 import { syncFilesystem } from "@/engine/sync-filesystem";
+import { useExportStore } from "@/stores/export-store";
 
 import WebGpu from "@/components/WebGpu.vue";
 
@@ -57,6 +58,7 @@ props.engine.setOnShaderCompiled((shader, messages) => {
 
 // The underlying data
 const sceneFile = ref<string | null>(null);
+const exportModel = ref(false);
 
 props.fs.watchFromStart((change) => {
   if (change.key === SceneFileName) {
@@ -360,6 +362,21 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
   filePath = makeFilePath(filePath.replace(".graph", ".graph.wgsl"));
   props.fs.writeTextFile(filePath, content);
 }
+function toggleExportUI() {
+  exportModel.value = !exportModel.value;
+  if (exportModel.value == false) props.engine.setLodStage(null);
+}
+const exportStore = useExportStore();
+
+watchImmediate(
+  () => exportStore.isExportMode,
+  (isExport) => {
+    toggleExportUI();
+    if (isExport) {
+    } else {
+    }
+  }
+);
 </script>
 
 <template>
@@ -433,6 +450,7 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
         >
           <template #1>
             <WebGpu
+              v-if="exportModel"
               :gpuDevice="props.gpuDevice"
               :engine="props.engine"
               :fs="props.fs"

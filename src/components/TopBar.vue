@@ -8,14 +8,16 @@ import IconGithub from "~icons/mdi/github";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { homepage, version } from "@/../package.json";
 import { useFsStore } from "@/stores/fs-store";
+import { useExportStore } from "@/stores/export-store";
 
 const store = useStore();
 const fsStore = useFsStore();
+const exportStore = useExportStore();
 
 const examplesModule = () => import("@/scenes/example-scenes");
 
 type FileDropdownOption = DropdownOption & {
-  key: "open" | "save-as" | "examples" | "example-scene" | "heart-sphere-scene";
+  key: "open" | "save-as" | "examples" | "example-scene" | "heart-sphere-scene" | "export";
 };
 
 const inputFileElement = ref<HTMLInputElement | null>(null);
@@ -28,6 +30,10 @@ const fileOptions = computed((): FileDropdownOption[] => {
     {
       label: "Save As",
       key: "save-as",
+    },
+    {
+      label: "Toggle Export GUI",
+      key: "export"
     },
     {
       label: "Examples",
@@ -58,7 +64,10 @@ async function handleFile(key: FileDropdownOption["key"]) {
   } else if (key === "heart-sphere-scene") {
     const module = await examplesModule();
     fsStore.importInMemoryProject(module.createHeartSphereProject().files);
-  } else {
+  } else if(key === "export") {
+    exportStore.isExportMode = !exportStore.isExportMode;
+  }
+  else {
     assertUnreachable(key);
   }
 }
