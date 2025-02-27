@@ -12,7 +12,12 @@ import { save, saveFile, saveFileBinary } from "./exporter/FileDownload";
 import { MeshExporter3DFormats } from "./exporter/MeshExporter3DFormats";
 import { SceneFileName, deserializeScene } from "@/filesystem/scene-file";
 import { assert } from "@stefnotch/typestef/assert";
+import { useStore } from "../stores/store";
+import { computed } from "vue";
+import { darkTheme, lightTheme } from "naive-ui";
 
+const store = useStore();
+const theme = computed(() => (store.isDark ? darkTheme : lightTheme));
 const props = defineProps<{
   gpuDevice: GPUDevice;
   engine: WgpuEngine;
@@ -47,14 +52,11 @@ function onFrame() {
 }
 
 async function exportMeshBuffer(name: string) {
-  if(mergeModels.value)
-  {
-    exportMeshList(meshBuffer,name);
-  }
-  else
-  {
-    meshBuffer.forEach(mesh => {
-      exportMeshList([mesh],mesh.name);
+  if (mergeModels.value) {
+    exportMeshList(meshBuffer, name);
+  } else {
+    meshBuffer.forEach((mesh) => {
+      exportMeshList([mesh], mesh.name);
     });
   }
 
@@ -66,7 +68,6 @@ async function exportMeshBuffer(name: string) {
 }
 
 async function exportMeshList(meshes: any[], name: string) {
-  
   let modelExporter = new MeshExporter3DFormats(meshes);
   modelExporter.useUvs = includeUVs.value;
   let format = fileFormat.value;
@@ -233,94 +234,116 @@ async function startExport() {
   });
 }
 </script>
-<template>
-  <div class="absolute bg-red-100 p-2">
-    <label
-      >Min Size:
-      <input
-        type="range"
-        v-model="minSize"
-        min="0"
-        max="30"
-        step="0.001"
-        :disabled="exportInProgress"
-      />
-      <input type="number" v-model="minSize" :disabled="true" />
-    </label>
-    <div></div>
-    <label
-      >Max Curvature:
-      <input
-        type="range"
-        v-model="maxCurvature"
-        min="0"
-        max="3"
-        step="0.01"
-        :disabled="exportInProgress"
-    /></label>
-    <input type="number" v-model="maxCurvature" :disabled="true" />
+<template :theme="theme">
+  <div class="absolute bg-red-100 p-4 rounded-lg shadow-md w-80 space-y-4">
+    <div class="flex items-center justify-between">
+      <label>Min Size:</label>
+      <div class="flex items-center space-x-2">
+        <input
+          type="range"
+          v-model="minSize"
+          min="0"
+          max="30"
+          step="0.001"
+          :disabled="exportInProgress"
+          class="w-32"
+        />
+        <input
+          type="number"
+          v-model="minSize"
+          :disabled="true"
+          class="w-14 text-center"
+        />
+      </div>
+    </div>
 
-    <div></div>
-    <label
-      >Planarity Criterium:
-      <input
-        type="range"
-        v-model="acceptablePlanarity"
-        min="0.97"
-        max="1"
-        step="0.00001"
+    <div class="flex items-center justify-between">
+      <label>Max Curvature:</label>
+      <div class="flex items-center space-x-2">
+        <input
+          type="range"
+          v-model="maxCurvature"
+          min="0"
+          max="3"
+          step="0.01"
+          :disabled="exportInProgress"
+          class="w-32"
+        />
+        <input
+          type="number"
+          v-model="maxCurvature"
+          :disabled="true"
+          class="w-14 text-center"
+        />
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between">
+      <label>Planarity Criterium:</label>
+      <div class="flex items-center space-x-2">
+        <input
+          type="range"
+          v-model="acceptablePlanarity"
+          min="0.97"
+          max="1"
+          step="0.00001"
+          :disabled="exportInProgress"
+          class="w-32"
+        />
+        <input
+          type="number"
+          v-model="acceptablePlanarity"
+          :disabled="true"
+          class="w-14 text-center"
+        />
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between">
+      <label>File Format:</label>
+      <select
+        v-model="fileFormat"
         :disabled="exportInProgress"
-      />
-
-      <input
-        type="number"
-        min="0.97"
-        max="1"
-        v-model="acceptablePlanarity"
-        :disabled="true"
-      />
-    </label>
-
-    <div></div>
-    <label
-      >File Format:
-      <select v-model="fileFormat" :disabled="exportInProgress">
+        class="w-24 p-1"
+      >
         <option value="obj">obj</option>
         <option value="glb">glb</option>
-      </select></label
-    >
+      </select>
+    </div>
 
-    <label
-      >Target Model:
-      <select v-model="downloadTarget" :disabled="exportInProgress">
-        <option
-          v-for="model in models"
-          :value="model.path"
-          v-bind:key="model.path"
-        >
+    <div class="flex items-center justify-between">
+      <label>Target Model:</label>
+      <select
+        v-model="downloadTarget"
+        :disabled="exportInProgress"
+        class="w-24 p-1"
+      >
+        <option v-for="model in models" :value="model.path" :key="model.path">
           {{ model.name }}
         </option>
-      </select></label
-    >
-    <label v-if="downloadTarget == ''"
-      >Merge Models<input
-        type="checkbox"
-        :disabled="exportInProgress"
-        v-model="mergeModels"
-    /></label>
+      </select>
+    </div>
 
-    <div></div>
-    <label
-      >Include UVs:
+    <div v-if="downloadTarget == ''" class="flex items-center justify-between">
+      <label>Merge Models</label>
+      <input
+        type="checkbox"
+        v-model="mergeModels"
+        :disabled="exportInProgress"
+      />
+    </div>
+
+    <div class="flex items-center justify-between">
+      <label>Include UVs:</label>
       <input
         type="checkbox"
         v-model="includeUVs"
         :disabled="exportInProgress"
       />
-    </label>
-    <div></div>
-    <label
-      >Division Steps:
+    </div>
+
+    <div class="flex items-center justify-between">
+      <label>Division Steps:</label>
       <input
         type="range"
         v-model="subdivisionSteps"
@@ -328,9 +351,16 @@ async function startExport() {
         max="5"
         step="1"
         :disabled="exportInProgress"
+        class="w-32"
       />
-    </label>
-    <div></div>
-    <button @click="startExport" :disabled="exportInProgress">Download</button>
+    </div>
+
+    <button
+      @click="startExport"
+      :disabled="exportInProgress"
+      class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400"
+    >
+      Download
+    </button>
   </div>
 </template>
