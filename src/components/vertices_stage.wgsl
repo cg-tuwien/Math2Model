@@ -167,7 +167,8 @@ struct OutputBuffer {
 struct VertexOutput {
    // TODO: Compute normal vectors
    world_position: vec3<f32>,
-   texture_coords: vec2<f32>
+   texture_coords: vec2<f32>,
+   vertex_instance: u32
 }
 
 var<workgroup> quad_vertices: array<VertexOutput, 4>;
@@ -203,6 +204,7 @@ fn main(
     out.world_position = world_pos.xyz;
     let size = calculateWorldSpaceSizeOfPatch(quad);
     out.texture_coords = quad_point.xy;//quad_point;
+    out.vertex_instance = quad.instance;
 
     // Write to shared array and wait
     quad_vertices[local_invocation_id.x] = out;
@@ -216,6 +218,7 @@ fn main(
             output_buffer.vertices[write_index + 1] = quad_vertices[1];
             output_buffer.vertices[write_index + 2] = quad_vertices[2];
             output_buffer.vertices[write_index + 3] = quad_vertices[3];
+
         }
     }
 }
