@@ -362,19 +362,13 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
   filePath = makeFilePath(filePath.replace(".graph", ".graph.wgsl"));
   props.fs.writeTextFile(filePath, content);
 }
-function toggleExportUI() {
-  exportModel.value = !exportModel.value;
-  if (exportModel.value == false) props.engine.setLodStage(null);
-}
 const exportStore = useExportStore();
 
 watchImmediate(
   () => exportStore.isExportMode,
   (isExport) => {
-    toggleExportUI();
-    if (isExport) {
-    } else {
-    }
+    exportModel.value = exportStore.isExportMode;
+    if (exportModel.value == false) props.engine.setLodStage(null);
   }
 );
 </script>
