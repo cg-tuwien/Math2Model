@@ -1,7 +1,5 @@
 import { vec3, mat4 } from "webgpu-matrix";
 import { Document, WebIO } from "@gltf-transform/core";
-import { assert } from "@stefnotch/typestef/assert";
-import { error } from "naive-ui/es/_utils/naive/warn";
 
 export class MeshExporter3DFormats {
   meshBuffer: any[];
