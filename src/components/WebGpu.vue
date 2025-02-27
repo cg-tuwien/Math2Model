@@ -135,6 +135,7 @@ async function accumulateMeshForExport(
     exporterInstance.useUvs = includeUVs;
     exporterInstance.Run();
 
+    debugger;
     let sceneModel: any = null;
     models.value.forEach((localModel) => {
       if (localModel.uuid == uuid) {
