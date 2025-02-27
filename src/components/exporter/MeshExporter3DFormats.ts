@@ -6,9 +6,8 @@ export class MeshExporter3DFormats {
   public useUvs = false;
   public merge: boolean = false;
   public name: string = "";
-  constructor(meshBuffer: any[], merge: boolean) {
+  constructor(meshBuffer: any[]) {
     this.meshBuffer = meshBuffer;
-    this.merge = merge;
   }
 
   public async exportModel(format: string): Promise<any> {
@@ -44,7 +43,7 @@ export class MeshExporter3DFormats {
       let matrix = transformPointMatrix(buf.rotation, buf.position, buf.scale);
 
       for (let vert of buf.verts) {
-        debugger;
+        //        debugger;
         let vecResult = [vert.x, vert.y, vert.z];
         vec3.transformMat4(vecResult, matrix, vecResult);
         mexpstring +=

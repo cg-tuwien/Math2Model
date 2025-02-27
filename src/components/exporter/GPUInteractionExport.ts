@@ -347,7 +347,6 @@ export async function mainExport(
       vertexOutputLayout,
       device
     );
-    console.log("Final patches: " + buffers.finalPatches2.size/32)
 
     lodStageParameters = new Float32Array([
       lodExportParametersRefs.minSize.value,
@@ -439,17 +438,18 @@ export async function mainExport(
     let downloadAll = downloadTarget == "";
     let isRightDownloadTarget = downloadAll || downloadTarget == shaderPath;
     if (triggerDownload.value) {
-      //        debugger;
+      //debugger;
     }
     onFrame();
+    console.log(triggerDownload.value + " Value");
     if (
       triggerDownload.value &&
       isRightDownloadTarget &&
-      !lodExportParametersRefs.bufferedNames.value.includes(name)
+      lodExportParametersRefs.toDownload.value.includes(uuid)
     ) {
+      //      debugger;
       console.log("Exporting " + name);
       triggerDownload.value = false;
-      if (!downloadAll) triggerDownload.value = false;
       simpleB2BSameSize(vertOutputBuffer, vertReadableBuffer, commandEncoder);
       setTimeout(() => {
         vertReadableBuffer
@@ -461,7 +461,12 @@ export async function mainExport(
               .slice(0);
             const vertexStream = new Float32Array(arrayBuffer);
             vertReadableBuffer.unmap();
-            if (downloadAll) triggerDownload.value = true;
+            if (downloadAll) {
+              triggerDownload.value = true;
+              let l = lodExportParametersRefs.toDownload.value;
+              l.splice(l.indexOf(uuid), 1);
+            }
+            console.log("Export mesh from patches called");
             exportMeshFromPatches(
               vertexStream,
               lodExportParametersRefs.includeUVs.value,

@@ -20,12 +20,12 @@ const props = defineProps<{
 }>();
 
 const triggerDownload = ref(false);
-const minSize = ref(30.0);
-const maxCurvature = ref(20.0);
+const minSize = ref(0);
+const maxCurvature = ref(3);
 const acceptablePlanarity = ref(1.0);
 const includeUVs = ref(false);
 const fileFormat = ref("obj");
-const subdivisionSteps = ref(5);
+const subdivisionSteps = ref(4);
 const models: Ref<any[]> = ref([
   {
     path: "",
@@ -33,8 +33,9 @@ const models: Ref<any[]> = ref([
   },
 ]);
 const downloadTarget = ref("");
-const mergeModels = ref(false);
+const mergeModels = ref(true);
 const exportInProgress = ref(false);
+const toDownload: Ref<string[]> = ref([]);
 
 let meshBuffer: any[] = [];
 let bufferedNames: Ref<string[]> = ref([]);
@@ -43,17 +44,30 @@ let lastMeshBufferUpdate = 0;
 let frameCount = 0;
 function onFrame() {
   frameCount++;
-  if (meshBuffer.length > 0) {
-    //  debugger;
-    if (lastMeshBufferUpdate < frameCount - 5) {
-      exportMeshBuffer(models.value.at(-1).name);
-      triggerDownload.value = false;
-    }
-  }
 }
 
 async function exportMeshBuffer(name: string) {
-  let modelExporter = new MeshExporter3DFormats(meshBuffer, true);
+  if(mergeModels.value)
+  {
+    exportMeshList(meshBuffer,name);
+  }
+  else
+  {
+    meshBuffer.forEach(mesh => {
+      exportMeshList([mesh],mesh.name);
+    });
+  }
+
+  meshBuffer = [];
+  bufferedNames.value = [];
+  lastMeshBufferUpdate = frameCount;
+  exportInProgress.value = false;
+  triggerDownload.value = false;
+}
+
+async function exportMeshList(meshes: any[], name: string) {
+  
+  let modelExporter = new MeshExporter3DFormats(meshes);
   modelExporter.useUvs = includeUVs.value;
   let format = fileFormat.value;
   modelExporter.name = name;
@@ -64,7 +78,7 @@ async function exportMeshBuffer(name: string) {
     console.log("Error during exporting, format did not match any known");
     return;
   }
-  //  alert(name+format);
+
   let filename = name + "." + format;
   let binary = fileContent.binary;
   let data = fileContent.data;
@@ -74,10 +88,6 @@ async function exportMeshBuffer(name: string) {
   if (extraFile) {
     saveFile(extraFile.data, name + "." + extraFile.fileExtension);
   }
-  meshBuffer = [];
-  bufferedNames.value = [];
-  lastMeshBufferUpdate = frameCount;
-  exportInProgress.value = false;
 }
 
 async function readSceneFile(): Promise<string> {
@@ -92,59 +102,53 @@ async function exportMeshEarClipping(
   name: string,
   buffer: boolean
 ) {
-  console.log("ExportMeshEarClipping called");
   let looped = false;
-  if (bufferedNames.value.includes(name)) {
+  if (toDownload.value.length == 0) {
     buffer = false;
     looped = true;
-    triggerDownload.value = false;
   }
 
   let sceneFile = readSceneFile();
-  if (buffer) {
-    bufferedNames.value.push(name);
-    console.log(bufferedNames);
-  }
   lastMeshBufferUpdate = frameCount;
-  if (!looped) {
-    // Prebake
-    let edgeInformation = analyzeEdges(arrayVertices);
-    let exporterInstance: ExporterInstance = new ExporterInstance(
-      arrayVertices,
-      edgeInformation
-    );
-    exporterInstance.useUvs = includeUVs;
-    exporterInstance.Run();
 
-    let scene = deserializeScene(await sceneFile);
-    let sceneModel: any = null;
-    models.value.forEach((localModel) => {
-      if (localModel.name == name) {
-        scene.models.forEach((model) => {
-          if (model.id == localModel.uuid) {
-            // console.log("Found info on model!")
-            sceneModel = model;
-            //console.log(sceneModel);
-            // console.log("Equal to");
-            // console.log(localModel);
-          }
-        });
-      }
-    });
-    assert(sceneModel != null);
-    meshBuffer.push({
-      name: name,
-      verts: exporterInstance.vertPositions,
-      tris: exporterInstance.tris,
-      uvs: exporterInstance.uvs,
-      material: sceneModel.material,
-      position: sceneModel.position,
-      rotation: sceneModel.rotation,
-      scale: sceneModel.scale,
-      instanceCount: sceneModel.instance_count,
-    });
-  }
-  if (buffer) return;
+  // Prebake
+  let edgeInformation = analyzeEdges(arrayVertices);
+  let exporterInstance: ExporterInstance = new ExporterInstance(
+    arrayVertices,
+    edgeInformation
+  );
+  exporterInstance.useUvs = includeUVs;
+  exporterInstance.Run();
+
+  let scene = deserializeScene(await sceneFile);
+  let sceneModel: any = null;
+  models.value.forEach((localModel) => {
+    if (localModel.name == name) {
+      scene.models.forEach((model) => {
+        if (model.id == localModel.uuid) {
+          // console.log("Found info on model!")
+          sceneModel = model;
+          //console.log(sceneModel);
+          // console.log("Equal to");
+          // console.log(localModel);
+        }
+      });
+    }
+  });
+  assert(sceneModel != null);
+  meshBuffer.push({
+    name: name,
+    verts: exporterInstance.vertPositions,
+    tris: exporterInstance.tris,
+    uvs: exporterInstance.uvs,
+    material: sceneModel.material,
+    position: sceneModel.position,
+    rotation: sceneModel.rotation,
+    scale: sceneModel.scale,
+    instanceCount: sceneModel.instance_count,
+  });
+
+  if (toDownload.value.length != 0) return;
   exportMeshBuffer(name);
 }
 
@@ -213,19 +217,48 @@ mainExport(
     downloadTarget: downloadTarget,
     bufferedNames: bufferedNames,
     subdivisionSteps: subdivisionSteps,
+    toDownload: toDownload,
   },
   onFrame
 );
+
+async function startExport() {
+  triggerDownload.value = true;
+  exportInProgress.value = true;
+  toDownload.value.length = 0;
+  let sceneFile = readSceneFile();
+  let scene = deserializeScene(await sceneFile);
+  scene.models.forEach((model) => {
+    toDownload.value.push(model.id);
+  });
+}
 </script>
 <template>
   <div class="absolute bg-red-100 p-2">
     <label
       >Min Size:
-      <input type="range" v-model="minSize" min="0" max="30" step="0.01" :disabled="exportInProgress"/></label>
+      <input
+        type="range"
+        v-model="minSize"
+        min="0"
+        max="30"
+        step="0.001"
+        :disabled="exportInProgress"
+      />
+      <input type="number" v-model="minSize" :disabled="true" />
+    </label>
     <div></div>
     <label
       >Max Curvature:
-      <input type="range" v-model="maxCurvature" min="0" max="5" step="0.01" :disabled="exportInProgress"/></label>
+      <input
+        type="range"
+        v-model="maxCurvature"
+        min="0"
+        max="3"
+        step="0.01"
+        :disabled="exportInProgress"
+    /></label>
+    <input type="number" v-model="maxCurvature" :disabled="true" />
 
     <div></div>
     <label
@@ -233,11 +266,20 @@ mainExport(
       <input
         type="range"
         v-model="acceptablePlanarity"
-        min="0.85"
+        min="0.97"
         max="1"
-        step="0.001"
+        step="0.00001"
         :disabled="exportInProgress"
-    /></label>
+      />
+
+      <input
+        type="number"
+        min="0.97"
+        max="1"
+        v-model="acceptablePlanarity"
+        :disabled="true"
+      />
+    </label>
 
     <div></div>
     <label
@@ -261,13 +303,24 @@ mainExport(
       </select></label
     >
     <label v-if="downloadTarget == ''"
-      >Merge Models<input type="checkbox" :disabled="exportInProgress" v-model="mergeModels"
+      >Merge Models<input
+        type="checkbox"
+        :disabled="exportInProgress"
+        v-model="mergeModels"
     /></label>
 
     <div></div>
-    <label>Include UVs: <input type="checkbox" v-model="includeUVs" :disabled="exportInProgress" /> </label>
+    <label
+      >Include UVs:
+      <input
+        type="checkbox"
+        v-model="includeUVs"
+        :disabled="exportInProgress"
+      />
+    </label>
     <div></div>
-    <label>Division Steps:
+    <label
+      >Division Steps:
       <input
         type="range"
         v-model="subdivisionSteps"
@@ -275,8 +328,9 @@ mainExport(
         max="5"
         step="1"
         :disabled="exportInProgress"
-    />
-      </label><div></div>
-    <button @click="triggerDownload = true; exportInProgress=true;" :disabled="exportInProgress">Download</button>
+      />
+    </label>
+    <div></div>
+    <button @click="startExport" :disabled="exportInProgress">Download</button>
   </div>
 </template>
