@@ -268,6 +268,11 @@ export async function mainExport(
     commandEncoder: GPUCommandEncoder
   ) {
     let name = shaderPath;
+    if(!buffers.computePatchesInput)
+    {
+         alert("Missing buffer???");
+      console.log(buffers);
+    }
     let uuid = buffers.computePatchesInput.label.split(" ")[0];
     var re = /\.wgsl$/;
     name = name.replace(re, "");
@@ -410,46 +415,50 @@ export async function mainExport(
       }
     }
 
-    // Prepare vertices output
-    let computePassPrep = commandEncoder.beginComputePass({
-      label: "prepareVertexOutput",
-    });
-    computePassPrep.setPipeline(prepVerticesStageShaderAndPipeline.pipeline);
-    computePassPrep.setBindGroup(0, bindGroupVertPrep);
-    computePassPrep.dispatchWorkgroups(1);
-    computePassPrep.end();
-
-    simpleB2BSameSize(vertOutputBufferReset, vertOutputBuffer, commandEncoder);
-
-    // Run vertex output shader
-    let computePassVertices = commandEncoder.beginComputePass({
-      label: "vertexOutputStage",
-    });
-    computePassVertices.setPipeline(compiledShader.verticesStage.pipeline);
-    computePassVertices.setBindGroup(0, userInputBindGroup);
-    computePassVertices.setBindGroup(1, outputVerticesBindGroup);
-    computePassVertices.dispatchWorkgroupsIndirect(dispatchVerticesStage, 0);
-    computePassVertices.end();
+    
 
     //      console.log("SHADER OF THIS OBJECT IS: " + shaderPath);
     //console.log("Hi from " + buffers.computePatchesInput.label);
 
+    //console.log("Currently rendering: " + uuid);
+    if(!triggerDownload.value)
+    {
+      return;
+    }
     let downloadTarget = lodExportParametersRefs.downloadTarget.value;
     let downloadAll = downloadTarget == "";
     let isRightDownloadTarget = downloadAll || downloadTarget == shaderPath;
     if (triggerDownload.value) {
       //debugger;
     }
-    onFrame();
-    console.log(triggerDownload.value + " Value");
     if (
-      triggerDownload.value &&
       isRightDownloadTarget &&
       lodExportParametersRefs.toDownload.value.includes(uuid)
     ) {
-      //      debugger;
+
       console.log("Exporting " + name);
       triggerDownload.value = false;
+        // Prepare vertices output
+      let computePassPrep = commandEncoder.beginComputePass({
+        label: "prepareVertexOutput",
+      });
+      computePassPrep.setPipeline(prepVerticesStageShaderAndPipeline.pipeline);
+      computePassPrep.setBindGroup(0, bindGroupVertPrep);
+      computePassPrep.dispatchWorkgroups(1);
+      computePassPrep.end();
+
+      simpleB2BSameSize(vertOutputBufferReset, vertOutputBuffer, commandEncoder);
+
+      // Run vertex output shader
+      let computePassVertices = commandEncoder.beginComputePass({
+        label: "vertexOutputStage",
+      });
+      computePassVertices.setPipeline(compiledShader.verticesStage.pipeline);
+      computePassVertices.setBindGroup(0, userInputBindGroup);
+      computePassVertices.setBindGroup(1, outputVerticesBindGroup);
+      computePassVertices.dispatchWorkgroupsIndirect(dispatchVerticesStage, 0);
+      computePassVertices.end();
+
       simpleB2BSameSize(vertOutputBuffer, vertReadableBuffer, commandEncoder);
       setTimeout(() => {
         vertReadableBuffer

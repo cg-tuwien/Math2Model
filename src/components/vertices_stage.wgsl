@@ -181,7 +181,7 @@ fn main(
     let sample_index: u32 = local_invocation_id.x; // From 0 to 3, aka the four corners
     // Get the patch
     let quad = patch_decode(render_buffer.patches[patch_index]);
-
+    instance_id = quad.instance;
     // Coordinates of one of the corners
     var quad_point = quad.min;
     if(local_invocation_id.x == 0) {

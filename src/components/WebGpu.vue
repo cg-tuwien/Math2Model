@@ -15,9 +15,11 @@ import { assert } from "@stefnotch/typestef/assert";
 import { useStore } from "../stores/store";
 import { computed } from "vue";
 import { darkTheme, lightTheme } from "naive-ui";
+import { useExportStore } from "@/stores/export-store";
 
 const store = useStore();
 const theme = computed(() => (store.isDark ? darkTheme : lightTheme));
+const exportStore = useExportStore();
 const props = defineProps<{
   gpuDevice: GPUDevice;
   engine: WgpuEngine;
@@ -25,9 +27,9 @@ const props = defineProps<{
 }>();
 
 const triggerDownload = ref(false);
-const minSize = ref(0);
-const maxCurvature = ref(3);
-const acceptablePlanarity = ref(1.0);
+const minSize = ref(0.1);
+const maxCurvature = ref(2.5);
+const acceptablePlanarity = ref(0.999);
 const includeUVs = ref(false);
 const fileFormat = ref("obj");
 const subdivisionSteps = ref(4);
@@ -74,7 +76,7 @@ async function exportMeshList(meshes: any[], name: string) {
   modelExporter.name = name;
   let fileContent = await modelExporter.exportModel(format);
 
-  let error = fileContent == "error";
+  let error = fileContent.error;
   if (error) {
     console.log("Error during exporting, format did not match any known");
     return;
@@ -83,11 +85,18 @@ async function exportMeshList(meshes: any[], name: string) {
   let filename = name + "." + format;
   let binary = fileContent.binary;
   let data = fileContent.data;
-  if (!binary) saveFile(data, filename);
-  else saveFileBinary(data, filename);
+  let successful = fileContent.error;
+  if(fileContent.errors)
+  {
+    fileContent.errors.forEach((errorModel) => {
+      alert("Did not successfully export " + errorModel);
+    });
+  }
+  if (!binary) saveFile(data as string, filename);
+  else saveFileBinary(data as Uint8Array, filename);
   let extraFile = fileContent.extraFile;
   if (extraFile) {
-    saveFile(extraFile.data, name + "." + extraFile.fileExtension);
+    saveFile(extraFile.data as string, name + "." + extraFile.fileExtension);
   }
 }
 
@@ -97,7 +106,7 @@ async function readSceneFile(): Promise<string> {
   assert(text !== undefined);
   return text as string;
 }
-async function exportMeshEarClipping(
+async function accumulateMeshForExport(
   arrayVertices: any,
   includeUVs: boolean,
   name: string,
@@ -148,6 +157,7 @@ async function exportMeshEarClipping(
     scale: sceneModel.scale,
     instanceCount: sceneModel.instance_count,
   });
+  console.log("Mesh has " + exporterInstance.vertPositions.length+ " vertices")
 
   if (toDownload.value.length != 0) return;
   exportMeshBuffer(name);
@@ -201,7 +211,7 @@ function exportMeshFromPatches(
       patches[i][j].globalIndex = -1;
     }
   }
-  exportMeshEarClipping(patches, includeUVs, name, buffer);
+  accumulateMeshForExport(patches, includeUVs, name, buffer);
 }
 
 // Main function
@@ -325,7 +335,7 @@ async function startExport() {
     </div>
 
     <div v-if="downloadTarget == ''" class="flex items-center justify-between">
-      <label>Merge Models</label>
+      <label>Merge Model Files</label>
       <input
         type="checkbox"
         v-model="mergeModels"
@@ -361,6 +371,13 @@ async function startExport() {
       class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400"
     >
       Download
+    </button>
+    <button
+      @click="exportStore.isExportMode = false;"
+      :disabled="exportInProgress"
+      class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400"
+    >
+      Cancel
     </button>
   </div>
 </template>

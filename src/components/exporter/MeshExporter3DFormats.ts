@@ -1,5 +1,7 @@
 import { vec3, mat4 } from "webgpu-matrix";
 import { Document, WebIO } from "@gltf-transform/core";
+import { assert } from "@stefnotch/typestef/assert";
+import { error } from "naive-ui/es/_utils/naive/warn";
 
 export class MeshExporter3DFormats {
   meshBuffer: any[];
@@ -10,7 +12,15 @@ export class MeshExporter3DFormats {
     this.meshBuffer = meshBuffer;
   }
 
-  public async exportModel(format: string): Promise<any> {
+  public async exportModel(
+    format: string
+  ): Promise<{
+    data: Uint8Array | string;
+    binary: boolean;
+    error?: boolean | undefined;
+    errors?: string[] | undefined;
+    extraFile?: { data: string | Uint8Array; fileExtension: string } | undefined;
+  }> {
     if (format == "obj") {
       let file = this.objExport(this.meshBuffer);
       return {
@@ -20,12 +30,17 @@ export class MeshExporter3DFormats {
       };
     }
     if (format == "glb") {
+      let outputData = await this.gltfExport(this.meshBuffer, false);
+      let errors = outputData.errors;
+      let data = outputData.data;
       return await {
-        data: await this.gltfExport(this.meshBuffer, false),
+        data: data,
         binary: false,
+        error: data.length == 0 || this.meshBuffer.length == errors.length,
+        errors: errors,
       };
     }
-    return "error";
+    return {data:"",binary:false,error:true};
   }
 
   /**
@@ -84,13 +99,22 @@ export class MeshExporter3DFormats {
   /**
    * gltfExport
    */
-  public async gltfExport(meshes: any[], binary: boolean): Promise<Uint8Array> {
+  public async gltfExport(
+    meshes: any[],
+    binary: boolean
+  ): Promise<{ data: Uint8Array; errors: string[] }> {
     const doc = new Document();
 
+    //    debugger;
     const scene = doc.createScene();
     const buffer = doc.createBuffer();
+    let errorModels = [];
     for (let x = 0; x < meshes.length; x++) {
       let meshBuf = meshes[x];
+      if (!(meshBuf.verts.length > 0)) {
+        errorModels.push(meshBuf.name);
+        continue;
+      }
       let inMaterial = meshBuf.material;
       if (!inMaterial) {
         alert("HELP I NEED A MATERIAL");
@@ -103,14 +127,19 @@ export class MeshExporter3DFormats {
       let material = doc
         .createMaterial(materialName)
         .setBaseColorFactor([
-          inMaterial.color[0],
-          inMaterial.color[1],
-          inMaterial.color[2],
+          clamp01(inMaterial.color[0]),
+          clamp01(inMaterial.color[1]),
+          clamp01(inMaterial.color[2]),
           1,
         ])
-        .setEmissiveFactor(inMaterial.emissive)
-        .setMetallicFactor(inMaterial.metallic)
-        .setRoughnessFactor(inMaterial.roughness);
+        .setEmissiveFactor(
+          [
+            clamp01(inMaterial.emissive[0]),
+            clamp01(inMaterial.emissive[1]),
+            clamp01(inMaterial.emissive[2])
+          ])
+        .setMetallicFactor( clamp01(inMaterial.metallic))
+        .setRoughnessFactor(clamp01(inMaterial.roughness));
       let transformedVerts = new Float32Array(meshBuf.verts.length * 3);
       for (let i = 0; i < meshBuf.verts.length; i++) {
         let v = meshBuf.verts[i];
@@ -160,7 +189,7 @@ export class MeshExporter3DFormats {
       scene.addChild(node);
     }
     const glb = await new WebIO().writeBinary(doc);
-    return glb;
+    return { data: glb, errors: errorModels };
   }
 }
 
@@ -192,4 +221,8 @@ function transformPointMatrix(rotation: any, translation: any, scale: number) {
   mat4.translate(matrix, translation, matrix); // Multiplication does not seem to function?
   mat4.scale(matrix, [scale, scale, scale], matrix);
   return matrix;
+}
+function clamp01(value: number): number
+{
+  return Math.min(1.,Math.max(0.,value));
 }
