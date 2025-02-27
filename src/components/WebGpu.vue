@@ -25,6 +25,7 @@ const maxCurvature = ref(20.0);
 const acceptablePlanarity = ref(1.0);
 const includeUVs = ref(false);
 const fileFormat = ref("obj");
+const subdivisionSteps = ref(5);
 const models: Ref<any[]> = ref([
   {
     path: "",
@@ -33,6 +34,7 @@ const models: Ref<any[]> = ref([
 ]);
 const downloadTarget = ref("");
 const mergeModels = ref(false);
+const exportInProgress = ref(false);
 
 let meshBuffer: any[] = [];
 let bufferedNames: Ref<string[]> = ref([]);
@@ -75,6 +77,7 @@ async function exportMeshBuffer(name: string) {
   meshBuffer = [];
   bufferedNames.value = [];
   lastMeshBufferUpdate = frameCount;
+  exportInProgress.value = false;
 }
 
 async function readSceneFile(): Promise<string> {
@@ -209,6 +212,7 @@ mainExport(
     models: models,
     downloadTarget: downloadTarget,
     bufferedNames: bufferedNames,
+    subdivisionSteps: subdivisionSteps,
   },
   onFrame
 );
@@ -217,13 +221,11 @@ mainExport(
   <div class="absolute bg-red-100 p-2">
     <label
       >Min Size:
-      <input type="range" v-model="minSize" min="0" max="30" step="0.01"
-    /></label>
+      <input type="range" v-model="minSize" min="0" max="30" step="0.01" :disabled="exportInProgress"/></label>
     <div></div>
     <label
       >Max Curvature:
-      <input type="range" v-model="maxCurvature" min="0" max="5" step="0.01"
-    /></label>
+      <input type="range" v-model="maxCurvature" min="0" max="5" step="0.01" :disabled="exportInProgress"/></label>
 
     <div></div>
     <label
@@ -234,12 +236,13 @@ mainExport(
         min="0.85"
         max="1"
         step="0.001"
+        :disabled="exportInProgress"
     /></label>
 
     <div></div>
     <label
       >File Format:
-      <select v-model="fileFormat">
+      <select v-model="fileFormat" :disabled="exportInProgress">
         <option value="obj">obj</option>
         <option value="glb">glb</option>
       </select></label
@@ -247,7 +250,7 @@ mainExport(
 
     <label
       >Target Model:
-      <select v-model="downloadTarget">
+      <select v-model="downloadTarget" :disabled="exportInProgress">
         <option
           v-for="model in models"
           :value="model.path"
@@ -258,12 +261,22 @@ mainExport(
       </select></label
     >
     <label v-if="downloadTarget == ''"
-      >Merge Models<input type="checkbox" v-model="mergeModels"
+      >Merge Models<input type="checkbox" :disabled="exportInProgress" v-model="mergeModels"
     /></label>
 
     <div></div>
-    <label>Include UVs: <input type="checkbox" v-model="includeUVs" /> </label>
+    <label>Include UVs: <input type="checkbox" v-model="includeUVs" :disabled="exportInProgress" /> </label>
     <div></div>
-    <button @click="triggerDownload = true">Download</button>
+    <label>Division Steps:
+      <input
+        type="range"
+        v-model="subdivisionSteps"
+        min="1"
+        max="5"
+        step="1"
+        :disabled="exportInProgress"
+    />
+      </label><div></div>
+    <button @click="triggerDownload = true; exportInProgress=true;" :disabled="exportInProgress">Download</button>
   </div>
 </template>

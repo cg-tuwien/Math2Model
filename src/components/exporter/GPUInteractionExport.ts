@@ -132,11 +132,12 @@ export async function mainExport(
     device
   );
 
+  const MAX_PATCHES = 1_000_000;
   let oneVertexEntry = 32;
   let startVertexOffset = 8;
   let padding = 8;
   const vertOutputBufferSize =
-    startVertexOffset + padding + oneVertexEntry * 500_000;
+    startVertexOffset + padding + oneVertexEntry * MAX_PATCHES;
   let vertOutputBuffer = device.createBuffer({
     label: "VertOutputBuffer",
     size: vertOutputBufferSize,
@@ -205,7 +206,6 @@ export async function mainExport(
     }
   };
 
-  const MAX_PATCHES = 500_000;
   const patchesBufferReset = createBufferWith(
     props,
     concatArrayBuffers(props, [new Uint32Array([0, MAX_PATCHES])]),
@@ -347,6 +347,7 @@ export async function mainExport(
       vertexOutputLayout,
       device
     );
+    console.log("Final patches: " + buffers.finalPatches2.size/32)
 
     lodStageParameters = new Float32Array([
       lodExportParametersRefs.minSize.value,
@@ -360,7 +361,7 @@ export async function mainExport(
       0,
       lodStageParameters.length
     );
-    const doubleNumberOfRounds = 5;
+    const doubleNumberOfRounds = lodExportParametersRefs.subdivisionSteps.value;
     // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
     for (let i = 0; i < doubleNumberOfRounds; i++) {
       const isLastRound = i === doubleNumberOfRounds - 1;
