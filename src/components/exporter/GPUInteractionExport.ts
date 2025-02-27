@@ -17,6 +17,7 @@ import {
   makeShaderFromCodeAndPipeline,
 } from "./GPUUtils";
 // Unchanging props! No need to watch them.
+// Base structure Taken from https://webgpu.github.io/webgpu-samples/?sample=rotatingCube#main.ts
 
 const compiledShaders = ref<
   Map<
@@ -132,7 +133,7 @@ export async function mainExport(
     device
   );
 
-  const MAX_PATCHES = 1_000_000;
+  const MAX_PATCHES = 2_000_000;
   let oneVertexEntry = 32;
   let startVertexOffset = 8;
   let padding = 8;
@@ -268,6 +269,10 @@ export async function mainExport(
     commandEncoder: GPUCommandEncoder
   ) {
     let name = shaderPath;
+    if(!buffers.computePatchesInput)
+    {
+      console.log("Missing buffer. Buffers: " + buffers);
+    }
     let uuid = buffers.computePatchesInput.label.split(" ")[0];
     var re = /\.wgsl$/;
     name = name.replace(re, "");
@@ -353,6 +358,7 @@ export async function mainExport(
       lodExportParametersRefs.maxCurvature.value,
       lodExportParametersRefs.acceptablePlanarity.value,
     ]);
+    
     device.queue.writeBuffer(
       lodStageParametersBuffer,
       0,
@@ -410,46 +416,42 @@ export async function mainExport(
       }
     }
 
-    // Prepare vertices output
-    let computePassPrep = commandEncoder.beginComputePass({
-      label: "prepareVertexOutput",
-    });
-    computePassPrep.setPipeline(prepVerticesStageShaderAndPipeline.pipeline);
-    computePassPrep.setBindGroup(0, bindGroupVertPrep);
-    computePassPrep.dispatchWorkgroups(1);
-    computePassPrep.end();
 
-    simpleB2BSameSize(vertOutputBufferReset, vertOutputBuffer, commandEncoder);
-
-    // Run vertex output shader
-    let computePassVertices = commandEncoder.beginComputePass({
-      label: "vertexOutputStage",
-    });
-    computePassVertices.setPipeline(compiledShader.verticesStage.pipeline);
-    computePassVertices.setBindGroup(0, userInputBindGroup);
-    computePassVertices.setBindGroup(1, outputVerticesBindGroup);
-    computePassVertices.dispatchWorkgroupsIndirect(dispatchVerticesStage, 0);
-    computePassVertices.end();
-
-    //      console.log("SHADER OF THIS OBJECT IS: " + shaderPath);
-    //console.log("Hi from " + buffers.computePatchesInput.label);
-
+    if(!triggerDownload.value)
+    {
+      return;
+    }
     let downloadTarget = lodExportParametersRefs.downloadTarget.value;
     let downloadAll = downloadTarget == "";
     let isRightDownloadTarget = downloadAll || downloadTarget == shaderPath;
-    if (triggerDownload.value) {
-      //debugger;
-    }
-    onFrame();
-    console.log(triggerDownload.value + " Value");
     if (
-      triggerDownload.value &&
       isRightDownloadTarget &&
       lodExportParametersRefs.toDownload.value.includes(uuid)
     ) {
-      //      debugger;
+
       console.log("Exporting " + name);
       triggerDownload.value = false;
+        // Prepare vertices output
+      let computePassPrep = commandEncoder.beginComputePass({
+        label: "prepareVertexOutput",
+      });
+      computePassPrep.setPipeline(prepVerticesStageShaderAndPipeline.pipeline);
+      computePassPrep.setBindGroup(0, bindGroupVertPrep);
+      computePassPrep.dispatchWorkgroups(1);
+      computePassPrep.end();
+
+      simpleB2BSameSize(vertOutputBufferReset, vertOutputBuffer, commandEncoder);
+
+      // Run vertex output shader
+      let computePassVertices = commandEncoder.beginComputePass({
+        label: "vertexOutputStage",
+      });
+      computePassVertices.setPipeline(compiledShader.verticesStage.pipeline);
+      computePassVertices.setBindGroup(0, userInputBindGroup);
+      computePassVertices.setBindGroup(1, outputVerticesBindGroup);
+      computePassVertices.dispatchWorkgroupsIndirect(dispatchVerticesStage, 0);
+      computePassVertices.end();
+
       simpleB2BSameSize(vertOutputBuffer, vertReadableBuffer, commandEncoder);
       setTimeout(() => {
         vertReadableBuffer

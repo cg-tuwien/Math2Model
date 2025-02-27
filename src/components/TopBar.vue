@@ -142,7 +142,6 @@ async function handleFile(key: FileDropdownOption["key"]) {
       await fsStore.clearFiles();
       fsStore.importFiles(data);
     }
-    fsStore.importInMemoryProject(module.createHeartSphereProject().files);
   } else if(key === "export") {
     exportStore.isExportMode = !exportStore.isExportMode;
   } else {

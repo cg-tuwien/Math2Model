@@ -272,7 +272,7 @@ fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>,
     let quad_encoded = patches_from_buffer.patches[patch_index];
     let quad = patch_decode(patches_from_buffer.patches[patch_index]);
     let quad_size = quad.max - quad.min;
-
+    //instance_id = quad_encoded.instance;
     let u_v_sample_index = vec2<u32>(sample_index % U_X, sample_index / U_X);
 
     let u_sample_location = quad.min + vec2(

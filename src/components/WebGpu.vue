@@ -15,9 +15,11 @@ import { assert } from "@stefnotch/typestef/assert";
 import { useStore } from "../stores/store";
 import { computed } from "vue";
 import { darkTheme, lightTheme } from "naive-ui";
+import { useExportStore } from "@/stores/export-store";
 
 const store = useStore();
 const theme = computed(() => (store.isDark ? darkTheme : lightTheme));
+const exportStore = useExportStore();
 const props = defineProps<{
   gpuDevice: GPUDevice;
   engine: WgpuEngine;
@@ -25,9 +27,9 @@ const props = defineProps<{
 }>();
 
 const triggerDownload = ref(false);
-const minSize = ref(0);
-const maxCurvature = ref(3);
-const acceptablePlanarity = ref(1.0);
+const minSize = ref(0.1);
+const maxCurvature = ref(2.5);
+const acceptablePlanarity = ref(0.999);
 const includeUVs = ref(false);
 const fileFormat = ref("obj");
 const subdivisionSteps = ref(4);
@@ -74,7 +76,7 @@ async function exportMeshList(meshes: any[], name: string) {
   modelExporter.name = name;
   let fileContent = await modelExporter.exportModel(format);
 
-  let error = fileContent == "error";
+  let error = fileContent.error;
   if (error) {
     console.log("Error during exporting, format did not match any known");
     return;
@@ -83,11 +85,18 @@ async function exportMeshList(meshes: any[], name: string) {
   let filename = name + "." + format;
   let binary = fileContent.binary;
   let data = fileContent.data;
-  if (!binary) saveFile(data, filename);
-  else saveFileBinary(data, filename);
+  let successful = fileContent.error;
+  if(fileContent.errors)
+  {
+    fileContent.errors.forEach((errorModel) => {
+      alert("Did not successfully export " + errorModel);
+    });
+  }
+  if (!binary) saveFile(data as string, filename);
+  else saveFileBinary(data as Uint8Array, filename);
   let extraFile = fileContent.extraFile;
   if (extraFile) {
-    saveFile(extraFile.data, name + "." + extraFile.fileExtension);
+    saveFile(extraFile.data as string, name + "." + extraFile.fileExtension);
   }
 }
 
@@ -97,8 +106,8 @@ async function readSceneFile(): Promise<string> {
   assert(text !== undefined);
   return text as string;
 }
-async function exportMeshEarClipping(
-  arrayVertices: any,
+async function accumulateMeshForExport(
+  instanceMapPatches: Map<number,any>,
   includeUVs: boolean,
   name: string,
   buffer: boolean
@@ -112,43 +121,48 @@ async function exportMeshEarClipping(
   let sceneFile = readSceneFile();
   lastMeshBufferUpdate = frameCount;
 
-  // Prebake
-  let edgeInformation = analyzeEdges(arrayVertices);
-  let exporterInstance: ExporterInstance = new ExporterInstance(
-    arrayVertices,
-    edgeInformation
-  );
-  exporterInstance.useUvs = includeUVs;
-  exporterInstance.Run();
+  
+  for (const [instance_id, patches] of instanceMapPatches) {
+    // Prebake
+    let edgeInformation = analyzeEdges(patches);
+    let exporterInstance: ExporterInstance = new ExporterInstance(
+      patches,
+      edgeInformation
+    );
+    exporterInstance.useUvs = includeUVs;
+    exporterInstance.Run();
 
-  let scene = deserializeScene(await sceneFile);
-  let sceneModel: any = null;
-  models.value.forEach((localModel) => {
-    if (localModel.name == name) {
-      scene.models.forEach((model) => {
-        if (model.id == localModel.uuid) {
-          // console.log("Found info on model!")
-          sceneModel = model;
-          //console.log(sceneModel);
-          // console.log("Equal to");
-          // console.log(localModel);
-        }
-      });
-    }
-  });
-  assert(sceneModel != null);
-  meshBuffer.push({
-    name: name,
-    verts: exporterInstance.vertPositions,
-    tris: exporterInstance.tris,
-    uvs: exporterInstance.uvs,
-    material: sceneModel.material,
-    position: sceneModel.position,
-    rotation: sceneModel.rotation,
-    scale: sceneModel.scale,
-    instanceCount: sceneModel.instance_count,
-  });
-
+    let scene = deserializeScene(await sceneFile);
+    let sceneModel: any = null;
+    models.value.forEach((localModel) => {
+      if (localModel.name == name) {
+        scene.models.forEach((model) => {
+          if (model.id == localModel.uuid) {
+            // console.log("Found info on model!")
+            sceneModel = model;
+            //console.log(sceneModel);
+            // console.log("Equal to");
+            // console.log(localModel);
+          }
+        });
+      }
+    });
+    
+    assert(sceneModel != null);
+    meshBuffer.push({
+      name: name,
+      verts: exporterInstance.vertPositions,
+      tris: exporterInstance.tris,
+      uvs: exporterInstance.uvs,
+      material: sceneModel.material,
+      position: sceneModel.position,
+      rotation: sceneModel.rotation,
+      scale: sceneModel.scale,
+      instanceCount: sceneModel.instance_count,
+      instance_id: instance_id,
+    });
+    console.log("Mesh has " + exporterInstance.vertPositions.length+ " vertices on instance#" + instance_id);
+  }
   if (toDownload.value.length != 0) return;
   exportMeshBuffer(name);
 }
@@ -159,14 +173,19 @@ function exportMeshFromPatches(
   name: string,
   buffer: boolean
 ) {
+  let instance_id: Uint32Array = new Uint32Array(vertexStream.buffer);
+  instance_id = instance_id.slice(4);
   let slicedStream = vertexStream.slice(4);
   let index = 0;
-  let patch_verts = [];
-  let patches: any = [];
+  let patch_verts: {vert: Vector3, uv: Vector2}[] = [];
+  let patches: Map<number,{vert: Vector3, uv: Vector2, globalIndex?: number}[][]> = new Map();
+
   while (index < slicedStream.length) {
-    let section = slicedStream.slice(index, index + 3);
-    let section2 = slicedStream.slice(index + 4, index + 6);
-    if (section[0] == 0 && section[1] == 0 && section[2] == 0) {
+    let vertex = slicedStream.slice(index, index + 3);
+    let uv = slicedStream.slice(index + 4, index + 6);
+    let instance = instance_id[index+6];
+    let latestPatch = 0;
+    if (vertex[0] == 0 && vertex[1] == 0 && vertex[2] == 0) {
       let endofdata = true;
       for (let x = 0; x < 10; x++) {
         if (slicedStream[index + x] != 0) {
@@ -178,8 +197,8 @@ function exportMeshFromPatches(
       }
     }
     patch_verts.push({
-      vert: new Vector3(section[0], section[1], section[2]),
-      uv: new Vector2(section2[0], section2[1]),
+      vert: new Vector3(vertex[0], vertex[1], vertex[2]),
+      uv: new Vector2(uv[0], uv[1])
     });
 
     index += 8;
@@ -187,21 +206,25 @@ function exportMeshFromPatches(
       continue;
     }
 
-    patches.push(patch_verts);
+    if(!patches.has(instance))
+    {
+      patches.set(instance,[]);
+    }
+    patches.get(instance)?.push(patch_verts);
 
     patch_verts = [];
   }
 
-  for (let i = 0; i < patches.length; i++) {
-    for (let j = 0; j < 4; j++) {
-      let p = patches[i][j];
-      patches[i][j].vert = new Vector3(p.vert.x, p.vert.y, p.vert.z);
-
-      patches[i][j].uv = new Vector2(p.uv.x, p.uv.y);
-      patches[i][j].globalIndex = -1;
+  for (const [instance_id, patchstructure] of patches) {
+    for (let i = 0; i < patchstructure.length; i++) {
+      for (let j = 0; j < 4; j++) {
+        let p = patchstructure[i][j];
+        p.globalIndex = -1;
+      }
     }
   }
-  exportMeshEarClipping(patches, includeUVs, name, buffer);
+
+  accumulateMeshForExport(patches, includeUVs, name, buffer);
 }
 
 // Main function
@@ -325,7 +348,7 @@ async function startExport() {
     </div>
 
     <div v-if="downloadTarget == ''" class="flex items-center justify-between">
-      <label>Merge Models</label>
+      <label>Merge Model Files</label>
       <input
         type="checkbox"
         v-model="mergeModels"
@@ -361,6 +384,13 @@ async function startExport() {
       class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400"
     >
       Download
+    </button>
+    <button
+      @click="exportStore.isExportMode = false;"
+      :disabled="exportInProgress"
+      class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400"
+    >
+      Cancel
     </button>
   </div>
 </template>
