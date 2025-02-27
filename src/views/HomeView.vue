@@ -9,27 +9,23 @@ const sceneFiles = shallowRef<ReactiveFilesystem | null>(null);
 sceneFilesPromise.then((v) => {
   sceneFiles.value = markRaw(v);
 });
-const engine = shallowRef<WgpuEngine | null>(null);
 const canvasElement = takeCanvas();
-const gpuDevice = shallowRef<GPUDevice | null>(null);
 if (canvasElement === null) {
   window.location.reload();
   throw new Error("Canvas element already used, reloading the site.");
 }
+const engine = shallowRef<WgpuEngine>(
+  markRaw(WgpuEngine.createEngine(canvasElement))
+);
+const gpuDevice = shallowRef<GPUDevice | null>(null);
 GpuDevicePromise.then((v) => {
   gpuDevice.value = markRaw(v);
 });
-engine.value = markRaw(WgpuEngine.createEngine(canvasElement));
 </script>
 
 <template>
   <EditorAndOutput
-    v-if="
-      sceneFiles !== null &&
-      engine !== null &&
-      canvasElement !== null &&
-      gpuDevice !== null
-    "
+    v-if="sceneFiles !== null && canvasElement !== null && gpuDevice !== null"
     :fs="sceneFiles"
     :canvas="canvasElement"
     :engine="engine"

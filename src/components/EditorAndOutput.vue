@@ -36,6 +36,9 @@ import CodeGraph from "@/components/visual-programming/CodeGraph.vue";
 import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
 import { useErrorStore } from "@/stores/error-store";
 import { syncFilesystem } from "@/engine/sync-filesystem";
+import { useExportStore } from "@/stores/export-store";
+
+import WebGpu from "@/components/WebGpu.vue";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -55,6 +58,7 @@ props.engine.setOnShaderCompiled((shader, messages) => {
 
 // The underlying data
 const sceneFile = ref<string | null>(null);
+const exportModel = ref(false);
 
 props.fs.watchFromStart((change) => {
   if (change.key === SceneFileName) {
@@ -358,6 +362,15 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
   filePath = makeFilePath(filePath.replace(".graph", ".graph.wgsl"));
   props.fs.writeTextFile(filePath, content);
 }
+const exportStore = useExportStore();
+
+watchImmediate(
+  () => exportStore.isExportMode,
+  (isExport) => {
+    exportModel.value = exportStore.isExportMode;
+    if (exportModel.value == false) props.engine.setLodStage(null);
+  }
+);
 </script>
 
 <template>
@@ -430,6 +443,12 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
           :default-size="0.5"
         >
           <template #1>
+            <WebGpu
+              v-if="exportModel"
+              :gpuDevice="props.gpuDevice"
+              :engine="props.engine"
+              :fs="props.fs"
+            ></WebGpu>
             <div class="flex h-full w-full">
               <div
                 ref="canvasContainer"

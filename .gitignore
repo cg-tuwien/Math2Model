@@ -31,3 +31,4 @@ coverage
 components.d.ts
 
 bun.lockb
+/parametric-renderer-core-old

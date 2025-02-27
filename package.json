@@ -11,6 +11,7 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@gltf-transform/core": "^4.1.1",
     "@iconify-json/mdi": "^1.2.1",
     "@stefnotch/typestef": "^1.0.3",
     "@vueuse/core": "^11.2.0",
@@ -31,6 +32,7 @@
     "rete-structures": "^2.0.1",
     "rete-vue-plugin": "^2.1.0",
     "seemly": "^0.3.9",
+    "three": "^0.171.0",
     "vue": "^3.5.12",
     "vue-router": "^4.4.5",
     "webgpu-matrix": "^1.0.0",
@@ -42,6 +44,7 @@
     "@tsconfig/node20": "^20.1.4",
     "@types/dom-webcodecs": "^0.1.13",
     "@types/node": "^20.17.6",
+    "@types/three": "^0.173.0",
     "@vitejs/plugin-vue": "^5.1.5",
     "@vue/tsconfig": "^0.6.0",
     "@webgpu/types": "^0.1.51",
@@ -58,5 +61,6 @@
   },
   "browserslist": [
     "defaults"
-  ]
+  ],
+  "packageManager": "pnpm@8.15.4+sha1.c85a4305534f76d461407b59277b954bac97b5c4"
 }
