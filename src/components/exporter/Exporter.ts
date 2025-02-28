@@ -4,6 +4,10 @@ export class ExporterInstance {
   private colors: string[] = [];
   public useUvs: boolean = false;
   public uvs: { x: number; y: number }[] = [];
+  public normalsType: number = 0;
+  public exportProgressVar  : any = {value: 0};
+  public exportProgressStart: number = 0;
+  public exportProgressToDo : number = 0;  
 
   private patches: any;
   private edges: any;
@@ -36,6 +40,7 @@ export class ExporterInstance {
     this.uvs = [];
     let vertsMapping = new Map<string, number>();
     let vertexIndex = 0;
+    this.exportProgressVar.value = this.exportProgressStart+this.exportProgressToDo*0.1;
     this.patches.forEach((patch: any[]) => {
       patch.forEach((vertex: any) => {
         let uv = vertex.uv;
@@ -49,7 +54,7 @@ export class ExporterInstance {
         }
       });
     });
-
+    this.exportProgressVar.value = this.exportProgressStart+this.exportProgressToDo*0.3;
     // Create a boolean array using the vertsMapping count if available,
     // otherwise compute the total number of vertices across all patches.
     const vertCount = vertsMapping
@@ -59,6 +64,7 @@ export class ExporterInstance {
           0
         );
     const bools: boolean[] = new Array(vertCount).fill(false);
+    this.exportProgressVar.value = this.exportProgressStart+this.exportProgressToDo*0.5;
 
     // For each patch, add each vertex’s position and UV (only once per globalIndex)
     for (const patch of this.patches) {
@@ -74,12 +80,14 @@ export class ExporterInstance {
         }
       }
     }
+    this.exportProgressVar.value = this.exportProgressStart+this.exportProgressToDo*0.7;
 
     let step = 0;
     // Process each patch (the C# version processes one patch at a time)
     for (const patch of this.patches) {
       step = this.processPatch(patch, step);
     }
+    this.exportProgressVar.value = this.exportProgressStart+this.exportProgressToDo*0.9;
   }
 
   private processPatch(patch: any[], step: number): number {
@@ -252,7 +260,22 @@ export class ExporterInstance {
       }
 
       vp.splice((i + 1 + offset) % vp.length, 1); // Remove ear vertex
-      this.tris.push(v1.globalIndex, v3.globalIndex, v2.globalIndex);
+      
+      
+      debugger;
+      switch(this.normalsType)
+      {
+        case 0:
+          this.tris.push(v1.globalIndex, v3.globalIndex, v2.globalIndex);
+          break;
+        case 1:
+          this.tris.push(v1.globalIndex, v2.globalIndex, v3.globalIndex);
+          break;
+        case 2:
+          this.tris.push(v1.globalIndex, v3.globalIndex, v2.globalIndex);
+          this.tris.push(v1.globalIndex, v2.globalIndex, v3.globalIndex);
+          break;
+      }
       loopDetection = 0;
 
       i++;

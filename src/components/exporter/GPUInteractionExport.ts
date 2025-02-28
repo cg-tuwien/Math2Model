@@ -268,6 +268,7 @@ export async function mainExport(
     buffers: LodStageBuffers,
     commandEncoder: GPUCommandEncoder
   ) {
+    const doubleNumberOfRounds = lodExportParametersRefs.subdivisionSteps.value;
     if (!buffers.computePatchesInput) {
       console.log("Missing buffer. Buffers: " + buffers);
     }
@@ -360,7 +361,6 @@ export async function mainExport(
       0,
       lodStageParameters.length
     );
-    const doubleNumberOfRounds = lodExportParametersRefs.subdivisionSteps.value;
     // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
     for (let i = 0; i < doubleNumberOfRounds; i++) {
       const isLastRound = i === doubleNumberOfRounds - 1;
@@ -379,13 +379,11 @@ export async function mainExport(
       computePassPing.setBindGroup(2, pingPongPatchesBindGroup[0]);
       computePassPing.dispatchWorkgroupsIndirect(buffers.indirectDispatch0, 0);
       computePassPing.end();
-
-      // debugPrintBuffer(buffers.patches1, commandEncoder);
-
       // Pong
       if (isLastRound) {
         simpleB2BSameSize(forceRenderTrue, buffers.forceRender, commandEncoder);
       }
+
       simpleB2BSameSize(patchesBufferReset, buffers.patches0, commandEncoder);
       simpleB2BSameSize(
         indirectComputeBufferReset,
@@ -456,6 +454,7 @@ export async function mainExport(
             const arrayBuffer = vertReadableBuffer
               .getMappedRange(0, vertReadableBuffer.size)
               .slice(0);
+            let size = arrayBuffer[0];
             const vertexStream = new Float32Array(arrayBuffer);
             vertReadableBuffer.unmap();
             if (downloadAll) {

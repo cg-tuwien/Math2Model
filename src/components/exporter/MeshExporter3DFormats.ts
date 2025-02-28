@@ -6,6 +6,9 @@ export class MeshExporter3DFormats {
   public useUvs = false;
   public merge: boolean = false;
   public name: string = "";
+  public progressToMake: number = 0;
+  public exportProgress: any = {value:0};
+  
   constructor(meshBuffer: any[]) {
     this.meshBuffer = meshBuffer;
   }
@@ -45,6 +48,8 @@ export class MeshExporter3DFormats {
    * objExport
    */
   public objExport(meshes: any[]): [string, string] {
+    let progressPerMesh = 1./meshes.length*this.progressToMake;
+    
     let mexpstring = "mtllib " + this.name + ".mtl\n";
     let offset = 1;
 
@@ -54,19 +59,23 @@ export class MeshExporter3DFormats {
       mexpstring += "o " + buf.name + "\n";
       mexpstring += "usemtl Material" + i + "\n";
       let matrix = transformPointMatrix(buf.rotation, buf.position, buf.scale);
-
+      let progressPerVert = progressPerMesh/buf.verts.length/3;
       for (let vert of buf.verts) {
         //        debugger;
         let vecResult = [vert.x, vert.y, vert.z];
         vec3.transformMat4(vecResult, matrix, vecResult);
         mexpstring +=
           "v " + vecResult[0] + " " + vecResult[1] + " " + vecResult[2] + "\n";
+        this.exportProgress.value += progressPerVert;
       }
       if (this.useUvs) {
         for (let uv of buf.uvs) {
           mexpstring += "vt " + uv.x + " " + uv.y + "\n";
         }
+        this.exportProgress.value+=progressPerMesh/3;
       }
+      let progressPerTri = progressPerMesh/buf.tris.length/3;
+
       let t = buf.tris;
       for (let i = 0; i < t.length; i += 3) {
         mexpstring +=
@@ -77,6 +86,7 @@ export class MeshExporter3DFormats {
           " " +
           (t[i + 2] + offset) +
           "\n";
+        this.exportProgress.value+=progressPerTri;
       }
       offset += buf.verts.length;
     }
@@ -107,6 +117,7 @@ export class MeshExporter3DFormats {
     const scene = doc.createScene();
     const buffer = doc.createBuffer();
     let errorModels = [];
+    let progressPerMesh = 1./meshes.length*this.progressToMake;
     for (let x = 0; x < meshes.length; x++) {
       let meshBuf = meshes[x];
       if (!(meshBuf.verts.length > 0)) {
@@ -118,8 +129,6 @@ export class MeshExporter3DFormats {
         alert("HELP I NEED A MATERIAL");
         debugger;
       }
-      console.log(meshBuf);
-      console.log(inMaterial);
       let materialName = "material" + x;
       console.log(inMaterial);
       let material = doc
@@ -139,11 +148,13 @@ export class MeshExporter3DFormats {
         .setMetallicFactor( clamp01(inMaterial.metallic))
         .setRoughnessFactor(clamp01(inMaterial.roughness));
       let transformedVerts = new Float32Array(meshBuf.verts.length * 3);
+      let progressPerVert = progressPerMesh/meshBuf.verts.length/2;
       for (let i = 0; i < meshBuf.verts.length; i++) {
         let v = meshBuf.verts[i];
         transformedVerts[i * 3] = v.x;
         transformedVerts[i * 3 + 1] = v.y;
         transformedVerts[i * 3 + 2] = v.z;
+        this.exportProgress.value+=progressPerVert;
       }
       let transformedUvs = new Float32Array(meshBuf.uvs.length * 2);
       if (this.useUvs)

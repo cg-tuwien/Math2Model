@@ -42,27 +42,41 @@ const models: Ref<any[]> = ref([
     uuid: "",
   },
 ]);
+const normalType: Ref<number> = ref(0);
 const downloadTarget = ref("");
 const mergeModels = ref(true);
 const exportInProgress = ref(false);
 const toDownload: Ref<string[]> = ref([]);
+const exportProgress: Ref<number> = ref(0);
+
+let exportSteps = 0;
+let exportStepsDone = 0;
+let stepProgress = 0;
 
 let meshBuffer: any[] = [];
 let bufferedNames: Ref<string[]> = ref([]);
 let lastMeshBufferUpdate = 0;
 
 let frameCount = 0;
+let canceled = false;
 function onFrame() {
   frameCount++;
 }
 
 async function exportMeshBuffer(name: string) {
-  if (mergeModels.value) {
-    exportMeshList(meshBuffer, name);
-  } else {
-    meshBuffer.forEach((mesh) => {
-      exportMeshList([mesh], mesh.name);
-    });
+  let exportProgressBase = 0;
+  let exportProgressPerStep = 1 / meshBuffer.length;
+  let i = 0;
+  if (!canceled) {
+    if (mergeModels.value) {
+      exportMeshList(meshBuffer, name);
+    } else {
+      meshBuffer.forEach((mesh) => {
+        exportProgress.value = i * exportProgressPerStep;
+        exportMeshList([mesh], mesh.name, exportProgressPerStep);
+        i++;
+      });
+    }
   }
 
   meshBuffer = [];
@@ -70,15 +84,31 @@ async function exportMeshBuffer(name: string) {
   lastMeshBufferUpdate = frameCount;
   exportInProgress.value = false;
   triggerDownload.value = false;
+  exportProgress.value = 0;
+  exportStepsDone = 0;
+  canceled = false;
 }
 
-async function exportMeshList(meshes: any[], name: string) {
+async function exportMeshList(
+  meshes: any[],
+  name: string,
+  progressToMake?: number
+) {
+  let exportProgressPerStep = 1 / meshBuffer.length;
   let modelExporter = new MeshExporter3DFormats(meshes);
   modelExporter.useUvs = includeUVs.value;
   let format = fileFormat.value;
   modelExporter.name = name;
+  if (progressToMake) {
+    modelExporter.progressToMake = progressToMake;
+    modelExporter.exportProgress = exportProgress;
+  }
   let fileContent = await modelExporter.exportModel(format);
 
+  if(canceled)
+  {
+    return;
+  }
   let error = fileContent.error;
   if (error) {
     console.log("Error during exporting, format did not match any known");
@@ -114,6 +144,7 @@ async function accumulateMeshForExport(
   uuid: string,
   buffer: boolean
 ) {
+  let progressPerStep = 1 / exportSteps;
   let name = uuid;
   let looped = false;
   if (toDownload.value.length == 0) {
@@ -124,6 +155,7 @@ async function accumulateMeshForExport(
   let scenePromise = getScene();
   lastMeshBufferUpdate = frameCount;
 
+  exportProgress.value = progressPerStep * (exportStepsDone + 0.5);
   let scene = await scenePromise;
   for (const [instance_id, patches] of instanceMapPatches) {
     // Bake edge information
@@ -133,6 +165,10 @@ async function accumulateMeshForExport(
       edgeInformation
     );
     exporterInstance.useUvs = includeUVs;
+    exporterInstance.normalsType = normalType.value;
+    exporterInstance.exportProgressVar = exportProgress;
+    exporterInstance.exportProgressStart = exportProgress.value;
+    exporterInstance.exportProgressToDo = progressPerStep * 0.5;
     exporterInstance.Run();
 
     debugger;
@@ -168,6 +204,7 @@ async function accumulateMeshForExport(
         instance_id
     );
   }
+  exportStepsDone++;
   if (toDownload.value.length != 0) return;
   exportMeshBuffer(name);
 }
@@ -183,6 +220,7 @@ function exportMeshFromPatches(
   name: string,
   buffer: boolean
 ) {
+  let progressPerStep = 1 / exportSteps;
   let instance_id: Uint32Array = new Uint32Array(vertexStream.buffer);
   instance_id = instance_id.slice(4);
   let slicedStream = vertexStream.slice(4);
@@ -225,6 +263,10 @@ function exportMeshFromPatches(
     patches.get(instance)?.push(patch_verts);
 
     patch_verts = [];
+    let progressForStep = (index / slicedStream.length) * progressPerStep;
+    progressForStep /= 2;
+    exportProgress.value =
+      progressPerStep * (exportStepsDone + progressForStep);
   }
 
   for (const [instance_id, patchstructure] of patches) {
@@ -286,10 +328,19 @@ async function startExport() {
     if (downloadTarget.value == "" || model.id == downloadTarget.value)
       toDownload.value.push(model.id);
   });
+  exportSteps = toDownload.value.length;
   console.log("To download: ", toDownload);
 }
-</script>
-<template :theme="theme">
+
+function cancelExport() {
+  exportStore.isExportMode = false;
+  meshBuffer = [];
+  exportInProgress.value = false;
+  exportProgress.value = 0;
+  toDownload.value = [];
+  canceled = true;
+}
+</script><template :theme="theme">
   <div class="absolute bg-red-100 p-4 rounded-lg shadow-md w-80 space-y-4">
     <div class="flex items-center justify-between">
       <label>Min Size:</label>
@@ -306,7 +357,6 @@ async function startExport() {
         <input
           type="number"
           v-model="minSize"
-          :disabled="true"
           class="w-14 text-center"
         />
       </div>
@@ -327,7 +377,6 @@ async function startExport() {
         <input
           type="number"
           v-model="maxCurvature"
-          :disabled="true"
           class="w-14 text-center"
         />
       </div>
@@ -348,7 +397,6 @@ async function startExport() {
         <input
           type="number"
           v-model="acceptablePlanarity"
-          :disabled="true"
           class="w-14 text-center"
         />
       </div>
@@ -398,6 +446,19 @@ async function startExport() {
     </div>
 
     <div class="flex items-center justify-between">
+      <label>Normal Direction:</label>
+      <select
+        v-model="normalType"
+        :disabled="exportInProgress"
+        class="w-24 p-1"
+      >
+        <option :value="0">default</option>
+        <option :value="1">inverse</option>
+        <option :value="2">double sided</option>
+      </select>
+    </div>
+
+    <div class="flex items-center justify-between">
       <label>Division Steps:</label>
       <input
         type="range"
@@ -417,9 +478,17 @@ async function startExport() {
     >
       Download
     </button>
+    <div
+      v-if="exportInProgress"
+      class="w-full bg-gray-300 h-2 rounded-lg overflow-hidden"
+    >
+      <div
+        class="bg-blue-500 h-full transition-all duration-200"
+        :style="{ width: `${exportProgress * 100}%` }"
+      ></div>
+    </div>
     <button
-      @click="exportStore.isExportMode = false"
-      :disabled="exportInProgress"
+      @click="cancelExport()"
       class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400"
     >
       Cancel
