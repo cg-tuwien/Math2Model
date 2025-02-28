@@ -462,7 +462,7 @@ export async function mainExport(
             }
             let l = lodExportParametersRefs.toDownload.value;
             l.splice(l.indexOf(uuid), 1);
-            console.log("Export mesh from patches called");
+            console.log("exportMeshFromPatches called");
             exportMeshFromPatches(
               vertexStream,
               lodExportParametersRefs.includeUVs.value,

@@ -127,10 +127,8 @@ export class MeshExporter3DFormats {
       let inMaterial = meshBuf.material;
       if (!inMaterial) {
         alert("HELP I NEED A MATERIAL");
-        debugger;
       }
       let materialName = "material" + x;
-      console.log(inMaterial);
       let material = doc
         .createMaterial(materialName)
         .setBaseColorFactor([

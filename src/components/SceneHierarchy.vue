@@ -6,6 +6,7 @@ import {
 } from "@/scenes/scene-state";
 import { computed, h, ref, watchEffect, type DeepReadonly } from "vue";
 import { NButton, NInput, NText, type UploadFileInfo } from "naive-ui";
+import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import NumberInput from "@/components/input/NumberInput.vue";
 import VectorInput from "@/components/input/VectorInput.vue";
 import EulerInput from "@/components/input/EulerInput.vue";
@@ -16,7 +17,6 @@ import {
   makeFilePath,
   ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
-import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import {
   NodeTreeHelper,
   makeSelectionGeneration,
@@ -26,7 +26,10 @@ import {
   type TreeSelection,
 } from "./node-tree/NodeTreeHelper";
 import { ObjectUpdate, type ObjectPathPart } from "./input/object-update";
+import { useExportStore } from "@/stores/export-store";
 
+
+const exportStore = useExportStore();
 const props = defineProps<{
   models: DeepReadonly<VirtualModelState>[];
   fs: ReactiveFilesystem;
@@ -323,6 +326,10 @@ function onNodeSelect(path: NodePath, value: [SelectionGeneration, boolean]) {
   }
 }
 
+function toggleExportUI() {
+  exportStore.isExportMode = !exportStore.isExportMode;
+}
+
 function uploadFile(data: {
   file: UploadFileInfo;
   fileList: UploadFileInfo[];
@@ -377,6 +384,7 @@ function uploadFile(data: {
   <n-flex justify="">
     <n-flex vertical class="mr-1 ml-1">
       <n-h3 class="underline">Scene</n-h3>
+      <n-button size="small" @click="toggleExportUI()"> Toggle Export </n-button>
       <n-flex>
         <n-button size="small" @click="startAddModel()"> Add </n-button>
         <n-button size="small" @click="removeModel()"> Delete </n-button>
