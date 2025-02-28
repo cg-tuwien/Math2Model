@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Taken from https://webgpu.github.io/webgpu-samples/?sample=rotatingCube#main.ts
-// TODO: Either add attribution, or remove this file.
 import { type ReactiveFilesystem } from "@/filesystem/reactive-files";
 import { ref, type Ref } from "vue";
 import { ExporterInstance } from "./exporter/Exporter";
@@ -10,7 +8,11 @@ import type { WgpuEngine } from "@/engine/wgpu-engine";
 import { analyzeEdges } from "./exporter/EdgeAnalysis";
 import { save, saveFile, saveFileBinary } from "./exporter/FileDownload";
 import { MeshExporter3DFormats } from "./exporter/MeshExporter3DFormats";
-import { SceneFileName, deserializeScene } from "@/filesystem/scene-file";
+import {
+  SceneFileName,
+  deserializeScene,
+  type SerializedScene,
+} from "@/filesystem/scene-file";
 import { assert } from "@stefnotch/typestef/assert";
 import { useStore } from "../stores/store";
 import { computed } from "vue";
@@ -37,29 +39,44 @@ const models: Ref<any[]> = ref([
   {
     path: "",
     name: "all",
+    uuid: "",
   },
 ]);
+const normalType: Ref<number> = ref(0);
 const downloadTarget = ref("");
 const mergeModels = ref(true);
 const exportInProgress = ref(false);
 const toDownload: Ref<string[]> = ref([]);
+const exportProgress: Ref<number> = ref(0);
+
+let exportSteps = 0;
+let exportStepsDone = 0;
+let stepProgress = 0;
 
 let meshBuffer: any[] = [];
 let bufferedNames: Ref<string[]> = ref([]);
 let lastMeshBufferUpdate = 0;
 
 let frameCount = 0;
+let canceled = false;
 function onFrame() {
   frameCount++;
 }
 
 async function exportMeshBuffer(name: string) {
-  if (mergeModels.value) {
-    exportMeshList(meshBuffer, name);
-  } else {
-    meshBuffer.forEach((mesh) => {
-      exportMeshList([mesh], mesh.name);
-    });
+  let exportProgressBase = 0;
+  let exportProgressPerStep = 1 / meshBuffer.length;
+  let i = 0;
+  if (!canceled) {
+    if (mergeModels.value) {
+      exportMeshList(meshBuffer, name);
+    } else {
+      meshBuffer.forEach((mesh) => {
+        exportProgress.value = i * exportProgressPerStep;
+        exportMeshList([mesh], mesh.name, exportProgressPerStep);
+        i++;
+      });
+    }
   }
 
   meshBuffer = [];
@@ -67,15 +84,31 @@ async function exportMeshBuffer(name: string) {
   lastMeshBufferUpdate = frameCount;
   exportInProgress.value = false;
   triggerDownload.value = false;
+  exportProgress.value = 0;
+  exportStepsDone = 0;
+  canceled = false;
 }
 
-async function exportMeshList(meshes: any[], name: string) {
+async function exportMeshList(
+  meshes: any[],
+  name: string,
+  progressToMake?: number
+) {
+  let exportProgressPerStep = 1 / meshBuffer.length;
   let modelExporter = new MeshExporter3DFormats(meshes);
   modelExporter.useUvs = includeUVs.value;
   let format = fileFormat.value;
   modelExporter.name = name;
+  if (progressToMake) {
+    modelExporter.progressToMake = progressToMake;
+    modelExporter.exportProgress = exportProgress;
+  }
   let fileContent = await modelExporter.exportModel(format);
 
+  if(canceled)
+  {
+    return;
+  }
   let error = fileContent.error;
   if (error) {
     console.log("Error during exporting, format did not match any known");
@@ -86,8 +119,7 @@ async function exportMeshList(meshes: any[], name: string) {
   let binary = fileContent.binary;
   let data = fileContent.data;
   let successful = fileContent.error;
-  if(fileContent.errors)
-  {
+  if (fileContent.errors) {
     fileContent.errors.forEach((errorModel) => {
       alert("Did not successfully export " + errorModel);
     });
@@ -107,50 +139,53 @@ async function readSceneFile(): Promise<string> {
   return text as string;
 }
 async function accumulateMeshForExport(
-  instanceMapPatches: Map<number,any>,
+  instanceMapPatches: Map<number, any>,
   includeUVs: boolean,
-  name: string,
+  uuid: string,
   buffer: boolean
 ) {
+  let progressPerStep = 1 / exportSteps;
+  let name = uuid;
   let looped = false;
   if (toDownload.value.length == 0) {
     buffer = false;
     looped = true;
   }
 
-  let sceneFile = readSceneFile();
+  let scenePromise = getScene();
   lastMeshBufferUpdate = frameCount;
 
-  
+  exportProgress.value = progressPerStep * (exportStepsDone + 0.5);
+  let scene = await scenePromise;
   for (const [instance_id, patches] of instanceMapPatches) {
-    // Prebake
+    // Bake edge information
     let edgeInformation = analyzeEdges(patches);
     let exporterInstance: ExporterInstance = new ExporterInstance(
       patches,
       edgeInformation
     );
     exporterInstance.useUvs = includeUVs;
+    exporterInstance.normalsType = normalType.value;
+    exporterInstance.exportProgressVar = exportProgress;
+    exporterInstance.exportProgressStart = exportProgress.value;
+    exporterInstance.exportProgressToDo = progressPerStep * 0.5;
     exporterInstance.Run();
 
-    let scene = deserializeScene(await sceneFile);
+    debugger;
     let sceneModel: any = null;
     models.value.forEach((localModel) => {
-      if (localModel.name == name) {
+      if (localModel.uuid == uuid) {
         scene.models.forEach((model) => {
           if (model.id == localModel.uuid) {
-            // console.log("Found info on model!")
             sceneModel = model;
-            //console.log(sceneModel);
-            // console.log("Equal to");
-            // console.log(localModel);
           }
         });
       }
     });
-    
+
     assert(sceneModel != null);
     meshBuffer.push({
-      name: name,
+      name: sceneModel.name,
       verts: exporterInstance.vertPositions,
       tris: exporterInstance.tris,
       uvs: exporterInstance.uvs,
@@ -161,29 +196,45 @@ async function accumulateMeshForExport(
       instanceCount: sceneModel.instance_count,
       instance_id: instance_id,
     });
-    console.log("Mesh has " + exporterInstance.vertPositions.length+ " vertices on instance#" + instance_id);
+    name = sceneModel.name;
+    console.log(
+      "Mesh has " +
+        exporterInstance.vertPositions.length +
+        " vertices on instance#" +
+        instance_id
+    );
   }
+  exportStepsDone++;
   if (toDownload.value.length != 0) return;
   exportMeshBuffer(name);
 }
 
+async function getScene(): Promise<SerializedScene> {
+  let sceneFile = readSceneFile();
+  let scene = deserializeScene(await sceneFile);
+  return scene;
+}
 function exportMeshFromPatches(
   vertexStream: Float32Array,
   includeUVs: boolean,
   name: string,
   buffer: boolean
 ) {
+  let progressPerStep = 1 / exportSteps;
   let instance_id: Uint32Array = new Uint32Array(vertexStream.buffer);
   instance_id = instance_id.slice(4);
   let slicedStream = vertexStream.slice(4);
   let index = 0;
-  let patch_verts: {vert: Vector3, uv: Vector2}[] = [];
-  let patches: Map<number,{vert: Vector3, uv: Vector2, globalIndex?: number}[][]> = new Map();
+  let patch_verts: { vert: Vector3; uv: Vector2 }[] = [];
+  let patches: Map<
+    number,
+    { vert: Vector3; uv: Vector2; globalIndex?: number }[][]
+  > = new Map();
 
   while (index < slicedStream.length) {
     let vertex = slicedStream.slice(index, index + 3);
     let uv = slicedStream.slice(index + 4, index + 6);
-    let instance = instance_id[index+6];
+    let instance = instance_id[index + 6];
     let latestPatch = 0;
     if (vertex[0] == 0 && vertex[1] == 0 && vertex[2] == 0) {
       let endofdata = true;
@@ -198,7 +249,7 @@ function exportMeshFromPatches(
     }
     patch_verts.push({
       vert: new Vector3(vertex[0], vertex[1], vertex[2]),
-      uv: new Vector2(uv[0], uv[1])
+      uv: new Vector2(uv[0], uv[1]),
     });
 
     index += 8;
@@ -206,13 +257,16 @@ function exportMeshFromPatches(
       continue;
     }
 
-    if(!patches.has(instance))
-    {
-      patches.set(instance,[]);
+    if (!patches.has(instance)) {
+      patches.set(instance, []);
     }
     patches.get(instance)?.push(patch_verts);
 
     patch_verts = [];
+    let progressForStep = (index / slicedStream.length) * progressPerStep;
+    progressForStep /= 2;
+    exportProgress.value =
+      progressPerStep * (exportStepsDone + progressForStep);
   }
 
   for (const [instance_id, patchstructure] of patches) {
@@ -226,6 +280,17 @@ function exportMeshFromPatches(
 
   accumulateMeshForExport(patches, includeUVs, name, buffer);
 }
+
+let scene = getScene();
+scene.then((actualScene) => {
+  actualScene.models.forEach((model) => {
+    models.value.push({
+      path: model.parametricShader,
+      name: model.name,
+      uuid: model.id,
+    });
+  });
+});
 
 // Main function
 mainExport(
@@ -253,11 +318,29 @@ async function startExport() {
   let sceneFile = readSceneFile();
   let scene = deserializeScene(await sceneFile);
   scene.models.forEach((model) => {
-    toDownload.value.push(model.id);
+    if (downloadTarget.value !== "")
+      console.log(
+        "Searching for download target " +
+          downloadTarget.value +
+          " candidate: " +
+          model.id
+      );
+    if (downloadTarget.value == "" || model.id == downloadTarget.value)
+      toDownload.value.push(model.id);
   });
+  exportSteps = toDownload.value.length;
+  console.log("To download: ", toDownload);
 }
-</script>
-<template :theme="theme">
+
+function cancelExport() {
+  exportStore.isExportMode = false;
+  meshBuffer = [];
+  exportInProgress.value = false;
+  exportProgress.value = 0;
+  toDownload.value = [];
+  canceled = true;
+}
+</script><template :theme="theme">
   <div class="absolute bg-red-100 p-4 rounded-lg shadow-md w-80 space-y-4">
     <div class="flex items-center justify-between">
       <label>Min Size:</label>
@@ -274,7 +357,6 @@ async function startExport() {
         <input
           type="number"
           v-model="minSize"
-          :disabled="true"
           class="w-14 text-center"
         />
       </div>
@@ -295,7 +377,6 @@ async function startExport() {
         <input
           type="number"
           v-model="maxCurvature"
-          :disabled="true"
           class="w-14 text-center"
         />
       </div>
@@ -316,7 +397,6 @@ async function startExport() {
         <input
           type="number"
           v-model="acceptablePlanarity"
-          :disabled="true"
           class="w-14 text-center"
         />
       </div>
@@ -341,7 +421,7 @@ async function startExport() {
         :disabled="exportInProgress"
         class="w-24 p-1"
       >
-        <option v-for="model in models" :value="model.path" :key="model.path">
+        <option v-for="model in models" :value="model.uuid" :key="model.path">
           {{ model.name }}
         </option>
       </select>
@@ -366,6 +446,19 @@ async function startExport() {
     </div>
 
     <div class="flex items-center justify-between">
+      <label>Normal Direction:</label>
+      <select
+        v-model="normalType"
+        :disabled="exportInProgress"
+        class="w-24 p-1"
+      >
+        <option :value="0">default</option>
+        <option :value="1">inverse</option>
+        <option :value="2">double sided</option>
+      </select>
+    </div>
+
+    <div class="flex items-center justify-between">
       <label>Division Steps:</label>
       <input
         type="range"
@@ -385,9 +478,17 @@ async function startExport() {
     >
       Download
     </button>
+    <div
+      v-if="exportInProgress"
+      class="w-full bg-gray-300 h-2 rounded-lg overflow-hidden"
+    >
+      <div
+        class="bg-blue-500 h-full transition-all duration-200"
+        :style="{ width: `${exportProgress * 100}%` }"
+      ></div>
+    </div>
     <button
-      @click="exportStore.isExportMode = false;"
-      :disabled="exportInProgress"
+      @click="cancelExport()"
       class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-blue-600 disabled:bg-gray-400"
     >
       Cancel

@@ -268,28 +268,23 @@ export async function mainExport(
     buffers: LodStageBuffers,
     commandEncoder: GPUCommandEncoder
   ) {
-    let name = shaderPath;
-    if(!buffers.computePatchesInput)
-    {
+    const doubleNumberOfRounds = lodExportParametersRefs.subdivisionSteps.value;
+    if (!buffers.computePatchesInput) {
       console.log("Missing buffer. Buffers: " + buffers);
     }
     let uuid = buffers.computePatchesInput.label.split(" ")[0];
+
+    let name = uuid;
     var re = /\.wgsl$/;
     name = name.replace(re, "");
     let models: Ref<any[]> = lodExportParametersRefs.models;
     let registered = false;
     models.value.forEach((model) => {
-      if (model.path == shaderPath) {
-        registered = true;
+      if (model.uuid == uuid) {
+        name = model.name;
       }
     });
-    if (!registered) {
-      models.value.push({
-        path: shaderPath,
-        name: name,
-        uuid: uuid,
-      });
-    }
+
     const compiledShader = compiledShaders.value.get(makeFilePath(shaderPath));
     if (!compiledShader) {
       console.error("Shader not found: ", shaderPath);
@@ -358,7 +353,7 @@ export async function mainExport(
       lodExportParametersRefs.maxCurvature.value,
       lodExportParametersRefs.acceptablePlanarity.value,
     ]);
-    
+
     device.queue.writeBuffer(
       lodStageParametersBuffer,
       0,
@@ -366,7 +361,6 @@ export async function mainExport(
       0,
       lodStageParameters.length
     );
-    const doubleNumberOfRounds = lodExportParametersRefs.subdivisionSteps.value;
     // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
     for (let i = 0; i < doubleNumberOfRounds; i++) {
       const isLastRound = i === doubleNumberOfRounds - 1;
@@ -385,13 +379,11 @@ export async function mainExport(
       computePassPing.setBindGroup(2, pingPongPatchesBindGroup[0]);
       computePassPing.dispatchWorkgroupsIndirect(buffers.indirectDispatch0, 0);
       computePassPing.end();
-
-      // debugPrintBuffer(buffers.patches1, commandEncoder);
-
       // Pong
       if (isLastRound) {
         simpleB2BSameSize(forceRenderTrue, buffers.forceRender, commandEncoder);
       }
+
       simpleB2BSameSize(patchesBufferReset, buffers.patches0, commandEncoder);
       simpleB2BSameSize(
         indirectComputeBufferReset,
@@ -416,22 +408,19 @@ export async function mainExport(
       }
     }
 
-
-    if(!triggerDownload.value)
-    {
+    if (!triggerDownload.value) {
       return;
     }
     let downloadTarget = lodExportParametersRefs.downloadTarget.value;
     let downloadAll = downloadTarget == "";
-    let isRightDownloadTarget = downloadAll || downloadTarget == shaderPath;
+    let isRightDownloadTarget = downloadAll || downloadTarget == uuid;
     if (
       isRightDownloadTarget &&
       lodExportParametersRefs.toDownload.value.includes(uuid)
     ) {
-
       console.log("Exporting " + name);
       triggerDownload.value = false;
-        // Prepare vertices output
+      // Prepare vertices output
       let computePassPrep = commandEncoder.beginComputePass({
         label: "prepareVertexOutput",
       });
@@ -440,7 +429,11 @@ export async function mainExport(
       computePassPrep.dispatchWorkgroups(1);
       computePassPrep.end();
 
-      simpleB2BSameSize(vertOutputBufferReset, vertOutputBuffer, commandEncoder);
+      simpleB2BSameSize(
+        vertOutputBufferReset,
+        vertOutputBuffer,
+        commandEncoder
+      );
 
       // Run vertex output shader
       let computePassVertices = commandEncoder.beginComputePass({
@@ -461,18 +454,19 @@ export async function mainExport(
             const arrayBuffer = vertReadableBuffer
               .getMappedRange(0, vertReadableBuffer.size)
               .slice(0);
+            let size = arrayBuffer[0];
             const vertexStream = new Float32Array(arrayBuffer);
             vertReadableBuffer.unmap();
             if (downloadAll) {
               triggerDownload.value = true;
-              let l = lodExportParametersRefs.toDownload.value;
-              l.splice(l.indexOf(uuid), 1);
             }
+            let l = lodExportParametersRefs.toDownload.value;
+            l.splice(l.indexOf(uuid), 1);
             console.log("Export mesh from patches called");
             exportMeshFromPatches(
               vertexStream,
               lodExportParametersRefs.includeUVs.value,
-              name,
+              uuid,
               downloadAll
             );
           });
