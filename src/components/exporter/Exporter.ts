@@ -261,8 +261,6 @@ export class ExporterInstance {
 
       vp.splice((i + 1 + offset) % vp.length, 1); // Remove ear vertex
       
-      
-      debugger;
       switch(this.normalsType)
       {
         case 0:

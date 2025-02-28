@@ -443,12 +443,6 @@ watchImmediate(
           :default-size="0.5"
         >
           <template #1>
-            <WebGpu
-              v-if="exportModel"
-              :gpuDevice="props.gpuDevice"
-              :engine="props.engine"
-              :fs="props.fs"
-            ></WebGpu>
             <div class="flex h-full w-full">
               <div
                 ref="canvasContainer"
@@ -460,8 +454,14 @@ watchImmediate(
           </template>
           <template #2>
             <div class="flex h-full w-full">
+            <WebGpu
+              v-if="exportModel"
+              :gpuDevice="props.gpuDevice"
+              :engine="props.engine"
+              :fs="props.fs"
+            ></WebGpu>
               <CodeEditor
-                v-if="openFile.editorType.value === 'shader'"
+                v-if="openFile.editorType.value === 'shader' && !exportModel"
                 class="self-stretch overflow-hidden flex-1"
                 :keyed-code="openFile.code.value"
                 :is-readonly="openFile.isReadonly.value"
@@ -478,7 +478,7 @@ watchImmediate(
               >
               </CodeEditor>
               <CodeGraph
-                v-if="openFile.editorType.value === 'graph'"
+                v-if="openFile.editorType.value === 'graph' && !exportModel"
                 :fs="props.fs"
                 :keyedGraph="openFile.code.value"
                 @update="
