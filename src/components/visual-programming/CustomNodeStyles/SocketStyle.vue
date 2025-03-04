@@ -17,18 +17,13 @@ const props = defineProps<{
 }>();
 </script>
 
-<style lang="scss" scoped>
-@use "sass:math";
-
+<style scoped>
 .socket {
   display: inline-block;
   cursor: pointer;
-  //border: 1px solid grey;
-  //height: 16px * 2;
   vertical-align: middle;
   background: inherit;
   z-index: 2;
-  // box-sizing: border-box;
   &:hover {
     color: #fff;
   }

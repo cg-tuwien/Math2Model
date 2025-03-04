@@ -9,7 +9,7 @@ type ExampleProject = {
   name: string;
   files: {
     name: string;
-    value: ArrayBuffer;
+    value: Uint8Array;
   }[];
 };
 

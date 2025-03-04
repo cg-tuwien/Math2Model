@@ -122,9 +122,7 @@ function outputs() {
 }
 </script>
 
-<style lang="scss" scoped>
-@use "sass:math";
-
+<style scoped>
 .node {
   background: #b03535;
   border: 2px solid black;
@@ -185,13 +183,13 @@ function outputs() {
 
   .input-control {
     z-index: 1;
-    width: calc(100% - #{16px + 2 * 6px});
+    width: calc(100% - 16px + 2 * 6px);
     vertical-align: middle;
     display: inline-block;
   }
 
   .control {
-    padding: 6px math.div(16px, 2) + 6px;
+    padding: 6px 14px;
   }
 }
 </style>

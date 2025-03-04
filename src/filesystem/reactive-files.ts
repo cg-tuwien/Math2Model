@@ -16,7 +16,10 @@ export interface ReadonlyFiles {
 
 export interface WritableFiles extends ReadonlyFiles {
   writeTextFile(name: FilePath, content: string): Promise<void>;
-  writeBinaryFile(name: FilePath, content: ArrayBuffer | File): Promise<void>;
+  writeBinaryFile(
+    name: FilePath,
+    content: ArrayBufferView | ArrayBuffer | File
+  ): Promise<void>;
   renameFile(oldName: FilePath, newName: FilePath): Promise<void>;
   deleteFile(name: FilePath): Promise<void>;
 }
@@ -121,7 +124,10 @@ export class ReactiveFilesystem implements WritableFiles {
     });
   }
 
-  writeBinaryFile(name: FilePath, content: ArrayBuffer | File): Promise<void> {
+  writeBinaryFile(
+    name: FilePath,
+    content: ArrayBufferView | ArrayBuffer | File
+  ): Promise<void> {
     this.setOrIncrementVersion(name);
     return this.addTask(async (sceneDirectory) => {
       const fileHandle = await sceneDirectory.getFileHandle(

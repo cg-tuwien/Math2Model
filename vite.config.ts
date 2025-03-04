@@ -4,6 +4,7 @@ import { NaiveUiResolver } from "unplugin-vue-components/resolvers";
 import Icons from "unplugin-icons/vite";
 import IconsResolver from "unplugin-icons/resolver";
 import checker from "vite-plugin-checker";
+import tailwindcss from "@tailwindcss/vite";
 
 import { defineConfig, UserConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
@@ -12,6 +13,7 @@ import vue from "@vitejs/plugin-vue";
 const config: UserConfig = defineConfig({
   base: "./",
   plugins: [
+    tailwindcss(),
     vue(),
     Icons(),
     Components({
@@ -31,13 +33,6 @@ const config: UserConfig = defineConfig({
   },
   build: {
     target: "esnext",
-  },
-  css: {
-    preprocessorOptions: {
-      scss: {
-        api: "modern-compiler", // or "modern"
-      },
-    },
   },
 });
 

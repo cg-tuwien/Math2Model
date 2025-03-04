@@ -10,7 +10,7 @@ const props = defineProps<{
 }>();
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 svg {
   overflow: visible !important;
   position: absolute;

@@ -49,7 +49,7 @@ export type ImportFilesList =
       type: "in-memory";
       value: {
         name: string;
-        value: ArrayBuffer;
+        value: ArrayBufferView | ArrayBuffer;
       }[];
     };
 
@@ -117,7 +117,7 @@ export const useFsStore = defineStore("fs-store", () => {
   async function importInMemoryProject(
     files: {
       name: string;
-      value: ArrayBuffer;
+      value: ArrayBufferView | ArrayBuffer;
     }[]
   ) {
     importProjectDialog.value = {
