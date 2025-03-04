@@ -5,204 +5,112 @@ import { computed, h, ref } from "vue";
 import IconMoon from "~icons/mdi/moon-and-stars";
 import IconSun from "~icons/mdi/white-balance-sunny";
 import IconGithub from "~icons/mdi/github";
-import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { homepage, version } from "@/../package.json";
-import { useFsStore, type ImportFilesList } from "@/stores/fs-store";
+import { useFsStore } from "@/stores/fs-store";
 import { useExportStore } from "@/stores/export-store";
-import { makeFilePath } from "@/filesystem/reactive-files";
-import { ZipReader } from "@zip.js/zip.js";
+import { ExampleProjects } from "@/scenes/example-scenes";
 
 const store = useStore();
 const fsStore = useFsStore();
 const exportStore = useExportStore();
 
-const examplesModule = () => import("@/scenes/example-scenes");
-
-const heartSphereMorphExamplePath = "./HeartSphereMorph.zip";
-const templeExamplePath = "./TempleExample.zip";
-const towerExamplePath = "./TowerExample.zip";
-const treesAndTerrainExamplePath = "./TreesAndTerrainExample.zip";
-
-type FileDropdownOption = DropdownOption & {
-
-  key:
-    | "open"
-    | "save-as"
-    | "examples"
-    | "example-scene"
-    | "heart-sphere-scene"
-    | "temple-scene"
-    | "tower-scene"
-    | "terrain-trees-scene"
-    | "export";
+type ActionDropdownOption = DropdownOption & {
+  action: () => void;
 };
+function isActionDropdownOption(
+  option: DropdownOption
+): option is ActionDropdownOption {
+  return "action" in option;
+}
+
+async function handleDropdownOption(
+  _key: string | number,
+  option: DropdownOption
+) {
+  if (isActionDropdownOption(option)) {
+    option.action();
+  }
+}
+
+const exampleProjectsDropdown = ExampleProjects.map(
+  (v): ActionDropdownOption => ({
+    label: v.name,
+    key: v.key,
+    action: async () => {
+      const data = await v.files();
+      await fsStore.importProject(data);
+    },
+  })
+);
 
 const inputFileElement = ref<HTMLInputElement | null>(null);
-const fileOptions = computed((): FileDropdownOption[] => {
+const fileOptions = computed((): ActionDropdownOption[] => {
   return [
     {
       label: "Open",
       key: "open",
+      action: () => {
+        inputFileElement.value?.click();
+      },
     },
     {
       label: "Save As",
       key: "save-as",
+      action: async () => {
+        await fsStore.exportToZip();
+      },
     },
     {
       label: "Toggle Export GUI",
-      key: "export"
+      key: "export",
+      action: () => {
+        exportStore.isExportMode = !exportStore.isExportMode;
+      },
     },
     {
       label: "Examples",
       key: "examples",
-      children: [
-        {
-          label: "Example Scene",
-          key: "example-scene",
-        },
-        {
-          label: "Heart Sphere Scene",
-          key: "heart-sphere-scene",
-        },
-        {
-          label: "Temple Scene",
-          key: "temple-scene",
-        },
-        {
-          label: "Tower Scene",
-          key: "tower-scene",
-        },
-        {
-          label: "Terrain and Trees",
-          key: "terrain-trees-scene",
-        },
-      ] as FileDropdownOption[],
+      children: exampleProjectsDropdown,
+      action: () => {},
     },
   ];
 });
-async function handleFile(key: FileDropdownOption["key"]) {
-  if (key === "open") {
-    inputFileElement.value?.click();
-  } else if (key === "save-as") {
-    await fsStore.exportToZip();
-  } else if (key === "examples") {
-    // Do nothing
-  } else if (key === "example-scene") {
-    const module = await examplesModule();
-    fsStore.importInMemoryProject(module.createDefaultProject().files);
-  } else if (key === "heart-sphere-scene") {
-    const module = await examplesModule();
-    const heartSphereScene = await module.getZipExample(
-      makeFilePath(heartSphereMorphExamplePath)
-    );
-    if (heartSphereScene) {
-      const data: ImportFilesList = {
-        type: "zip",
-        value: new ZipReader(heartSphereScene.stream()),
-      };
-      await fsStore.clearFiles();
-      fsStore.importFiles(data);
-    }
-  } else if (key === "temple-scene") {
-    const module = await examplesModule();
-    const templeScene = await module.getZipExample(
-      makeFilePath(templeExamplePath)
-    );
-    if (templeScene) {
-      const data: ImportFilesList = {
-        type: "zip",
-        value: new ZipReader(templeScene.stream()),
-      };
-      await fsStore.clearFiles();
-      fsStore.importFiles(data);
-    }
-  } else if (key === "terrain-trees-scene") {
-    const module = await examplesModule();
-    const treesAndTerrainScene = await module.getZipExample(
-      makeFilePath(treesAndTerrainExamplePath)
-    );
-    if (treesAndTerrainScene) {
-      const data: ImportFilesList = {
-        type: "zip",
-        value: new ZipReader(treesAndTerrainScene.stream()),
-      };
-      await fsStore.clearFiles();
-      fsStore.importFiles(data);
-    }
-  } else if (key === "tower-scene") {
-    const module = await examplesModule();
-    const towerScene = await module.getZipExample(
-      makeFilePath(towerExamplePath)
-    );
-    if (towerScene) {
-      const data: ImportFilesList = {
-        type: "zip",
-        value: new ZipReader(towerScene.stream()),
-      };
-      await fsStore.clearFiles();
-      fsStore.importFiles(data);
-    }
-  } else if(key === "export") {
-    exportStore.isExportMode = !exportStore.isExportMode;
-  } else {
-    assertUnreachable(key);
-  }
-}
 
-type ViewDropdownOption = DropdownOption & {
-  key: "switch-to-dark" | "switch-to-light";
-};
-const viewOptions = computed((): ViewDropdownOption[] => {
+const viewOptions = computed((): ActionDropdownOption[] => {
   return [
     store.isDark
       ? {
           label: "Light",
           key: "switch-to-light",
           icon: () => h(IconSun),
+          action: () => store.setIsDark(false),
         }
       : {
           label: "Dark",
           key: "switch-to-dark",
           icon: () => h(IconMoon),
+          action: () => store.setIsDark(true),
         },
   ];
 });
-function handleView(key: ViewDropdownOption["key"]) {
-  if (key === "switch-to-dark") {
-    store.setIsDark(true);
-  } else if (key === "switch-to-light") {
-    store.setIsDark(false);
-  } else {
-    assertUnreachable(key);
-  }
-}
 
-type HelpDropdownOption = DropdownOption & {
-  key: "go-to-github" | "version";
-};
-const helpOptions = computed((): HelpDropdownOption[] => {
+const helpOptions = computed((): ActionDropdownOption[] => {
   return [
     {
       label: `Version ${version}`,
       key: "version",
+      action: () => {},
     },
     {
       label: "GitHub",
       key: "go-to-github",
       icon: () => h(IconGithub),
+      action: () => {
+        window.open(homepage, "_blank")?.focus();
+      },
     },
   ];
 });
-
-function handleHelp(key: HelpDropdownOption["key"]) {
-  if (key === "go-to-github") {
-    window.open(homepage, "_blank")?.focus();
-  } else if (key === "version") {
-    // Do nothing
-  } else {
-    assertUnreachable(key);
-  }
-}
 
 async function openFiles(inputFiles: FileList) {
   fsStore.importFilesOrProject(inputFiles);
@@ -236,7 +144,7 @@ async function openFiles(inputFiles: FileList) {
           <n-dropdown
             trigger="click"
             :options="fileOptions"
-            @select="handleFile"
+            @select="handleDropdownOption"
           >
             <n-button :bordered="false" size="small" quaternary>
               File
@@ -245,7 +153,7 @@ async function openFiles(inputFiles: FileList) {
           <n-dropdown
             trigger="click"
             :options="viewOptions"
-            @select="handleView"
+            @select="handleDropdownOption"
           >
             <n-button :bordered="false" size="small" quaternary>
               View
@@ -254,7 +162,7 @@ async function openFiles(inputFiles: FileList) {
           <n-dropdown
             trigger="click"
             :options="helpOptions"
-            @select="handleHelp"
+            @select="handleDropdownOption"
           >
             <n-button :bordered="false" size="small" quaternary>
               Help

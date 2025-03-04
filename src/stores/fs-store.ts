@@ -107,21 +107,16 @@ export const useFsStore = defineStore("fs-store", () => {
         await finishImport("project");
       }
     } else {
-      importFiles({ type: "files", value: files });
+      addFiles({ type: "files", value: files });
     }
   }
 
   /**
    * Can trigger an import dialog.
    */
-  async function importInMemoryProject(
-    files: {
-      name: string;
-      value: ArrayBufferView | ArrayBuffer;
-    }[]
-  ) {
+  async function importProject(filesToImport: ImportFilesList) {
     importProjectDialog.value = {
-      data: { type: "in-memory", value: files },
+      data: filesToImport,
     };
     const noProject = !(await hasProject());
     if (noProject) {
@@ -129,27 +124,28 @@ export const useFsStore = defineStore("fs-store", () => {
     }
   }
 
-  async function importFiles(filesToImport: ImportFilesList) {
+  /** Forcibly imports files */
+  async function addFiles(filesToAdd: ImportFilesList) {
     filesystemCommands.add(async (sceneFiles) => {
-      if (filesToImport.type === "in-memory") {
-        for (let i = 0; i < filesToImport.value.length; i++) {
-          const file = filesToImport.value[i];
+      if (filesToAdd.type === "in-memory") {
+        for (let i = 0; i < filesToAdd.value.length; i++) {
+          const file = filesToAdd.value[i];
           await sceneFiles.writeBinaryFile(makeFilePath(file.name), file.value);
         }
-      } else if (filesToImport.type === "zip") {
-        const entries = filesToImport.value.getEntriesGenerator();
+      } else if (filesToAdd.type === "zip") {
+        const entries = filesToAdd.value.getEntriesGenerator();
         for await (const entry of entries) {
           const file = (await entry.getData?.(new Uint8ArrayWriter())) ?? null;
           if (file === null) continue;
           await sceneFiles.writeBinaryFile(makeFilePath(entry.filename), file);
         }
-      } else if (filesToImport.type === "files") {
-        for (let i = 0; i < filesToImport.value.length; i++) {
-          const file = filesToImport.value[i];
+      } else if (filesToAdd.type === "files") {
+        for (let i = 0; i < filesToAdd.value.length; i++) {
+          const file = filesToAdd.value[i];
           await sceneFiles.writeBinaryFile(makeFilePath(file.name), file);
         }
       } else {
-        assertUnreachable(filesToImport);
+        assertUnreachable(filesToAdd);
       }
     });
   }
@@ -162,11 +158,11 @@ export const useFsStore = defineStore("fs-store", () => {
     if (importAs === "cancel") {
       // Nothing to do
     } else if (importAs === "files") {
-      await importFiles(dialog.data);
+      await addFiles(dialog.data);
     } else if (importAs === "project") {
       // Clear the current project before importing the new one
       await clearFiles();
-      await importFiles(dialog.data);
+      await addFiles(dialog.data);
     } else {
       assertUnreachable(importAs);
     }
@@ -183,8 +179,8 @@ export const useFsStore = defineStore("fs-store", () => {
   return {
     importProjectDialog: computed(() => importProjectDialog.value),
     importFilesOrProject,
-    importInMemoryProject,
-    importFiles,
+    importProject,
+    addFiles,
     finishImport,
     exportToZip,
     clearFiles,
