@@ -135,7 +135,7 @@ async function exportMeshList(
 async function readSceneFile(): Promise<string> {
   let f: File | null = await props.fs.readFile(SceneFileName);
   let text: string | undefined = await f?.text();
-  assert(text !== undefined);
+  assert(text !== undefined, "Missing scene file");
   return text as string;
 }
 async function accumulateMeshForExport(
