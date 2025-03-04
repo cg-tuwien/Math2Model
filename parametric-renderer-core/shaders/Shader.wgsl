@@ -158,20 +158,25 @@ struct Camera {
     projection: mat4x4<f32>,
 }
 
-struct PointLight {
+const LIGHT_TYPE_POINT: u32 = 0;
+const LIGHT_TYPE_DIRECTIONAL: u32 = 1;
+
+struct LightSource {
     // position_range.xyz is the position of the light in world space
     // position_range.w is the range of the light
     position_range: vec4f,
     // color.rgb is the color of the light
     // color.a is the intensity of the light
     color_intensity: vec4f,
+
+    light_type: u32
 }
 
 struct Lights {
     ambient: Vec3Padded,
     // TODO: Directional light
     points_length: u32,
-    points: array<PointLight>,
+    points: array<LightSource>,
 }
 
 struct VertexInput {
@@ -492,9 +497,12 @@ fn getRangeAttenuation(range: f32, distance: f32) -> f32
     }
     return max(min(1.0 - pow(distance / range, 4.0), 1.0), 0.0) / pow(distance, 2.0);
 }
-fn getLighIntensity(light: PointLight, pointToLight: vec3f) -> vec3f
+fn getLighIntensity(light: LightSource, pointToLight: vec3f) -> vec3f
 {
-    var rangeAttenuation: f32 = getRangeAttenuation(light.position_range.w, length(pointToLight));
+    var rangeAttenuation: f32 = 1.0;
+    if(light.light_type != LIGHT_TYPE_DIRECTIONAL) {
+      rangeAttenuation = getRangeAttenuation(light.position_range.w, length(pointToLight));
+    }
     return rangeAttenuation * light.color_intensity.a * light.color_intensity.rgb;
 }
 
@@ -600,7 +608,17 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var f_specular = vec3f(0.0);
     for (var i: u32 = 0u; i < lights.points_length; i += 1u) {
         let light = lights.points[i];
-        let pointToLight = light.position_range.xyz - in.world_position;
+        var pointToLight: vec3f;
+        if (light.light_type != LIGHT_TYPE_DIRECTIONAL)
+        {
+            pointToLight = light.position_range.xyz - in.world_position;
+        }
+        else
+        {
+            pointToLight = -light.position_range.xyz;
+        }
+
+
         let l = normalize(pointToLight); // Direction from surface point to light
         let h = normalize(l + v);        // Direction of the vector between l and v, called halfway vector
         let intensity: vec3f = getLighIntensity(light, pointToLight);

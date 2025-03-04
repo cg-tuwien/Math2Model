@@ -57,12 +57,20 @@ impl SceneData {
                 device,
                 "Light Buffer",
                 &shader::Lights {
-                    ambient: Vec4::new(0.1, 0.1, 0.1, 0.0),
+                    ambient: Vec4::new(0.05, 0.05, 0.05, 0.0),
                     points_length: 1,
-                    points: vec![shader::PointLight {
-                        position_range: Vec4::new(0.0, 4.0, 2.0, 40.0),
-                        color_intensity: Vec4::new(1.0, 1.0, 1.0, 3.0),
-                    }],
+                    points: vec![
+                        shader::LightSource {
+                            position_range: glam::Vec3::new(1.0, -4.0, 1.0).normalize().extend(1.0),
+                            color_intensity: Vec4::new(0.5, 0.55, 0.5, 0.9),
+                            light_type: shader::LIGHT_TYPE_DIRECTIONAL,
+                        },
+                        shader::LightSource {
+                            position_range: Vec4::new(0.0, 4.0, 2.0, 40.0),
+                            color_intensity: Vec4::new(1.0, 1.0, 1.0, 3.0),
+                            light_type: shader::LIGHT_TYPE_POINT,
+                        },
+                    ],
                 },
                 wgpu::BufferUsages::COPY_DST,
             ),
