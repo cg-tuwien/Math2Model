@@ -15,6 +15,7 @@ type ExampleProject = {
 
 const textEncoder = new TextEncoder();
 
+// Unused, shows how to programmatically create an example scene.
 function createDefaultProject(): ImportFilesList {
   const shaderName = makeFilePath("my-shader.wgsl");
   const shader = DefaultParametric;
@@ -101,22 +102,17 @@ export function createFirstTimeVisitorProject(): Promise<ImportFilesList> {
 export const ExampleProjects: ExampleProject[] = [
   {
     key: crypto.randomUUID(),
-    name: "Basic Scene",
-    files: async () => createDefaultProject(),
-  },
-  {
-    key: crypto.randomUUID(),
-    name: "Heart Sphere Scene",
+    name: "Morph Heart to Sphere",
     files: () => importZipExample("./HeartSphereMorph.zip"),
   },
   {
     key: crypto.randomUUID(),
-    name: "Temple Scene",
+    name: "Parametric Temple",
     files: () => importZipExample("./TempleExample.zip"),
   },
   {
     key: crypto.randomUUID(),
-    name: "Tower Scene",
+    name: "Parametric Tower",
     files: () => importZipExample("./TowerExample.zip"),
   },
   {
