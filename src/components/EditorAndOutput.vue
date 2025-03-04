@@ -347,7 +347,7 @@ watchImmediate(
                   Create empty scene
                 </n-button>
               </n-card>
-              <div class="absolute bottom-0 text-gray-500">
+              <div class="absolute bottom-0 text-gray-900">
                 CPU {{ (fpsCounter.avg_delta_time * 1000.0).toFixed(1) }} ms
               </div>
             </div>
