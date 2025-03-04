@@ -28,7 +28,6 @@ import {
 import { ObjectUpdate, type ObjectPathPart } from "./input/object-update";
 import { useExportStore } from "@/stores/export-store";
 
-
 const exportStore = useExportStore();
 const props = defineProps<{
   models: DeepReadonly<VirtualModelState>[];
@@ -184,14 +183,6 @@ props.fs.watchFromStart((change) => {
 
 const textureFiles = ref(new Set<FilePath>());
 props.fs.watchFromStart((change) => {
-  console.log(change.key.substring(change.key.length - 6));
-  console.log(
-    change.key
-      .substring(change.key.length - 6)
-      .match(
-        "\.(xbm|tif|jfif|pjp|apng|jpeg|heif|ico|tiff|webp|svgz|jpg|heic|gif|svg|png|bmp|pjpeg|avif)"
-      )
-  );
   if (
     !change.key
       .substring(change.key.length - 6)
@@ -384,7 +375,9 @@ function uploadFile(data: {
   <n-flex justify="">
     <n-flex vertical class="mr-1 ml-1">
       <n-h3 class="underline">Scene</n-h3>
-      <n-button size="small" @click="toggleExportUI()"> Toggle Export </n-button>
+      <n-button size="small" @click="toggleExportUI()">
+        Toggle Export
+      </n-button>
       <n-flex>
         <n-button size="small" @click="startAddModel()"> Add </n-button>
         <n-button size="small" @click="removeModel()"> Delete </n-button>
