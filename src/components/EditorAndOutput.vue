@@ -36,6 +36,9 @@ import CodeGraph from "@/components/visual-programming/CodeGraph.vue";
 import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
 import { useErrorStore } from "@/stores/error-store";
 import { syncFilesystem } from "@/engine/sync-filesystem";
+import { useExportStore } from "@/stores/export-store";
+
+import WebGpu from "@/components/WebGpu.vue";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -55,6 +58,7 @@ props.engine.setOnShaderCompiled((shader, messages) => {
 
 // The underlying data
 const sceneFile = ref<string | null>(null);
+const exportModel = ref(false);
 
 props.fs.watchFromStart((change) => {
   if (change.key === SceneFileName) {
@@ -358,6 +362,15 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
   filePath = makeFilePath(filePath.replace(".graph", ".graph.wgsl"));
   props.fs.writeTextFile(filePath, content);
 }
+const exportStore = useExportStore();
+
+watchImmediate(
+  () => exportStore.isExportMode,
+  (isExport) => {
+    exportModel.value = exportStore.isExportMode;
+    if (exportModel.value == false) props.engine.setLodStage(null);
+  }
+);
 </script>
 
 <template>
@@ -441,8 +454,14 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
           </template>
           <template #2>
             <div class="flex h-full w-full">
+            <WebGpu
+              v-if="exportModel"
+              :gpuDevice="props.gpuDevice"
+              :engine="props.engine"
+              :fs="props.fs"
+            ></WebGpu>
               <CodeEditor
-                v-if="openFile.editorType.value === 'shader'"
+                v-if="openFile.editorType.value === 'shader' && !exportModel"
                 class="self-stretch overflow-hidden flex-1"
                 :keyed-code="openFile.code.value"
                 :is-readonly="openFile.isReadonly.value"
@@ -459,7 +478,7 @@ function saveGraphWgsl(filePath: FilePath, content: string) {
               >
               </CodeEditor>
               <CodeGraph
-                v-if="openFile.editorType.value === 'graph'"
+                v-if="openFile.editorType.value === 'graph' && !exportModel"
                 :fs="props.fs"
                 :keyedGraph="openFile.code.value"
                 @update="

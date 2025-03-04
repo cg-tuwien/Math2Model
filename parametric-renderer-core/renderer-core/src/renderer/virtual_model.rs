@@ -95,7 +95,7 @@ impl VirtualModel {
                     &format!("{id} Render Buffer {size}"),
                     &render_buffer_initial,
                     MAX_PATCH_COUNT as u64,
-                    wgpu::BufferUsages::COPY_DST,
+                    wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
                 )
             })
             .collect::<Vec<_>>();

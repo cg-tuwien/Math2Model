@@ -8,11 +8,13 @@ import IconGithub from "~icons/mdi/github";
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { homepage, version } from "@/../package.json";
 import { useFsStore, type ImportFilesList } from "@/stores/fs-store";
+import { useExportStore } from "@/stores/export-store";
 import { makeFilePath } from "@/filesystem/reactive-files";
 import { ZipReader } from "@zip.js/zip.js";
 
 const store = useStore();
 const fsStore = useFsStore();
+const exportStore = useExportStore();
 
 const examplesModule = () => import("@/scenes/example-scenes");
 
@@ -22,6 +24,7 @@ const towerExamplePath = "./TowerExample.zip";
 const treesAndTerrainExamplePath = "./TreesAndTerrainExample.zip";
 
 type FileDropdownOption = DropdownOption & {
+
   key:
     | "open"
     | "save-as"
@@ -30,7 +33,8 @@ type FileDropdownOption = DropdownOption & {
     | "heart-sphere-scene"
     | "temple-scene"
     | "tower-scene"
-    | "terrain-trees-scene";
+    | "terrain-trees-scene"
+    | "export";
 };
 
 const inputFileElement = ref<HTMLInputElement | null>(null);
@@ -43,6 +47,10 @@ const fileOptions = computed((): FileDropdownOption[] => {
     {
       label: "Save As",
       key: "save-as",
+    },
+    {
+      label: "Toggle Export GUI",
+      key: "export"
     },
     {
       label: "Examples",
@@ -134,6 +142,8 @@ async function handleFile(key: FileDropdownOption["key"]) {
       await fsStore.clearFiles();
       fsStore.importFiles(data);
     }
+  } else if(key === "export") {
+    exportStore.isExportMode = !exportStore.isExportMode;
   } else {
     assertUnreachable(key);
   }
