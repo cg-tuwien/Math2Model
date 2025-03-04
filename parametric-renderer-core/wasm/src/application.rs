@@ -5,8 +5,9 @@ use renderer_core::{
     camera::camera_controller::{self, CameraController},
     game::{ModelInfo, ShaderId, ShaderInfo, TextureData, TextureId, TextureInfo},
     input::WinitAppHelper,
+    time::TimeStats,
 };
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use wasm_bindgen::{prelude::wasm_bindgen, JsError, JsValue};
 use web_sys::{HtmlCanvasElement, ImageBitmap};
 use winit::event_loop::{EventLoop, EventLoopProxy};
@@ -16,6 +17,8 @@ use crate::wasm_abi::{WasmCompilationMessage, WasmFrameTime, WasmModelInfo, Wasm
 #[wasm_bindgen]
 pub struct WasmApplication {
     event_loop_proxy: Option<EventLoopProxy<AppCommand>>,
+    last_time_stats: TimeStats,
+    time_stats: Arc<Mutex<TimeStats>>,
 }
 
 #[wasm_bindgen]
@@ -24,6 +27,8 @@ impl WasmApplication {
     pub fn new() -> Result<WasmApplication, JsError> {
         Ok(Self {
             event_loop_proxy: None,
+            last_time_stats: Default::default(),
+            time_stats: Default::default(),
         })
     }
 
@@ -37,17 +42,14 @@ impl WasmApplication {
         #[cfg(not(target_arch = "wasm32"))]
         let wasm_canvas = WasmCanvas::new();
         let mut application = Application::new(event_loop_proxy, |_| {}, wasm_canvas);
+        self.time_stats = application.time_stats.clone();
+        application.app.profiler_settings.gpu = true;
         application.app.camera_controller = CameraController::new(
             camera_controller::GeneralController {
                 position: Vec3::new(3.0, 7.0, 6.0),
                 // TODO: Do this once glam updoots
                 // orientation: Quat::look_at_rh(Vec3::new(3.0, 7.0, 6.0), Vec3::ZERO, Camera::up()),
-                orientation: Quat::from_euler(
-                    glam::EulerRot::YXZ,
-                    0.5,
-                    -0.6,
-                    0.0,
-                ),
+                orientation: Quat::from_euler(glam::EulerRot::YXZ, 0.5, -0.6, 0.0),
                 distance_to_center: 4.0,
             },
             application.app.camera_controller.settings,
@@ -195,18 +197,17 @@ impl WasmApplication {
         .await;
     }
 
-    pub async fn get_frame_time(&self) -> WasmFrameTime {
-        let frame_time = run_on_main(self.event_loop_proxy.clone().unwrap(), |app| {
-            WasmFrameTime {
-                avg_delta_time: app.time_counters.avg_delta_time(),
-                avg_gpu_time: app.time_counters.avg_gpu_time(),
-            }
-        })
-        .await;
-        frame_time
+    pub fn get_frame_time(&mut self) -> WasmFrameTime {
+        if let Ok(new_stats) = self.time_stats.try_lock() {
+            self.last_time_stats = new_stats.clone();
+        }
+        WasmFrameTime {
+            avg_delta_time: self.last_time_stats.avg_delta_time,
+            avg_gpu_time: self.last_time_stats.avg_gpu_time,
+        }
     }
 
-    pub async fn try_set_threshold_factor(&self, factor: f32) {
+    pub async fn set_threshold_factor(&self, factor: f32) {
         let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), move |app| {
             if let Some(renderer) = &app.renderer {
                 renderer.set_threshold_factor(factor);

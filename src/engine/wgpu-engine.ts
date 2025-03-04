@@ -4,6 +4,7 @@ import init, {
   type WasmModelInfo,
   type WasmShaderInfo,
   type WasmCompilationMessage,
+  type WasmFrameTime,
 } from "../../parametric-renderer-core/pkg";
 
 await init();
@@ -73,6 +74,20 @@ export class WgpuEngine {
         })
       );
     }
+    await this.taskQueue;
+  }
+  async getFrameTime(): Promise<WasmFrameTime> {
+    let { promise, resolve } = Promise.withResolvers<WasmFrameTime>();
+    this.taskQueue = this.taskQueue.then(() => {
+      resolve(this.engine.get_frame_time());
+    });
+    await this.taskQueue;
+    return promise;
+  }
+  async setThresholdFactor(factor: number) {
+    this.taskQueue = this.taskQueue.then(() =>
+      this.engine.set_threshold_factor(factor)
+    );
     await this.taskQueue;
   }
 }

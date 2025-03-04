@@ -8,5 +8,6 @@ pub mod reactive;
 pub mod renderer;
 pub mod shaders;
 pub mod texture;
+pub mod time;
 pub mod transform;
 pub mod window_or_fallback;

@@ -1,4 +1,3 @@
-pub mod frame_counter;
 mod frame_data;
 mod scene;
 mod virtual_model;
@@ -9,7 +8,6 @@ pub use frame_data::FrameData;
 use std::{collections::HashMap, sync::Arc};
 
 use encase::ShaderType;
-use frame_counter::{FrameCounter, Seconds};
 use glam::UVec2;
 
 use reactive_graph::{
@@ -33,6 +31,7 @@ use crate::{
     reactive::{ForEach, MemoComputed, SignalVec},
     shaders::{compute_patches, copy_patches, ground_plane, shader},
     texture::Texture,
+    time::{FrameCounter, Seconds},
     window_or_fallback::WindowOrFallback,
 };
 struct ComputePatchesStep {
@@ -68,7 +67,7 @@ pub struct GpuApplication {
     profiling_enabled: bool,
     _runtime: Owner,
     // render_tree: Arc<dyn Fn(&FrameData) -> Result<RenderResults, wgpu::SurfaceError>>,
-    render_effect: RenderEffect<Result<RenderResults, wgpu::SurfaceError>>,
+    render_effect: RenderEffect<Result<Option<RenderResults>, wgpu::SurfaceError>>,
     set_render_data: ArcWriteSignal<FrameData>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     textures: RwSignal<HashMap<TextureId, Arc<Texture>>>,
@@ -202,7 +201,7 @@ impl GpuApplication {
         });
     }
 
-    pub fn render(&mut self, game: &GameRes) -> Result<RenderResults, wgpu::SurfaceError> {
+    pub fn render(&mut self, game: &GameRes) -> Result<Option<RenderResults>, wgpu::SurfaceError> {
         self.cursor_capture = self.update_cursor_capture(game.cursor_capture);
 
         if self.profiling_enabled != game.profiler_settings.gpu {
@@ -264,7 +263,7 @@ fn render_component(
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     textures: RwSignal<HashMap<TextureId, Arc<Texture>>>,
     models: SignalVec<ModelInfo>,
-) -> impl Fn(&FrameData) -> Result<RenderResults, wgpu::SurfaceError> {
+) -> impl Fn(&FrameData) -> Result<Option<RenderResults>, wgpu::SurfaceError> {
     let context = &wgpu_context();
     let frame_counter = RwSignal::new(FrameCounter::new());
     let new_frame_time = move || frame_counter.write().new_frame();
@@ -386,10 +385,10 @@ fn render_component(
             err @ Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 // Roughly based on https://github.com/gfx-rs/wgpu/blob/a0c185a28c232ee2ab63f72d6fd3a63a3f787309/examples/src/framework.rs#L216
                 surface.update(|surface| surface.recreate_swapchain(&context));
-                return err.map(|_| RenderResults::skip());
+                return err.map(|_| None);
             }
             err => {
-                return err.map(|_| RenderResults::skip());
+                return err.map(|_| None);
             }
         };
 
@@ -474,10 +473,10 @@ fn render_component(
             profiler.end_frame().unwrap();
             let profiler_results =
                 profiler.process_finished_frame(context.queue.get_timestamp_period());
-            RenderResults {
+            Some(RenderResults {
                 delta_time,
                 profiler_results,
-            }
+            })
         };
 
         if force_wait.get() {
@@ -1064,12 +1063,6 @@ fn render_model_component(
 pub struct RenderResults {
     pub delta_time: Seconds,
     pub profiler_results: Option<Vec<wgpu_profiler::GpuTimerQueryResult>>,
-}
-
-impl RenderResults {
-    pub fn skip() -> Self {
-        Self::default()
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

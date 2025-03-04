@@ -11,7 +11,7 @@ use crate::{
         Camera, CameraSettings,
     },
     input::WindowInputs,
-    renderer::{frame_counter::Seconds, CursorCapture, WindowCursorCapture},
+    renderer::{CursorCapture, WindowCursorCapture},
     transform::Transform,
 };
 
@@ -131,8 +131,8 @@ impl GameRes {
     pub fn update(&mut self, inputs: &WindowInputs) {
         let now = Instant::now();
         if let Some(last_update_instant) = self.last_update_instant {
-            let delta = Seconds((now - last_update_instant).as_secs_f32());
-            self.cursor_capture = match self.camera_controller.update(inputs, delta.0) {
+            let delta = (now - last_update_instant).as_secs_f32();
+            self.cursor_capture = match self.camera_controller.update(inputs, delta) {
                 CursorCapture::Free => WindowCursorCapture::Free,
                 CursorCapture::LockedAndHidden => {
                     WindowCursorCapture::LockedAndHidden(inputs.mouse.position)

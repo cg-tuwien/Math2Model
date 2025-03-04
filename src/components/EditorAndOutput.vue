@@ -29,7 +29,10 @@ import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?ra
 import BasicGraphShader from "@/../parametric-renderer-core/graphs/BasicGraphShader.graph.wgsl?raw";
 import type { ObjectUpdate } from "./input/object-update";
 import CodeGraph from "@/components/visual-programming/CodeGraph.vue";
-import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
+import type {
+  WasmFrameTime,
+  WasmModelInfo,
+} from "parametric-renderer-core/pkg/web";
 import { useErrorStore } from "@/stores/error-store";
 import { syncFilesystem } from "@/engine/sync-filesystem";
 import { useExportStore } from "@/stores/export-store";
@@ -58,7 +61,7 @@ const fpsCounter = ref<WasmFrameTime>({ avg_delta_time: 0, avg_gpu_time: 0 });
     props.engine.getFrameTime().then((v) => {
       fpsCounter.value = v;
     });
-  }, 100);
+  }, 300);
   onUnmounted(() => {
     clearInterval(timer);
   });
@@ -80,10 +83,10 @@ const exportModel = ref(false);
 props.fs.watch((change) => {
   if (change.key === SceneFileName) {
     if (change.type === "insert" || change.type === "update") {
-    // Thread safety: Ordered reads are guaranteed by readTextFile.
-    props.fs.readTextFile(change.key)?.then((v) => {
-      sceneFile.value = v;
-    });
+      // Thread safety: Ordered reads are guaranteed by readTextFile.
+      props.fs.readTextFile(change.key)?.then((v) => {
+        sceneFile.value = v;
+      });
     } else {
       sceneFile.value = null;
     }
@@ -339,12 +342,15 @@ watchImmediate(
                 class="self-stretch overflow-hidden flex-1"
                 v-show="sceneFile !== null"
               ></div>
-              <n-card                 title="Missing scene file"                 v-if="sceneFile === null"              >
+              <n-card title="Missing scene file" v-if="sceneFile === null">
                 <n-button type="primary" @click="saveScene()">
                   Create empty scene
                 </n-button>
               </n-card>
-                          </div>
+              <div class="absolute bottom-0 text-gray-500">
+                CPU {{ (fpsCounter.avg_delta_time * 1000.0).toFixed(1) }} ms
+              </div>
+            </div>
           </template>
           <template #2>
             <div class="flex h-full w-full">

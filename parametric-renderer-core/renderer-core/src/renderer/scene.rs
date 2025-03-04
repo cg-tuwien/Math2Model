@@ -1,7 +1,7 @@
-use crate::{buffer::TypedBuffer, camera::Camera, shaders::shader};
+use crate::{buffer::TypedBuffer, camera::Camera, shaders::shader, time::FrameTime};
 use glam::{Mat4, UVec2, Vec2, Vec4};
 
-use super::{frame_counter::FrameTime, FrameData};
+use super::FrameData;
 
 pub struct SceneData {
     pub time_buffer: TypedBuffer<shader::Time>,
