@@ -15,7 +15,7 @@ type ExampleProject = {
 
 const textEncoder = new TextEncoder();
 
-export function createDefaultProject(): Promise<ImportFilesList> {
+function createDefaultProject(): ImportFilesList {
   const shaderName = makeFilePath("my-shader.wgsl");
   const shader = DefaultParametric;
 
@@ -25,7 +25,7 @@ export function createDefaultProject(): Promise<ImportFilesList> {
       {
         type: "model",
         id: crypto.randomUUID(),
-        name: "Heart Sphere",
+        name: "Basic Plane",
         parametricShader: shaderName,
         position: [0, 0, 0],
         rotation: ReadonlyEulerAngles.identity.serialize(),
@@ -40,7 +40,7 @@ export function createDefaultProject(): Promise<ImportFilesList> {
     ],
   };
 
-  return Promise.resolve({
+  return {
     type: "in-memory",
     value: [
       {
@@ -52,7 +52,7 @@ export function createDefaultProject(): Promise<ImportFilesList> {
         value: textEncoder.encode(shader),
       },
     ],
-  });
+  };
 }
 
 async function getZipExample(path: FilePath): Promise<File | undefined> {
@@ -94,11 +94,15 @@ async function importZipExample(path: string): Promise<ImportFilesList> {
   };
 }
 
+export function createFirstTimeVisitorProject(): Promise<ImportFilesList> {
+  return importZipExample("./HeartSphereMorph.zip");
+}
+
 export const ExampleProjects: ExampleProject[] = [
   {
     key: crypto.randomUUID(),
-    name: "Example Scene",
-    files: createDefaultProject,
+    name: "Basic Scene",
+    files: async () => createDefaultProject(),
   },
   {
     key: crypto.randomUUID(),

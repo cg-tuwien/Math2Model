@@ -1,13 +1,9 @@
 <script setup lang="ts">
-import CodeEditor, {
-  type KeyedCode,
-  type Marker,
-} from "@/components/CodeEditor.vue";
-import { MarkerSeverity } from "monaco-editor/esm/vs/editor/editor.api";
+import CodeEditor from "@/components/CodeEditor.vue";
 import IconFolderMultipleOutline from "~icons/mdi/folder-multiple-outline";
 import IconFileTreeOutline from "~icons/mdi/file-tree-outline";
-import { ref, watchEffect, computed, h } from "vue";
-import { useDebounceFn, watchImmediate } from "@vueuse/core";
+import { ref, watchEffect, h, onUnmounted } from "vue";
+import { useLocalStorage, watchImmediate } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import {
   ReactiveFilesystem,
@@ -37,9 +33,11 @@ import type { WasmModelInfo } from "parametric-renderer-core/pkg/web";
 import { useErrorStore } from "@/stores/error-store";
 import { syncFilesystem } from "@/engine/sync-filesystem";
 import { useExportStore } from "@/stores/export-store";
+import { createFirstTimeVisitorProject } from "@/scenes/example-scenes";
 
 import WebGpu from "@/components/WebGpu.vue";
 import { useOpenFile } from "./use-open-file";
+import { useFsStore } from "@/stores/fs-store";
 
 // Unchanging props! No need to watch them.
 const props = defineProps<{
@@ -53,6 +51,22 @@ syncFilesystem(props.fs, props.engine);
 
 const store = useStore();
 const errorsStore = useErrorStore();
+
+const isLoadingScene = ref(false); // Maybe I should look at suspense?
+const isFirstTimeVisitor = useLocalStorage("is-first-time-visitor", true);
+
+if (props.fs.hasFile(SceneFileName)) {
+  isLoadingScene.value = true;
+} else if (isFirstTimeVisitor.value) {
+  isLoadingScene.value = true;
+  createFirstTimeVisitorProject()
+    .then((v) => fsStore.addFiles(v))
+    .then(() => {
+      isLoadingScene.value = false;
+    });
+} else {
+  // Well, they want an empty scene.
+}
 
 props.engine.setOnShaderCompiled((shader, messages) => {
   errorsStore.setErrors(makeFilePath(shader), messages);
@@ -319,11 +333,17 @@ watchImmediate(
                 class="self-stretch overflow-hidden flex-1"
                 v-show="sceneFile !== null"
               ></div>
-              <n-card title="Missing scene file" v-if="sceneFile === null">
+              <n-card
+                title="Missing scene file"
+                v-if="sceneFile === null && !isLoadingScene"
+              >
                 <n-button type="primary" @click="saveScene()">
                   Create empty scene
                 </n-button>
               </n-card>
+              <div v-if="sceneFile === null && isLoadingScene">
+                Loading scene...
+              </div>
             </div>
           </template>
           <template #2>
