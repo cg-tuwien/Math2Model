@@ -26,10 +26,7 @@ impl TimeCounters {
             self.cpu_delta_times.remove(0);
         }
         if let Some(gpu_time_results) = gpu_time_results {
-            let time_range = gpu_time_results
-                .iter()
-                .filter_map(|v| v.time.clone())
-                .reduce(|a, b| a.start.min(b.start)..a.end.max(b.end));
+            let time_range = get_time_range(&gpu_time_results);
             if let Some(frame_time) = time_range.map(|v| Seconds((v.end - v.start) as f32)) {
                 self.gpu_frame_times.push(frame_time);
                 if self.gpu_frame_times.len() > 10 {
@@ -46,6 +43,16 @@ impl TimeCounters {
             avg_gpu_time: avg_seconds(&self.gpu_frame_times),
         }
     }
+}
+
+fn get_time_range(
+    gpu_time_results: &[wgpu_profiler::GpuTimerQueryResult],
+) -> Option<std::ops::Range<f64>> {
+    let time_range = gpu_time_results
+        .iter()
+        .filter_map(|v| v.time.clone().or_else(|| get_time_range(&v.nested_queries)))
+        .reduce(|a, b| a.start.min(b.start)..a.end.max(b.end));
+    time_range
 }
 
 fn avg_seconds(data: &[Seconds]) -> f32 {
