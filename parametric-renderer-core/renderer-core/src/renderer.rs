@@ -1019,11 +1019,6 @@ fn render_model_component(
                 .collect::<Vec<_>>()
         }
     });
-
-    Effect::new(move |_| {
-        let _a = bind_group_1.read();
-    });
-
     Effect::new(move |_| {
         let model = model.read();
         let queue = &wgpu_context().queue;

@@ -39,8 +39,15 @@ impl WasmApplication {
         let mut application = Application::new(event_loop_proxy, |_| {}, wasm_canvas);
         application.app.camera_controller = CameraController::new(
             camera_controller::GeneralController {
-                position: Vec3::new(0.0, 0.0, 4.0),
-                orientation: Quat::IDENTITY,
+                position: Vec3::new(3.0, 7.0, 6.0),
+                // TODO: Do this once glam updoots
+                // orientation: Quat::look_at_rh(Vec3::new(3.0, 7.0, 6.0), Vec3::ZERO, Camera::up()),
+                orientation: Quat::from_euler(
+                    glam::EulerRot::YXZ,
+                    0.5,
+                    -0.6,
+                    0.0,
+                ),
                 distance_to_center: 4.0,
             },
             application.app.camera_controller.settings,
