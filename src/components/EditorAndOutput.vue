@@ -447,19 +447,23 @@ watchImmediate(
               <div
                 ref="canvasContainer"
                 class="self-stretch overflow-hidden flex-1"
-              >
-                <div v-if="sceneFile == null">Missing scene.json</div>
-              </div>
+                v-show="sceneFile !== null"
+              ></div>
+              <n-card title="Missing scene file" v-if="sceneFile === null">
+                <n-button type="primary" @click="saveScene()">
+                  Create empty scene
+                </n-button>
+              </n-card>
             </div>
           </template>
           <template #2>
             <div class="flex h-full w-full">
-            <WebGpu
-              v-if="exportModel"
-              :gpuDevice="props.gpuDevice"
-              :engine="props.engine"
-              :fs="props.fs"
-            ></WebGpu>
+              <WebGpu
+                v-if="exportModel"
+                :gpuDevice="props.gpuDevice"
+                :engine="props.engine"
+                :fs="props.fs"
+              ></WebGpu>
               <CodeEditor
                 v-if="openFile.editorType.value === 'shader' && !exportModel"
                 class="self-stretch overflow-hidden flex-1"
