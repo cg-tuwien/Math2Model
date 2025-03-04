@@ -15,7 +15,7 @@ use glam::UVec2;
 use reactive_graph::{
     computed::Memo,
     effect::{Effect, RenderEffect},
-    owner::{expect_context, provide_context, use_context, Owner, StoredValue},
+    owner::{expect_context, provide_context, take_context, use_context, Owner, StoredValue},
     prelude::*,
     signal::{
         arc_signal, signal, ArcReadSignal, ArcWriteSignal, ReadSignal, RwSignal, WriteSignal,
@@ -62,7 +62,7 @@ impl GpuApplicationBuilder {
 }
 
 pub struct GpuApplication {
-    context: Arc<WgpuContext>,
+    pub context: Arc<WgpuContext>,
     surface: RwSignal<SurfaceOrFallback>,
     profiler: StoredValue<GpuProfiler>,
     profiling_enabled: bool,
@@ -243,6 +243,13 @@ impl GpuApplication {
     }
 }
 
+impl Drop for GpuApplication {
+    fn drop(&mut self) {
+        let ctx = take_context::<Arc<WgpuContext>>();
+        std::mem::drop(ctx);
+    }
+}
+
 fn wgpu_context() -> Arc<WgpuContext> {
     expect_context::<Arc<WgpuContext>>()
 }
@@ -258,7 +265,7 @@ fn render_component(
     textures: RwSignal<HashMap<TextureId, Arc<Texture>>>,
     models: SignalVec<ModelInfo>,
 ) -> impl Fn(&FrameData) -> Result<RenderResults, wgpu::SurfaceError> {
-    let context = wgpu_context();
+    let context = &wgpu_context();
     let frame_counter = RwSignal::new(FrameCounter::new());
     let new_frame_time = move || frame_counter.write().new_frame();
 
@@ -371,7 +378,7 @@ fn render_component(
     );
 
     move |render_data: &FrameData| {
-        let context = wgpu_context();
+        let context = &wgpu_context();
         let frame_time = new_frame_time();
         // 2. Render
         let surface_texture = match surface.with(|surface| surface.surface_texture(&context)) {
@@ -485,7 +492,7 @@ fn render_component(
 fn ground_plane_component(
     surface: RwSignal<SurfaceOrFallback>,
 ) -> impl Fn(&FrameData, &mut wgpu_profiler::OwningScope<'_, wgpu::RenderPass<'_>>) {
-    let context = wgpu_context();
+    let context = &wgpu_context();
     let quad_mesh = Mesh::new_tesselated_quad(&context.device, 2);
 
     let shader_source = RwSignal::new(ground_plane::SOURCE.to_string());
@@ -518,8 +525,8 @@ fn ground_plane_component(
     // };
 
     let shader = Memo::new_computed({
-        let context = context.clone();
         move |_| {
+            let context = &wgpu_context();
             context
                 .device
                 .create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -530,8 +537,8 @@ fn ground_plane_component(
     });
 
     let pipeline = Memo::new_computed({
-        let context = context.clone();
         move |_| {
+            let context = &wgpu_context();
             let shader = shader.read();
             context
                 .device
@@ -584,6 +591,7 @@ fn ground_plane_component(
     );
 
     move |render_data: &FrameData, render_pass| {
+        let context = &wgpu_context();
         // #[cfg(feature = "desktop")]
         // let _watcher = &_file_watcher;
         let size = 100_000.0;
@@ -678,7 +686,7 @@ fn lod_stage_component(
     copy_patches_pipeline: StoredValue<wgpu::ComputePipeline>,
     threshold_factor: ReadSignal<f32>,
 ) -> impl Fn(&FrameData, &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>) {
-    let context = wgpu_context();
+    let context = &wgpu_context();
     let device = &context.device;
     let id = model.read_untracked().id.clone(); // I wonder if this ID stays the same
 
@@ -754,7 +762,7 @@ fn lod_stage_component(
     );
 
     let bind_group_1 = Memo::new_computed(move |_| {
-        let context = wgpu_context();
+        let context = &wgpu_context();
         let virtual_model = virtual_model.read();
         let render_buffer = &virtual_model.render_buffer;
         compute_patches::bind_groups::BindGroup1::from_bindings(
@@ -801,7 +809,7 @@ fn lod_stage_component(
     });
 
     move |frame_data: &FrameData, commands: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>| {
-        let context = wgpu_context();
+        let context = &wgpu_context();
         let queue = &context.queue;
         let device = &context.device;
         force_render_uniform.write_buffer(queue, &compute_patches::ForceRenderFlag { flag: 0 });
@@ -965,7 +973,7 @@ fn render_model_component(
         }
     });
 
-    let context = wgpu_context();
+    let context = &wgpu_context();
     let device = &context.device;
 
     let model_buffer = RwSignal::new(TypedBuffer::new_uniform(
@@ -988,7 +996,7 @@ fn render_model_component(
         let model = model.clone();
         move |_| {
             let _m = model.read();
-            let context = wgpu_context();
+            let context = &wgpu_context();
             let device = &context.device;
             let model_buffer = model_buffer.read();
             let material_buffer = material_buffer.read();

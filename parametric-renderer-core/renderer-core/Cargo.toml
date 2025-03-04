@@ -24,12 +24,12 @@ web-sys = { version = "0.3.77", optional = true, features = [
 ] }
 web-time = "1.1.0"
 wgpu = { workspace = true }
-wgpu-profiler = "0.21.0"
+wgpu-profiler = "0.21.1"
 winit = { workspace = true }
 
 [dev-dependencies]
 any_spawner = { version = "0.2.0-rc3", features = ["futures-executor"] }
-criterion2 = "2.0.0"
+criterion2 = "3.0.0"
 pollster = "0.4.0"
 
 [[bench]]
