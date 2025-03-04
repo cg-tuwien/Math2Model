@@ -348,15 +348,18 @@ function uploadFile(data: {
         <n-flex vertical>
           <n-flex justify="space-between">
             <n-text
-              >Create a code-based model, if you want full freedom. Pick this
-              option if you have advanced knowledge in mathematics and
+              >Create a code-based model, if you want full freedom. A code
+              editor with syntax highlighting and auto completion will be
+              provided. Pick this option if you have advanced knowledge in
               programming.</n-text
             >
             <n-text
               >Create a graph-based model, if you want a more restricted option.
-              Pick this option if you have basic knowledge in
-              mathematics.</n-text
-            >
+              A visual scripting tool, where you connect predefined nodes with
+              each other will be provided. Pick this option if you have little
+              to no programming experience. Some complex functionality is
+              available for more experienced programmers.
+            </n-text>
           </n-flex>
           <n-text type="info">optional enter model name</n-text>
           <n-input v-model:value="toAddModel[0]"></n-input>
