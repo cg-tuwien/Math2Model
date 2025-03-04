@@ -36,7 +36,7 @@ const props = defineProps<{
     :step="props.data.step"
     :min="props.data.min"
     :max="props.data.max"
-    v-on:change="(v: number | null) => props.data.change(v)"
+    @update="(v: number | null) => props.data.change(v)"
     v-on:pointerdown.stop=""
   >
   </n-input-number>
