@@ -287,7 +287,8 @@ export async function mainExport(
 
     const compiledShader = compiledShaders.value.get(makeFilePath(shaderPath));
     if (!compiledShader) {
-      console.error("Shader not found: ", shaderPath);
+      // The shader probably didn't load yet
+      // console.error("Shader not found: ", shaderPath);
       return;
     }
     const pipeline = compiledShader.lodStage.pipeline;
