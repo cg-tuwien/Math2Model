@@ -104,7 +104,7 @@ watch(monacoMount, (element) => {
 </script>
 <template>
   <div class="flex flex-col">
-    <h2 class="border border-gray-500 border-b-0 px-2">
+    <h2 class="border border-gray-500 border-b-0 px-2 dark:text-white">
       {{ props.keyedCode?.name ?? "No file opened" }}
     </h2>
     <div
