@@ -51,21 +51,23 @@ syncFilesystem(props.fs, props.engine);
 
 const store = useStore();
 const errorsStore = useErrorStore();
+const fsStore = useFsStore();
+const fpsCounter = ref<WasmFrameTime>({ avg_delta_time: 0, avg_gpu_time: 0 });
+{
+  const timer = setInterval(() => {
+    props.engine.getFrameTime().then((v) => {
+      fpsCounter.value = v;
+    });
+  }, 100);
+  onUnmounted(() => {
+    clearInterval(timer);
+  });
+}
 
-const isLoadingScene = ref(false); // Maybe I should look at suspense?
 const isFirstTimeVisitor = useLocalStorage("is-first-time-visitor", true);
 
-if (props.fs.hasFile(SceneFileName)) {
-  isLoadingScene.value = true;
-} else if (isFirstTimeVisitor.value) {
-  isLoadingScene.value = true;
-  createFirstTimeVisitorProject()
-    .then((v) => fsStore.addFiles(v))
-    .then(() => {
-      isLoadingScene.value = false;
-    });
-} else {
-  // Well, they want an empty scene.
+if (isFirstTimeVisitor.value && !props.fs.hasFile(SceneFileName)) {
+  await createFirstTimeVisitorProject().then((v) => fsStore.addFiles(v));
 }
 
 props.engine.setOnShaderCompiled((shader, messages) => {
@@ -75,15 +77,19 @@ props.engine.setOnShaderCompiled((shader, messages) => {
 // The underlying data
 const sceneFile = ref<string | null>(null);
 const exportModel = ref(false);
-
-props.fs.watchFromStart((change) => {
+props.fs.watch((change) => {
   if (change.key === SceneFileName) {
+    if (change.type === "insert" || change.type === "update") {
     // Thread safety: Ordered reads are guaranteed by readTextFile.
     props.fs.readTextFile(change.key)?.then((v) => {
       sceneFile.value = v;
     });
+    } else {
+      sceneFile.value = null;
+    }
   }
 });
+sceneFile.value = await props.fs.readTextFile(SceneFileName);
 
 const scene = useVirtualScene();
 watchEffect(() => {
@@ -333,18 +339,12 @@ watchImmediate(
                 class="self-stretch overflow-hidden flex-1"
                 v-show="sceneFile !== null"
               ></div>
-              <n-card
-                title="Missing scene file"
-                v-if="sceneFile === null && !isLoadingScene"
-              >
+              <n-card                 title="Missing scene file"                 v-if="sceneFile === null"              >
                 <n-button type="primary" @click="saveScene()">
                   Create empty scene
                 </n-button>
               </n-card>
-              <div v-if="sceneFile === null && isLoadingScene">
-                Loading scene...
-              </div>
-            </div>
+                          </div>
           </template>
           <template #2>
             <div class="flex h-full w-full">

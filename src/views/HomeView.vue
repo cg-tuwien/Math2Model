@@ -24,14 +24,26 @@ GpuDevicePromise.then((v) => {
 </script>
 
 <template>
-  <EditorAndOutput
+  <template
     v-if="sceneFiles !== null && canvasElement !== null && gpuDevice !== null"
-    :fs="sceneFiles"
-    :canvas="canvasElement"
-    :engine="engine"
-    :gpuDevice="gpuDevice"
-  ></EditorAndOutput>
-  <span v-else>Loading...</span>
+  >
+    <Suspense>
+      <EditorAndOutput
+        :fs="sceneFiles"
+        :canvas="canvasElement"
+        :engine="engine"
+        :gpuDevice="gpuDevice"
+      ></EditorAndOutput>
+
+      <template #fallback>
+        <h1 class="dark:text-white">Loading... <n-spin size="large" /></h1>
+      </template>
+    </Suspense>
+  </template>
+  <span v-else>
+    <h1 class="dark:text-white">Loading...</h1>
+    <n-spin size="large" />
+  </span>
 </template>
 
 <style scoped></style>
