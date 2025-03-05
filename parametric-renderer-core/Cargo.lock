@@ -509,6 +509,7 @@ dependencies = [
  "any_spawner",
  "anyhow",
  "env_logger",
+ "futures",
  "glam",
  "log",
  "nanoserde",
