@@ -106,7 +106,7 @@ fn main() {
                 close_requested: Default::default(),
             });
             renderer.force_wait();
-            let render_results = renderer.render(&app).unwrap();
+            let render_results = renderer.render(&app).unwrap().unwrap();
             timer.increment_query(render_results.profiler_results.unwrap());
         })
     });
