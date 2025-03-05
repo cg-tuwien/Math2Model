@@ -5,11 +5,11 @@ export default defineConfig({
   title: "Math2Model Documentation",
   description:
     "Documentation for Math2Model - the shadertoy of parametric modeling",
-  base: "/docs/",
+  base: "/Math2Model/docs/",
   outDir: "../dist/docs/",
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
-    nav: [{ text: "Go to Math2Model", link: "/../" }],
+    nav: [{ text: "Go to Math2Model", link: "../" }],
 
     sidebar: [
       {
