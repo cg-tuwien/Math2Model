@@ -12,7 +12,7 @@ export default defineConfig({
     nav: [
       {
         text: "Go to Math2Model",
-        link: "https://cg-tuwien.github.io/Math2Model/",
+        link: "https://cg-tuwien.github.io/Math2Model/#/",
       },
     ],
 
