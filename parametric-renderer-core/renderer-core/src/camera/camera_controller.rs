@@ -1,6 +1,6 @@
 use glam::{Quat, Vec3};
 
-use crate::{input::WindowInputs, renderer::CursorCapture};
+use crate::input::{CursorCaptureRequest, WindowInputs};
 
 use super::{freecam_controller::FreecamController, orbitcam_controller::OrbitcamController};
 
@@ -33,7 +33,7 @@ impl ChosenController {
         input: &WindowInputs,
         delta_time: f32,
         settings: &GeneralControllerSettings,
-    ) -> CursorCapture {
+    ) -> CursorCaptureRequest {
         match self {
             ChosenController::Orbitcam(orbitcam) => orbitcam.update(input, delta_time, settings),
             ChosenController::Freecam(freecam) => freecam.update(input, delta_time, settings),
@@ -81,7 +81,7 @@ impl CameraController {
         }
     }
 
-    pub fn update(&mut self, input: &WindowInputs, delta_time: f32) -> CursorCapture {
+    pub fn update(&mut self, input: &WindowInputs, delta_time: f32) -> CursorCaptureRequest {
         self.chosen.update(input, delta_time, &self.settings)
     }
 }

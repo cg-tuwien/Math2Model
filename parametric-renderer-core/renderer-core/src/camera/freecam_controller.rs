@@ -1,7 +1,7 @@
 use glam::{Quat, Vec2, Vec3};
 use winit::{event::MouseButton, keyboard::KeyCode};
 
-use crate::{input::WindowInputs, renderer::CursorCapture};
+use crate::input::{CursorCaptureRequest, WindowInputs};
 
 use super::{
     Camera,
@@ -30,18 +30,18 @@ impl FreecamController {
         input: &WindowInputs,
         delta_time: f32,
         settings: &GeneralControllerSettings,
-    ) -> CursorCapture {
-        let mut cursor_capture = CursorCapture::Free;
+    ) -> CursorCaptureRequest {
+        let mut cursor_capture = CursorCaptureRequest::Free;
         let mouse_delta = Vec2::new(input.mouse.motion.0 as f32, input.mouse.motion.1 as f32);
         if input.mouse.pressed(MouseButton::Right) {
             self.update_orientation(mouse_delta, settings);
-            cursor_capture = CursorCapture::LockedAndHidden;
+            cursor_capture = CursorCaptureRequest::LockedAndHidden;
         }
 
         self.update_position(input_to_direction(input), delta_time, settings);
         if input.mouse.pressed(MouseButton::Middle) {
             self.update_pan_position(mouse_delta, delta_time, settings);
-            cursor_capture = CursorCapture::LockedAndHidden;
+            cursor_capture = CursorCaptureRequest::LockedAndHidden;
         }
         cursor_capture
     }

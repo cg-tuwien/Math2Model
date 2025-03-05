@@ -27,6 +27,7 @@ use wgpu_profiler::GpuProfiler;
 use crate::{
     buffer::{CommandEncoderExt, TypedBuffer},
     game::{GameRes, MaterialInfo, ModelInfo, ShaderId, TextureId, TextureInfo},
+    input::WindowCursorCapture,
     mesh::Mesh,
     reactive::{ForEach, MemoComputed, SignalVec},
     shaders::{compute_patches, copy_patches, ground_plane, shader},
@@ -202,7 +203,7 @@ impl GpuApplication {
     }
 
     pub fn render(&mut self, game: &GameRes) -> Result<Option<RenderResults>, wgpu::SurfaceError> {
-        self.cursor_capture = self.update_cursor_capture(game.cursor_capture);
+        self.update_cursor_capture(game.cursor_capture);
 
         if self.profiling_enabled != game.profiler_settings.gpu {
             self.profiling_enabled = game.profiler_settings.gpu;
@@ -239,6 +240,15 @@ impl GpuApplication {
     pub fn set_threshold_factor(&self, factor: f32) {
         self.set_threshold_factor
             .set(factor.clamp(0.0001, 100000.0));
+    }
+
+    fn update_cursor_capture(&mut self, cursor_capture: WindowCursorCapture) {
+        if let Some(window) = self.surface.with_untracked(|surface| match surface {
+            wgpu_context::SurfaceOrFallback::Surface { window, .. } => Some(window.clone()),
+            wgpu_context::SurfaceOrFallback::Fallback { .. } => None,
+        }) {
+            self.cursor_capture.update(cursor_capture, &window);
+        }
     }
 }
 
@@ -1063,55 +1073,4 @@ fn render_model_component(
 pub struct RenderResults {
     pub delta_time: Seconds,
     pub profiler_results: Option<Vec<wgpu_profiler::GpuTimerQueryResult>>,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum CursorCapture {
-    Free,
-    LockedAndHidden,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum WindowCursorCapture {
-    Free,
-    LockedAndHidden(winit::dpi::PhysicalPosition<f64>),
-}
-
-impl GpuApplication {
-    pub fn update_cursor_capture(
-        &self,
-        cursor_capture: WindowCursorCapture,
-    ) -> WindowCursorCapture {
-        let window_result = self.surface.with_untracked(|surface| match surface {
-            wgpu_context::SurfaceOrFallback::Surface { window, .. } => Result::Ok(window.clone()),
-            wgpu_context::SurfaceOrFallback::Fallback { .. } => Result::Err(self.cursor_capture),
-        });
-        let window = match window_result {
-            Ok(window) => window,
-            Err(v) => return v,
-        };
-        match (self.cursor_capture, cursor_capture) {
-            (WindowCursorCapture::LockedAndHidden(position), WindowCursorCapture::Free) => {
-                window
-                    .set_cursor_grab(winit::window::CursorGrabMode::None)
-                    .unwrap();
-                window.set_cursor_visible(true);
-                let _ = window.set_cursor_position(position);
-                WindowCursorCapture::Free
-            }
-            (WindowCursorCapture::Free, WindowCursorCapture::Free) => WindowCursorCapture::Free,
-            (
-                WindowCursorCapture::LockedAndHidden(_),
-                WindowCursorCapture::LockedAndHidden(position),
-            ) => WindowCursorCapture::LockedAndHidden(position),
-            (WindowCursorCapture::Free, WindowCursorCapture::LockedAndHidden(cursor_position)) => {
-                window
-                    .set_cursor_grab(winit::window::CursorGrabMode::Confined)
-                    .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))
-                    .unwrap();
-                window.set_cursor_visible(false);
-                WindowCursorCapture::LockedAndHidden(cursor_position)
-            }
-        }
-    }
 }
