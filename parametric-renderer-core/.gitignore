@@ -1,3 +1,4 @@
 /target
 /cache.json
 /profile-*.json
+/pkg

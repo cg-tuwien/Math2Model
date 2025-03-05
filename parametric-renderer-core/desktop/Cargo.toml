@@ -1,6 +1,6 @@
 [package]
 default-run = "desktop"
-edition = "2021"
+edition = "2024"
 name = "desktop"
 version = "0.2.0"
 
