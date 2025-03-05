@@ -58,6 +58,7 @@ pub struct TextureInfo {
 
 pub enum TextureData {
     Bytes(Vec<u8>),
+    #[cfg(feature = "web-sys")]
     Image(web_sys::ImageBitmap),
 }
 

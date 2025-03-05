@@ -24,7 +24,6 @@ web-sys = { version = "0.3.77", optional = true, features = [
     "HtmlCanvasElement",
 ] }
 web-time = "1.1.0"
-
 wgpu = { workspace = true }
 wgpu-profiler = "0.21.1"
 winit = { workspace = true }
@@ -39,6 +38,7 @@ harness = false
 name = "gpu_bench"
 
 [build-dependencies]
+wesl = "0.1.1"
 wgsl_to_wgpu = { version = "0.13.0" }
 
 [features]

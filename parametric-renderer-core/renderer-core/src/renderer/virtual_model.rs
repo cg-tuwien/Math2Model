@@ -243,7 +243,7 @@ pub fn create_compute_patches_pipeline(
 }
 
 fn replace_render_code<'a>(source: &'a str, sample_object_code: &str) -> String {
-    // TODO: use wgsl-parser instead of this
+    // TODO: use wesl-rs instead of this
     let start_1 = source.find("//// START sampleObject").unwrap();
     let end_1 = source.find("//// END sampleObject").unwrap();
     let start_2 = source.find("//// START getColor").unwrap();
@@ -264,9 +264,9 @@ fn replace_render_code<'a>(source: &'a str, sample_object_code: &str) -> String 
 }
 
 fn replace_compute_code<'a>(source: &'a str, sample_object_code: &str) -> String {
-    // TODO: use wgsl-parser instead of this
-    let start_1 = source.find("//// START sampleObject").unwrap();
-    let end_1 = source.find("//// END sampleObject").unwrap();
+    // TODO: use wesl-rs instead of this
+    let start_1 = source.find("fn sampleObject").unwrap();
+    let end_1 = source[start_1..].find("}").unwrap() + start_1 + 1;
 
     let mut result = String::new();
     result.push_str(&source[..start_1]);
