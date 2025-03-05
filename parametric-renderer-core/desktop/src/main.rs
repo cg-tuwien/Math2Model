@@ -14,15 +14,12 @@ fn main() -> anyhow::Result<()> {
     any_spawner::Executor::init_local_custom_executor(executor)
         .expect("Futures executor failed to init");
     let result = run();
-    // local_pool.borrow_mut().replace(LocalPool::new());
-    any_spawner::Executor::poll_local();
+    // any_spawner::Executor::poll_local();
     result
 }
 
 /// Wasm is single threaded,
-/// and we want to be as close to the actual environment as possible    
-/// And we want to manually dispose of the local pool,
-/// instead of relying on any_spawner's eventual disposing.
+/// and we want to be as close to the actual environment as possible
 struct SingleThreadedExecutor {
     local_pool: RefCell<LocalPool>,
     local_spawner: LocalSpawner,

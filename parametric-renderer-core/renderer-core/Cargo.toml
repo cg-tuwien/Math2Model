@@ -25,7 +25,7 @@ web-sys = { version = "0.3.77", optional = true, features = [
 ] }
 web-time = "1.1.0"
 wgpu = { workspace = true }
-wgpu-profiler = "0.21.1"
+wgpu-profiler = "0.22.0"
 winit = { workspace = true }
 
 [dev-dependencies]
