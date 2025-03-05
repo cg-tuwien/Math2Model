@@ -2,38 +2,46 @@ struct EncodedPatch {
   u: u32,
   v: u32,
   instance: u32
-};
+}
+
 struct Patch {
   min: vec2<f32>,
   max: vec2<f32>,
   instance: u32
-};
+}
+
 struct Patches {
   patches_length: atomic<u32>,
   patches_capacity: u32,
   patches : array<EncodedPatch>,
-};
+}
+
 struct PatchesRead { // Is currently needed, see https://github.com/gpuweb/gpuweb/discussions/4438
   patches_length: u32, // Same size and alignment as atomic<u32>. Should be legal, right?
   patches_capacity: u32,
   patches : array<EncodedPatch>,
-};
+}
+
 struct RenderBuffer {
   patches_length: atomic<u32>,
   patches_capacity: u32,
   patches: array<EncodedPatch>,
-};
+}
+
 struct RenderBufferRead {
   patches_length: u32,
   patches_capacity: u32,
   patches: array<EncodedPatch>,
-};
+}
+
 struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/struct.DispatchIndirectArgs.html
   x: atomic<u32>,
   y: u32,
   z: u32,
-};
+}
+
 fn ceil_div(a: u32, b: u32) -> u32 { return (a + b - 1u) / b; }
+
 // Inspired from https://onrendering.com/data/papers/isubd/isubd.pdf
 fn patch_u_child(u: u32, child_bit: u32) -> u32 {
   return (u << 1) | (child_bit & 1);
@@ -62,6 +70,7 @@ fn patch_bottom_left_child(encoded: EncodedPatch) -> EncodedPatch {
 fn patch_bottom_right_child(encoded: EncodedPatch) -> EncodedPatch {
   return patch_bottom_child(patch_right_child(encoded));
 }
+
 fn patch_decode(encoded: EncodedPatch) -> Patch {
   // First we go to the implicit 1u
   let leading_zeroes_u = countLeadingZeros(encoded.u);

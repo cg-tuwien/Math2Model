@@ -27,15 +27,6 @@ cargo bench
 - `P` to get a benchmark of the current frame. It gets written to a `profile-*.json` file and can be viewed on [ui.perfetto.dev](https://ui.perfetto.dev/).
 
 
-
-## To update the WGSL shaders
-
-Whenever you are editing the WGSL shaders, you might want to update their "imports". To do so, run
-
-```bash
-cargo run --bin copy-includes
-```
-
 ## Benchmarking
 
 We have multiple forms of benchmarking. The simplest one is pressing `P` at runtime, which will save a profile of the current frame. 
@@ -58,4 +49,3 @@ cargo bench -p renderer-core -- --baseline base
 
 - WGPU Tutorial https://sotrh.github.io/learn-wgpu/#what-is-wgpu
 - WGSL to Rust library https://github.com/ScanMountGoat/wgsl_to_wgpu
-- Math library https://docs.rs/glamour/latest/glamour/

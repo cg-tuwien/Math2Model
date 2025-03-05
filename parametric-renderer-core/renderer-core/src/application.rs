@@ -62,7 +62,6 @@ impl Application {
 
     fn on_exit(&mut self) {
         info!("Stopping the application.");
-        self.renderer.take();
         if let Some(on_exit_callback) = self.on_exit_callback.take() {
             on_exit_callback(self);
         }
