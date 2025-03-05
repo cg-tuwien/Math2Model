@@ -4,9 +4,9 @@ use winit::{event::MouseButton, keyboard::KeyCode};
 use crate::{input::WindowInputs, renderer::CursorCapture};
 
 use super::{
+    Camera,
     angle::Angle,
     camera_controller::{GeneralController, GeneralControllerSettings, IsCameraController},
-    Camera,
 };
 
 pub struct FreecamController {

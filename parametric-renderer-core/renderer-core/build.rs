@@ -1,5 +1,5 @@
 use std::fmt::Write;
-use wgsl_to_wgpu::{create_shader_module_embedded, MatrixVectorTypes, WriteOptions};
+use wgsl_to_wgpu::{MatrixVectorTypes, WriteOptions, create_shader_module_embedded};
 
 #[derive(Default)]
 struct ShaderModule {

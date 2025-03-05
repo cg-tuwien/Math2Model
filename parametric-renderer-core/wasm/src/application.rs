@@ -1,14 +1,14 @@
 use glam::{Quat, Vec3};
 use log::error;
 use renderer_core::{
-    application::{run_on_main, AppCommand, Application, WasmCanvas},
+    application::{AppCommand, Application, WasmCanvas, run_on_main},
     camera::camera_controller::{self, CameraController},
     game::{ModelInfo, ShaderId, ShaderInfo, TextureData, TextureId, TextureInfo},
     input::WinitAppHelper,
     time::TimeStats,
 };
 use std::sync::{Arc, Mutex};
-use wasm_bindgen::{prelude::wasm_bindgen, JsError, JsValue};
+use wasm_bindgen::{JsError, JsValue, prelude::wasm_bindgen};
 use web_sys::{HtmlCanvasElement, ImageBitmap};
 use winit::event_loop::{EventLoop, EventLoopProxy};
 

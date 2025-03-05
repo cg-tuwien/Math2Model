@@ -6,8 +6,8 @@ use reactive_graph::{
     computed::{ArcMemo, Memo},
     owner::{ArcStoredValue, StoredValue, SyncStorage},
     signal::{
-        guards::{Plain, ReadGuard},
         ArcReadSignal, ArcRwSignal, ReadSignal, RwSignal,
+        guards::{Plain, ReadGuard},
     },
     traits::{Read, ReadValue, With, WithValue},
     wrappers::read::{ArcSignal, Signal, SignalReadGuard},

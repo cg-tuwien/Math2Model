@@ -13,15 +13,15 @@ use glam::UVec2;
 use reactive_graph::{
     computed::Memo,
     effect::{Effect, RenderEffect},
-    owner::{expect_context, provide_context, take_context, use_context, Owner, StoredValue},
+    owner::{Owner, StoredValue, expect_context, provide_context, take_context, use_context},
     prelude::*,
     signal::{
-        arc_signal, signal, ArcReadSignal, ArcWriteSignal, ReadSignal, RwSignal, WriteSignal,
+        ArcReadSignal, ArcWriteSignal, ReadSignal, RwSignal, WriteSignal, arc_signal, signal,
     },
 };
 use scene::SceneData;
-use virtual_model::{make_empty_texture, make_missing_shader, ShaderPipelines, VirtualModel};
-use wgpu_context::{create_profiler, SurfaceOrFallback, WgpuContext};
+use virtual_model::{ShaderPipelines, VirtualModel, make_empty_texture, make_missing_shader};
+use wgpu_context::{SurfaceOrFallback, WgpuContext, create_profiler};
 use wgpu_profiler::GpuProfiler;
 
 use crate::{

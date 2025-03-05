@@ -1,8 +1,8 @@
 use std::{cell::Cell, sync::Arc};
 
 use criterion::{
-    measurement::{Measurement, ValueFormatter},
     Criterion, Throughput,
+    measurement::{Measurement, ValueFormatter},
 };
 use glam::Vec3;
 use pollster::FutureExt;

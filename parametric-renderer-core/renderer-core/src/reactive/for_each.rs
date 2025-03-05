@@ -1,4 +1,4 @@
-use indexmap::{map::Entry, IndexMap};
+use indexmap::{IndexMap, map::Entry};
 use reactive_graph::{computed::ArcMemo, effect::RenderEffect, owner::Owner};
 
 /// Lazily computes a "iterable" of items.
@@ -16,7 +16,7 @@ where
     OutputFn: Fn(T) -> Output + Send + Sync + 'static,
     Output: Send + Sync + 'static,
 {
-    use indexmap::{map::Entry, IndexMap};
+    use indexmap::{IndexMap, map::Entry};
     let parent = Owner::current().expect("no reactive owner");
     ArcMemo::new_owning(move |old_cache: Option<IndexMap<Key, (Output, Owner)>>| {
         let mut old_cache = old_cache.unwrap_or_default();

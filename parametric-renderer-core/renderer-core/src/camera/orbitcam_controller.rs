@@ -4,9 +4,9 @@ use winit::event::MouseButton;
 use crate::{input::WindowInputs, renderer::CursorCapture};
 
 use super::{
+    Camera,
     angle::Angle,
     camera_controller::{GeneralController, GeneralControllerSettings, IsCameraController},
-    Camera,
 };
 
 struct LogarithmicDistance(f32);

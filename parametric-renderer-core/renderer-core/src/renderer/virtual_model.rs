@@ -8,7 +8,7 @@ use crate::{
     texture::Texture,
 };
 
-use super::{wgpu_context::WgpuContext, MAX_PATCH_COUNT, PATCH_SIZES};
+use super::{MAX_PATCH_COUNT, PATCH_SIZES, wgpu_context::WgpuContext};
 use std::sync::Arc;
 
 use glam::{Vec3, Vec4};

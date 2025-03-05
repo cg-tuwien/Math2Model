@@ -5,10 +5,10 @@ use web_time::Instant;
 
 use crate::{
     camera::{
+        Camera, CameraSettings,
         camera_controller::{
             CameraController, ChosenKind, GeneralController, GeneralControllerSettings,
         },
-        Camera, CameraSettings,
     },
     input::WindowInputs,
     renderer::{CursorCapture, WindowCursorCapture},
