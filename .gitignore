@@ -32,3 +32,6 @@ components.d.ts
 
 bun.lockb
 /parametric-renderer-core-old
+
+/docs/.vitepress/dist  
+/docs/.vitepress/cache

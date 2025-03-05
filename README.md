@@ -19,5 +19,6 @@ Now the dependencies have been installed.
 To run it
 1. `npm run dev` to start up the web server
 2. `cd parametric-renderer-core` and `npm run build` in a separate terminal to build the WASM package.
+3. `npm run docs:dev` to run the documentation page
 
 As for everything else, check out our [CONTRIBUTING.md](./CONTRIBUTING.md)
