@@ -1,6 +1,6 @@
 # ShadertoyOfParametricModeling
 
-Build [the Shadertoy of Parametric Modeling](https://math2model.cg.tuwien.ac.at/). View the [demo](https://math2model.cg.tuwien.ac.at/).
+Build [the Shadertoy of Parametric Modeling](https://cg-tuwien.github.io/Math2Model/#/). View the [demo](https://cg-tuwien.github.io/Math2Model/#/).
 
 ## Contributing
 
