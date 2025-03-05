@@ -9,7 +9,12 @@ export default defineConfig({
   outDir: "../dist/docs/",
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
-    nav: [{ text: "Go to Math2Model", link: "../" }],
+    nav: [
+      {
+        text: "Go to Math2Model",
+        link: "https://cg-tuwien.github.io/Math2Model/",
+      },
+    ],
 
     sidebar: [
       {
