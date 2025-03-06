@@ -20,7 +20,7 @@ notify-debouncer-full = { version = "0.5.0", optional = true }
 reactive_graph = { workspace = true }
 uuid = { workspace = true }
 web-time = "1.1.0"
-wesl = "0.1.1"
+wesl.workspace = true
 wgpu = { workspace = true }
 wgpu-profiler = "0.22.0"
 winit = { workspace = true }
@@ -41,7 +41,7 @@ harness = false
 name = "gpu_bench"
 
 [build-dependencies]
-wesl = "0.1.1"
+wesl.workspace = true
 wgsl_to_wgpu = { version = "0.13.0" }
 
 [features]

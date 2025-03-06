@@ -11,14 +11,16 @@ any_spawner = { version = "0.2.0", features = ["wasm-bindgen"] }
 anyhow = "1.0"
 console_error_panic_hook = "0.1.7"
 console_log = "1.0"
-# Needed for the UUID crate that the renderer-core uses
+
 glam = { workspace = true }
 log = { workspace = true }
 renderer-core = { path = "../renderer-core" }
 serde = { version = "1.0", features = ["derive"] }
 serde-wasm-bindgen = "0.6.5"
 tsify-next = { version = "0.5.5", default-features = false, features = ["js"] }
-uuid = { workspace = true, features = ["js"] }
+uuid = { workspace = true, features = [
+  "js",
+] } # Needed for the UUID crate that the renderer-core uses
 wasm-bindgen = "0.2.100"
 wasm-bindgen-futures = "0.4.50"
 web-sys = { version = "0.3.77", features = [

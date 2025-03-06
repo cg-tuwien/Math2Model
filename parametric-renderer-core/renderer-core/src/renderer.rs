@@ -1,5 +1,6 @@
 mod frame_data;
 mod scene;
+mod shader_compiler;
 mod virtual_model;
 mod wgpu_context;
 
