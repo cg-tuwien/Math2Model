@@ -245,12 +245,13 @@ fn create_fallback_texture(
     })
 }
 
-pub fn create_profiler(_context: &WgpuContext) -> GpuProfiler {
+pub fn create_profiler(context: &WgpuContext) -> GpuProfiler {
     let gpu_profiler_settings = GpuProfilerSettings {
         enable_timer_queries: false, // Disabled by default
         ..GpuProfilerSettings::default()
     };
 
-    let profiler = GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler");
+    let profiler = GpuProfiler::new(&context.device, gpu_profiler_settings)
+        .expect("Failed to create profiler");
     profiler
 }
