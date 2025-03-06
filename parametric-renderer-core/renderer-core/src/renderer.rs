@@ -13,7 +13,7 @@ use glam::UVec2;
 use reactive_graph::{
     computed::Memo,
     effect::{Effect, RenderEffect},
-    owner::{Owner, StoredValue, expect_context, provide_context, take_context, use_context},
+    owner::{Owner, StoredValue, expect_context, provide_context, use_context},
     prelude::*,
     signal::{
         ArcReadSignal, ArcWriteSignal, ReadSignal, RwSignal, WriteSignal, arc_signal, signal,
@@ -66,7 +66,7 @@ pub struct GpuApplication {
     surface: RwSignal<SurfaceOrFallback>,
     profiler: StoredValue<GpuProfiler>,
     profiling_enabled: bool,
-    _runtime: Owner,
+    runtime: Option<Owner>,
     // render_tree: Arc<dyn Fn(&FrameData) -> Result<RenderResults, wgpu::SurfaceError>>,
     render_effect: RenderEffect<Result<Option<RenderResults>, wgpu::SurfaceError>>,
     set_render_data: ArcWriteSignal<FrameData>,
@@ -127,7 +127,7 @@ impl GpuApplication {
             surface,
             profiler,
             profiling_enabled: false,
-            _runtime: runtime,
+            runtime: Some(runtime),
             render_effect,
             set_render_data,
             shaders,
@@ -222,7 +222,8 @@ impl GpuApplication {
             mouse_held: game.mouse_held,
             lod_stage: game.lod_stage.clone(),
         });
-        // any_spawner::Executor::poll_local(); TODO: We need a custom executor, I think
+        //  TODO: We need a custom executor, I think. On wasm, we'll need to hook up the futures thingy
+        // any_spawner::Executor::poll_local();
         // TODO: This currently gets the value of the last frame.
         self.render_effect
             .take_value()
@@ -254,8 +255,10 @@ impl GpuApplication {
 
 impl Drop for GpuApplication {
     fn drop(&mut self) {
-        let ctx = take_context::<Arc<WgpuContext>>();
-        std::mem::drop(ctx);
+        // Make sure to dispose of the Leptos runtime
+        if let Some(runtime) = self.runtime.take() {
+            runtime.unset();
+        }
     }
 }
 

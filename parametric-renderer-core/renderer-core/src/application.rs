@@ -62,6 +62,7 @@ impl Application {
 
     fn on_exit(&mut self) {
         info!("Stopping the application.");
+        let _ = self.renderer.take(); // Dispose of the renderer before threads start shutting down
         if let Some(on_exit_callback) = self.on_exit_callback.take() {
             on_exit_callback(self);
         }

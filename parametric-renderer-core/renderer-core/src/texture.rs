@@ -48,9 +48,8 @@ impl Texture {
                 },
                 size,
             ),
-            #[cfg(feature = "web-sys")]
+            #[cfg(target_arch = "wasm32")]
             crate::game::TextureData::Image(_image_bitmap) => {
-                #[cfg(target_arch = "wasm32")]
                 queue.copy_external_image_to_texture(
                     &wgpu::CopyExternalImageSourceInfo {
                         source: wgpu::ExternalImageSource::ImageBitmap(_image_bitmap.clone()),
