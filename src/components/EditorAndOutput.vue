@@ -336,7 +336,7 @@ watchImmediate(
           :default-size="0.5"
         >
           <template #1>
-            <div class="flex h-full w-full">
+            <div class="flex h-full w-full relative">
               <div
                 ref="canvasContainer"
                 class="self-stretch overflow-hidden flex-1"
@@ -347,7 +347,10 @@ watchImmediate(
                   Create empty scene
                 </n-button>
               </n-card>
-              <div class="absolute bottom-0 text-gray-900">
+              <div class="absolute top-2.5 right-2.5">
+                <img src="./../assets/TUWien.png" class="size-12" />
+              </div>
+              <div class="absolute bottom-0 left-1 text-gray-900">
                 CPU {{ (fpsCounter.avg_delta_time * 1000.0).toFixed(1) }} ms /
                 GPU {{ (fpsCounter.avg_gpu_time * 1000.0).toFixed(1) }} ms
               </div>
