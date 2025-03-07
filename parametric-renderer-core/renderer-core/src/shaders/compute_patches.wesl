@@ -29,6 +29,8 @@ struct ForceRenderFlag {
   flag: u32 // if flag == 0 { false } else { true }
 }
 
+// TODO: Change this to binding structs and then merge it with the shader
+
 // Group 1 is for things that change once per model
 // TODO: Read back the patches_length on the CPU to know when we're going out of bounds
 // (And how far out of bounds)
