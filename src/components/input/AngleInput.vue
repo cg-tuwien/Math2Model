@@ -5,6 +5,7 @@ import { ObjectUpdate } from "./object-update";
 
 const props = defineProps<{
   value: number;
+  label?: string;
 }>();
 const emit = defineEmits<{
   update: [value: ObjectUpdate<number>];
@@ -37,5 +38,6 @@ function emitValue(newValue: ObjectUpdate<number>) {
     :value="angleInDegrees"
     :step="1.0"
     @update="(newValue) => emitValue(newValue)"
+    :label="props.label"
   ></NumberInput>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AngleInput from "./AngleInput.vue";
 import type { ObjectUpdate } from "./object-update";
+import { VectorLabels } from "./vector-labels";
 
 const props = defineProps<{
   value: [number, number, number];
@@ -18,6 +19,7 @@ function updateValue(newValue: ObjectUpdate<number>, index: number) {
       <AngleInput
         :value="value"
         @update="(newValue) => updateValue(newValue, index)"
+        :label="VectorLabels[index]"
       ></AngleInput>
     </template>
   </div>

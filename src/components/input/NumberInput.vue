@@ -6,6 +6,7 @@ import { useThrottleFn } from "@vueuse/core";
 const props = defineProps<{
   value: number;
   step?: number;
+  label?: string;
 }>();
 const emit = defineEmits<{
   update: [value: ObjectUpdate<number>];
@@ -68,6 +69,18 @@ function onPointerUp(event: PointerEvent) {
 </script>
 <template>
   <n-input-group class="px-0.5">
+    <n-input-group-label
+      v-if="props.label"
+      size="small"
+      class="hover:cursor-col-resize flex justify-center items-center"
+      style="padding: 0px 2px"
+      @pointerdown="onPointerDown"
+      @pointermove="onPointerMove"
+      @pointerup="onPointerUp"
+      @pointercancel="onPointerUp"
+    >
+      {{ props.label }}
+    </n-input-group-label>
     <n-input-number
       type="number"
       :value="showValue"
@@ -81,6 +94,7 @@ function onPointerUp(event: PointerEvent) {
       class="grow"
     ></n-input-number>
     <n-input-group-label
+      v-if="!props.label"
       size="small"
       class="hover:cursor-col-resize flex justify-center items-center"
       style="padding: 6px 4px"
