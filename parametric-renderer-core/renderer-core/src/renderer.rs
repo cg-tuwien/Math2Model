@@ -107,18 +107,16 @@ impl GpuApplication {
         let shaders = RwSignal::new(HashMap::new());
         let textures = RwSignal::new(HashMap::new());
 
-        let render_tree = Owner::with(&runtime, || {
-            Arc::new(render_component(
-                surface,
-                profiler,
-                desired_size,
-                threshold_factor,
-                force_wait,
-                shaders,
-                textures,
-                models.clone(),
-            ))
-        });
+        let render_tree = Arc::new(render_component(
+            surface,
+            profiler,
+            desired_size,
+            threshold_factor,
+            force_wait,
+            shaders,
+            textures,
+            models.clone(),
+        ));
 
         let (render_data, set_render_data) = arc_signal(FrameData::default());
         let render_effect = RenderEffect::new(move |_| (render_tree)(&render_data.read()));
