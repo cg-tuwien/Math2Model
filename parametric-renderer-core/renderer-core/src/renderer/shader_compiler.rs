@@ -32,7 +32,6 @@ impl ShaderCompiler {
         let sources_changed = Arc::new(AtomicBool::new(true));
         Self {
             resolver: MyResolver {
-                version: Version::default(),
                 overlay: Default::default(),
                 tu_cache: Default::default(),
                 resolver: StandardResolver::new(SHADERS_PATH),
@@ -62,7 +61,8 @@ impl ShaderCompiler {
             .sources_changed
             .swap(false, std::sync::atomic::Ordering::Acquire)
         {
-            self.resolver.version = self.resolver.version.next();
+            // This isn't a fancy compiler tool, so don't do anything smart here!
+            self.resolver.tu_cache.borrow_mut().clear();
         }
 
         let mangler = NoMangler; // Technically not needed here
@@ -121,28 +121,11 @@ fn make_file_watcher(
     file_watcher
 }
 
-#[derive(Default, Copy, Clone, PartialEq, Eq)]
-struct Version(u32);
-impl Version {
-    fn next(self) -> Self {
-        Self(self.0 + 1)
-    }
-}
-
-struct CachedTranslationUnit {
-    /// For efficient invalidation
-    version: Version,
-    /// For checking whether the old values can still be reused
-    hash: u128,
-    data: TranslationUnit,
-}
-
 struct MyResolver {
-    version: Version,
     /// Lets me swap out files on the fly
     overlay: HashMap<ModulePath, (String, TranslationUnit)>,
     /// Super duper high perf caching
-    tu_cache: RefCell<HashMap<ModulePath, CachedTranslationUnit>>,
+    tu_cache: RefCell<HashMap<ModulePath, TranslationUnit>>,
     /// Underlying resolver
     resolver: StandardResolver,
 }
@@ -176,33 +159,15 @@ impl Resolver for MyResolver {
             return Ok(tu.clone());
         }
 
-        let old_hash = if let Some(tu) = self.tu_cache.borrow().get(path) {
-            if tu.version == self.version {
-                return Ok(tu.data.clone());
-            } else {
-                Some(tu.hash)
-            }
-        } else {
-            None
-        };
+        if let Some(tu) = self.tu_cache.borrow().get(path) {
+            return Ok(tu.clone());
+        }
 
         let source = self.resolver.resolve_source(path)?;
-        let hash = SipHasher::new().hash(source.as_bytes()).as_u128();
-        if Some(hash) == old_hash {
-            if let Some(tu) = self.tu_cache.borrow_mut().get_mut(path) {
-                tu.version = self.version;
-                return Ok(tu.data.clone());
-            }
-        }
         let wesl = self.resolver.source_to_module(&source, path)?;
-        self.tu_cache.borrow_mut().insert(
-            path.clone(),
-            CachedTranslationUnit {
-                version: self.version,
-                hash,
-                data: wesl.clone(),
-            },
-        );
+        self.tu_cache
+            .borrow_mut()
+            .insert(path.clone(), wesl.clone());
 
         Ok(wesl)
     }
