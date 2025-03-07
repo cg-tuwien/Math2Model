@@ -93,6 +93,7 @@ export type VirtualModelState = {
 
 export interface VirtualSceneState {
   models: VirtualModelState[];
+  description?: string;
 }
 
 export class VirtualScene {
@@ -125,6 +126,7 @@ export class VirtualScene {
 
   fromSerialized(data: SerializedScene): void {
     this.state.value.models = data.models.map(deserializeModel);
+    this.state.value.description = data.description;
   }
 
   addModel(model: VirtualModelState): void {

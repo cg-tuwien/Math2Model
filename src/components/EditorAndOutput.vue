@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import CodeEditor from "@/components/CodeEditor.vue";
-import { ref, watchEffect, h, onUnmounted } from "vue";
+import { ref, watchEffect, h, onUnmounted, computed } from "vue";
 import { useLocalStorage, watchImmediate } from "@vueuse/core";
 import { useStore } from "@/stores/store";
 import {
@@ -105,6 +105,7 @@ watchEffect(() => {
     showFileError("Could not load scene file", SceneFileName, { error });
   }
 });
+const sceneDescription = computed(() => scene.state.value.description);
 
 const openFile = useOpenFile(
   // Open the first .wgsl file if it exists
@@ -369,6 +370,14 @@ watchImmediate(
               <div class="absolute bottom-0 left-1 text-gray-900">
                 CPU {{ (fpsCounter.avg_delta_time * 1000.0).toFixed(1) }} ms /
                 GPU {{ (fpsCounter.avg_gpu_time * 1000.0).toFixed(1) }} ms
+              </div>
+              <div
+                class="absolute bottom-0 left-0 right-0"
+                v-if="sceneDescription"
+              >
+                <n-card class="" style="border-radius: 0px">{{
+                  sceneDescription
+                }}</n-card>
               </div>
             </div>
           </template>

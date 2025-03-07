@@ -34,6 +34,7 @@ export type SerializedModel = z.infer<typeof ModelSchema>;
 export const SceneFileSchema = z.object({
   $schema: z.literal(SceneFileSchemaUrl),
   models: z.array(ModelSchema),
+  description: z.string().optional(),
 });
 
 export type SerializedScene = z.infer<typeof SceneFileSchema>;
