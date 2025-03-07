@@ -99,8 +99,6 @@ let toAddModel = ref<[string, FilePath]>([
   "New Model",
   makeFilePath("new-model"),
 ]);
-let customShader = ref<string | null>(null);
-let customGraph = ref<string | null>(null);
 
 watchEffect(() => {
   const keys = selectedKeys.value;
@@ -129,7 +127,10 @@ watchEffect(() => {
 });
 
 function renderLabel({ option }: { option: TreeNode }) {
-  return h(NText, null, () => [h("span", null, option.label)]);
+  return h(
+    "div",
+    h(NText, null, () => [h("span", null, option.label)])
+  );
 }
 
 type VirtualModelPath =
@@ -235,43 +236,6 @@ function startAddModel() {
   }
 }
 
-function stopAddModel() {
-  isAdding.value = false;
-}
-
-function addModel() {
-  if (!toAddModel.value) {
-    showError("Illegal State!");
-    return;
-  }
-  if (!toAddModel.value[1]) {
-    showError("Please add a filename for the generated shaderfiles.");
-    return;
-  }
-
-  if (toAddModel.value[1] === "wgsl" || toAddModel.value[1] === "graph") {
-    if (!customShader || !customGraph) {
-      showError("Invalid State!");
-      return;
-    }
-    if (customGraph.value === null && customShader.value === null) {
-      showError(
-        "Please enter a name for the new shader or select an existing shader."
-      );
-      return;
-    }
-    if (customGraph.value !== null) {
-      toAddModel.value[1] = makeFilePath(customGraph.value + ".graph");
-    } else {
-      toAddModel.value[1] = makeFilePath(customShader.value + ".wgsl");
-    }
-  }
-
-  emit("addModel", toAddModel.value[0], toAddModel.value[1]);
-  customShader.value = null;
-  customGraph.value = null;
-}
-
 function addModelNew(fileEnd: "wgsl" | "graph") {
   if (!toAddModel.value) {
     showError("Illegal State!");
@@ -337,54 +301,71 @@ function uploadFile(data: {
 }
 </script>
 <template>
-  <n-modal :show="isAdding" closable class="w-full sm:w-1/2 lg:w-1/3">
-    <n-card
-      title="Create new Model"
-      closable
-      :v-if="isAdding"
-      :on-close="() => (isAdding = false)"
-    >
-      <template #action>
-        <n-flex vertical>
-          <n-flex justify="space-between">
-            <n-text
-              >Create a code-based model, if you want full freedom. A code
-              editor with syntax highlighting and auto completion will be
-              provided. Pick this option if you have advanced knowledge in
-              programming.</n-text
-            >
-            <n-text
-              >Create a graph-based model, if you want a more restricted option.
-              A visual scripting tool, where you connect predefined nodes with
-              each other will be provided. Pick this option if you have little
-              to no programming experience. Some complex functionality is
-              available for more experienced programmers.
-            </n-text>
+  <n-modal v-model:show="isAdding" closable>
+    <div class="w-full max-w-2xl">
+      <n-card
+        title="Create new Model"
+        closable
+        @close="() => (isAdding = false)"
+      >
+        <template #action>
+          <n-flex vertical>
+            <n-flex justify="space-between">
+              <n-text
+                >Create a code-based model, if you want full freedom. A code
+                editor with syntax highlighting and auto completion will be
+                provided. Pick this option if you have advanced knowledge in
+                programming.</n-text
+              >
+              <n-text
+                >Create a graph-based model, if you want a more restricted
+                option. A visual scripting tool, where you connect predefined
+                nodes with each other will be provided. Pick this option if you
+                have little to no programming experience. Some complex
+                functionality is available for more experienced programmers.
+              </n-text>
+            </n-flex>
+            <n-text type="info">optional enter model name</n-text>
+            <n-input v-model:value="toAddModel[0]"></n-input>
+            <n-flex justify="end">
+              <n-button type="info" @click="addModelNew('graph')"
+                >New Graph</n-button
+              >
+              <n-button type="primary" @click="addModelNew('wgsl')"
+                >New Code</n-button
+              >
+            </n-flex>
           </n-flex>
-          <n-text type="info">optional enter model name</n-text>
-          <n-input v-model:value="toAddModel[0]"></n-input>
-          <n-flex justify="end">
-            <n-button type="info" :on-click="() => addModelNew('graph')"
-              >New Graph</n-button
-            >
-            <n-button type="primary" :on-click="() => addModelNew('wgsl')"
-              >New Code</n-button
-            >
-          </n-flex>
-        </n-flex>
-      </template>
-    </n-card>
+        </template>
+      </n-card>
+    </div>
   </n-modal>
-  <n-flex justify="">
-    <n-flex vertical class="mr-1 ml-1">
-      <n-h3 class="underline">Scene</n-h3>
-      <n-button size="small" @click="toggleExportUI()">
-        Toggle Export
-      </n-button>
-      <n-flex>
-        <n-button size="small" @click="startAddModel()"> Add </n-button>
-        <n-button size="small" @click="removeModel()"> Delete </n-button>
-      </n-flex>
+  <n-flex vertical class="mr-2 ml-2">
+    <n-flex vertical class="mb-2">
+      <n-space justify="space-between" :wrap="false">
+        <span class="text-gray-600 text-xs">SCENE</span>
+        <span class="whitespace-nowrap">
+          <TooltippedIconButton tooltip="Add" @click="startAddModel()">
+            <mdi-add />
+          </TooltippedIconButton>
+          <span class="m-0.5"></span>
+          <TooltippedIconButton
+            tooltip="Remove"
+            :disabled="selectedKeys.length === 0"
+            @click="removeModel()"
+          >
+            <mdi-trash />
+          </TooltippedIconButton>
+          <n-divider vertical style="margin: -10px 12px 0px 12px"></n-divider>
+          <TooltippedIconButton
+            tooltip="Export scene"
+            @click="toggleExportUI()"
+          >
+            <mdi-export-variant />
+          </TooltippedIconButton>
+        </span>
+      </n-space>
+
       <NodeTree
         :root="filteredData"
         v-model:selection="treeSelection"
@@ -392,13 +373,26 @@ function uploadFile(data: {
         @setIsSelected="onNodeSelect"
       >
         <template #node="node">
-          <renderLabel :option="node" />
+          <n-text>{{ node.label }}</n-text>
         </template>
       </NodeTree>
+      <n-button size="small" @click="startAddModel()"> <mdi-add /> </n-button>
     </n-flex>
-    <n-divider></n-divider>
+    <n-divider :style="{ margin: '0px' }"></n-divider>
     <div v-if="currentModel && !isAdding" class="mr-1 ml-1">
-      <n-h3 class="underline">Inspector</n-h3>
+      <n-space justify="space-between">
+        <span class="text-gray-600 text-xs">INSPECTOR</span>
+        <TooltippedIconButton
+          tooltip="Close"
+          @click="
+            treeSelection.generation = (treeSelection.generation +
+              1) as SelectionGeneration
+          "
+        >
+          <mdi-close />
+        </TooltippedIconButton>
+      </n-space>
+      <br />
       <n-text>Name</n-text>
       <n-input
         :value="currentModel.name"
@@ -407,7 +401,7 @@ function uploadFile(data: {
         @input="(v) => change('name', new ObjectUpdate([], () => v + ''))"
       ></n-input>
       <br /><br />
-      <n-flex justify="space-between">
+      <n-flex>
         <div>
           <n-text>Position</n-text>
           <VectorInput
@@ -430,7 +424,7 @@ function uploadFile(data: {
             @update="(v) => change('rotation', eulerAnglesUpdate(v))"
           ></EulerInput>
         </div>
-        <div>
+        <div class="w-full">
           <n-text>Scale</n-text>
           <NumberInput
             :value="currentModel.scale"
@@ -438,7 +432,7 @@ function uploadFile(data: {
             @update="(v) => change('scale', v)"
           ></NumberInput>
         </div>
-        <div>
+        <div class="w-full">
           <n-text>Parametric Function</n-text>
           <n-select
             placeholder="Select a shader for the model"
@@ -530,39 +524,5 @@ function uploadFile(data: {
         </div>
       </n-flex>
     </div>
-    <!--<div v-if="toAddModel" class="mr-1 ml-1">
-      <n-flex>
-        <n-text>Name</n-text>
-        <n-input v-model:value="toAddModel[0]" type="text" clearable></n-input>
-        <n-text>Shader</n-text>
-        <n-select
-          placeholder="Select a shader for the model"
-          :options="shadersDropdown"
-          v-model:value="toAddModel[1]"
-          v-on:update-value="(v) => console.log(v)"
-        ></n-select>
-        <n-input
-          v-if="toAddModel[1] === 'wgsl'"
-          v-model:value="customShader"
-          type="text"
-          placeholder="Please input a name for the new Shader"
-          clearable
-        >
-        </n-input>
-        <n-input
-          v-if="toAddModel[1] === 'graph'"
-          v-model:value="customGraph"
-          type="text"
-          placeholder="Please input a name for the new Graph"
-          clearable
-        >
-        </n-input>
-      </n-flex>
-      <br />
-      <n-flex justify="space-between">
-        <n-button @click="stopAddModel()">Cancel</n-button>
-        <n-button @click="addModel()">Confirm</n-button>
-      </n-flex>
-    </div>-->
   </n-flex>
 </template>

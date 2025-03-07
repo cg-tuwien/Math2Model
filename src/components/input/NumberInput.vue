@@ -67,7 +67,7 @@ function onPointerUp(event: PointerEvent) {
 }
 </script>
 <template>
-  <n-input-group>
+  <n-input-group class="px-0.5">
     <n-input-number
       type="number"
       :value="showValue"
@@ -82,12 +82,14 @@ function onPointerUp(event: PointerEvent) {
     ></n-input-number>
     <n-input-group-label
       size="small"
-      class="hover:cursor-col-resize flex justify-center items-center px-0"
+      class="hover:cursor-col-resize flex justify-center items-center"
+      style="padding: 6px 4px"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
-      ><mdi-arrow-left-right></mdi-arrow-left-right
-    ></n-input-group-label>
+    >
+      <mdi-arrow-left-right></mdi-arrow-left-right>
+    </n-input-group-label>
   </n-input-group>
 </template>

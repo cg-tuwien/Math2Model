@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import CodeEditor from "@/components/CodeEditor.vue";
-import IconFolderMultipleOutline from "~icons/mdi/folder-multiple-outline";
-import IconFileTreeOutline from "~icons/mdi/file-tree-outline";
 import { ref, watchEffect, h, onUnmounted } from "vue";
 import { useLocalStorage, watchImmediate } from "@vueuse/core";
 import { useStore } from "@/stores/store";
@@ -155,15 +153,6 @@ function useTabs() {
   const defaultSplitSize = 0.1;
   const splitSize = ref(defaultSplitSize);
   const selectedTab = ref<TabName>("sceneview");
-  function renderTabIcon(name: TabName) {
-    if (name === "sceneview") {
-      return h(IconFileTreeOutline);
-    } else if (name === "filebrowser") {
-      return h(IconFolderMultipleOutline);
-    } else {
-      assertUnreachable(name);
-    }
-  }
 
   const lastSelectedTab = ref<TabName | null>(null);
   function toggleTabSize() {
@@ -179,7 +168,6 @@ function useTabs() {
   return {
     splitSize,
     selectedTab,
-    renderTabIcon,
     toggleTabSize,
   };
 }
@@ -272,20 +260,24 @@ watchImmediate(
       type="line"
       animated
       placement="left"
-      size="small"
+      size="medium"
       class="flex-1"
       v-model:value="tabs.selectedTab.value"
     >
       <n-tab
         name="sceneview"
-        :tab="tabs.renderTabIcon('sceneview')"
         @click="tabs.toggleTabSize()"
-      ></n-tab>
+        style="padding: 8px 12px"
+      >
+        <mdi-file-tree-outline class="text-lg" />
+      </n-tab>
       <n-tab
         name="filebrowser"
-        :tab="tabs.renderTabIcon('filebrowser')"
         @click="tabs.toggleTabSize()"
-      ></n-tab>
+        style="padding: 8px 12px"
+      >
+        <mdi-folder-multiple-outline class="text-lg" />
+      </n-tab>
     </n-tabs>
     <n-split
       direction="horizontal"
@@ -294,7 +286,9 @@ watchImmediate(
       v-model:size="tabs.splitSize.value"
     >
       <template #1>
-        <div class="pt-2 h-full w-full overflow-y-auto">
+        <div
+          class="pt-2 h-full w-full overflow-y-auto bg-neutral-50 dark:bg-slate-900"
+        >
           <div v-if="tabs.selectedTab.value === 'sceneview'">
             <SceneHierarchy
               :models="scene.state.value.models"

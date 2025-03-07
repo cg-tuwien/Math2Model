@@ -14,11 +14,13 @@ function updateValue(newValue: ObjectUpdate<number>, index: number) {
 }
 </script>
 <template>
-  <template v-for="(value, index) in props.value" :key="index">
-    <NumberInput
-      :value="value"
-      :step="props.step"
-      @update="(newValue) => updateValue(newValue, index)"
-    ></NumberInput>
-  </template>
+  <div class="flex">
+    <template v-for="(value, index) in props.value" :key="index">
+      <NumberInput
+        :value="value"
+        :step="props.step"
+        @update="(newValue) => updateValue(newValue, index)"
+      ></NumberInput>
+    </template>
+  </div>
 </template>

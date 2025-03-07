@@ -118,7 +118,7 @@ async function openFiles(inputFiles: FileList) {
 </script>
 
 <template>
-  <n-page-header class="px-2 border-b border-gray-200">
+  <n-page-header class="px-2 border-b border-gray-300">
     <template #title>
       <div class="flex">
         <span class="relative inline-block w-8">

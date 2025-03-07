@@ -13,10 +13,12 @@ function updateValue(newValue: ObjectUpdate<number>, index: number) {
 }
 </script>
 <template>
-  <template v-for="(value, index) in props.value" :key="index">
-    <AngleInput
-      :value="value"
-      @update="(newValue) => updateValue(newValue, index)"
-    ></AngleInput>
-  </template>
+  <div class="flex">
+    <template v-for="(value, index) in props.value" :key="index">
+      <AngleInput
+        :value="value"
+        @update="(newValue) => updateValue(newValue, index)"
+      ></AngleInput>
+    </template>
+  </div>
 </template>

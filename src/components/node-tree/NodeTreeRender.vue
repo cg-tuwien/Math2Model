@@ -65,7 +65,7 @@ const nodePaths = computed(() => {
           class="flex items-center select-none w-4"
         >
           <span v-if="(node.children?.length ?? 0) <= 0">
-            <mdi-circle-small></mdi-circle-small>
+            <mdi-circle-small class="invisible"></mdi-circle-small>
           </span>
           <span v-else-if="node.isExpanded">
             <mdi-chevron-down></mdi-chevron-down>

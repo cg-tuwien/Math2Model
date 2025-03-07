@@ -11,3 +11,7 @@ body {
 #app {
   height: 100%;
 }
+
+* {
+  scrollbar-width: thin;
+}
