@@ -150,23 +150,44 @@ watchEffect(() => {
 
 type TabName = "filebrowser" | "sceneview";
 function useTabs() {
-  const defaultSplitSize = 0.1;
+  const defaultSplitSize = "240px";
   const splitSize = ref(defaultSplitSize);
   const selectedTab = ref<TabName>("sceneview");
 
   const lastSelectedTab = ref<TabName | null>(null);
+
+  function toPx(value: string): number {
+    return +value.replace(/px$/, "");
+  }
+
   function toggleTabSize() {
-    const isTabBig = splitSize.value > 0.01;
+    const splitSizePx = toPx(splitSize.value);
+    const isTabBig = splitSizePx > 30;
     if (!isTabBig) {
       splitSize.value = defaultSplitSize;
     } else if (isTabBig && lastSelectedTab.value === selectedTab.value) {
-      splitSize.value = 0.0;
+      splitSize.value = "0px";
     }
 
     lastSelectedTab.value = selectedTab.value;
   }
+
+  function updateSplitSize(newSize: string) {
+    const splitSizePx = toPx(newSize);
+    const threshold = 180;
+    if (splitSizePx < threshold) {
+      if (splitSizePx < threshold / 2) {
+        splitSize.value = "0px";
+      } else {
+        splitSize.value = threshold + "px";
+      }
+    } else {
+      splitSize.value = newSize;
+    }
+  }
   return {
     splitSize,
+    updateSplitSize,
     selectedTab,
     toggleTabSize,
   };
@@ -283,7 +304,8 @@ watchImmediate(
       direction="horizontal"
       :max="0.75"
       :min="0"
-      v-model:size="tabs.splitSize.value"
+      :size="tabs.splitSize.value"
+      @update:size="tabs.updateSplitSize"
     >
       <template #1>
         <div
