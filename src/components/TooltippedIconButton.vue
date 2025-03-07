@@ -12,7 +12,11 @@ defineOptions({
 <template>
   <n-tooltip trigger="hover" placement="bottom">
     <template #trigger>
-      <n-button text @click="(e) => emit('click', e)" v-bind="$attrs">
+      <n-button
+        text
+        @click="(e: MouseEvent) => emit('click', e)"
+        v-bind="$attrs"
+      >
         <template #icon> <slot></slot> </template>
       </n-button>
     </template>
