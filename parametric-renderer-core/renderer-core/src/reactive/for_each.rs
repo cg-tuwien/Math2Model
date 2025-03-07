@@ -49,7 +49,7 @@ where
     })
 }
 
-/// Inspired by Leptos's <For> component.
+/// Inspired by Leptos's `<For>` component.
 /// Will forcibly compute everything, even if nobody depends on it.
 pub struct ForEach<Key, Output>
 where

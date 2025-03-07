@@ -10,6 +10,7 @@ indexmap = "2.7.1"
 log = "0.4.26"
 reactive_graph = { version = "0.1.7", features = ["effects"] }
 uuid = { version = "1.15.1", features = ["v4"] }
+wesl = { version = "0.1.1", git = "https://github.com/stefnotch/wesl-rs.git" }
 wgpu = { version = "24.0.1", default-features = false }
 winit = { version = "0.30.9" }
 
