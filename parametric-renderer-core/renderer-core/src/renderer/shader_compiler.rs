@@ -1,12 +1,23 @@
 use std::{borrow::Cow, cell::RefCell, collections::HashMap};
 
 use wesl::{
-    NoMangler, ResolveError, Resolver, StandardResolver, Wesl,
+    NoMangler, ResolveError, Resolver, StandardResolver,
     syntax::{ModulePath, TranslationUnit},
 };
 
+#[cfg(feature = "desktop")]
+use notify_debouncer_full::{Debouncer, FileIdMap, notify::ReadDirectoryChangesWatcher};
+use wgpu::ShaderModule;
+
+// TODO: change this to "./shaders"
+const SHADERS_PATH: &str = "src/shaders";
+
+/// Compiles shaders with filesystem caching
+/// This will probably become partially obsolete as wesl-rs improves
 pub struct ShaderCompiler {
     resolver: MyResolver,
+    #[cfg(feature = "desktop")]
+    _file_watcher: Debouncer<ReadDirectoryChangesWatcher, FileIdMap>,
 }
 
 impl ShaderCompiler {
@@ -15,21 +26,79 @@ impl ShaderCompiler {
             resolver: MyResolver {
                 overlay: Default::default(),
                 tu_cache: Default::default(),
-                // // TODO: change this to "./shaders"
-                resolver: StandardResolver::new("src/shaders"),
+                resolver: StandardResolver::new(SHADERS_PATH),
             },
+            #[cfg(feature = "desktop")]
+            _file_watcher: make_file_watcher(SHADERS_PATH),
         }
     }
 
     pub fn compile_shader(
         &mut self,
-        module_path: ModulePath,
-    ) -> Result<wesl::CompileResult, wesl::Error> {
-        // // TODO: change this to "./shaders"
-        let mut compiler = Wesl::new("src/shaders").set_custom_resolver(&self.resolver);
-        compiler.set_custom_mangler(NoMangler); // Technically not needed here
-        compiler.compile(module_path)
+        module_path: &ModulePath,
+        overlay: HashMap<ModulePath, String>,
+        device: &wgpu::Device,
+    ) -> Result<ShaderModule, wesl::Diagnostic<wesl::Error>> {
+        let overlay = overlay
+            .into_iter()
+            .map(|(key, value)| {
+                let translation_unit = self.resolver.resolver.source_to_module(&value, &key)?;
+                Ok((key, (value, translation_unit)))
+            })
+            .collect::<Result<HashMap<_, _>, wesl::Diagnostic<wesl::Error>>>()?;
+        let old_overlay = std::mem::replace(&mut self.resolver.overlay, overlay);
+
+        let mangler = NoMangler; // Technically not needed here
+        let shader = wesl::compile(
+            module_path,
+            &self.resolver,
+            &mangler,
+            &wesl::CompileOptions {
+                condcomp: false,
+                ..Default::default()
+            },
+        )
+        .map(|syntax| {
+            device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: None,
+                source: wgpu::ShaderSource::Wgsl(Cow::Owned(syntax.to_string())),
+            })
+        });
+
+        self.resolver.overlay = old_overlay;
+        Ok(shader?)
     }
+}
+
+impl Default for ShaderCompiler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "desktop")]
+fn make_file_watcher(path: &str) -> Debouncer<ReadDirectoryChangesWatcher, FileIdMap> {
+    use notify_debouncer_full::{DebounceEventResult, notify::RecursiveMode};
+    use std::time::Duration;
+
+    let mut file_watcher = notify_debouncer_full::new_debouncer(
+        Duration::from_millis(1000),
+        None,
+        move |result: DebounceEventResult| match result {
+            Ok(events) => {
+                let any_modification = events
+                    .into_iter()
+                    .any(|e| e.kind.is_remove() || e.kind.is_modify());
+                if any_modification {
+                    // TODO: Clear the tu_cache in MyResolver
+                }
+            }
+            Err(err) => log::error!("Error watching shaders: {:?}", err),
+        },
+    )
+    .unwrap();
+    file_watcher.watch(path, RecursiveMode::Recursive).unwrap();
+    file_watcher
 }
 
 struct MyResolver {

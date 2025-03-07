@@ -2955,7 +2955,7 @@ dependencies = [
 [[package]]
 name = "wesl"
 version = "0.1.1"
-source = "git+https://github.com/stefnotch/wesl-rs.git#9806a6962c89d83d169f2b848597ffa9c65acdd7"
+source = "git+https://github.com/wgsl-tooling-wg/wesl-rs#db6bd5a78e30daaa4fd78ddcd7dcbe435372d113"
 dependencies = [
  "annotate-snippets",
  "bytes",
@@ -2971,7 +2971,7 @@ dependencies = [
 [[package]]
 name = "wesl-macros"
 version = "0.1.1"
-source = "git+https://github.com/stefnotch/wesl-rs.git#9806a6962c89d83d169f2b848597ffa9c65acdd7"
+source = "git+https://github.com/wgsl-tooling-wg/wesl-rs#db6bd5a78e30daaa4fd78ddcd7dcbe435372d113"
 dependencies = [
  "itertools",
  "proc-macro2",
@@ -3102,7 +3102,7 @@ dependencies = [
 [[package]]
 name = "wgsl-parse"
 version = "0.1.1"
-source = "git+https://github.com/stefnotch/wesl-rs.git#9806a6962c89d83d169f2b848597ffa9c65acdd7"
+source = "git+https://github.com/wgsl-tooling-wg/wesl-rs#db6bd5a78e30daaa4fd78ddcd7dcbe435372d113"
 dependencies = [
  "annotate-snippets",
  "derive_more",

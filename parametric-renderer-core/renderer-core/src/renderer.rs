@@ -1,10 +1,13 @@
+mod compilation_message;
 mod frame_data;
 mod scene;
 mod shader_compiler;
 mod virtual_model;
 mod wgpu_context;
 
+pub use compilation_message::WeslCompilationMessage;
 pub use frame_data::FrameData;
+use shader_compiler::ShaderCompiler;
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -68,9 +71,9 @@ pub struct GpuApplication {
     profiler: StoredValue<GpuProfiler>,
     profiling_enabled: bool,
     runtime: Option<Owner>,
-    // render_tree: Arc<dyn Fn(&FrameData) -> Result<RenderResults, wgpu::SurfaceError>>,
     render_effect: RenderEffect<Result<Option<RenderResults>, wgpu::SurfaceError>>,
     set_render_data: ArcWriteSignal<FrameData>,
+    shader_compiler: ShaderCompiler,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     textures: RwSignal<HashMap<TextureId, Arc<Texture>>>,
     set_desired_size: WriteSignal<UVec2>,
@@ -102,7 +105,12 @@ impl GpuApplication {
         let (threshold_factor, set_threshold_factor) = signal(1.0f32);
         let models = SignalVec::new();
 
-        provide_context(MissingShader(make_missing_shader(&context)));
+        let mut shader_compiler = ShaderCompiler::new();
+
+        provide_context(MissingShader(make_missing_shader(
+            &context,
+            &mut shader_compiler,
+        )));
         provide_context(EmptyTexture(make_empty_texture(&context)));
         let shaders = RwSignal::new(HashMap::new());
         let textures = RwSignal::new(HashMap::new());
@@ -131,6 +139,7 @@ impl GpuApplication {
             set_render_data,
             shaders,
             textures,
+            shader_compiler,
 
             set_desired_size,
             set_threshold_factor,
@@ -140,6 +149,7 @@ impl GpuApplication {
         }
     }
 
+    // TODO: Consider reducing the amount of cool reactivity
     pub fn update_models(&self, game_models: &[ModelInfo]) {
         reactive_graph::graph::untrack(|| {
             for (model, game_model) in self.models.iter_mut().zip(game_models.iter()) {
@@ -160,26 +170,76 @@ impl GpuApplication {
         });
     }
 
+    pub fn set_model(&self, game_model: ModelInfo) {
+        match self
+            .models
+            .iter_mut()
+            .find(|v| &v.get().id == &game_model.id)
+        {
+            Some(v) => v.set(game_model),
+            None => self.models.push(game_model),
+        }
+    }
+
+    pub fn remove_model(&self, game_model: &ModelInfo) {
+        if let Some(index) = self
+            .models
+            .iter_mut()
+            .position(|v| &v.get().id == &game_model.id)
+        {
+            self.models.swap_remove(index);
+        }
+    }
+
     pub fn set_shader(
-        &self,
+        &mut self,
         shader_id: ShaderId,
         info: &crate::game::ShaderInfo,
-        on_shader_compiled: Option<Arc<dyn Fn(&ShaderId, Vec<wgpu::CompilationMessage>)>>,
+        on_shader_compiled: Option<Arc<dyn Fn(&ShaderId, Vec<WeslCompilationMessage>)>>,
     ) {
         let shaders = self.shaders;
-        let new_shaders = ShaderPipelines::new(&info.label, &info.code, &self.context);
-        any_spawner::Executor::spawn_local(async move {
-            let compilation_results = new_shaders.get_compilation_info().await;
-            let is_error = compilation_results
-                .iter()
-                .any(|v| v.message_type == wgpu::CompilationMessageType::Error);
-            on_shader_compiled.map(|f| f(&shader_id, compilation_results));
-            if !is_error {
-                shaders.update(move |shaders| {
-                    shaders.insert(shader_id, Arc::new(new_shaders));
+
+        match ShaderPipelines::new(
+            &info.label,
+            &info.code,
+            &self.context,
+            &mut self.shader_compiler,
+        ) {
+            Ok(new_shaders) => any_spawner::Executor::spawn_local(async move {
+                let compilation_results = new_shaders
+                    .get_compilation_info()
+                    .await
+                    .into_iter()
+                    .map(|compilation_message| {
+                        WeslCompilationMessage::from_compilation_message(
+                            compilation_message,
+                            ShaderPipelines::sample_object_module_path(),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                let is_error = compilation_results
+                    .iter()
+                    .any(|v| v.message_type == wgpu::CompilationMessageType::Error);
+                on_shader_compiled.map(|f| f(&shader_id, compilation_results));
+                // TODO: Use source-maps to remap these errors
+                if !is_error {
+                    shaders.update(move |shaders| {
+                        shaders.insert(shader_id, Arc::new(new_shaders));
+                    });
+                }
+            }),
+            Err(e) => {
+                on_shader_compiled.map(|callback| {
+                    callback(
+                        &shader_id,
+                        vec![WeslCompilationMessage::from_wesl_error(
+                            e,
+                            &ShaderPipelines::sample_object_module_path(),
+                        )],
+                    )
                 });
             }
-        });
+        }
     }
 
     pub fn remove_shader(&self, shader_id: &ShaderId) {
@@ -505,33 +565,6 @@ fn ground_plane_component(
     let quad_mesh = Mesh::new_tesselated_quad(&context.device, 2);
 
     let shader_source = RwSignal::new(ground_plane::SOURCE.to_string());
-
-    // #[cfg(feature = "desktop")]
-    // let _file_watcher = {
-    //     let source_path = "./shaders/GroundPlane.wgsl";
-    //     let mut file_watcher = notify_debouncer_full::new_debouncer(
-    //         std::time::Duration::from_millis(1000),
-    //         None,
-    //         move |result: notify_debouncer_full::DebounceEventResult| match result {
-    //             Ok(events) => {
-    //                 let any_modification = events.into_iter().any(|e| e.kind.is_modify());
-    //                 if any_modification {
-    //                     let contents = std::fs::read_to_string(source_path).unwrap();
-    //                     shader_source.set(contents);
-    //                 }
-    //             }
-    //             Err(err) => log::error!("Error watching shaders: {:?}", err),
-    //         },
-    //     )
-    //     .unwrap();
-    //     file_watcher
-    //         .watch(
-    //             "./shaders",
-    //             notify_debouncer_full::notify::RecursiveMode::Recursive,
-    //         )
-    //         .unwrap();
-    //     file_watcher
-    // };
 
     let shader = Memo::new_computed({
         move |_| {

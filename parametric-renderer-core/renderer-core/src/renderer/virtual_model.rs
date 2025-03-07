@@ -8,11 +8,14 @@ use crate::{
     texture::Texture,
 };
 
-use super::{MAX_PATCH_COUNT, PATCH_SIZES, wgpu_context::WgpuContext};
-use std::sync::Arc;
+use super::{
+    MAX_PATCH_COUNT, PATCH_SIZES, shader_compiler::ShaderCompiler, wgpu_context::WgpuContext,
+};
+use std::{collections::HashMap, sync::Arc};
 
 use glam::{Vec3, Vec4};
 use uuid::Uuid;
+use wesl::{ModulePath, syntax::PathOrigin};
 use wgpu::ShaderModule;
 
 pub struct ShaderPipelines {
@@ -33,17 +36,22 @@ impl PartialEq for ShaderPipelines {
 impl Eq for ShaderPipelines {}
 
 impl ShaderPipelines {
-    pub fn new(label: &str, code: &str, context: &WgpuContext) -> Self {
+    pub fn new(
+        label: &str,
+        code: &str,
+        context: &WgpuContext,
+        compiler: &mut ShaderCompiler,
+    ) -> Result<Self, wesl::Diagnostic<wesl::Error>> {
         let (compute_patches, shader_a) =
-            create_compute_patches_pipeline(label, &context.device, code);
-        let (render, shader_b) = create_render_pipeline(label, context, code);
+            create_compute_patches_pipeline(label, &context.device, code, compiler)?;
+        let (render, shader_b) = create_render_pipeline(label, context, code, compiler);
 
-        Self {
+        Ok(Self {
             compute_patches,
             render,
             shaders: [shader_a, shader_b],
             id: Uuid::new_v4(),
-        }
+        })
     }
 
     pub async fn get_compilation_info(&self) -> Vec<wgpu::CompilationMessage> {
@@ -51,16 +59,22 @@ impl ShaderPipelines {
         messages.extend(self.shaders[1].get_compilation_info().await.messages);
         messages
     }
+
+    pub fn sample_object_module_path() -> ModulePath {
+        ModulePath::new(
+            PathOrigin::Absolute,
+            vec!["package".into(), "sample_object_dummy".into()],
+        )
+    }
 }
 
 const MISSING_SHADER: &'static str = include_str!("../../../shaders/DefaultParametric.wgsl");
 
-pub fn make_missing_shader(context: &WgpuContext) -> Arc<ShaderPipelines> {
-    Arc::new(ShaderPipelines::new(
-        "Missing Shader",
-        MISSING_SHADER,
-        context,
-    ))
+pub fn make_missing_shader(
+    context: &WgpuContext,
+    compiler: &mut ShaderCompiler,
+) -> Arc<ShaderPipelines> {
+    Arc::new(ShaderPipelines::new("Missing Shader", MISSING_SHADER, context, compiler).unwrap())
 }
 
 pub fn make_empty_texture(context: &WgpuContext) -> Arc<Texture> {
@@ -168,6 +182,7 @@ fn create_render_pipeline(
     label: &str,
     context: &WgpuContext,
     code: &str,
+    compiler: &mut ShaderCompiler,
 ) -> (wgpu::RenderPipeline, ShaderModule) {
     let device = &context.device;
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -219,17 +234,17 @@ fn create_render_pipeline(
     )
 }
 
-pub fn create_compute_patches_pipeline(
+fn create_compute_patches_pipeline(
     label: &str,
     device: &wgpu::Device,
     code: &str,
-) -> (wgpu::ComputePipeline, ShaderModule) {
-    let source = replace_compute_code(compute_patches::SOURCE, code);
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: None,
-        source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(source.as_ref())),
-    });
-    (
+    compiler: &mut ShaderCompiler,
+) -> Result<(wgpu::ComputePipeline, ShaderModule), wesl::Diagnostic<wesl::Error>> {
+    let sample_object_path = ShaderPipelines::sample_object_module_path();
+    let mut overlay = HashMap::new();
+    overlay.insert(sample_object_path.clone(), code.to_string());
+    let shader = compiler.compile_shader(&sample_object_path, overlay, device)?;
+    Ok((
         device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
             label: Some(&format!("Compute Patches {}", label)),
             layout: Some(&compute_patches::create_pipeline_layout(device)),
@@ -239,7 +254,7 @@ pub fn create_compute_patches_pipeline(
             cache: Default::default(),
         }),
         shader,
-    )
+    ))
 }
 
 fn replace_render_code<'a>(source: &'a str, sample_object_code: &str) -> String {
@@ -260,17 +275,5 @@ fn replace_render_code<'a>(source: &'a str, sample_object_code: &str) -> String 
         result.push_str(&source[start_2..]);
     }
 
-    result
-}
-
-fn replace_compute_code<'a>(source: &'a str, sample_object_code: &str) -> String {
-    // TODO: use wesl-rs instead of this
-    let start_1 = source.find("fn sampleObject").unwrap();
-    let end_1 = source[start_1..].find("}").unwrap() + start_1 + 1;
-
-    let mut result = String::new();
-    result.push_str(&source[..start_1]);
-    result.push_str(sample_object_code);
-    result.push_str(&source[end_1..]);
     result
 }

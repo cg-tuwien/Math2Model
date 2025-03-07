@@ -9,7 +9,7 @@ use winit::{
 use crate::{
     game::{GameRes, ShaderId},
     input::{InputHandler, WindowInputs},
-    renderer::{GpuApplication, GpuApplicationBuilder},
+    renderer::{GpuApplication, GpuApplicationBuilder, WeslCompilationMessage},
     time::{TimeCounters, TimeStats},
     window_or_fallback::WindowOrFallback,
 };
@@ -37,7 +37,7 @@ pub struct Application {
     time_counters: TimeCounters,
     app_commands: EventLoopProxy<AppCommand>,
     on_exit_callback: Option<Box<dyn FnOnce(&mut Application)>>,
-    pub on_shader_compiled: Option<Arc<dyn Fn(&ShaderId, Vec<wgpu::CompilationMessage>)>>,
+    pub on_shader_compiled: Option<Arc<dyn Fn(&ShaderId, Vec<WeslCompilationMessage>)>>,
     _canvas: WasmCanvas,
 }
 
@@ -77,7 +77,7 @@ impl Application {
         let app_commands = self.app_commands.clone();
         let on_shader_compiled = self.on_shader_compiled.clone();
         let task = async move {
-            let renderer = gpu_builder.await.unwrap().build();
+            let mut renderer = gpu_builder.await.unwrap().build();
             let _ = run_on_main(app_commands, move |app| {
                 for (shader_id, shader_info) in &app.app.shaders {
                     renderer.set_shader(shader_id.clone(), shader_info, on_shader_compiled.clone());

@@ -1,2 +1,11 @@
 #[build]
 rustflags = ["-Z", "threads=8"]
+
+[unstable.git]
+shallow_deps = true
+shallow_index = true
+[unstable.gitoxide]
+checkout = true
+fetch = true
+internal_use_git2 = false
+list_files = true
