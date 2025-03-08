@@ -1,9 +1,13 @@
+mod compilation_message;
 mod frame_data;
 mod scene;
+mod shader_compiler;
 mod virtual_model;
 mod wgpu_context;
 
+pub use compilation_message::WeslCompilationMessage;
 pub use frame_data::FrameData;
+use shader_compiler::ShaderCompiler;
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -13,7 +17,7 @@ use glam::UVec2;
 use reactive_graph::{
     computed::Memo,
     effect::{Effect, RenderEffect},
-    owner::{Owner, StoredValue, expect_context, provide_context, take_context, use_context},
+    owner::{Owner, StoredValue, expect_context, provide_context, use_context},
     prelude::*,
     signal::{
         ArcReadSignal, ArcWriteSignal, ReadSignal, RwSignal, WriteSignal, arc_signal, signal,
@@ -66,10 +70,10 @@ pub struct GpuApplication {
     surface: RwSignal<SurfaceOrFallback>,
     profiler: StoredValue<GpuProfiler>,
     profiling_enabled: bool,
-    _runtime: Owner,
-    // render_tree: Arc<dyn Fn(&FrameData) -> Result<RenderResults, wgpu::SurfaceError>>,
+    runtime: Option<Owner>,
     render_effect: RenderEffect<Result<Option<RenderResults>, wgpu::SurfaceError>>,
     set_render_data: ArcWriteSignal<FrameData>,
+    shader_compiler: ShaderCompiler,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     textures: RwSignal<HashMap<TextureId, Arc<Texture>>>,
     set_desired_size: WriteSignal<UVec2>,
@@ -101,23 +105,26 @@ impl GpuApplication {
         let (threshold_factor, set_threshold_factor) = signal(1.0f32);
         let models = SignalVec::new();
 
-        provide_context(MissingShader(make_missing_shader(&context)));
+        let mut shader_compiler = ShaderCompiler::new();
+
+        provide_context(MissingShader(make_missing_shader(
+            &context,
+            &mut shader_compiler,
+        )));
         provide_context(EmptyTexture(make_empty_texture(&context)));
         let shaders = RwSignal::new(HashMap::new());
         let textures = RwSignal::new(HashMap::new());
 
-        let render_tree = Owner::with(&runtime, || {
-            Arc::new(render_component(
-                surface,
-                profiler,
-                desired_size,
-                threshold_factor,
-                force_wait,
-                shaders,
-                textures,
-                models.clone(),
-            ))
-        });
+        let render_tree = Arc::new(render_component(
+            surface,
+            profiler,
+            desired_size,
+            threshold_factor,
+            force_wait,
+            shaders,
+            textures,
+            models.clone(),
+        ));
 
         let (render_data, set_render_data) = arc_signal(FrameData::default());
         let render_effect = RenderEffect::new(move |_| (render_tree)(&render_data.read()));
@@ -127,11 +134,12 @@ impl GpuApplication {
             surface,
             profiler,
             profiling_enabled: false,
-            _runtime: runtime,
+            runtime: Some(runtime),
             render_effect,
             set_render_data,
             shaders,
             textures,
+            shader_compiler,
 
             set_desired_size,
             set_threshold_factor,
@@ -141,6 +149,7 @@ impl GpuApplication {
         }
     }
 
+    // TODO: Consider reducing the amount of cool reactivity
     pub fn update_models(&self, game_models: &[ModelInfo]) {
         reactive_graph::graph::untrack(|| {
             for (model, game_model) in self.models.iter_mut().zip(game_models.iter()) {
@@ -161,26 +170,76 @@ impl GpuApplication {
         });
     }
 
+    pub fn set_model(&self, game_model: ModelInfo) {
+        match self
+            .models
+            .iter_mut()
+            .find(|v| &v.get().id == &game_model.id)
+        {
+            Some(v) => v.set(game_model),
+            None => self.models.push(game_model),
+        }
+    }
+
+    pub fn remove_model(&self, game_model: &ModelInfo) {
+        if let Some(index) = self
+            .models
+            .iter_mut()
+            .position(|v| &v.get().id == &game_model.id)
+        {
+            self.models.swap_remove(index);
+        }
+    }
+
     pub fn set_shader(
-        &self,
+        &mut self,
         shader_id: ShaderId,
         info: &crate::game::ShaderInfo,
-        on_shader_compiled: Option<Arc<dyn Fn(&ShaderId, Vec<wgpu::CompilationMessage>)>>,
+        on_shader_compiled: Option<Arc<dyn Fn(&ShaderId, Vec<WeslCompilationMessage>)>>,
     ) {
         let shaders = self.shaders;
-        let new_shaders = ShaderPipelines::new(&info.label, &info.code, &self.context);
-        any_spawner::Executor::spawn_local(async move {
-            let compilation_results = new_shaders.get_compilation_info().await;
-            let is_error = compilation_results
-                .iter()
-                .any(|v| v.message_type == wgpu::CompilationMessageType::Error);
-            on_shader_compiled.map(|f| f(&shader_id, compilation_results));
-            if !is_error {
-                shaders.update(move |shaders| {
-                    shaders.insert(shader_id, Arc::new(new_shaders));
+
+        match ShaderPipelines::new(
+            &info.label,
+            &info.code,
+            &self.context,
+            &mut self.shader_compiler,
+        ) {
+            Ok(new_shaders) => any_spawner::Executor::spawn_local(async move {
+                let compilation_results = new_shaders
+                    .get_compilation_info()
+                    .await
+                    .into_iter()
+                    .map(|compilation_message| {
+                        WeslCompilationMessage::from_compilation_message(
+                            compilation_message,
+                            ShaderPipelines::sample_object_module_path(),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                let is_error = compilation_results
+                    .iter()
+                    .any(|v| v.message_type == wgpu::CompilationMessageType::Error);
+                on_shader_compiled.map(|f| f(&shader_id, compilation_results));
+                // TODO: Use source-maps to remap these errors
+                if !is_error {
+                    shaders.update(move |shaders| {
+                        shaders.insert(shader_id, Arc::new(new_shaders));
+                    });
+                }
+            }),
+            Err(e) => {
+                on_shader_compiled.map(|callback| {
+                    callback(
+                        &shader_id,
+                        vec![WeslCompilationMessage::from_wesl_error(
+                            e,
+                            &ShaderPipelines::sample_object_module_path(),
+                        )],
+                    )
                 });
             }
-        });
+        }
     }
 
     pub fn remove_shader(&self, shader_id: &ShaderId) {
@@ -222,7 +281,8 @@ impl GpuApplication {
             mouse_held: game.mouse_held,
             lod_stage: game.lod_stage.clone(),
         });
-        // any_spawner::Executor::poll_local(); TODO: We need a custom executor, I think
+        //  TODO: We need a custom executor, I think. On wasm, we'll need to hook up the futures thingy
+        // any_spawner::Executor::poll_local();
         // TODO: This currently gets the value of the last frame.
         self.render_effect
             .take_value()
@@ -254,8 +314,10 @@ impl GpuApplication {
 
 impl Drop for GpuApplication {
     fn drop(&mut self) {
-        let ctx = take_context::<Arc<WgpuContext>>();
-        std::mem::drop(ctx);
+        // Make sure to dispose of the Leptos runtime
+        if let Some(runtime) = self.runtime.take() {
+            runtime.unset();
+        }
     }
 }
 
@@ -418,8 +480,7 @@ fn render_component(
                     });
             // Profiling
             let profiler_guard = profiler.read_value();
-            let mut commands =
-                profiler_guard.scope("Render", &mut command_encoder, &context.device);
+            let mut commands = profiler_guard.scope("Render", &mut command_encoder);
 
             models_components.for_each(|v| {
                 (v.lod_stage)(render_data, &mut commands);
@@ -427,7 +488,6 @@ fn render_component(
 
             let mut render_pass = commands.scoped_render_pass(
                 "Render Pass",
-                &context.device,
                 wgpu::RenderPassDescriptor {
                     label: Some("Render Pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -505,33 +565,6 @@ fn ground_plane_component(
     let quad_mesh = Mesh::new_tesselated_quad(&context.device, 2);
 
     let shader_source = RwSignal::new(ground_plane::SOURCE.to_string());
-
-    // #[cfg(feature = "desktop")]
-    // let _file_watcher = {
-    //     let source_path = "./shaders/GroundPlane.wgsl";
-    //     let mut file_watcher = notify_debouncer_full::new_debouncer(
-    //         std::time::Duration::from_millis(1000),
-    //         None,
-    //         move |result: notify_debouncer_full::DebounceEventResult| match result {
-    //             Ok(events) => {
-    //                 let any_modification = events.into_iter().any(|e| e.kind.is_modify());
-    //                 if any_modification {
-    //                     let contents = std::fs::read_to_string(source_path).unwrap();
-    //                     shader_source.set(contents);
-    //                 }
-    //             }
-    //             Err(err) => log::error!("Error watching shaders: {:?}", err),
-    //         },
-    //     )
-    //     .unwrap();
-    //     file_watcher
-    //         .watch(
-    //             "./shaders",
-    //             notify_debouncer_full::notify::RecursiveMode::Recursive,
-    //         )
-    //         .unwrap();
-    //     file_watcher
-    // };
 
     let shader = Memo::new_computed({
         move |_| {
@@ -820,7 +853,6 @@ fn lod_stage_component(
     move |frame_data: &FrameData, commands: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>| {
         let context = &wgpu_context();
         let queue = &context.queue;
-        let device = &context.device;
         force_render_uniform.write_buffer(queue, &compute_patches::ForceRenderFlag { flag: 0 });
         let model_view_projection = frame_data.camera.projection_matrix(surface.read().size())
             * frame_data.camera.view_matrix()
@@ -887,8 +919,8 @@ fn lod_stage_component(
                         &compute_patches.indirect_compute_buffer_reset,
                         &indirect_compute_buffer[1],
                     );
-                    let mut compute_pass = commands
-                        .scoped_compute_pass(format!("Compute Patches From-To {i}"), device);
+                    let mut compute_pass =
+                        commands.scoped_compute_pass(format!("Compute Patches From-To {i}"));
                     compute_pass.set_pipeline(&shader.read().compute_patches);
                     compute_patches::set_bind_groups(
                         &mut compute_pass.recorder,
@@ -913,8 +945,8 @@ fn lod_stage_component(
                         &compute_patches.indirect_compute_buffer_reset,
                         &indirect_compute_buffer[0],
                     );
-                    let mut compute_pass = commands
-                        .scoped_compute_pass(format!("Compute Patches To-From {i}"), device);
+                    let mut compute_pass =
+                        commands.scoped_compute_pass(format!("Compute Patches To-From {i}"));
                     compute_pass.set_pipeline(&shader.read().compute_patches);
                     compute_patches::set_bind_groups(
                         &mut compute_pass.recorder,
@@ -934,7 +966,7 @@ fn lod_stage_component(
             }
         }
         {
-            let mut compute_pass = commands.scoped_compute_pass("Copy Patch Sizes Pass", device);
+            let mut compute_pass = commands.scoped_compute_pass("Copy Patch Sizes Pass");
             compute_pass.set_pipeline(&copy_patches_pipeline.read_value());
             copy_patches::set_bind_groups(
                 &mut compute_pass.recorder,

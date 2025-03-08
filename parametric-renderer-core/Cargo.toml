@@ -1,6 +1,6 @@
 [workspace]
-members = ["copy-includes", "desktop", "renderer-core", "wasm"]
-resolver = "2"
+members = ["desktop", "renderer-core", "wasm"]
+resolver = "3"
 
 [workspace.dependencies]
 bytemuck = { version = "1.21.0", features = ["derive"] }
@@ -10,6 +10,7 @@ indexmap = "2.7.1"
 log = "0.4.26"
 reactive_graph = { version = "0.1.7", features = ["effects"] }
 uuid = { version = "1.15.1", features = ["v4"] }
+wesl = { version = "0.1.1", git = "https://github.com/wgsl-tooling-wg/wesl-rs" }
 wgpu = { version = "24.0.1", default-features = false }
 winit = { version = "0.30.9" }
 

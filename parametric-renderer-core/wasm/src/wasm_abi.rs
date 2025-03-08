@@ -1,6 +1,8 @@
 #![allow(non_snake_case)]
 
-use renderer_core::game::TextureId;
+use std::ops::Range;
+
+use renderer_core::{game::TextureId, renderer::WeslCompilationMessage};
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 
@@ -79,14 +81,16 @@ pub struct WasmShaderInfo {
 pub struct WasmCompilationMessage {
     pub message: String,
     pub message_type: WasmCompilationMessageType,
+    pub module: Vec<String>,
     pub location: Option<WasmSourceLocation>,
 }
 
-impl From<wgpu::CompilationMessage> for WasmCompilationMessage {
-    fn from(v: wgpu::CompilationMessage) -> Self {
+impl From<WeslCompilationMessage> for WasmCompilationMessage {
+    fn from(v: WeslCompilationMessage) -> Self {
         Self {
             message: v.message,
             message_type: v.message_type.into(),
+            module: v.module.components,
             location: v.location.map(WasmSourceLocation::from),
         }
     }
@@ -113,24 +117,17 @@ impl From<wgpu::CompilationMessageType> for WasmCompilationMessageType {
 #[derive(Tsify, Serialize, Deserialize)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmSourceLocation {
-    /// 1-based line number.
-    pub line_number: u32,
-    /// 1-based column in code units (in bytes) of the start of the span.
-    /// Remember to convert accordingly when displaying to the user.
-    pub line_position: u32,
-    /// 0-based Offset in code units (in bytes) of the start of the span.
+    /// 0-based Offset in UTF-8 code units (in bytes) of the start of the span.
     pub offset: u32,
-    /// Length in code units (in bytes) of the span.
+    /// Length in UTF-8 code units (in bytes) of the span.
     pub length: u32,
 }
 
-impl From<wgpu::SourceLocation> for WasmSourceLocation {
-    fn from(v: wgpu::SourceLocation) -> Self {
+impl From<Range<usize>> for WasmSourceLocation {
+    fn from(v: Range<usize>) -> Self {
         Self {
-            line_number: v.line_number,
-            line_position: v.line_position,
-            offset: v.offset,
-            length: v.length,
+            offset: v.start as u32,
+            length: (v.end - v.start) as u32,
         }
     }
 }

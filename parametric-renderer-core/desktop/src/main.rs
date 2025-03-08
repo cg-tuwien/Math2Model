@@ -14,7 +14,7 @@ fn main() -> anyhow::Result<()> {
     any_spawner::Executor::init_local_custom_executor(executor)
         .expect("Futures executor failed to init");
     let result = run();
-    any_spawner::Executor::poll_local();
+    // any_spawner::Executor::poll_local();
     result
 }
 
