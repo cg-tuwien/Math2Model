@@ -7,14 +7,16 @@ use futures::{
     task::LocalSpawnExt,
 };
 use std::cell::RefCell;
+use env_logger::Env;
+use std::sync::Arc;
 
 fn main() -> anyhow::Result<()> {
-    env_logger::init();
-    let executor = SingleThreadedExecutor::new();
-    any_spawner::Executor::init_local_custom_executor(executor)
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    let executor = ArcSingleThreadedExecutor(Arc::new(SingleThreadedExecutor::new()));
+    any_spawner::Executor::init_local_custom_executor(executor.clone())
         .expect("Futures executor failed to init");
     let result = run();
-    any_spawner::Executor::poll_local();
+    // executor.yeet(); // Weird that dropping would make it unhappy
     result
 }
 
@@ -47,5 +49,27 @@ impl any_spawner::CustomExecutor for SingleThreadedExecutor {
 
     fn poll_local(&self) {
         self.local_pool.borrow_mut().run_until_stalled();
+    }
+}
+
+#[derive(Clone)]
+struct ArcSingleThreadedExecutor(Arc<SingleThreadedExecutor>);
+impl any_spawner::CustomExecutor for ArcSingleThreadedExecutor {
+    fn spawn(&self, fut: any_spawner::PinnedFuture<()>) {
+        self.0.spawn(fut);
+    }
+
+    fn spawn_local(&self, fut: any_spawner::PinnedLocalFuture<()>) {
+        self.0.spawn_local(fut);
+    }
+
+    fn poll_local(&self) {
+        self.0.poll_local();
+    }
+}
+
+impl ArcSingleThreadedExecutor {
+    fn yeet(&self) {
+        *self.0.local_pool.borrow_mut() = LocalPool::new();
     }
 }
