@@ -1,0 +1,201 @@
+{
+  "$schema": "http://virtual/scene-schema.json",
+  "models": [
+    {
+      "type": "model",
+      "id": "464bacb8-a15c-4294-8bfc-a359c0eaca42",
+      "name": "TempleRoofRight",
+      "position": [
+        9.4,
+        9.5,
+        -1.5
+      ],
+      "rotation": [
+        0,
+        3.141592653589793,
+        0
+      ],
+      "scale": 4,
+      "parametricShader": "TempleRoof1422025_203146.graph.wgsl",
+      "material": {
+        "color": [
+          0.5074354177958615,
+          0.36017203351679994,
+          0.34748524667486724
+        ],
+        "roughness": 0.10399402602285512,
+        "metallic": 0.7758696698380521,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "istockphoto-492651372-612x612.jpg"
+      },
+      "instanceCount": 1
+    },
+    {
+      "type": "model",
+      "id": "1e950bf0-71ef-40d2-9a33-1542bba2aa6c",
+      "name": "TempleRoofLeft",
+      "position": [
+        -5.4,
+        9.5,
+        -1.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 4,
+      "parametricShader": "TempleRoof1422025_203146.graph.wgsl",
+      "material": {
+        "color": [
+          0.7014533193289731,
+          0.058272169914288074,
+          0.21595627543896057
+        ],
+        "roughness": 0.5419016718370271,
+        "metallic": 0.6463496799215889,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "istockphoto-492651372-612x612.jpg"
+      },
+      "instanceCount": 1
+    },
+    {
+      "type": "model",
+      "id": "5df2b917-337b-48f4-a615-a33f7a5d31c6",
+      "name": "TempleColumnsFront",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "parametricShader": "TempleColumn1422025_210347.graph.wgsl",
+      "material": {
+        "color": [
+          0.5888446573788153,
+          0.3017523668131159,
+          0.9084812640566402
+        ],
+        "roughness": 0.32827078627498296,
+        "metallic": 0.31885313113834,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "istockphoto-1360384091-170667a.jpg"
+      },
+      "instanceCount": 2
+    },
+    {
+      "type": "model",
+      "id": "d077fc59-5eab-4df0-b595-e353c20a03de",
+      "name": "TempleColumnsBack",
+      "position": [
+        3,
+        0,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "parametricShader": "TempleColumn1422025_210347.graph.wgsl",
+      "material": {
+        "color": [
+          0.9610469544940379,
+          0.8401397717445944,
+          0.03840651025774955
+        ],
+        "roughness": 0.20214497180460356,
+        "metallic": 0.2862182199883301,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "istockphoto-1360384091-170667a.jpg"
+      },
+      "instanceCount": 2
+    },
+    {
+      "type": "model",
+      "id": "929ad1a7-a59b-46be-b580-64689b8505c4",
+      "name": "TempleRoofArcLeft",
+      "position": [
+        -2,
+        2.3000000000000003,
+        -2.3
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "parametricShader": "TempleRoofArc1722025_135545.wgsl",
+      "material": {
+        "color": [
+          0.7,
+          0.7,
+          0.7
+        ],
+        "roughness": 0.001035862420335043,
+        "metallic": 0.3823917719238321,
+        "emissive": [
+          0,
+          0,
+          0
+        ]
+      },
+      "instanceCount": 1
+    },
+    {
+      "type": "model",
+      "id": "344c2865-2be7-4039-8af5-4e8d88bb5a24",
+      "name": "TempleRoofArcRight",
+      "position": [
+        5.8,
+        2.3000000000000003,
+        -0.7
+      ],
+      "rotation": [
+        0,
+        3.141592653589793,
+        0
+      ],
+      "scale": 1,
+      "parametricShader": "TempleRoofArc1722025_135545.wgsl",
+      "material": {
+        "color": [
+          0.7,
+          0.7,
+          0.7
+        ],
+        "roughness": 0.06160526843737957,
+        "metallic": 0.5954133619249651,
+        "emissive": [
+          0,
+          0,
+          0
+        ]
+      },
+      "instanceCount": 1
+    }
+  ]
+}

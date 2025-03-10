@@ -1,0 +1,181 @@
+{
+  "graph": [
+    {
+      "size": [
+        180,
+        160
+      ],
+      "position": [
+        12,
+        349.5
+      ],
+      "uuid": "327eadc880f80d22",
+      "inputs": [],
+      "nodeType": "VariableOut",
+      "extraStringInformation": [
+        {
+          "key": "code",
+          "value": ""
+        },
+        {
+          "key": "ref",
+          "value": "input2"
+        }
+      ],
+      "extraNumberInformation": [
+        {
+          "key": "value",
+          "value": {
+            "0": 1,
+            "1": 1
+          }
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        160
+      ],
+      "position": [
+        979.5,
+        12
+      ],
+      "uuid": "c5eae76d7282c687",
+      "inputs": [
+        {
+          "key": "def",
+          "value": "vec3f(input2.x, 0, input2.y)",
+          "type": "text"
+        },
+        {
+          "key": "customName",
+          "value": "Return",
+          "type": "text"
+        },
+        {
+          "type": "node",
+          "value": "35e5a825cb908a14",
+          "keyFrom": "value",
+          "keyTo": "returnIn"
+        }
+      ],
+      "nodeType": "Return"
+    },
+    {
+      "size": [
+        180,
+        180
+      ],
+      "position": [
+        503,
+        99.5
+      ],
+      "uuid": "183a25a559e691ae",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "327eadc880f80d22",
+          "keyFrom": "value",
+          "keyTo": "param"
+        }
+      ],
+      "nodeType": "Shape",
+      "extraStringInformation": [
+        {
+          "key": "name",
+          "value": "Sphere"
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        180
+      ],
+      "position": [
+        273,
+        409.5
+      ],
+      "uuid": "7a6810eedd495c1e",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "327eadc880f80d22",
+          "keyFrom": "value",
+          "keyTo": "param"
+        }
+      ],
+      "nodeType": "Shape",
+      "extraStringInformation": [
+        {
+          "key": "name",
+          "value": "Heart"
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        250
+      ],
+      "position": [
+        749.5,
+        87
+      ],
+      "uuid": "35e5a825cb908a14",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "183a25a559e691ae",
+          "keyFrom": "value",
+          "keyTo": "param1"
+        },
+        {
+          "type": "node",
+          "value": "aaae32d3f20a8aae",
+          "keyFrom": "value",
+          "keyTo": "param2"
+        }
+      ],
+      "nodeType": "Combine",
+      "extraNumberInformation": [
+        {
+          "key": "cf",
+          "value": 0.7
+        }
+      ]
+    },
+    {
+      "size": [
+        180,
+        230
+      ],
+      "position": [
+        503,
+        299.5
+      ],
+      "uuid": "aaae32d3f20a8aae",
+      "inputs": [
+        {
+          "type": "number",
+          "value": 0.4,
+          "key": "right"
+        },
+        {
+          "type": "node",
+          "value": "7a6810eedd495c1e",
+          "keyFrom": "value",
+          "keyTo": "left"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "*"
+        }
+      ]
+    }
+  ]
+}

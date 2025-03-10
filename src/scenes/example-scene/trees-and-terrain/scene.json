@@ -1,0 +1,71 @@
+{
+  "$schema": "http://virtual/scene-schema.json",
+  "models": [
+    {
+      "type": "model",
+      "id": "7dd4ce0b-4331-4638-858b-9de119ebe860",
+      "name": "Terrain",
+      "position": [
+        0,
+        -7.5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 30,
+      "parametricShader": "Terrain1722025_165522.graph.wgsl",
+      "material": {
+        "color": [
+          0.9686968341336242,
+          0.16922567209124928,
+          0.17567598090622094
+        ],
+        "roughness": 0.8413164801701143,
+        "metallic": 0.003707993097993023,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "grassytexture.jpg"
+      },
+      "instanceCount": 1
+    },
+    {
+      "type": "model",
+      "id": "c43a8275-bc71-49f6-b5c9-094da43c82cf",
+      "name": "Trees",
+      "position": [
+        15,
+        -1,
+        15
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "parametricShader": "Trees1722025_172843.wgsl",
+      "material": {
+        "color": [
+          0.6389353015195036,
+          0.6924126219340543,
+          0.94356905080533
+        ],
+        "roughness": 0.5976841271871804,
+        "metallic": 0.43101668677131566,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "treetexture.jpg"
+      },
+      "instanceCount": 12
+    }
+  ]
+}

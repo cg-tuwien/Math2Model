@@ -1,0 +1,70 @@
+
+fn Heart(input2: vec2f) -> vec3f {
+	var PI = 3.14159265359;
+	var HALF_PI = 3.14159265359 / 2.0;
+	var TWO_PI = 3.14159265359 * 2.0;
+	let pos = vec3(input2.x, 0.0, 2. * input2.y) * PI;
+
+    let x2 = sin(pos.x) * (15. * sin(pos.z) - 4. * sin(3. * pos.z));
+    let y2 = 8. * cos(pos.x);
+    let z2 = sin(pos.x) * (15. * cos(pos.z) - 5. * cos(2. * pos.z) - 2. * cos(3. * pos.z) - cos(2. * pos.z));
+    let heart = vec3(x2, y2, z2) * 0.2;
+    
+    return heart;
+}
+fn Sphere(input2: vec2f) -> vec3f {
+	var PI = 3.14159265359;
+	var HALF_PI = 3.14159265359 / 2.0;
+	var TWO_PI = 3.14159265359 * 2.0;
+    var u = input2.x * PI;
+    var v = input2.y * TWO_PI;
+	var sx = sin(u);
+	var sy = sin(v);
+	var cx = cos(u);
+	var cy = cos(v);
+	var x = sx * cy;
+	var y = sx * sy;
+	var result = vec3f(x, y, cx);
+	return result;
+}
+fn Plane(input2: vec2f) -> vec3f {
+	return vec3f(input2.x, 0, input2.y);
+}
+fn Cylinder(input2: vec2f) -> vec3f {
+    let pos = vec3(2. * input2.x, 0.0, 2. * input2.y) * 3.14159265359;
+    var y = input2.x;
+
+    var sx = sin(pos.x);
+    var sy = sin(pos.z);
+    var cx = cos(pos.x);
+    var cy = cos(pos.z);
+
+    var x = cy;
+    var z = sy;
+
+    return vec3f(x, y, z);
+}
+
+fn sampleObject(input2: vec2f) -> vec3f {
+	var PI = 3.14159265359;
+	var HALF_PI = 3.14159265359 / 2.0;
+	var TWO_PI = 3.14159265359 * 2.0;
+	var ref_085cd = Plane(input2);
+	var ref_2a961_1 = ref_085cd[0];
+	var ref_2a961_2 = ref_085cd[1];
+	var ref_2a961_3 = ref_085cd[2];
+	var roofShape = 0.69999999999999995559;
+	var ref_27627 = 3.8 / roofShape;
+	var ref_f7af6 = ref_2a961_3 / ref_27627;
+	var halfCenterSpacingX = 4.00000000000000000000;
+	var columnSpacing = 3.00000000000000000000;
+	var ref_859b4 = ref_2a961_1 * 0.7;
+	var ref_0f4c3 = columnSpacing * 0.5;
+	var ref_4882b = ref_0f4c3 + ref_859b4;
+	var ref_e0aef = abs(ref_f7af6);
+	var ref_6c1f4 = roofShape - ref_e0aef;
+	var ref_64916 = ref_2a961_2 + ref_6c1f4;
+	var ref_84713 = vec3f(ref_4882b, ref_64916, ref_2a961_3);
+	return ref_84713;
+
+}

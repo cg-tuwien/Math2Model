@@ -1,11 +1,5 @@
-import { SceneFileName, SceneFileSchemaUrl } from "@/filesystem/scene-file";
-import { makeFilePath, type FilePath } from "@/filesystem/reactive-files";
-import DefaultParametric from "@/../parametric-renderer-core/shaders/DefaultParametric.wgsl?raw";
-import { ReadonlyEulerAngles } from "./scene-state";
-import { showError } from "@/notification";
 import type { ImportFilesList } from "@/stores/fs-store";
-import { assert } from "@stefnotch/typestef/assert";
-import { ZipReader } from "@zip.js/zip.js";
+import { DefaultScene, fileName } from "./default-scene";
 
 type ExampleProject = {
   key: string;
@@ -13,111 +7,62 @@ type ExampleProject = {
   files: () => Promise<ImportFilesList>;
 };
 
-const textEncoder = new TextEncoder();
+const temple = import.meta.glob("./example-scene/temple/*", {
+  query: "?url",
+  import: "default",
+  eager: true,
+});
 
-// Unused, shows how to programmatically create an example scene.
-function createDefaultProject(): ImportFilesList {
-  const shaderName = makeFilePath("my-shader.wgsl");
-  const shader = DefaultParametric;
+const tower = import.meta.glob("./example-scene/tower/*", {
+  query: "?url",
+  import: "default",
+  eager: true,
+});
 
-  const scene = {
-    $schema: SceneFileSchemaUrl,
-    models: [
-      {
-        type: "model",
-        id: crypto.randomUUID(),
-        name: "Basic Plane",
-        parametricShader: shaderName,
-        position: [0, 0, 0],
-        rotation: ReadonlyEulerAngles.identity.serialize(),
-        scale: 1,
-        material: {
-          color: [1, 0, 0],
-          roughness: 0.5,
-          metallic: 0.5,
-          emissive: [0, 0, 0],
-        },
-      },
-    ],
-  };
+const treesAndTerrain = import.meta.glob(
+  "./example-scene/trees-and-terrain/*",
+  {
+    query: "?url",
+    import: "default",
+    eager: true,
+  }
+);
 
+async function toLazyProject(
+  files: Record<string, unknown>
+): Promise<ImportFilesList> {
   return {
     type: "in-memory",
-    value: [
-      {
-        name: SceneFileName,
-        value: textEncoder.encode(JSON.stringify(scene, null, 2)),
-      },
-      {
-        name: shaderName,
-        value: textEncoder.encode(shader),
-      },
-    ],
+    value: await Promise.all(
+      Object.entries(files).map(async ([name, url]) => {
+        return {
+          name: fileName(name),
+          value: await fetch(url as string).then((v) => v.arrayBuffer()),
+        };
+      })
+    ),
   };
-}
-
-async function getZipExample(path: FilePath): Promise<File | undefined> {
-  try {
-    // Fetch the file from the public directory
-    const response = await fetch(path);
-
-    // Check if the response is valid
-    if (!response.ok) {
-      showError(
-        "Could not load example " +
-          path +
-          "\nServer responded with " +
-          response.statusText
-      );
-    }
-
-    // Convert the response to a Blob
-    const blob = await response.blob();
-
-    // Create a File object from the Blob
-    const zipFile = new File([blob], path, {
-      type: "application/zip",
-    });
-
-    console.log("Zip file loaded:", zipFile);
-    return zipFile;
-  } catch (error) {
-    showError("Could not load example " + path, { error: error });
-  }
-}
-
-async function importZipExample(path: string): Promise<ImportFilesList> {
-  const zipFile = await getZipExample(makeFilePath(path));
-  assert(zipFile !== undefined);
-  return {
-    type: "zip",
-    value: new ZipReader(zipFile.stream()),
-  };
-}
-
-export function createFirstTimeVisitorProject(): Promise<ImportFilesList> {
-  return importZipExample("./HeartSphereMorph.zip");
 }
 
 export const ExampleProjects: ExampleProject[] = [
   {
     key: crypto.randomUUID(),
     name: "Morph Heart to Sphere",
-    files: () => importZipExample("./HeartSphereMorph.zip"),
+    files: async () => DefaultScene,
   },
   {
     key: crypto.randomUUID(),
     name: "Parametric Temple",
-    files: () => importZipExample("./TempleExample.zip"),
+    files: () => toLazyProject(temple),
   },
   {
     key: crypto.randomUUID(),
     name: "Parametric Tower",
-    files: () => importZipExample("./TowerExample.zip"),
+    files: () => toLazyProject(tower),
   },
   {
     key: crypto.randomUUID(),
     name: "Terrain and Trees",
-    files: () => importZipExample("./TreesAndTerrainExample.zip"),
+    files: () => toLazyProject(treesAndTerrain),
   },
 ];

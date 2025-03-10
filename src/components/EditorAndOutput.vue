@@ -34,7 +34,7 @@ import type {
 import { useErrorStore } from "@/stores/error-store";
 import { syncFilesystem } from "@/engine/sync-filesystem";
 import { useExportStore } from "@/stores/export-store";
-import { createFirstTimeVisitorProject } from "@/scenes/example-scenes";
+import { DefaultScene } from "@/scenes/default-scene";
 
 import WebGpu from "@/components/WebGpu.vue";
 import { useOpenFile } from "./use-open-file";
@@ -68,7 +68,7 @@ const fpsCounter = ref<WasmFrameTime>({ avg_delta_time: 0, avg_gpu_time: 0 });
 const isFirstTimeVisitor = useLocalStorage("is-first-time-visitor", true);
 
 if (isFirstTimeVisitor.value && !props.fs.hasFile(SceneFileName)) {
-  await createFirstTimeVisitorProject().then((v) => fsStore.addFiles(v));
+  fsStore.addFiles(DefaultScene);
 }
 
 props.engine.setOnShaderCompiled((shader, messages) => {

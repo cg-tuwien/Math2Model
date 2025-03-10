@@ -8,6 +8,8 @@ import IconGithub from "~icons/mdi/github";
 import { homepage, version } from "@/../package.json";
 import { useFsStore } from "@/stores/fs-store";
 import { useExportStore } from "@/stores/export-store";
+
+// TODO: Lazy load the examples
 import { ExampleProjects } from "@/scenes/example-scenes";
 
 const store = useStore();

@@ -1,0 +1,170 @@
+{
+  "$schema": "http://virtual/scene-schema.json",
+  "models": [
+    {
+      "type": "model",
+      "id": "9566ae5a-d346-48ed-848f-3df0c0ebc88b",
+      "name": "TowerBase",
+      "position": [
+        0,
+        7,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "parametricShader": "TowerBase1722025_203221.wgsl",
+      "material": {
+        "color": [
+          0.34210909026029324,
+          0.9760456176582692,
+          0.7515107906238254
+        ],
+        "roughness": 0.5649958444386076,
+        "metallic": 0.7398848448241044,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "towerbrick.jpg"
+      },
+      "instanceCount": 1
+    },
+    {
+      "type": "model",
+      "id": "96479a2f-5b0e-41c3-aa77-b9caedb7e012",
+      "name": "TowerRoof",
+      "position": [
+        0,
+        17.9,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "parametricShader": "TowerWindows1722025_204818.graph.wgsl",
+      "material": {
+        "color": [
+          0.09128361141152919,
+          0.2319490429652189,
+          0.04872287822641197
+        ],
+        "roughness": 0.5195607776293911,
+        "metallic": 0.519243008263726,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "black-painted-wall-texture.jpg"
+      },
+      "instanceCount": 1
+    },
+    {
+      "type": "model",
+      "id": "6aa8c62b-976c-41c9-9099-51cee4393bed",
+      "name": "TowerWindows",
+      "position": [
+        0,
+        14.5,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1.1,
+      "parametricShader": "TowerWindows1722025_205728.graph.wgsl",
+      "material": {
+        "color": [
+          0.19644285494701919,
+          0.20336142342462493,
+          2.4845837206208627
+        ],
+        "roughness": 0.925357642434665,
+        "metallic": 0.8475262222252853,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "lightblue.jpg"
+      },
+      "instanceCount": 5
+    },
+    {
+      "type": "model",
+      "id": "145c670e-e888-4d80-ac4b-3f943475c8e4",
+      "name": "TowerBricks",
+      "position": [
+        0,
+        2.4000000000000004,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1.7,
+      "parametricShader": "TowerBricks1722025_211748.wgsl",
+      "material": {
+        "color": [
+          0.34546595154178616,
+          0.8214257823258868,
+          0.702049997404689
+        ],
+        "roughness": 0.9954003836679017,
+        "metallic": 0.6320121198090056,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "black-painted-wall-texture.jpg"
+      },
+      "instanceCount": 1
+    },
+    {
+      "type": "model",
+      "id": "68afb42f-e881-4ff2-9f85-35016a076978",
+      "name": "TowerRoofSpikes",
+      "position": [
+        0,
+        19,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 0.4,
+      "parametricShader": "TowerRoofSpikes1722025_213702.graph.wgsl",
+      "material": {
+        "color": [
+          0.619970939069604,
+          0.6773226200186719,
+          0.7169427295939346
+        ],
+        "roughness": 0.3654210899853554,
+        "metallic": 0.20180748108465085,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "grey.jpg"
+      },
+      "instanceCount": 20
+    }
+  ]
+}
