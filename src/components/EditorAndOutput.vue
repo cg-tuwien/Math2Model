@@ -77,7 +77,6 @@ props.engine.setOnShaderCompiled((shader, messages) => {
 
 // The underlying data
 const sceneFile = ref<string | null>(null);
-const exportModel = ref(false);
 props.fs.watch((change) => {
   if (change.key === SceneFileName) {
     if (change.type === "insert" || change.type === "update") {
@@ -270,8 +269,7 @@ const exportStore = useExportStore();
 watchImmediate(
   () => exportStore.isExportMode,
   (isExport) => {
-    exportModel.value = exportStore.isExportMode;
-    if (exportModel.value == false) props.engine.setLodStage(null);
+    if (!isExport) props.engine.setLodStage(null);
   }
 );
 </script>
@@ -384,13 +382,13 @@ watchImmediate(
           <template #2>
             <div class="flex h-full w-full">
               <WebGpu
-                v-if="exportModel"
+                v-if="exportStore.isExportMode"
                 :gpuDevice="props.gpuDevice"
                 :engine="props.engine"
                 :fs="props.fs"
               ></WebGpu>
               <CodeEditor
-                v-if="openFile.editorType.value === 'shader' && !exportModel"
+                v-else-if="openFile.editorType.value === 'shader'"
                 class="self-stretch overflow-hidden flex-1"
                 :keyed-code="openFile.code.value"
                 :is-readonly="openFile.isReadonly.value"
@@ -407,7 +405,7 @@ watchImmediate(
               >
               </CodeEditor>
               <CodeGraph
-                v-if="openFile.editorType.value === 'graph' && !exportModel"
+                v-else-if="openFile.editorType.value === 'graph'"
                 :fs="props.fs"
                 :keyedGraph="openFile.code.value"
                 @update="
