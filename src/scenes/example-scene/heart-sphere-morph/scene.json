@@ -1,0 +1,38 @@
+{
+  "$schema": "http://virtual/scene-schema.json",
+  "models": [
+    {
+      "type": "model",
+      "id": "756110ea-ad90-46bb-8217-0ec926722489",
+      "name": "MorphHeartSphere",
+      "position": [
+        0,
+        0,
+        0
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        0
+      ],
+      "scale": 1,
+      "parametricShader": "heart-sphere.graph.wgsl",
+      "material": {
+        "color": [
+          0.6248038604312252,
+          0.3274762011419219,
+          0.3882194625833142
+        ],
+        "roughness": 0.027098681007907244,
+        "metallic": 0.7435161899093774,
+        "emissive": [
+          0,
+          0,
+          0
+        ]
+      },
+      "instanceCount": 1
+    }
+  ],
+  "description": "Please change the Slider in the 'Combine Shapes' node to morph between a parametrically-defined Sphere and a parametrically-defined Heart. The shape changes gradually based on the parametric formulation of both objects."
+}

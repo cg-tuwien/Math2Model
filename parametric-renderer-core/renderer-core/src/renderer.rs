@@ -604,13 +604,7 @@ fn ground_plane_component(
         // #[cfg(feature = "desktop")]
         // let _watcher = &_file_watcher;
         let size = 100_000.0;
-        let inv_grid_scale = (render_data.camera.position.distance(glam::Vec3::ZERO) / 50.0)
-            .max(1.0)
-            .log2()
-            .ceil()
-            .exp2()
-            .max(1.0);
-        let grid_scale = 1.0 / inv_grid_scale;
+        let grid_scale = 1.0;
         uniforms.write_buffer(
             &context.queue,
             &ground_plane::Uniforms {

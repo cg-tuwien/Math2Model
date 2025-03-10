@@ -61,17 +61,22 @@ const fileOptions = computed((): ActionDropdownOption[] => {
       },
     },
     {
-      label: "Toggle Export GUI",
-      key: "export",
-      action: () => {
-        exportStore.isExportMode = !exportStore.isExportMode;
-      },
-    },
-    {
       label: "Examples",
       key: "examples",
       children: exampleProjectsDropdown,
       action: () => {},
+    },
+  ];
+});
+
+const exportOptions = computed((): ActionDropdownOption[] => {
+  return [
+    {
+      label: "Export Scene",
+      key: "export",
+      action: () => {
+        exportStore.isExportMode = !exportStore.isExportMode;
+      },
     },
   ];
 });
@@ -148,6 +153,15 @@ async function openFiles(inputFiles: FileList) {
           >
             <n-button :bordered="false" size="small" quaternary>
               File
+            </n-button>
+          </n-dropdown>
+          <n-dropdown
+            trigger="click"
+            :options="exportOptions"
+            @select="handleDropdownOption"
+          >
+            <n-button :bordered="false" size="small" quaternary>
+              Export
             </n-button>
           </n-dropdown>
           <n-dropdown
