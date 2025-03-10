@@ -67,5 +67,6 @@
       },
       "instanceCount": 12
     }
-  ]
+  ],
+  "description": "The terrain and trees have been generated procedurally on the GPU. By adjusting the instance count of the trees, you can adjust the nubmer of trees."
 }

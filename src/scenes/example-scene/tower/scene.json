@@ -166,5 +166,6 @@
       },
       "instanceCount": 20
     }
-  ]
+  ],
+  "description": "This is a procedurally generated tower."
 }
