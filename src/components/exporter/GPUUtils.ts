@@ -73,10 +73,8 @@ export function createSimpleBindGroup(
   device: GPUDevice,
   guid: string | null
 ) {
-  if (!bindgroupLayout.label) {
-    console.warn("BindGroupLayout label is missing. Caching might not work properly.");
-    return null;
-  }
+  
+
   let entries: GPUBindGroupEntry[] = buffers.map((buffer, i) => ({
     binding: i,
     resource: { buffer: buffer },

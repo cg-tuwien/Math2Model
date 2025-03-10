@@ -32,7 +32,7 @@ struct RenderBufferRead {
 };
 struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/struct.DispatchIndirectArgs.html
   x: atomic<u32>,
-  y: u32,
+  y: atomic<u32>,
   z: u32,
 };
 fn ceil_div(a: u32, b: u32) -> u32 { return (a + b - 1u) / b; }

@@ -6,6 +6,7 @@ import {
 import LodStageWgsl from "../lod_stage.wgsl?raw";
 import PrepVerticesStageWgsl from "../prep_vertices_stage.wgsl?raw";
 import OutputVerticesWgsl from "../vertices_stage.wgsl?raw";
+import IndirectDispatchRebalanceSource from "../indirect_dispatch_rebalance.wgsl?raw";
 import { ref, type Ref } from "vue";
 import type { LodStageBuffers } from "@/webgpu-hook";
 import {
@@ -93,6 +94,14 @@ export async function mainExport(
     "target instance id"
   );
 
+  
+  const indirectDispatchTransformerBindGroupLayout = simpleBindGroupLayout(
+    GPUShaderStage.COMPUTE,
+    ["storage"],
+    device,
+    "indirect dispatch transformer bind group layout"
+  );
+
   const pipelineLayout = device.createPipelineLayout({
     bindGroupLayouts: [sceneUniformsLayout, layout1, layout2],
   });
@@ -103,6 +112,14 @@ export async function mainExport(
   const outputVerticesLayout = device.createPipelineLayout({
     bindGroupLayouts: [sceneUniformsLayout, vertexOutputLayout, instanceSelectionLayout],
   });
+
+  const indirectDispatchTransformerLayout: GPUPipelineLayout = device.createPipelineLayout({
+    bindGroupLayouts: [indirectDispatchTransformerBindGroupLayout]
+  });
+
+  let v = makeShaderFromCodeAndPipeline(IndirectDispatchRebalanceSource,indirectDispatchTransformerLayout, device);
+  const indirectDispatchRebalancePipeline = v.pipeline;
+  const indirectDispatchRebalanceShader = v.shader;
 
   async function getShaderCode(
     fs: ReactiveFilesystem,
@@ -144,8 +161,9 @@ export async function mainExport(
   let oneVertexEntry = 32;
   let startVertexOffset = 8;
   let padding = 8;
-  const vertOutputBufferSize =
+  const vertOutputBufferSize: number =
     startVertexOffset + padding + oneVertexEntry * MAX_PATCHES;
+
   let vertOutputBuffer = device.createBuffer({
     label: "VertOutputBuffer",
     size: vertOutputBufferSize,
@@ -154,6 +172,7 @@ export async function mainExport(
       GPUBufferUsage.COPY_DST |
       GPUBufferUsage.STORAGE,
   });
+//  alert("Actual size: " + vertOutputBuffer.size)
   let vertReadableBuffer = device.createBuffer({
     label: "VertReadableBuffer",
     size: vertOutputBufferSize,
@@ -353,10 +372,10 @@ export async function mainExport(
     const pingPongPatchesBindGroup = [
       createSimpleBindGroup(
         [
-          buffers.indirectDispatch1,  
+          buffers.indirectDispatch1,
           buffers.patches0,
           buffers.patches1,
-          buffers.forceRender,  
+          buffers.forceRender,
         ],
         layout2,
         device,
@@ -374,6 +393,27 @@ export async function mainExport(
         null
       ),
     ];
+
+    const indirectRebalanceBindGroups = [
+      createSimpleBindGroup(
+        [
+          buffers.indirectDispatch1
+        ],
+        indirectDispatchTransformerBindGroupLayout,
+        device,
+        null
+      ),
+      createSimpleBindGroup(
+        [
+          buffers.indirectDispatch0,
+        ],
+        indirectDispatchTransformerBindGroupLayout,
+        device,
+        null
+      ),
+    ];
+
+
 
 
     lodStageParameters = new Float32Array([
@@ -400,6 +440,7 @@ export async function mainExport(
         commandEncoder
       );
 
+      
       let computePassPing = commandEncoder.beginComputePass();
       computePassPing.setPipeline(pipeline);
       computePassPing.setBindGroup(0, userInputBindGroup);
@@ -418,6 +459,12 @@ export async function mainExport(
         buffers.indirectDispatch0,
         commandEncoder
       );
+      
+      let rebalancePass = commandEncoder.beginComputePass();
+      rebalancePass.setPipeline(indirectDispatchRebalancePipeline);
+      rebalancePass.setBindGroup(0,indirectRebalanceBindGroups[0]);
+      rebalancePass.dispatchWorkgroups(1,1,1);
+      rebalancePass.end();
 
       let computePassPong = commandEncoder.beginComputePass({ label: "Pong" });
       computePassPong.setPipeline(pipeline);
@@ -434,6 +481,12 @@ export async function mainExport(
           commandEncoder
         );
       }
+      
+      let rebalancePass2 = commandEncoder.beginComputePass();
+      rebalancePass2.setPipeline(indirectDispatchRebalancePipeline);
+      rebalancePass2.setBindGroup(0,indirectRebalanceBindGroups[1] );
+      rebalancePass2.dispatchWorkgroups(1,1,1);
+      rebalancePass2.end();
     }
 
     if (!triggerDownload.value) {

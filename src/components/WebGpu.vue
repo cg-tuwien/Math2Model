@@ -347,6 +347,7 @@ async function startExport() {
   exportInProgress.value = true;
   toDownload.value.length = 0;
   let sceneFile = readSceneFile();
+  let toDownloadSteps = 0;
   let scene = deserializeScene(await sceneFile);
   scene.models.forEach((model) => {
     if (downloadTarget.value !== "")
@@ -358,6 +359,7 @@ async function startExport() {
       );
     if (downloadTarget.value == "" || model.id == downloadTarget.value)
       toDownload.value.push({name:model.id, currentInstance: 0});
+    toDownloadSteps+=model.instanceCount;
   });
   exportSteps = toDownload.value.length;
   console.log("To download: ", toDownload);
