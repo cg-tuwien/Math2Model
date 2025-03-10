@@ -36,6 +36,11 @@ fn fade_from_center(coord: vec2f, center: vec2f) -> f32 {
     return 1.0 - dist;
 }
 
+fn grid_to_color(grid: f32) -> f32 {
+    let color = 1.0 - min(grid, 1.0);
+    return pow(color, 1.0 / 2.2); // Gamma correction helps a lot
+}
+
 @fragment
 fn fs_main(
     @location(0) uv: vec2f,
@@ -43,12 +48,11 @@ fn fs_main(
 ) -> @location(0) vec4f {
     let coord = uv.xy * uniforms.grid_scale;
 
-    let large_grid = make_grid(coord, vec2f(0.5), 0.8);
-    let small_grid = make_grid(coord, vec2f(2.0), 0.5);
-    var color = (1.0 - min(large_grid, 1.0)) * 0.9;
+    let large_grid = make_grid(coord, vec2f(0.5), 0.6);
+    let small_grid = make_grid(coord, vec2f(4.0), 0.5);
+    var color = grid_to_color(large_grid) * 0.1;
     // See https://madebyevan.com/shaders/grid/
-    color += (1.0 - min(small_grid, 1.0)) * 0.1;
-    color = pow(color, 1.0 / 2.2); // Gamma correction helps a lot
+    color += grid_to_color(small_grid) * 0.05;
 
     let fade_factor = fade_from_center(coord, vec2f(0.0));
     return vec4f(vec3f(1.0), color * fade_factor);
