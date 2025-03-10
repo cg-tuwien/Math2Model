@@ -8,8 +8,6 @@ import IconGithub from "~icons/mdi/github";
 import { homepage, version } from "@/../package.json";
 import { useFsStore } from "@/stores/fs-store";
 import { useExportStore } from "@/stores/export-store";
-
-// TODO: Lazy load the examples
 import { ExampleProjects } from "@/scenes/example-scenes";
 
 const store = useStore();
@@ -63,17 +61,22 @@ const fileOptions = computed((): ActionDropdownOption[] => {
       },
     },
     {
-      label: "Toggle Export GUI",
-      key: "export",
-      action: () => {
-        exportStore.isExportMode = !exportStore.isExportMode;
-      },
-    },
-    {
       label: "Examples",
       key: "examples",
       children: exampleProjectsDropdown,
       action: () => {},
+    },
+  ];
+});
+
+const exportOptions = computed((): ActionDropdownOption[] => {
+  return [
+    {
+      label: "Export Scene",
+      key: "export",
+      action: () => {
+        exportStore.isExportMode = !exportStore.isExportMode;
+      },
     },
   ];
 });
@@ -150,6 +153,15 @@ async function openFiles(inputFiles: FileList) {
           >
             <n-button :bordered="false" size="small" quaternary>
               File
+            </n-button>
+          </n-dropdown>
+          <n-dropdown
+            trigger="click"
+            :options="exportOptions"
+            @select="handleDropdownOption"
+          >
+            <n-button :bordered="false" size="small" quaternary>
+              Export
             </n-button>
           </n-dropdown>
           <n-dropdown
