@@ -185,6 +185,7 @@ fn force_render_internal(quad_encoded: EncodedPatch) {
 }
 
 fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>, planarity: f32) {
+    
     let patch_top_left = patch_top_left_child(quad_encoded);
     let patch_top_right = patch_top_right_child(quad_encoded);
     let patch_bottom_right = patch_bottom_right_child(quad_encoded);
@@ -350,8 +351,6 @@ fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>,
         let planarity_local = 1.0 - (lambda_min / trace);
         planarity_score = planarity_local;
     
-    // Use the planarity score to decide: if highly planar, force render; else split patch.
-        let planarity_threshold: f32 = 0.;
         split_patch(quad_encoded, quad, u_length, v_length, planarity_local);
     }
 }

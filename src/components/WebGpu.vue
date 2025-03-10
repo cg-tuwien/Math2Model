@@ -47,7 +47,7 @@ const normalType: Ref<number> = ref(0);
 const downloadTarget = ref("");
 const mergeModels = ref(true);
 const exportInProgress = ref(false);
-const toDownload: Ref<string[]> = ref([]);
+const toDownload: Ref<{name: string, currentInstance: number}[]> = ref([]);
 const exportProgress: Ref<number> = ref(0);
 
 let exportSteps = 0;
@@ -273,6 +273,7 @@ function exportMeshFromPatches(
   console.log(
     "Got request to export mesh " + name + " patch verts: " + patch_verts.length
   );
+  console.log(toDownload.value);
   for (const [instance_id, patchstructure] of patches) {
     for (let i = 0; i < patchstructure.length; i++) {
       for (let j = 0; j < 4; j++) {
@@ -292,6 +293,7 @@ scene.then((actualScene) => {
       path: model.parametricShader,
       name: model.name,
       uuid: model.id,
+      instanceCount: model.instanceCount
     });
   });
 });
@@ -305,6 +307,7 @@ props.fs.watchFromStart((change) => {
           path: "",
           name: "all",
           uuid: "",
+          instanceCount: 0
         },
       ];
       let actualScene = deserializeScene(v);
@@ -313,6 +316,7 @@ props.fs.watchFromStart((change) => {
           path: model.parametricShader,
           name: model.name,
           uuid: model.id,
+          instanceCount: model.instanceCount
         })
       );
     });
@@ -353,7 +357,7 @@ async function startExport() {
           model.id
       );
     if (downloadTarget.value == "" || model.id == downloadTarget.value)
-      toDownload.value.push(model.id);
+      toDownload.value.push({name:model.id, currentInstance: 0});
   });
   exportSteps = toDownload.value.length;
   console.log("To download: ", toDownload);

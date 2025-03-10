@@ -86,6 +86,13 @@ export async function mainExport(
     "patch output"
   );
 
+  const instanceSelectionLayout = simpleBindGroupLayout(
+    GPUShaderStage.COMPUTE,
+    ["uniform"],
+    device,
+    "target instance id"
+  );
+
   const pipelineLayout = device.createPipelineLayout({
     bindGroupLayouts: [sceneUniformsLayout, layout1, layout2],
   });
@@ -94,7 +101,7 @@ export async function mainExport(
     bindGroupLayouts: [prepVerticesBinding0],
   });
   const outputVerticesLayout = device.createPipelineLayout({
-    bindGroupLayouts: [sceneUniformsLayout, vertexOutputLayout],
+    bindGroupLayouts: [sceneUniformsLayout, vertexOutputLayout, instanceSelectionLayout],
   });
 
   async function getShaderCode(
@@ -263,6 +270,28 @@ export async function mainExport(
     GPUBufferUsage.MAP_WRITE | GPUBufferUsage.COPY_SRC
   );
 
+  let numberBuffersArray: GPUBuffer[] = [];
+  for(let i = 0; i < 30; i++)
+  {
+    numberBuffersArray.push(
+      createBufferWith(
+        props,
+        concatArrayBuffers(props, [new Uint32Array([i])]),
+        GPUBufferUsage.COPY_SRC | GPUBufferUsage.UNIFORM
+      )
+    );
+  }
+
+  let target_instance_id_buffer: GPUBuffer = 
+    createBufferWith(
+      props,
+      concatArrayBuffers(props, [new Uint32Array([0])]),
+      GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM
+    );
+
+
+  let userInputBindGroup: any = null;
+
   function lodStageCallback(
     shaderPath: string,
     buffers: LodStageBuffers,
@@ -279,9 +308,11 @@ export async function mainExport(
     name = name.replace(re, "");
     let models: Ref<any[]> = lodExportParametersRefs.models;
     let registered = false;
+    let instanceCount = 0;
     models.value.forEach((model) => {
       if (model.uuid == uuid) {
         name = model.name;
+        instanceCount = model.instanceCount;
       }
     });
 
@@ -294,11 +325,15 @@ export async function mainExport(
     const pipeline = compiledShader.lodStage.pipeline;
 
     // We inefficiently recreate the bind groups every time.
-    const userInputBindGroup = createSimpleBindGroup(
-      [buffers.time, buffers.screen, buffers.mouse],
-      sceneUniformsLayout,
-      device
-    );
+    if(userInputBindGroup == null)
+      userInputBindGroup = createSimpleBindGroup(
+        [buffers.time, buffers.screen, buffers.mouse],
+        sceneUniformsLayout,
+        device,
+        uuid
+      );
+
+//      console.log(buffers);
 
     const toRenderPatchesBindGroup = createSimpleBindGroup(
       [
@@ -311,19 +346,21 @@ export async function mainExport(
         lodStageParametersBuffer,
       ],
       layout1,
-      device
+      device,
+      uuid
     );
 
     const pingPongPatchesBindGroup = [
       createSimpleBindGroup(
         [
-          buffers.indirectDispatch1,
+          buffers.indirectDispatch1,  
           buffers.patches0,
           buffers.patches1,
-          buffers.forceRender,
+          buffers.forceRender,  
         ],
         layout2,
-        device
+        device,
+        null
       ),
       createSimpleBindGroup(
         [
@@ -333,21 +370,11 @@ export async function mainExport(
           buffers.forceRender,
         ],
         layout2,
-        device
+        device,
+        null
       ),
     ];
 
-    let bindGroupVertPrep = createSimpleBindGroup(
-      [buffers.finalPatches2, dispatchVerticesStage],
-      prepVerticesBinding0,
-      device
-    );
-
-    let outputVerticesBindGroup = createSimpleBindGroup(
-      [buffers.finalPatches2, vertOutputBuffer],
-      vertexOutputLayout,
-      device
-    );
 
     lodStageParameters = new Float32Array([
       lodExportParametersRefs.minSize.value,
@@ -415,13 +442,52 @@ export async function mainExport(
     let downloadTarget = lodExportParametersRefs.downloadTarget.value;
     let downloadAll = downloadTarget == "";
     let isRightDownloadTarget = downloadAll || downloadTarget == uuid;
+    let toDownload = lodExportParametersRefs.toDownload.value;
+    let toDownloadModel = null;
+    let toDownloadIndex = 0;
+    for(let i = 0; i < toDownload.length; i++)
+    {
+      if(toDownload[i].name == uuid && toDownload[i].currentInstance <= instanceCount)
+      {
+        toDownloadModel = toDownload[i];
+        toDownloadIndex = i;
+      }
+    }
     if (
-      isRightDownloadTarget &&
-      lodExportParametersRefs.toDownload.value.includes(uuid)
-    ) {
+      isRightDownloadTarget && toDownloadModel != null
+      )
+    {
       console.log("Exporting " + name);
       triggerDownload.value = false;
+      let instanceToDownload = toDownloadModel.currentInstance++;
       // Prepare vertices output
+      
+      if(instanceToDownload >= instanceCount)
+      {
+        toDownload.splice(toDownloadIndex,1);
+        console.log("Removed " + toDownload + " because it was done");
+      }
+
+      let bindGroupVertPrep = createSimpleBindGroup(
+        [buffers.finalPatches2, dispatchVerticesStage, ],
+        prepVerticesBinding0,
+        device,
+        uuid
+      );
+  
+      let outputVerticesBindGroup = createSimpleBindGroup(
+        [buffers.finalPatches2, vertOutputBuffer],
+        vertexOutputLayout,
+        device,
+        uuid
+      );
+
+      let instanceSelectionBindGroup = createSimpleBindGroup(
+        [target_instance_id_buffer],
+        instanceSelectionLayout,
+        device,
+        null
+      )
       let computePassPrep = commandEncoder.beginComputePass({
         label: "prepareVertexOutput",
       });
@@ -436,6 +502,8 @@ export async function mainExport(
         commandEncoder
       );
 
+      
+      simpleB2BSameSize(numberBuffersArray[instanceToDownload],target_instance_id_buffer,commandEncoder);
       // Run vertex output shader
       let computePassVertices = commandEncoder.beginComputePass({
         label: "vertexOutputStage",
@@ -443,6 +511,7 @@ export async function mainExport(
       computePassVertices.setPipeline(compiledShader.verticesStage.pipeline);
       computePassVertices.setBindGroup(0, userInputBindGroup);
       computePassVertices.setBindGroup(1, outputVerticesBindGroup);
+      computePassVertices.setBindGroup(2, instanceSelectionBindGroup);
       computePassVertices.dispatchWorkgroupsIndirect(dispatchVerticesStage, 0);
       computePassVertices.end();
 
@@ -451,27 +520,30 @@ export async function mainExport(
         vertReadableBuffer
           .mapAsync(GPUMapMode.READ, 0, vertReadableBuffer.size)
           .then(() => {
-            console.log("Memory mapped the buffer for " + name);
-            const arrayBuffer = vertReadableBuffer
-              .getMappedRange(0, vertReadableBuffer.size)
-              .slice(0);
-            let size = arrayBuffer[0];
-            const vertexStream = new Float32Array(arrayBuffer);
-            vertReadableBuffer.unmap();
-            if (downloadAll) {
-              triggerDownload.value = true;
-            }
-            let l = lodExportParametersRefs.toDownload.value;
-            l.splice(l.indexOf(uuid), 1);
-            console.log("exportMeshFromPatches called");
-            exportMeshFromPatches(
-              vertexStream,
-              lodExportParametersRefs.includeUVs.value,
-              uuid,
-              downloadAll
-            );
+
+            console.log("Memory mapped the buffer for " + name + " instance " + instanceToDownload);
+              const arrayBuffer = vertReadableBuffer
+                .getMappedRange(0, vertReadableBuffer.size)
+                .slice(0);
+              let size = arrayBuffer[0];
+              const vertexStream = new Float32Array(arrayBuffer);
+              vertReadableBuffer.unmap();
+              if (downloadAll) {
+                triggerDownload.value = true;
+              }
+//              let l = lodExportParametersRefs.toDownload.value;
+//              l.splice(l.indexOf(uuid), 1);
+              
+              console.log("exportMeshFromPatches called");
+              exportMeshFromPatches(
+                vertexStream,
+                lodExportParametersRefs.includeUVs.value,
+                uuid,
+                downloadAll
+              );
           });
       }, 1);
+
     }
   }
   await props.engine.setLodStage(lodStageCallback);

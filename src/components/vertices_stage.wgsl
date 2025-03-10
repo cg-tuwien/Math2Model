@@ -164,6 +164,8 @@ struct OutputBuffer {
 @group(1) @binding(0) var<storage, read> render_buffer: RenderBufferRead;
 @group(1) @binding(1) var<storage, read_write> output_buffer: OutputBuffer;
 
+@group(2) @binding(0) var<uniform> target_instance_id: u32;
+
 struct VertexOutput {
    // TODO: Compute normal vectors
    world_position: vec3<f32>,
@@ -202,7 +204,7 @@ fn main(
     // Prepare output
     var out: VertexOutput;
     out.world_position = world_pos.xyz;
-    let size = calculateWorldSpaceSizeOfPatch(quad);
+    //let size = calculateWorldSpaceSizeOfPatch(quad);
     out.texture_coords = quad_point.xy;//quad_point;
     out.vertex_instance = quad.instance;
 
@@ -211,14 +213,13 @@ fn main(
     workgroupBarrier();
 
     // Finally, write to output_buffer
-    if(local_invocation_id.x == 0) {
+    if(local_invocation_id.x == 0u && quad.instance == target_instance_id) {
         let write_index = atomicAdd(&output_buffer.length, 4u);
         if (write_index < output_buffer.capacity) {
             output_buffer.vertices[write_index] = quad_vertices[0];
-            output_buffer.vertices[write_index + 1] = quad_vertices[1];
-            output_buffer.vertices[write_index + 2] = quad_vertices[2];
-            output_buffer.vertices[write_index + 3] = quad_vertices[3];
-
+            output_buffer.vertices[write_index + 1u] = quad_vertices[1];
+            output_buffer.vertices[write_index + 2u] = quad_vertices[2];
+            output_buffer.vertices[write_index + 3u] = quad_vertices[3];
         }
     }
 }

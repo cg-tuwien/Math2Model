@@ -33,7 +33,7 @@ export function createBufferWith(
   });
   new Uint8Array(buffer.getMappedRange()).set(contents);
   buffer.unmap();
-  return buffer;
+  return buffer
 }
 
 /**
@@ -43,7 +43,7 @@ export function simpleBindGroupLayout(
   shaderStage: GPUShaderStageFlags,
   types: string[],
   device: any,
-  name: string | null
+  name: string
 ) {
   let entries: any[] = [];
   let i = 0;
@@ -60,30 +60,37 @@ export function simpleBindGroupLayout(
   return device.createBindGroupLayout(
     {
       entries: entries,
+      label: name
     },
     name
   );
 }
+let bindGroupCache: Map<string, Map<string, GPUBindGroup>> = new Map();
 
 export function createSimpleBindGroup(
   buffers: GPUBuffer[],
   bindgroupLayout: GPUBindGroupLayout,
-  device: GPUDevice
+  device: GPUDevice,
+  guid: string | null
 ) {
-  let entries: GPUBindGroupEntry[] = [];
-  let i = 0;
-  buffers.forEach((buffer) => {
-    entries.push({
-      binding: i,
-      resource: { buffer: buffer },
-    });
-    i++;
-  });
-  return device.createBindGroup({
+  if (!bindgroupLayout.label) {
+    console.warn("BindGroupLayout label is missing. Caching might not work properly.");
+    return null;
+  }
+  let entries: GPUBindGroupEntry[] = buffers.map((buffer, i) => ({
+    binding: i,
+    resource: { buffer: buffer },
+  }));
+
+  let bindGroup = device.createBindGroup({
     layout: bindgroupLayout,
     entries: entries,
   });
+
+  
+  return bindGroup;
 }
+
 
 export function simpleB2BSameSize(
   bufferSource: GPUBuffer,
