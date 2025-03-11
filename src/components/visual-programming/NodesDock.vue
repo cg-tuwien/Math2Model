@@ -29,7 +29,7 @@ const colors = [
   <n-infinite-scroll>
     <n-list show-divide>
       <template #header>
-        <div class="m-1">{{ props.header }}</div>
+        <div class="m-1 select-none">{{ props.header }}</div>
       </template>
       <n-list-item class="m-1" v-for="name of displayNodes.keys()">
         <MultipleNodesCollapsable

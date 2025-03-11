@@ -14,7 +14,11 @@ const props = defineProps<{
 
 <template>
   <n-collapse :default-expanded-names="props.header">
-    <n-collapse-item :title="props.header" :name="props.header">
+    <n-collapse-item
+      :title="props.header"
+      :name="props.header"
+      class="select-none"
+    >
       <n-list clickable hoverable>
         <n-list-item
           v-for="node of displayNodes.values()"
