@@ -460,15 +460,10 @@ function uploadFile(data: {
           ></NumberInput>
           <n-text>Material</n-text>
           <n-text>Color</n-text>
-          <VectorInput
-            :value="[
-              currentModel.material.color.x,
-              currentModel.material.color.y,
-              currentModel.material.color.z,
-            ]"
-            :step="0.1"
-            @update="(v) => change(['material', 'color'], vector3Update(v))"
-          ></VectorInput>
+          <ColorInput
+            :value="currentModel.material.color"
+            @update="(v) => change(['material', 'color'], v)"
+          ></ColorInput>
           <n-text>Roughness</n-text>
           <NumberInput
             :value="currentModel.material.roughness"
@@ -482,15 +477,10 @@ function uploadFile(data: {
             @update="(v) => change(['material', 'metallic'], v)"
           ></NumberInput>
           <n-text>Emissive</n-text>
-          <VectorInput
-            :value="[
-              currentModel.material.emissive.x,
-              currentModel.material.emissive.y,
-              currentModel.material.emissive.z,
-            ]"
-            :step="0.1"
-            @update="(v) => change(['material', 'emissive'], vector3Update(v))"
-          ></VectorInput>
+          <ColorInput
+            :value="currentModel.material.emissive"
+            @update="(v) => change(['material', 'emissive'], v)"
+          ></ColorInput>
           <n-text>Texture</n-text>
           <n-select
             placeholder="Select an existing texture or upload a new one for this model"
