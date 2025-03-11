@@ -30,7 +30,6 @@ import {
   AutoArrangePlugin,
   Presets as ArrangePresets,
 } from "rete-auto-arrange-plugin";
-import { vec2 } from "webgpu-matrix";
 import { MathOpNode, NumberNode } from "@/vpnodes/basic/math";
 import { JoinNode, SeparateNode, VectorNode } from "@/vpnodes/basic/vector";
 import { DropdownControl } from "@/vpnodes/controls/dropdown";
@@ -71,7 +70,6 @@ import NodesDock from "@/components/visual-programming/NodesDock.vue";
 import type { UINode } from "@/vpnodes/ui/uinode";
 import { SliderControl } from "@/vpnodes/controls/slider";
 import SliderComponent from "@/vpnodes/components/SliderComponent.vue";
-import Code from "~icons/mdi/code";
 import ReturnNodeStyle from "@/components/visual-programming/CustomNodeStyles/ReturnNodeStyle.vue";
 import VariableOutNodeStyle from "@/components/visual-programming/CustomNodeStyles/VariableOutNodeStyle.vue";
 import DefaultNodeStyle from "@/components/visual-programming/CustomNodeStyles/DefaultNodeStyle.vue";
@@ -866,14 +864,14 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
       </template>
     </n-card>
   </n-modal>
-  <n-flex vertical style="width: 100%">
-    <n-flex style="height: 100%">
-      <NodesDock
-        :display-nodes="uiNodes"
-        :editor="editor"
-        header="Nodes"
-        style="width: 25%"
-      ></NodesDock>
+  <div class="flex w-full">
+    <NodesDock
+      :display-nodes="uiNodes"
+      :editor="editor"
+      header="Nodes"
+      style="width: 25%"
+    ></NodesDock>
+    <div class="flex flex-1 relative">
       <div
         class="flex flex-1"
         ref="container"
@@ -908,19 +906,20 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
             }
           }
         "
-      >
+      ></div>
+      <div class="absolute top-2 right-2">
         <n-button
           quaternary
           circle
-          class="float-right m-2 z-10 mt-7"
           type="primary"
-          v-on:click="emit('code')"
+          @click="emit('code')"
+          class="text-xl"
         >
           <template #icon>
-            <n-icon :component="Code" size="32px"></n-icon>
+            <n-icon size="32px"><mdi-code /></n-icon>
           </template>
         </n-button>
       </div>
-    </n-flex>
-  </n-flex>
+    </div>
+  </div>
 </template>

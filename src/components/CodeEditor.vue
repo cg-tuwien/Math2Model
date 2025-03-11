@@ -4,7 +4,6 @@ import { computed, ref, shallowRef, watch, type DeepReadonly } from "vue";
 import { watchDebounced, useElementSize } from "@vueuse/core";
 import type { FilePath } from "@/filesystem/reactive-files";
 import { showInfo } from "@/notification";
-import Connect from "~icons/mdi/transit-connection-variant";
 
 export type Marker = monaco.editor.IMarkerData;
 
@@ -107,23 +106,28 @@ watch(monacoMount, (element) => {
     <h2 class="border border-gray-500 border-b-0 px-2 dark:text-white">
       {{ props.keyedCode?.name ?? "No file opened" }}
     </h2>
-    <div
-      ref="monacoMount"
-      class="border border-gray-500 self-stretch flex-1 overflow-hidden"
-      :class="{ 'bg-gray-800': isReadonly }"
-    >
-      <n-button
+    <div class="flex self-stretch flex-1 relative">
+      <div
+        ref="monacoMount"
+        class="border border-gray-500 self-stretch flex-1 overflow-hidden"
+        :class="{ 'bg-gray-800': isReadonly }"
+      ></div>
+      <div
+        class="absolute top-2 right-2"
         v-if="props.keyedCode?.name.includes('.graph')"
-        quaternary
-        circle
-        class="float-right m-2 z-10"
-        type="primary"
-        v-on:click="emit('graph')"
       >
-        <template #icon>
-          <n-icon :component="Connect"></n-icon>
-        </template>
-      </n-button>
+        <n-button
+          quaternary
+          circle
+          type="primary"
+          @click="emit('graph')"
+          class="text-xl"
+        >
+          <template #icon>
+            <n-icon size="32px"><mdi-transit-connection-variant /></n-icon>
+          </template>
+        </n-button>
+      </div>
     </div>
   </div>
 </template>
