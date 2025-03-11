@@ -7,7 +7,7 @@
       "name": "MorphHeartSphere",
       "position": [
         0,
-        0,
+        2,
         0
       ],
       "rotation": [
@@ -15,18 +15,18 @@
         0,
         0
       ],
-      "scale": 1,
+      "scale": 2.5,
       "parametricShader": "heart-sphere.graph.wgsl",
       "material": {
         "color": [
-          0.6248038604312252,
-          0.3274762011419219,
-          0.3882194625833142
+          0.8948,
+          0.1675,
+          0.1882
         ],
-        "roughness": 0.027098681007907244,
-        "metallic": 0.7435161899093774,
+        "roughness": 0.4471,
+        "metallic": 0.15,
         "emissive": [
-          0,
+          0.01,
           0,
           0
         ]
