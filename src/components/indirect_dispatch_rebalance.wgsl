@@ -10,10 +10,14 @@ struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/stru
 @compute @workgroup_size(1, 1, 1)
 fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>,
     @builtin(local_invocation_id) local_invocation_id: vec3<u32>) {
-        var x = atomicLoad(&dispatch_next.x);
-        while(x > 65536u)
+        if(local_invocation_id.x == 0u && workgroup_id.x == 0u)
         {
-            atomicAdd(&dispatch_next.y,1u);
-            x-=65536u;
+            var x = atomicLoad(&dispatch_next.x);
+            while(x >= 65536u)
+            {
+                atomicAdd(&dispatch_next.y,1u);
+                x-=65536u;
+            }
+            atomicMin(&dispatch_next.x,0xFFFFu);
         }
 }
