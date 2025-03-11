@@ -290,7 +290,7 @@ export async function mainExport(
   );
 
   let numberBuffersArray: GPUBuffer[] = [];
-  for(let i = 0; i < 30; i++)
+  for(let i = 0; i < 100; i++)
   {
     numberBuffersArray.push(
       createBufferWith(
@@ -584,9 +584,7 @@ export async function mainExport(
               if (downloadAll) {
                 triggerDownload.value = true;
               }
-//              let l = lodExportParametersRefs.toDownload.value;
-//              l.splice(l.indexOf(uuid), 1);
-              
+
               console.log("exportMeshFromPatches called");
               exportMeshFromPatches(
                 vertexStream,
