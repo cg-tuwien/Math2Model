@@ -36,7 +36,7 @@ const config: UserConfig = defineConfig({
   },
   server: {
     watch: {
-      ignored: ["parametric-renderer-core/target/**/*"],
+      ignored: ["**/parametric-renderer-core/target/**"],
     },
   },
 });
