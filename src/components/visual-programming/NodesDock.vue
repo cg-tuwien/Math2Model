@@ -3,12 +3,12 @@ import type { UINode } from "@/vpnodes/ui/uinode";
 import { NodeEditor } from "rete";
 import MultipleNodesCollapsable from "@/components/visual-programming/MultipleNodesCollapsable.vue";
 import type { Schemes } from "@/vpnodes/nodes-list";
+import { ref } from "vue";
 
 const props = defineProps<{
   displayNodes: Map<string, Map<string, UINode>>;
   editor: NodeEditor<Schemes>;
   header: string;
-  filter: string;
 }>();
 
 const colors = [
@@ -20,27 +20,38 @@ const colors = [
   "#4CA346",
 ];
 
-function matchesFilter(name: string): boolean {
-  return name.toLowerCase().includes(props.filter.toLowerCase());
-}
+const filter = ref("");
 </script>
 
 <template>
   <n-infinite-scroll>
     <n-list show-divide>
       <template #header>
-        <div class="m-1 select-none">{{ props.header }}</div>
+        <div class="mx-2">
+          <div class="m-1 select-none">{{ props.header }}</div>
+          <n-input
+            v-model:value="filter"
+            placeholder="Search"
+            size="small"
+            clearable
+          >
+            <template #prefix> <mdi-search /> </template>
+          </n-input>
+        </div>
       </template>
-      <template v-for="(name, index) of displayNodes.keys()" :key="name">
-        <n-list-item class="m-1" v-if="matchesFilter(name)">
-          <MultipleNodesCollapsable
-            :display-nodes="displayNodes.get(name) ?? new Map<string, UINode>()"
-            :editor="props.editor"
-            :header="name"
-            :color="colors[index]"
-          ></MultipleNodesCollapsable>
-        </n-list-item>
-      </template>
+      <n-list-item
+        class="m-1"
+        v-for="(name, index) of displayNodes.keys()"
+        :key="name"
+      >
+        <MultipleNodesCollapsable
+          :display-nodes="displayNodes.get(name) ?? new Map<string, UINode>()"
+          :editor="props.editor"
+          :header="name"
+          :color="colors[index]"
+          :filter="filter"
+        ></MultipleNodesCollapsable>
+      </n-list-item>
     </n-list>
   </n-infinite-scroll>
 </template>

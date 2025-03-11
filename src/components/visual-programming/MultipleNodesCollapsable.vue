@@ -9,7 +9,12 @@ const props = defineProps<{
   editor: NodeEditor<Schemes>;
   header: string;
   color: string;
+  filter: string;
 }>();
+
+function matchesFilter(node: UINode): boolean {
+  return node.name.toLowerCase().includes(props.filter.toLowerCase());
+}
 </script>
 
 <template>
@@ -20,21 +25,26 @@ const props = defineProps<{
       class="select-none"
     >
       <n-list clickable hoverable>
-        <n-list-item
-          v-for="node of displayNodes.values()"
-          :onclick="() => node.create(node)"
-          :draggable="node.draggable"
-          v-on:dragstart="
-            (ev: DragEvent) => {
-              if (ev.dataTransfer) {
-                ev.dataTransfer.setData('text/plain', JSON.stringify(node));
-                ev.dataTransfer.effectAllowed = 'copy';
+        <template v-for="node of displayNodes.values()">
+          <n-list-item
+            v-if="matchesFilter(node)"
+            :onclick="() => node.create(node)"
+            :draggable="node.draggable"
+            v-on:dragstart="
+              (ev: DragEvent) => {
+                if (ev.dataTransfer) {
+                  ev.dataTransfer.setData('text/plain', JSON.stringify(node));
+                  ev.dataTransfer.effectAllowed = 'copy';
+                }
               }
-            }
-          "
-        >
-          <SingleNodeDisplay :ui-node="node" :color="color"></SingleNodeDisplay>
-        </n-list-item>
+            "
+          >
+            <SingleNodeDisplay
+              :ui-node="node"
+              :color="color"
+            ></SingleNodeDisplay>
+          </n-list-item>
+        </template>
       </n-list>
     </n-collapse-item>
   </n-collapse>

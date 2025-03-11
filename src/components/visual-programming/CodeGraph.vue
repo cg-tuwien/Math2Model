@@ -871,7 +871,6 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
       <NodesDock
         :display-nodes="uiNodes"
         :editor="editor"
-        :filter="''"
         header="Nodes"
         style="width: 25%"
       ></NodesDock>
