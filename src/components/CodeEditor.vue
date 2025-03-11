@@ -102,32 +102,27 @@ watch(monacoMount, (element) => {
 });
 </script>
 <template>
-  <div class="flex flex-col">
-    <h2 class="border border-gray-500 border-b-0 px-2 dark:text-white">
-      {{ props.keyedCode?.name ?? "No file opened" }}
-    </h2>
-    <div class="flex self-stretch flex-1 relative">
-      <div
-        ref="monacoMount"
-        class="border border-gray-500 self-stretch flex-1 overflow-hidden"
-        :class="{ 'bg-gray-800': isReadonly }"
-      ></div>
-      <div
-        class="absolute top-2 right-2"
-        v-if="props.keyedCode?.name.includes('.graph')"
+  <div class="flex self-stretch flex-1 relative">
+    <div
+      ref="monacoMount"
+      class="border border-gray-500 self-stretch flex-1 overflow-hidden"
+      :class="{ 'bg-gray-800': isReadonly }"
+    ></div>
+    <div
+      class="absolute top-2 right-2"
+      v-if="props.keyedCode?.name.includes('.graph')"
+    >
+      <n-button
+        quaternary
+        circle
+        type="primary"
+        @click="emit('graph')"
+        class="text-xl"
       >
-        <n-button
-          quaternary
-          circle
-          type="primary"
-          @click="emit('graph')"
-          class="text-xl"
-        >
-          <template #icon>
-            <n-icon size="32px"><mdi-transit-connection-variant /></n-icon>
-          </template>
-        </n-button>
-      </div>
+        <template #icon>
+          <n-icon size="32px"><mdi-transit-connection-variant /></n-icon>
+        </template>
+      </n-button>
     </div>
   </div>
 </template>

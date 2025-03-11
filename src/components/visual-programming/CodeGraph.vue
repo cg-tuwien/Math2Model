@@ -864,7 +864,7 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
       </template>
     </n-card>
   </n-modal>
-  <div class="flex w-full">
+  <div class="flex w-full border border-gray-500">
     <NodesDock
       :display-nodes="uiNodes"
       :editor="editor"

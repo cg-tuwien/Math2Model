@@ -379,61 +379,67 @@ watchImmediate(
             </div>
           </template>
           <template #2>
-            <div class="flex h-full w-full">
+            <div class="h-full w-full">
               <WebGpu
                 v-if="exportStore.isExportMode"
                 :gpuDevice="props.gpuDevice"
                 :engine="props.engine"
                 :fs="props.fs"
               ></WebGpu>
-              <CodeEditor
-                v-else-if="openFile.editorType.value === 'shader'"
-                class="self-stretch overflow-hidden flex-1"
-                :keyed-code="openFile.code.value"
-                :is-readonly="openFile.isReadonly.value"
-                :is-dark="store.isDark"
-                :markers="openFile.markers.value"
-                @update="openFile.setNewCode($event)"
-                @graph="
-                  openFile.openFile(
-                    makeFilePath(
-                      openFile.path.value?.replace('.wgsl', '') ?? ''
-                    )
-                  )
-                "
+              <EditorTab
+                v-else
+                :title="openFile.code.value?.name ?? 'No file opened'"
+                class="h-full"
               >
-              </CodeEditor>
-              <CodeGraph
-                v-else-if="openFile.editorType.value === 'graph'"
-                :fs="props.fs"
-                :keyedGraph="openFile.code.value"
-                @update="
-                  (content) => {
-                    if (openFile.path.value !== null) {
-                      saveGraphWgsl(openFile.path.value, content);
-                    } else {
-                      console.error('Invalid state!');
-                    }
-                  }
-                "
-                @save="
-                  (content) => {
-                    if (openFile.path.value !== null) {
-                      props.fs.writeTextFile(openFile.path.value, content);
-                    } else {
-                      console.error('Invalid state!');
-                    }
-                  }
-                "
-                @code="
-                  () => {
+                <CodeEditor
+                  v-if="openFile.editorType.value === 'shader'"
+                  class="self-stretch overflow-hidden flex-1"
+                  :keyed-code="openFile.code.value"
+                  :is-readonly="openFile.isReadonly.value"
+                  :is-dark="store.isDark"
+                  :markers="openFile.markers.value"
+                  @update="openFile.setNewCode($event)"
+                  @graph="
                     openFile.openFile(
-                      makeFilePath(openFile.path.value + '.wgsl')
-                    );
-                  }
-                "
-                ref="graphRef"
-              ></CodeGraph>
+                      makeFilePath(
+                        openFile.path.value?.replace('.wgsl', '') ?? ''
+                      )
+                    )
+                  "
+                >
+                </CodeEditor>
+                <CodeGraph
+                  v-else-if="openFile.editorType.value === 'graph'"
+                  :fs="props.fs"
+                  :keyedGraph="openFile.code.value"
+                  @update="
+                    (content) => {
+                      if (openFile.path.value !== null) {
+                        saveGraphWgsl(openFile.path.value, content);
+                      } else {
+                        console.error('Invalid state!');
+                      }
+                    }
+                  "
+                  @save="
+                    (content) => {
+                      if (openFile.path.value !== null) {
+                        props.fs.writeTextFile(openFile.path.value, content);
+                      } else {
+                        console.error('Invalid state!');
+                      }
+                    }
+                  "
+                  @code="
+                    () => {
+                      openFile.openFile(
+                        makeFilePath(openFile.path.value + '.wgsl')
+                      );
+                    }
+                  "
+                  ref="graphRef"
+                ></CodeGraph>
+              </EditorTab>
             </div>
           </template>
         </n-split>
