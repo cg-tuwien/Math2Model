@@ -81,7 +81,7 @@ pub struct GpuApplication {
 }
 
 const PATCH_SIZES: [u32; 5] = [2, 4, 8, 16, 32];
-const MAX_PATCH_COUNT: u32 = 10_217_728;
+const MAX_PATCH_COUNT: u32 = 524_288;
 
 #[derive(Clone)]
 struct MissingShader(Arc<ShaderPipelines>);
