@@ -269,7 +269,8 @@ fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>,
     @builtin(local_invocation_id) local_invocation_id: vec3<u32>) {
     let patch_index: u32 = workgroup_id.x+workgroup_id.y*65536u;
     let sample_index: u32 = local_invocation_id.x; // 0 to 31
-    assert(patch_index < patches_from_buffer.patches_length);
+    if(patch_index >= patches_from_buffer.patches_length) {return;}
+    //assert(patch_index < patches_from_buffer.patches_length);
     let quad_encoded = patches_from_buffer.patches[patch_index];
     let quad = patch_decode(patches_from_buffer.patches[patch_index]);
     let quad_size = quad.max - quad.min;
@@ -351,6 +352,9 @@ fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>,
         let planarity_local = 1.0 - (lambda_min / trace);
         planarity_score = planarity_local;
     
-        split_patch(quad_encoded, quad, u_length, v_length, planarity_local);
+        if(patch_index <= 1000000u)
+        {
+            split_patch(quad_encoded, quad, u_length, v_length, planarity_local);
+        }
     }
 }
