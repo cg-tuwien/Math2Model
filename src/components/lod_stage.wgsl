@@ -267,7 +267,7 @@ fn calculateNormalOfPatch(p: Patch) -> vec3<f32> {
 @compute @workgroup_size(WORKGROUP_SIZE, 1, 1)
 fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>,
     @builtin(local_invocation_id) local_invocation_id: vec3<u32>) {
-    // This 65536u must match the limit in indirect_dispatch_rebalance
+    // This 8192u must match the limit in indirect_dispatch_rebalance
     let patch_index: u32 = workgroup_id.x+workgroup_id.y*8192u; 
     let sample_index: u32 = local_invocation_id.x; // 0 to 31
     if(patch_index >= patches_from_buffer.patches_length) {return;}
