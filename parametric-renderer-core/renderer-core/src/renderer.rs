@@ -368,11 +368,12 @@ fn render_component(
         move || models.iter(),
         |model| model.get_untracked().id.clone(),
         {
-            move |model: ArcReadSignal<ModelInfo>| {
+            move |key: &String, model: ArcReadSignal<ModelInfo>| {
                 model_component(
                     surface,
                     shaders,
                     textures,
+                    key,
                     model.clone(),
                     threshold_factor,
                     compute_patches,
@@ -632,29 +633,23 @@ fn model_component(
     surface: RwSignal<SurfaceOrFallback>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     textures: RwSignal<HashMap<TextureId, Arc<Texture>>>,
+    key: &str,
     model: ArcReadSignal<ModelInfo>,
     threshold_factor: ReadSignal<f32>,
     compute_patches: StoredValue<ComputePatchesStep>,
     copy_patches_pipeline: StoredValue<wgpu::ComputePipeline>,
     render_stage: RenderInfo,
 ) -> ModelRenderers<
-    impl Fn(&FrameData, &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>),
-    impl Fn(&mut wgpu_profiler::OwningScope<'_, wgpu::RenderPass<'_>>),
+    impl Fn(&FrameData, &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>) + use<>,
+    impl Fn(&mut wgpu_profiler::OwningScope<'_, wgpu::RenderPass<'_>>) + use<>,
 > {
-    let virtual_model = Memo::new_computed({
-        let model = model.clone();
-        move |_| {
-            let meshes = render_stage.meshes.read_value();
-            let model = model.read();
-            VirtualModel::new(&wgpu_context(), &meshes, &format!("ID{}", model.id))
-        }
-    });
+    let virtual_model = Arc::new(VirtualModel::new(&wgpu_context(), &render_stage.meshes.read_value(), &format!("ID{}", key)));
 
     let lod_stage_component = lod_stage_component(
         surface,
         shaders,
         model.clone(),
-        virtual_model,
+        virtual_model.clone(),
         compute_patches,
         copy_patches_pipeline,
         threshold_factor,
@@ -684,7 +679,7 @@ fn lod_stage_component(
     surface: RwSignal<SurfaceOrFallback>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     model: ArcReadSignal<ModelInfo>,
-    virtual_model: Memo<VirtualModel>,
+    virtual_model: Arc<VirtualModel>,
     compute_patches: StoredValue<ComputePatchesStep>,
     copy_patches_pipeline: StoredValue<wgpu::ComputePipeline>,
     threshold_factor: ReadSignal<f32>,
@@ -693,11 +688,10 @@ fn lod_stage_component(
     let device = &context.device;
     let id = model.read_untracked().id.clone(); // I wonder if this ID stays the same
 
-    let copy_patches_bind_group_0 = Memo::new_computed(move |_| {
-        let virtual_model = virtual_model.read();
+    let copy_patches_bind_group_0 = {
         let render_buffer = &virtual_model.render_buffer;
         copy_patches::bind_groups::BindGroup0::from_bindings(
-            &wgpu_context().device,
+            device,
             copy_patches::bind_groups::BindGroupLayout0 {
                 render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
                 render_buffer_4: render_buffer[1].as_entire_buffer_binding(),
@@ -707,7 +701,7 @@ fn lod_stage_component(
                 indirect_draw: virtual_model.indirect_draw.as_entire_buffer_binding(),
             },
         )
-    });
+    };
 
     let input_buffer = RwSignal::new(TypedBuffer::new_uniform(
         &context.device,
@@ -764,12 +758,10 @@ fn lod_stage_component(
         wgpu::BufferUsages::COPY_DST,
     );
 
-    let bind_group_1 = Memo::new_computed(move |_| {
-        let context = &wgpu_context();
-        let virtual_model = virtual_model.read();
+    let bind_group_1 = {
         let render_buffer = &virtual_model.render_buffer;
         compute_patches::bind_groups::BindGroup1::from_bindings(
-            &context.device,
+            device,
             compute_patches::bind_groups::BindGroupLayout1 {
                 input_buffer: input_buffer.read().as_entire_buffer_binding(),
                 render_buffer_2: render_buffer[0].as_entire_buffer_binding(),
@@ -779,7 +771,7 @@ fn lod_stage_component(
                 render_buffer_32: render_buffer[4].as_entire_buffer_binding(),
             },
         )
-    });
+    };
     let bind_group_2 = [
         compute_patches::bind_groups::BindGroup2::from_bindings(
             device,
@@ -858,7 +850,7 @@ fn lod_stage_component(
             patches_capacity: MAX_PATCH_COUNT,
             patches: vec![],
         };
-        for render_buffer in virtual_model.read().render_buffer.iter() {
+        for render_buffer in virtual_model.render_buffer.iter() {
             render_buffer.write_buffer(queue, &render_buffer_reset);
         }
 
@@ -887,7 +879,7 @@ fn lod_stage_component(
                     compute_patches::set_bind_groups(
                         &mut compute_pass.recorder,
                         &compute_patches.bind_group_0,
-                        &bind_group_1.read(),
+                        &bind_group_1,
                         &bind_group_2[0],
                     );
                     compute_pass.dispatch_workgroups_indirect(&indirect_compute_buffer[0], 0);
@@ -914,7 +906,7 @@ fn lod_stage_component(
                         &mut compute_pass.recorder,
                         // Maybe refactor so that parent components set bind groups, and children just assume that they're set?
                         &compute_patches.bind_group_0,
-                        &bind_group_1.read(),
+                        &bind_group_1,
                         &bind_group_2[1],
                     );
                     compute_pass.dispatch_workgroups_indirect(&indirect_compute_buffer[1], 0);
@@ -932,7 +924,7 @@ fn lod_stage_component(
             compute_pass.set_pipeline(&copy_patches_pipeline.read_value());
             copy_patches::set_bind_groups(
                 &mut compute_pass.recorder,
-                &copy_patches_bind_group_0.read(),
+                &copy_patches_bind_group_0,
             );
             compute_pass.dispatch_workgroups(1, 1, 1);
         }
@@ -951,7 +943,7 @@ fn render_model_component(
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     textures: RwSignal<HashMap<TextureId, Arc<Texture>>>,
     model: ArcReadSignal<ModelInfo>,
-    virtual_model: Memo<VirtualModel>,
+    virtual_model: Arc<VirtualModel>,
     meshes: StoredValue<Vec<Mesh>>,
 ) -> impl Fn(&mut wgpu_profiler::OwningScope<'_, wgpu::RenderPass<'_>>) {
     let shader = Memo::new({
@@ -997,6 +989,7 @@ fn render_model_component(
 
     let bind_group_1 = Memo::new_computed({
         let model = model.clone();
+        let virtual_model = virtual_model.clone();
         move |_| {
             let _m = model.read();
             let context = &wgpu_context();
@@ -1005,7 +998,6 @@ fn render_model_component(
             let material_buffer = material_buffer.read();
             let t_diffuse = texture.read();
             virtual_model
-                .read()
                 .render_buffer
                 .iter()
                 .map(|render| {
@@ -1037,7 +1029,6 @@ fn render_model_component(
     });
 
     move |render_pass: &mut wgpu_profiler::OwningScope<'_, wgpu::RenderPass<'_>>| {
-        let virtual_model = virtual_model.read();
         render_pass.set_pipeline(&shader.read().render);
 
         meshes.with_value(|meshes| {

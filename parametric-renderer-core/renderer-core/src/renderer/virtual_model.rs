@@ -75,6 +75,7 @@ pub fn make_empty_texture(context: &WgpuContext) -> Arc<Texture> {
     ))
 }
 
+// Minimal amount of info to pass from patches stage to render stage
 pub struct VirtualModel {
     pub render_buffer: Vec<TypedBuffer<compute_patches::RenderBuffer>>,
     pub indirect_draw: TypedBuffer<Vec<copy_patches::DrawIndexedIndirectArgs>>,
