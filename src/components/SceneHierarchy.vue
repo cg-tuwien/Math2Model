@@ -311,14 +311,14 @@ function uploadFile(data: {
         <template #action>
           <n-flex vertical>
             <n-flex justify="space-between">
-              <n-text
-                >Create a code-based model, if you want full freedom. A code
+              <n-text>
+                Create a code-based model, if you want full freedom. A code
                 editor with syntax highlighting and auto completion will be
                 provided. Pick this option if you have advanced knowledge in
-                programming.</n-text
-              >
-              <n-text
-                >Create a graph-based model, if you want a more restricted
+                programming.
+              </n-text>
+              <n-text>
+                Create a graph-based model, if you want a more restricted
                 option. A visual scripting tool, where you connect predefined
                 nodes with each other will be provided. Pick this option if you
                 have little to no programming experience. Some complex
