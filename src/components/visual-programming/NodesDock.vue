@@ -37,7 +37,7 @@ function matchesFilter(name: string): boolean {
             :display-nodes="displayNodes.get(name) ?? new Map<string, UINode>()"
             :editor="props.editor"
             :header="name"
-            :color="colors[index - 1]"
+            :color="colors[index]"
           ></MultipleNodesCollapsable>
         </n-list-item>
       </template>
