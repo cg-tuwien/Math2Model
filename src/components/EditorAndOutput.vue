@@ -351,28 +351,27 @@ watchImmediate(
           :default-size="0.5"
         >
           <template #1>
-            <div class="flex h-full w-full relative">
-              <div
-                ref="canvasContainer"
-                class="self-stretch overflow-hidden flex-1"
-                v-show="sceneFile !== null"
-              ></div>
-              <n-card title="Missing scene file" v-if="sceneFile === null">
-                <n-button type="primary" @click="saveScene()">
-                  Create empty scene
-                </n-button>
-              </n-card>
-              <div class="absolute top-2.5 right-2.5">
-                <img src="./../assets/TUWien.png" class="size-12" />
+            <div class="flex flex-col h-full w-full">
+              <div class="h-full w-full relative">
+                <div
+                  ref="canvasContainer"
+                  class="absolute top-0 bottom-0 left-0 right-0"
+                  v-show="sceneFile !== null"
+                ></div>
+                <n-card title="Missing scene file" v-if="sceneFile === null">
+                  <n-button type="primary" @click="saveScene()">
+                    Create empty scene
+                  </n-button>
+                </n-card>
+                <div class="absolute top-2.5 right-2.5">
+                  <img src="./../assets/TUWien.png" class="size-12" />
+                </div>
+                <div class="absolute bottom-0 left-1 text-gray-900">
+                  CPU {{ (fpsCounter.avg_delta_time * 1000.0).toFixed(1) }} ms /
+                  GPU {{ (fpsCounter.avg_gpu_time * 1000.0).toFixed(1) }} ms
+                </div>
               </div>
-              <div class="absolute bottom-0 left-1 text-gray-900">
-                CPU {{ (fpsCounter.avg_delta_time * 1000.0).toFixed(1) }} ms /
-                GPU {{ (fpsCounter.avg_gpu_time * 1000.0).toFixed(1) }} ms
-              </div>
-              <div
-                class="absolute bottom-0 left-0 right-0"
-                v-if="sceneDescription"
-              >
+              <div v-if="sceneDescription">
                 <n-card class="" style="border-radius: 0px">{{
                   sceneDescription
                 }}</n-card>
