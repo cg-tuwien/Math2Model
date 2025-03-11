@@ -34,6 +34,11 @@ const config: UserConfig = defineConfig({
   build: {
     target: "esnext",
   },
+  server: {
+    watch: {
+      ignored: ["parametric-renderer-core/target/**/*"],
+    },
+  },
 });
 
 export default config;
