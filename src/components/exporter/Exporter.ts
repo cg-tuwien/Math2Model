@@ -263,10 +263,10 @@ export class ExporterInstance {
       
       switch(this.normalsType)
       {
-        case 0:
+        case 1:
           this.tris.push(v1.globalIndex, v3.globalIndex, v2.globalIndex);
           break;
-        case 1:
+        case 0:
           this.tris.push(v1.globalIndex, v2.globalIndex, v3.globalIndex);
           break;
         case 2:
