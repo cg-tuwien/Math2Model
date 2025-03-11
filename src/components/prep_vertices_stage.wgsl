@@ -23,5 +23,11 @@ var<private> instance_id: u32;
 /// Copies the render buffer sizes to the indirect dispatching of the vertices stage
 @compute @workgroup_size(1, 1, 1)
 fn main() {
-  dispatch_next.x = render_buffer_2.patches_length;
+  var x = render_buffer_2.patches_length;
+  while(x >= 65536u)
+  {
+      dispatch_next.y+=1u;
+      x-=65536u;
+  }
+  dispatch_next.x = min(render_buffer_2.patches_length,0xFFFFu);
 }

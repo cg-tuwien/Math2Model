@@ -180,7 +180,7 @@ fn main(
     @builtin(workgroup_id) workgroup_id : vec3<u32>,
     @builtin(local_invocation_id) local_invocation_id : vec3<u32>
 ) {
-    let patch_index: u32 = workgroup_id.x;
+    let patch_index: u32 = workgroup_id.x+workgroup_id.y*65536u;
     let sample_index: u32 = local_invocation_id.x; // From 0 to 3, aka the four corners
     // Get the patch
     let quad = patch_decode(render_buffer.patches[patch_index]);
