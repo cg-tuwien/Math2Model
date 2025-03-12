@@ -21,6 +21,7 @@ import {
   newPlaneShape,
   newCylinderShape,
   ShapeNode,
+  newCubeShape,
 } from "./simple-mode/shapes";
 import type { UINode } from "./ui/uinode";
 import { ClassicPreset, type GetSchemes, type NodeEditor } from "rete";
@@ -152,6 +153,17 @@ export function useUiNodes(
           image: CategoryOutlined,
           get: () => {
             return newCylinderShape();
+          },
+          create: createUINode,
+          draggable: true,
+        },
+        {
+          name: "Cube",
+          type: "SHAPE",
+          prefix: "parametric",
+          image: RectangleLandscape24Regular,
+          get: () => {
+            return newCubeShape();
           },
           create: createUINode,
           draggable: true,

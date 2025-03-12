@@ -2,6 +2,7 @@ import Heart from "@/../parametric-renderer-core/graphs/Heart.graph.wgsl?raw";
 import Sphere from "@/../parametric-renderer-core/graphs/Sphere.graph.wgsl?raw";
 import Plane from "@/../parametric-renderer-core/graphs/BasicGraphShader.graph.wgsl?raw";
 import Cylinder from "@/../parametric-renderer-core/graphs/Cylinder.graph.wgsl?raw";
+import Cube from "@/../parametric-renderer-core/graphs/Cube.graph.wgsl?raw";
 import {
   idToVariableName,
   NodeReturn,
@@ -18,17 +19,17 @@ import { SliderControl } from "@/vpnodes/controls/slider";
 export class ShapeNode extends VPNode {
   constructor(
     protected name: string,
-    protected code: string,
+    protected code: string
   ) {
     super(name);
 
     this.addInput(
       "param",
-      new ClassicPreset.Input(reteSocket, "input[u, v]/vec2f"),
+      new ClassicPreset.Input(reteSocket, "input[u, v]/vec2f")
     );
     this.addOutput(
       "value",
-      new ClassicPreset.Output(reteSocket, "output[x, y, z]/vec3f"),
+      new ClassicPreset.Output(reteSocket, "output[x, y, z]/vec3f")
     );
   }
 
@@ -44,7 +45,7 @@ export class ShapeNode extends VPNode {
       },
       value: {
         value: vec3.zero(),
-        code: `${nodeToVariableDeclaration(this)} = ${this.name}(${param ? param[0].refId ?? param[0].value : "vec2f(0.0, 0.0)"});`,
+        code: `${nodeToVariableDeclaration(this)} = ${this.name}(${param ? (param[0].refId ?? param[0].value) : "vec2f(0.0, 0.0)"});`,
         refId: idToVariableName(this.id),
       },
     };
@@ -84,6 +85,10 @@ export function newPlaneShape() {
 
 export function newCylinderShape() {
   return new ShapeNode("Cylinder", Cylinder);
+}
+
+export function newCubeShape() {
+  return new ShapeNode("Cube", Cube);
 }
 
 function nameToCode(name: string) {
