@@ -752,7 +752,6 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
     <NodesDock
       :display-nodes="uiNodes"
       :editor="editor"
-      header="Nodes"
       style="width: 25%"
     ></NodesDock>
     <div class="flex flex-1 relative">

@@ -8,7 +8,6 @@ import { ref } from "vue";
 const props = defineProps<{
   displayNodes: Map<string, Map<string, UINode>>;
   editor: NodeEditor<Schemes>;
-  header: string;
 }>();
 
 const colors = [
@@ -19,39 +18,38 @@ const colors = [
   "#E069AF",
   "#4CA346",
 ];
-
 const filter = ref("");
 </script>
 
 <template>
-  <n-scrollbar class="h-full">
-    <n-list show-divide class="h-full">
-      <template #header>
-        <div class="mx-2">
-          <div class="m-1 select-none">{{ props.header }}</div>
-          <n-input
-            v-model:value="filter"
-            placeholder="Search"
-            size="small"
-            clearable
-          >
-            <template #prefix> <mdi-search /> </template>
-          </n-input>
-        </div>
-      </template>
-      <n-list-item
-        class="m-1"
-        v-for="(name, index) of displayNodes.keys()"
-        :key="name"
+  <div class="h-full bg-neutral-50 dark:bg-neutral-900 p-1">
+    <div class="p-2">
+      <span class="select-none dark:text-white">Nodes</span>
+      <n-input
+        class="mt-2"
+        v-model:value="filter"
+        placeholder="Search"
+        size="small"
+        clearable
       >
-        <MultipleNodesCollapsable
-          :display-nodes="displayNodes.get(name) ?? new Map<string, UINode>()"
-          :editor="props.editor"
-          :header="name"
-          :color="colors[index]"
-          :filter="filter"
-        ></MultipleNodesCollapsable>
-      </n-list-item>
-    </n-list>
-  </n-scrollbar>
+      </n-input>
+    </div>
+    <n-scrollbar class="h-full">
+      <ul class="h-full">
+        <li
+          class="m-1"
+          v-for="(name, index) of displayNodes.keys()"
+          :key="name"
+        >
+          <MultipleNodesCollapsable
+            :display-nodes="displayNodes.get(name) ?? new Map<string, UINode>()"
+            :editor="props.editor"
+            :header="name"
+            :color="colors[index]"
+            :filter="filter"
+          ></MultipleNodesCollapsable>
+        </li>
+      </ul>
+    </n-scrollbar>
+  </div>
 </template>

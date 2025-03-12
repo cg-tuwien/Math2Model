@@ -24,13 +24,15 @@ function matchesFilter(node: UINode): boolean {
       :name="props.header"
       class="select-none"
     >
-      <n-list clickable hoverable>
+      <n-list clickable hoverable :show-divider="false">
         <template v-for="node of displayNodes.values()">
           <n-list-item
+            class="border-2 border-black mb-1"
+            style="border-radius: 10px; padding: 8px 12px"
             v-if="matchesFilter(node)"
-            :onclick="() => node.create(node)"
+            @click="() => node.create(node)"
             :draggable="node.draggable"
-            v-on:dragstart="
+            @dragstart="
               (ev: DragEvent) => {
                 if (ev.dataTransfer) {
                   ev.dataTransfer.setData('text/plain', JSON.stringify(node));
