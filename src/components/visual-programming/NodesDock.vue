@@ -22,7 +22,7 @@ const filter = ref("");
 </script>
 
 <template>
-  <div class="h-full bg-neutral-50 dark:bg-neutral-900 p-1">
+  <div class="flex flex-col h-full bg-neutral-50 dark:bg-neutral-900 p-1">
     <div class="p-2">
       <span class="select-none dark:text-white">Nodes</span>
       <n-input
@@ -34,8 +34,8 @@ const filter = ref("");
       >
       </n-input>
     </div>
-    <n-scrollbar class="h-full">
-      <ul class="h-full">
+    <n-scrollbar>
+      <ul class="pb-20">
         <li
           class="m-1"
           v-for="(name, index) of displayNodes.keys()"
