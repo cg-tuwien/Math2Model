@@ -55,17 +55,36 @@ fn main() {
         instance_count: 1,
     }]);
 
-    let mut renderer = GpuApplicationBuilder::new(WindowOrFallback::Headless {
-        size: glam::UVec2::new(1280, 720),
-    })
-    .block_on()
-    .unwrap()
-    .build();
+    let window = {
+        if true {
+            let event_loop = winit::event_loop::EventLoop::new().unwrap();
+            #[allow(deprecated)]
+            WindowOrFallback::Window(std::sync::Arc::new(
+                event_loop
+                    .create_window(
+                        winit::window::WindowAttributes::default()
+                            .with_inner_size(winit::dpi::LogicalSize::new(1280, 720)),
+                    )
+                    .unwrap(),
+            ))
+        } else {
+            // TODO: Why does this still not quite work?
+            WindowOrFallback::Headless {
+                size: glam::UVec2::new(1280, 720),
+            }
+        }
+    };
+
+    let mut renderer = GpuApplicationBuilder::new(window)
+        .block_on()
+        .unwrap()
+        .build();
     for (shader_id, shader_info) in &app.shaders {
         renderer
             .set_shader(shader_id.clone(), shader_info, None)
             .block_on();
     }
+    renderer.update_models(&app.models);
 
     let mut group = c.benchmark_group("render");
     // group.throughput(throughput);

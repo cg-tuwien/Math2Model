@@ -95,9 +95,9 @@ impl GpuApplication {
         runtime.set();
         let context = Arc::new(context);
         provide_context::<Arc<WgpuContext>>(context.clone());
+        let (desired_size, set_desired_size) = signal(surface.size());
         let surface = RwSignal::new(surface);
         let profiler = StoredValue::new(create_profiler(&context));
-        let (desired_size, set_desired_size) = signal(UVec2::new(1, 1));
         let (force_wait, set_force_wait) = signal(false);
         let (threshold_factor, set_threshold_factor) = signal(1.0f32);
         let models = SignalVec::new();

@@ -155,9 +155,11 @@ impl ApplicationHandler<AppCommand> for Application {
     fn new_events(
         &mut self,
         _event_loop: &winit::event_loop::ActiveEventLoop,
-        cause: winit::event::StartCause,
+        _cause: winit::event::StartCause,
     ) {
-        if let winit::event::StartCause::Poll = cause {
+        // We need this for the window creation to work
+        #[cfg(target_arch = "wasm32")]
+        if let winit::event::StartCause::Poll = _cause {
             any_spawner::Executor::poll_local();
         }
     }
@@ -169,9 +171,7 @@ impl ApplicationHandler<AppCommand> for Application {
         event: winit::event::WindowEvent,
     ) {
         match event {
-            WindowEvent::Resized(_) => {
-                any_spawner::Executor::poll_local();
-            }
+            WindowEvent::Resized(_) => {}
             WindowEvent::CloseRequested => {
                 self.on_exit();
                 event_loop.exit();
