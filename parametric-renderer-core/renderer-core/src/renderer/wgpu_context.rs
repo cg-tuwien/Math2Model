@@ -9,7 +9,6 @@ use super::WindowOrFallback;
 
 pub struct WgpuContext {
     pub instance: wgpu::Instance,
-    pub _adapter: wgpu::Adapter,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub view_format: wgpu::TextureFormat,
@@ -104,7 +103,6 @@ impl WgpuContext {
         Ok((
             WgpuContext {
                 instance,
-                _adapter: adapter,
                 device,
                 queue,
                 view_format,
@@ -122,21 +120,22 @@ impl WgpuContext {
 }
 
 pub enum SurfaceTexture {
-    Surface(wgpu::SurfaceTexture, wgpu::TextureView),
+    Surface(wgpu::SurfaceTexture, wgpu::TextureView, Arc<Window>),
     Fallback(wgpu::TextureView),
 }
 
 impl SurfaceTexture {
     pub fn texture_view(&self) -> &wgpu::TextureView {
         match self {
-            SurfaceTexture::Surface(_, view) => &view,
+            SurfaceTexture::Surface(_, view, _) => &view,
             SurfaceTexture::Fallback(view) => &view,
         }
     }
 
     pub fn present(self) {
         match self {
-            SurfaceTexture::Surface(surface_texture, _) => {
+            SurfaceTexture::Surface(surface_texture, _, window) => {
+                window.pre_present_notify();
                 surface_texture.present();
             }
             SurfaceTexture::Fallback(_) => {}
@@ -211,12 +210,12 @@ impl SurfaceOrFallback {
         context: &WgpuContext,
     ) -> Result<SurfaceTexture, wgpu::SurfaceError> {
         match self {
-            SurfaceOrFallback::Surface { surface, .. } => {
-                surface.get_current_texture().map(|surface_texture| {
-                    let view = context.create_view(&surface_texture.texture);
-                    SurfaceTexture::Surface(surface_texture, view)
-                })
-            }
+            SurfaceOrFallback::Surface {
+                surface, window, ..
+            } => surface.get_current_texture().map(|surface_texture| {
+                let view = context.create_view(&surface_texture.texture);
+                SurfaceTexture::Surface(surface_texture, view, window.clone())
+            }),
             SurfaceOrFallback::Fallback { texture, .. } => {
                 Ok(SurfaceTexture::Fallback(context.create_view(&texture)))
             }
@@ -245,12 +244,13 @@ fn create_fallback_texture(
     })
 }
 
-pub fn create_profiler(_context: &WgpuContext) -> GpuProfiler {
+pub fn create_profiler(context: &WgpuContext) -> GpuProfiler {
     let gpu_profiler_settings = GpuProfilerSettings {
-        enable_timer_queries: false, // Disabled by default
+        enable_timer_queries: true, // Enabled by default
         ..GpuProfilerSettings::default()
     };
 
-    let profiler = GpuProfiler::new(gpu_profiler_settings).expect("Failed to create profiler");
+    let profiler = GpuProfiler::new(&context.device, gpu_profiler_settings)
+        .expect("Failed to create profiler");
     profiler
 }

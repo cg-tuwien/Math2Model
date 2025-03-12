@@ -11,7 +11,6 @@ pub struct WindowInputs<'a> {
     pub keyboard: WindowKeyboardInputs<'a>,
     pub new_size: Option<PhysicalSize<u32>>,
     pub new_scale_factor: Option<f64>,
-    pub close_requested: bool,
 }
 
 pub struct WindowMouseInputs<'a> {
@@ -124,7 +123,6 @@ pub struct WindowInputCollector {
     key_held: HashSet<Key>,
     new_size: Option<PhysicalSize<u32>>,
     new_scale_factor: Option<f64>,
-    close_requested: bool,
     // Not supported at the moment
     // - dropped_file
     // - step_start and step_duration
@@ -150,7 +148,6 @@ impl WindowInputCollector {
             key_held: HashSet::new(),
             new_size: None,
             new_scale_factor: None,
-            close_requested: false,
         }
     }
 
@@ -200,9 +197,6 @@ impl WindowInputCollector {
                     }
                 }
             }
-            winit::event::WindowEvent::CloseRequested => {
-                self.close_requested = true;
-            }
             winit::event::WindowEvent::Resized(size) => {
                 self.new_size = Some(*size);
             }
@@ -244,7 +238,6 @@ impl WindowInputCollector {
             },
             new_size: self.new_size,
             new_scale_factor: self.new_scale_factor,
-            close_requested: self.close_requested,
         };
 
         self.start_cursor_position = self.end_cursor_position;
@@ -254,7 +247,6 @@ impl WindowInputCollector {
         self.key_inputs.clear();
         self.new_size = None;
         self.new_scale_factor = None;
-        self.close_requested = false;
 
         inputs
     }

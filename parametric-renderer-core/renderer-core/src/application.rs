@@ -3,7 +3,8 @@ use std::sync::{Arc, Mutex};
 use glam::UVec2;
 use log::{error, info, warn};
 use winit::{
-    application::ApplicationHandler, dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window,
+    application::ApplicationHandler, dpi::PhysicalSize, event::WindowEvent,
+    event_loop::EventLoopProxy, window::Window,
 };
 
 use crate::{
@@ -37,9 +38,11 @@ pub struct Application {
     time_counters: TimeCounters,
     app_commands: EventLoopProxy<AppCommand>,
     on_exit_callback: Option<Box<dyn FnOnce(&mut Application)>>,
-    pub on_shader_compiled: Option<Arc<dyn Fn(&ShaderId, Vec<wgpu::CompilationMessage>)>>,
+    pub on_shader_compiled: Option<ShaderCompiledCallback>,
     _canvas: WasmCanvas,
 }
+#[derive(Clone)]
+pub struct ShaderCompiledCallback(pub Arc<dyn Fn(&ShaderId, Vec<wgpu::CompilationMessage>)>);
 
 impl Application {
     pub fn new(
@@ -80,7 +83,11 @@ impl Application {
             let renderer = gpu_builder.await.unwrap().build();
             let _ = run_on_main(app_commands, move |app| {
                 for (shader_id, shader_info) in &app.app.shaders {
-                    renderer.set_shader(shader_id.clone(), shader_info, on_shader_compiled.clone());
+                    any_spawner::Executor::spawn_local(renderer.set_shader(
+                        shader_id.clone(),
+                        shader_info,
+                        on_shader_compiled.clone(),
+                    ));
                 }
                 renderer.update_models(&app.app.models);
                 app.renderer = Some(renderer)
@@ -134,6 +141,8 @@ impl ApplicationHandler<AppCommand> for Application {
         };
 
         let window = event_loop.create_window(window_attributes).unwrap();
+        // someday winit will natively support having a future here. instead of the dance that create_surface has to do
+        // https://github.com/rust-windowing/winit/issues/3626#issuecomment-2097916252
         self.create_surface(window);
     }
 
@@ -148,21 +157,32 @@ impl ApplicationHandler<AppCommand> for Application {
         _event_loop: &winit::event_loop::ActiveEventLoop,
         _cause: winit::event::StartCause,
     ) {
-        any_spawner::Executor::poll_local();
+        // We need this for the window creation to work
+        #[cfg(target_arch = "wasm32")]
+        if let winit::event::StartCause::Poll = _cause {
+            any_spawner::Executor::poll_local();
+        }
     }
 
     fn window_event(
         &mut self,
-        _event_loop: &winit::event_loop::ActiveEventLoop,
+        event_loop: &winit::event_loop::ActiveEventLoop,
         _window_id: winit::window::WindowId,
         event: winit::event::WindowEvent,
     ) {
-        match &event {
-            winit::event::WindowEvent::RedrawRequested => match self.window {
-                Some(ref mut window) => window.request_redraw(),
-                None => {}
-            },
-            _ => {}
+        match event {
+            WindowEvent::Resized(_) => {}
+            WindowEvent::CloseRequested => {
+                self.on_exit();
+                event_loop.exit();
+            }
+            WindowEvent::RedrawRequested => {
+                any_spawner::Executor::poll_local();
+                if let Some(window) = &self.window {
+                    window.request_redraw();
+                }
+            }
+            _ => (),
         }
     }
 }
@@ -176,10 +196,6 @@ impl InputHandler for Application {
                 winit::keyboard::NamedKey::Escape,
             ))
         {
-            self.on_exit();
-            return event_loop.exit();
-        }
-        if input.close_requested {
             self.on_exit();
             return event_loop.exit();
         }

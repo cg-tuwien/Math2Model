@@ -1,6 +1,6 @@
 [workspace]
 members = ["copy-includes", "desktop", "renderer-core", "wasm"]
-resolver = "2"
+resolver = "3"
 
 [workspace.dependencies]
 bytemuck = { version = "1.21.0", features = ["derive"] }

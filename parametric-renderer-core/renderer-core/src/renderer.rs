@@ -4,6 +4,7 @@ mod virtual_model;
 mod wgpu_context;
 
 pub use frame_data::FrameData;
+use wgpu::BufferUsages;
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -13,7 +14,7 @@ use glam::UVec2;
 use reactive_graph::{
     computed::Memo,
     effect::{Effect, RenderEffect},
-    owner::{Owner, StoredValue, expect_context, provide_context, take_context, use_context},
+    owner::{Owner, StoredValue, expect_context, provide_context, use_context},
     prelude::*,
     signal::{
         ArcReadSignal, ArcWriteSignal, ReadSignal, RwSignal, WriteSignal, arc_signal, signal,
@@ -25,7 +26,8 @@ use wgpu_context::{SurfaceOrFallback, WgpuContext, create_profiler};
 use wgpu_profiler::GpuProfiler;
 
 use crate::{
-    buffer::{CommandEncoderExt, TypedBuffer},
+    application::ShaderCompiledCallback,
+    buffer::{CommandEncoderBufferExt, DeviceBufferExt, TypedBuffer},
     game::{GameRes, MaterialInfo, ModelInfo, ShaderId, TextureId, TextureInfo},
     input::WindowCursorCapture,
     mesh::Mesh,
@@ -66,8 +68,7 @@ pub struct GpuApplication {
     surface: RwSignal<SurfaceOrFallback>,
     profiler: StoredValue<GpuProfiler>,
     profiling_enabled: bool,
-    _runtime: Owner,
-    // render_tree: Arc<dyn Fn(&FrameData) -> Result<RenderResults, wgpu::SurfaceError>>,
+    runtime: Option<Owner>,
     render_effect: RenderEffect<Result<Option<RenderResults>, wgpu::SurfaceError>>,
     set_render_data: ArcWriteSignal<FrameData>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
@@ -94,9 +95,9 @@ impl GpuApplication {
         runtime.set();
         let context = Arc::new(context);
         provide_context::<Arc<WgpuContext>>(context.clone());
+        let (desired_size, set_desired_size) = signal(surface.size());
         let surface = RwSignal::new(surface);
         let profiler = StoredValue::new(create_profiler(&context));
-        let (desired_size, set_desired_size) = signal(UVec2::new(1, 1));
         let (force_wait, set_force_wait) = signal(false);
         let (threshold_factor, set_threshold_factor) = signal(1.0f32);
         let models = SignalVec::new();
@@ -127,7 +128,7 @@ impl GpuApplication {
             surface,
             profiler,
             profiling_enabled: false,
-            _runtime: runtime,
+            runtime: Some(runtime),
             render_effect,
             set_render_data,
             shaders,
@@ -165,22 +166,22 @@ impl GpuApplication {
         &self,
         shader_id: ShaderId,
         info: &crate::game::ShaderInfo,
-        on_shader_compiled: Option<Arc<dyn Fn(&ShaderId, Vec<wgpu::CompilationMessage>)>>,
-    ) {
+        on_shader_compiled: Option<ShaderCompiledCallback>,
+    ) -> impl Future<Output = ()> + use<> {
         let shaders = self.shaders;
         let new_shaders = ShaderPipelines::new(&info.label, &info.code, &self.context);
-        any_spawner::Executor::spawn_local(async move {
+        async move {
             let compilation_results = new_shaders.get_compilation_info().await;
             let is_error = compilation_results
                 .iter()
                 .any(|v| v.message_type == wgpu::CompilationMessageType::Error);
-            on_shader_compiled.map(|f| f(&shader_id, compilation_results));
+            on_shader_compiled.map(|f| (f.0)(&shader_id, compilation_results));
             if !is_error {
                 shaders.update(move |shaders| {
                     shaders.insert(shader_id, Arc::new(new_shaders));
                 });
             }
-        });
+        }
     }
 
     pub fn remove_shader(&self, shader_id: &ShaderId) {
@@ -222,11 +223,10 @@ impl GpuApplication {
             mouse_held: game.mouse_held,
             lod_stage: game.lod_stage.clone(),
         });
-        // any_spawner::Executor::poll_local(); TODO: We need a custom executor, I think
-        // TODO: This currently gets the value of the last frame.
+        any_spawner::Executor::poll_local();
         self.render_effect
             .take_value()
-            .unwrap_or(Err(wgpu::SurfaceError::Timeout)) // Temporary hack
+            .expect("Render effect should have re-executed")
     }
 
     pub fn resize(&self, new_size: UVec2) {
@@ -254,8 +254,10 @@ impl GpuApplication {
 
 impl Drop for GpuApplication {
     fn drop(&mut self) {
-        let ctx = take_context::<Arc<WgpuContext>>();
-        std::mem::drop(ctx);
+        // Make sure to dispose of the Leptos runtime
+        if let Some(runtime) = self.runtime.take() {
+            runtime.unset();
+        }
     }
 }
 
@@ -410,17 +412,17 @@ fn render_component(
             &context.queue,
         );
 
-        let mut command_encoder = {
-            let mut command_encoder =
-                context
-                    .device
-                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                        label: Some("Render Encoder"),
-                    });
+        let mut command_encoder =
+            context
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+                });
+
+        {
             // Profiling
             let profiler_guard = profiler.read_value();
-            let mut commands =
-                profiler_guard.scope("Render", &mut command_encoder, &context.device);
+            let mut commands = profiler_guard.scope("Render", &mut command_encoder);
 
             models_components.for_each(|v| {
                 (v.lod_stage)(render_data, &mut commands);
@@ -428,7 +430,6 @@ fn render_component(
 
             let mut render_pass = commands.scoped_render_pass(
                 "Render Pass",
-                &context.device,
                 wgpu::RenderPassDescriptor {
                     label: Some("Render Pass"),
                     color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -464,17 +465,15 @@ fn render_component(
 
             // Render transparent objects
             (ground_plane_component)(render_data, &mut render_pass);
-
-            // Finish the profiler
-            std::mem::drop(render_pass);
-            std::mem::drop(commands);
-
-            command_encoder
         };
         profiler.update_value(|profiler| profiler.resolve_queries(&mut command_encoder));
         context
             .queue
             .submit(std::iter::once(command_encoder.finish()));
+
+        if force_wait.get() {
+            context.instance.poll_all(true);
+        }
 
         surface_texture.present();
 
@@ -643,7 +642,11 @@ fn model_component(
     impl Fn(&FrameData, &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>) + use<>,
     impl Fn(&mut wgpu_profiler::OwningScope<'_, wgpu::RenderPass<'_>>) + use<>,
 > {
-    let virtual_model = Arc::new(VirtualModel::new(&wgpu_context(), &render_stage.meshes.read_value(), &format!("ID{}", key)));
+    let virtual_model = Arc::new(VirtualModel::new(
+        &wgpu_context(),
+        &render_stage.meshes.read_value(),
+        &format!("ID{}", key),
+    ));
 
     let lod_stage_component = lod_stage_component(
         surface,
@@ -736,18 +739,16 @@ fn lod_stage_component(
     ];
 
     let indirect_compute_buffer = [
-        TypedBuffer::new_storage(
-            device,
+        device.storage_buffer(
             &format!("{id} Indirect Compute Dispatch Buffer 0"),
             // None of these values will ever be read
             &compute_patches::DispatchIndirectArgs { x: 0, y: 0, z: 0 },
-            wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
+            BufferUsages::INDIRECT | BufferUsages::COPY_DST,
         ),
-        TypedBuffer::new_storage(
-            device,
+        device.storage_buffer(
             &format!("{id} Indirect Compute Dispatch Buffer 1"),
             &compute_patches::DispatchIndirectArgs { x: 0, y: 0, z: 0 },
-            wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
+            BufferUsages::INDIRECT | BufferUsages::COPY_DST,
         ),
     ];
 
@@ -806,7 +807,6 @@ fn lod_stage_component(
     move |frame_data: &FrameData, commands: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>| {
         let context = &wgpu_context();
         let queue = &context.queue;
-        let device = &context.device;
         force_render_uniform.write_buffer(queue, &compute_patches::ForceRenderFlag { flag: 0 });
         let model_view_projection = frame_data.camera.projection_matrix(surface.read().size())
             * frame_data.camera.view_matrix()
@@ -873,8 +873,8 @@ fn lod_stage_component(
                         &compute_patches.indirect_compute_buffer_reset,
                         &indirect_compute_buffer[1],
                     );
-                    let mut compute_pass = commands
-                        .scoped_compute_pass(format!("Compute Patches From-To {i}"), device);
+                    let mut compute_pass =
+                        commands.scoped_compute_pass(format!("Compute Patches From-To {i}"));
                     compute_pass.set_pipeline(&shader.read().compute_patches);
                     compute_patches::set_bind_groups(
                         &mut compute_pass.recorder,
@@ -899,8 +899,8 @@ fn lod_stage_component(
                         &compute_patches.indirect_compute_buffer_reset,
                         &indirect_compute_buffer[0],
                     );
-                    let mut compute_pass = commands
-                        .scoped_compute_pass(format!("Compute Patches To-From {i}"), device);
+                    let mut compute_pass =
+                        commands.scoped_compute_pass(format!("Compute Patches To-From {i}"));
                     compute_pass.set_pipeline(&shader.read().compute_patches);
                     compute_patches::set_bind_groups(
                         &mut compute_pass.recorder,
@@ -920,12 +920,9 @@ fn lod_stage_component(
             }
         }
         {
-            let mut compute_pass = commands.scoped_compute_pass("Copy Patch Sizes Pass", device);
+            let mut compute_pass = commands.scoped_compute_pass("Copy Patch Sizes Pass");
             compute_pass.set_pipeline(&copy_patches_pipeline.read_value());
-            copy_patches::set_bind_groups(
-                &mut compute_pass.recorder,
-                &copy_patches_bind_group_0,
-            );
+            copy_patches::set_bind_groups(&mut compute_pass.recorder, &copy_patches_bind_group_0);
             compute_pass.dispatch_workgroups(1, 1, 1);
         }
     }
