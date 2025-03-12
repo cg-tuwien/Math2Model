@@ -83,7 +83,9 @@ export type Conns =
   | Connection<ConditionNode, MathOpNode>
   | Connection<ReturnNode, VectorNode>
   | Connection<NumberNode, FunctionCallNode>
-  | Connection<InitializeNode, LogicScopeNode>;
+  | Connection<InitializeNode, LogicScopeNode>
+  | Connection<ConditionNode, LogicScopeNode>
+  | Connection<CustomFunctionNode, FunctionScopeNode>;
 
 export type Schemes = GetSchemes<Nodes, Conns>;
 

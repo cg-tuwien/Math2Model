@@ -56,6 +56,9 @@ export class LogicScopeNode extends BlockNode {
 
     this.varOutNode.parent = this.id;
     this.varInNode.parent = this.id;
+
+    this.extraHeight = 30;
+    this.updateSize();
   }
 
   data(input: { context: NodeReturn[]; reference: NodeReturn[] }): {

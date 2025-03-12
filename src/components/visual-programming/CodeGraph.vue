@@ -16,6 +16,7 @@ import {
   InitializeNode,
   NothingNode,
   ReturnNode,
+  typeToValueCode,
   VariableInNode,
   VariableOutNode,
 } from "@/vpnodes/basic/nodes";
@@ -34,11 +35,6 @@ import { MathOpNode, NumberNode } from "@/vpnodes/basic/math";
 import { JoinNode, SeparateNode, VectorNode } from "@/vpnodes/basic/vector";
 import { DropdownControl } from "@/vpnodes/controls/dropdown";
 import DropdownComponent from "@/vpnodes/components/DropdownComponent.vue";
-import {
-  CallCustomFunctionNode,
-  CustomFunctionNode,
-  FunctionScopeNode,
-} from "@/vpnodes/basic/functions";
 import { graphFromJSON, SerializedGraph } from "@/vpnodes/serialization/graph";
 import { SerializedNode, toSerializedNode } from "@/vpnodes/serialization/node";
 import {
@@ -176,21 +172,6 @@ watch(
   }
 );
 
-async function newFunctionNode(area: AreaPlugin<Schemes, AreaExtra>) {
-  shouldUpdate = false;
-  const cfn = new CustomFunctionNode(
-    (n) => area.update("node", n.id),
-    (n) => editor.addNode(n),
-    (n) => editor.removeNode(n.id),
-    (nA, kA, nB, kB) => editor.addConnection(new Connection(nA, kA, nB, kB))
-  );
-  await editor.addNode(cfn);
-  cfn.functionScope.retNode.parent = cfn.functionScope.id;
-  await editor.addNode(cfn.functionScope.retNode);
-  shouldUpdate = true;
-  return new NothingNode();
-}
-
 async function newConditionNode(
   scope1: string,
   scope2: string,
@@ -211,20 +192,29 @@ async function newConditionNode(
     (n) => editor.removeNode(n.id)
   );
 
-  await editor.addNode(sc1);
-  await editor.addNode(sc2);
+  await editor.addNode(sc1).catch((e) => console.log(e));
+  await editor.addNode(sc2).catch((e) => console.log(e));
+
+  let pointer_offset = 300;
+
+  let xsc = area.area.pointer.x + pointer_offset;
+  let ysc1 = area.area.pointer.y + pointer_offset;
+  let ysc2 = area.area.pointer.y - pointer_offset;
 
   const c = new ConditionNode(operator, operator);
 
-  await editor.addNode(c);
-  editor
-    .addConnection(new ClassicPreset.Connection(c, "true", sc1, "context"))
+  await editor.addNode(c).catch((e) => console.log(e));
+  await editor
+    .addConnection(new Connection(c, "true", sc1, "context"))
     .catch((e) => console.log(e));
-  editor
-    .addConnection(new ClassicPreset.Connection(c, "false", sc2, "context"))
+  await editor
+    .addConnection(new Connection(c, "false", sc2, "context"))
     .catch((e) => console.log(e));
 
-  await arrange.layout({ applier });
+  // await arrange.layout({ applier });
+  void area.translate(c.id, area.area.pointer);
+  void area.translate(sc2.id, { x: xsc, y: ysc1 });
+  void area.translate(sc1.id, { x: xsc, y: ysc2 });
 
   shouldUpdate = true;
 
@@ -290,7 +280,7 @@ async function createEditor() {
       ["Rearrange", () => rearrange()],
       ["Initialize", () => new InitializeNode()],
       [
-        "Advanced",
+        "Advanced (experimental)",
         [
           ["Equals", () => newConditionNode("True", "False", area, "==")],
           ["Not Equals", () => newConditionNode("True", "False", area, "!=")],
@@ -298,11 +288,6 @@ async function createEditor() {
           ["Le", () => newConditionNode("True", "False", area, "<=")],
           ["Gt", () => newConditionNode("True", "False", area, ">")],
           ["Ge", () => newConditionNode("True", "False", area, ">=")],
-          ["New Function", () => newFunctionNode(area)],
-          [
-            "Call Custom Function",
-            () => new CallCustomFunctionNode((n) => area.update("node", n.id)),
-          ],
         ],
       ],
     ]),
@@ -417,9 +402,7 @@ function update() {
 
   editor
     .getNodes()
-    .filter(
-      (n) => !(n instanceof LogicScopeNode || n instanceof FunctionScopeNode)
-    )
+    .filter((n) => !(n instanceof LogicScopeNode))
     .forEach((n) => n.updateSize(area));
 
   saveGraphThrottled();
@@ -493,23 +476,6 @@ async function getNodesCode(
         falseCode +
         (await getNodesCode(content, visited, graph, indent));
     }
-  } else if (node instanceof CustomFunctionNode) {
-    let scopeCode = "";
-    fullCode += nodeData.value.code + "\n";
-
-    const blockContent = graph.outgoers(node.id).nodes();
-    for (let content of blockContent) {
-      visited.push(content.id);
-      const scopeChildren = editor
-        .getNodes()
-        .filter((n) => n.parent === content.id);
-      if (scopeChildren.length > 0) {
-        scopeCode += await getScopeCode(scopeChildren, visited, indent);
-      }
-
-      fullCode +=
-        scopeCode + (await getNodesCode(content, visited, graph, indent));
-    }
   } else {
     if (nodeData.value.code !== "")
       fullCode += indent + nodeData.value.code + "\n";
@@ -530,13 +496,7 @@ async function getScopeCode(
 
 async function logCode() {
   const graph = structures(editor);
-  const allNodes = graph
-    .nodes()
-    .filter((n) => !n.parent)
-    .filter((n) => !(n instanceof CustomFunctionNode));
-  const customFunctionNodes = graph
-    .nodes()
-    .filter((n) => n instanceof CustomFunctionNode);
+  const allNodes = graph.nodes().filter((n) => !n.parent);
 
   if (allNodes.length <= 0) return;
 
@@ -548,8 +508,6 @@ async function logCode() {
    *  3. Write code into main method in correct order (e.g. all needed variables for a line are declared before that line)
    */
   let fullCode =
-    (await orderedCode(customFunctionNodes, visited)) +
-    "\n" +
     HeartWGSL +
     "\n" +
     SphereWGSL +
@@ -635,28 +593,8 @@ async function replaceOrAddDeserialize(
   if (!add) {
     await editor.clear();
     await deserialize(json);
-  } else {
-    // TODO this is currently unused. Logic for loading another code graph into this one as a custom callable function
-    shouldUpdate = false;
-    const func = new CustomFunctionNode(
-      (n) => area.update("node", n.id),
-      (n) => editor.addNode(n),
-      (n) => editor.removeNode(n.id),
-      (nA, kA, nB, kB) => editor.addConnection(new Connection(nA, kA, nB, kB)),
-      true
-    );
-    func.nControl.setValue(1);
-    func.paramControls[0].cont.selected = "vec2f";
-    func.setParamName(0, "input2");
-    func.retControl.selected = "vec3f";
-    func.nameControl.setValue(name);
-    func.label = name;
-
-    await editor.addNode(func);
-    shouldUpdate = true;
-    await editor.addNode(new NothingNode());
-    await deserialize(json, func.functionScope.id);
   }
+  // add parameter is fragment of custom functions in node graph. This feature has been removed for now, as it was very broken
 }
 
 async function deserialize(json: string, parent?: string) {
@@ -755,15 +693,6 @@ function serializedNodeToNode(
     case "Initialize":
       node = new InitializeNode();
       break;
-    case "FunctionScope":
-      node = new FunctionScopeNode("", (n) => area.update("node", n.id));
-      break;
-    case "CustomFunction":
-      node = new CustomFunctionNode((n) => area.update("node", n.id));
-      break;
-    case "CallCustomFunction":
-      node = new CallCustomFunctionNode((n) => area.update("node", n.id));
-      break;
     case "LogicScope":
       node = new LogicScopeNode("", (n) => area.update("node", n.id));
       break;
@@ -797,6 +726,8 @@ function serializedNodeToNode(
         }
       );
       break;
+    default:
+      return new NothingNode();
   }
 
   idMap.set(sn.uuid, node.id);
@@ -817,56 +748,6 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
 </script>
 
 <template>
-  <n-modal :show="loading" :mask-closable="false">
-    <n-card
-      class="w-full sm:w-1/2 lg:w-1/3"
-      title="Load Graph"
-      closable
-      @close="loading = false"
-      v-on:pointerdown.stop=""
-    >
-      <template #header-extra>
-        <n-p>Please select the graph file to load.</n-p>
-      </template>
-      <template #action>
-        <n-flex vertical>
-          <n-select
-            v-model:value="loadName"
-            :options="graphsDropdown"
-          ></n-select>
-          <div class="flex justify-around">
-            <n-button
-              type="primary"
-              @click="
-                replaceOrAddGraph(makeFilePath(loadName), false);
-                loading = false;
-              "
-              v-on:pointerdown.stop=""
-            >
-              Replace Graph
-            </n-button>
-            <n-button
-              type="primary"
-              @click="
-                replaceOrAddGraph(makeFilePath(loadName), true);
-                loading = false;
-              "
-              v-on:pointerdown.stop=""
-            >
-              Add to Graph
-            </n-button>
-          </div>
-        </n-flex>
-      </template>
-      <template #footer>
-        <n-text type="info" strong
-          >Note that adding the graph to this graph will create a Custom
-          Function Node containing the loaded graph. <br />Replacing the graph
-          will delete all nodes currently contained within this graph.</n-text
-        >
-      </template>
-    </n-card>
-  </n-modal>
   <div class="flex w-full border border-gray-500">
     <NodesDock
       :display-nodes="uiNodes"
