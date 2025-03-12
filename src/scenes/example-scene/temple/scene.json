@@ -72,9 +72,9 @@
       "id": "5df2b917-337b-48f4-a615-a33f7a5d31c6",
       "name": "TempleColumnsFront",
       "position": [
+        1,
         0,
-        0,
-        0
+        0.3
       ],
       "rotation": [
         0,
@@ -107,7 +107,7 @@
       "position": [
         3,
         0,
-        0
+        0.3
       ],
       "rotation": [
         0,

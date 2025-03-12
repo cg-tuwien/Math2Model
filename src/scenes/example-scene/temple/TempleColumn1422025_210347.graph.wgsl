@@ -44,6 +44,115 @@ fn Cylinder(input2: vec2f) -> vec3f {
 
     return vec3f(x, y, z);
 }
+fn Cube(input2: vec2f) -> vec3f {
+	var PI = 3.14159265359;
+	var HALF_PI = 3.14159265359 / 2.0;
+	var TWO_PI = 3.14159265359 * 2.0;
+    var u = input2.x * TWO_PI;
+    var v = input2.y * TWO_PI;
+    let x = sign(sin(u));
+    let y = sign(sin(u * v));
+    let z = sign(sin(v));
+	var result = vec3f(x, y, z);
+	return result;
+}
+fn mod289(x: vec4f) -> vec4f
+{
+  return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+fn permute(x: vec4f) -> vec4f
+{
+  return mod289(((x*34.0)+10.0)*x);
+}
+
+fn taylorInvSqrt(r: vec4f) -> vec4f
+{
+  return 1.79284291400159 - 0.85373472095314 * r;
+}
+
+fn fade(t: vec2f) -> vec2f {
+  return t*t*t*(t*(t*6.0-15.0)+10.0);
+}
+
+fn cnoise(P: vec2f) -> f32
+{
+  var Pi = floor(P.xyxy) + vec4f(0.0, 0.0, 1.0, 1.0);
+  var Pf = fract(P.xyxy) - vec4f(0.0, 0.0, 1.0, 1.0);
+  Pi = mod289(Pi);
+  var ix = Pi.xzxz;
+  var iy = Pi.yyww;
+  var fx = Pf.xzxz;
+  var fy = Pf.yyww;
+
+  var i = permute(permute(ix) + iy);
+
+  var gx = fract(i * (1.0 / 41.0)) * 2.0 - 1.0 ;
+  var gy = abs(gx) - 0.5 ;
+  var tx = floor(gx + 0.5);
+  gx = gx - tx;
+
+  var g00 = vec2f(gx.x,gy.x);
+  var g10 = vec2f(gx.y,gy.y);
+  var g01 = vec2f(gx.z,gy.z);
+  var g11 = vec2f(gx.w,gy.w);
+
+  var norm = taylorInvSqrt(vec4f(dot(g00, g00), dot(g01, g01), dot(g10, g10), dot(g11, g11)));
+  g00 *= norm.x;  
+  g01 *= norm.y;  
+  g10 *= norm.z;  
+  g11 *= norm.w;  
+
+  var n00 = dot(g00, vec2f(fx.x, fy.x));
+  var n10 = dot(g10, vec2f(fx.y, fy.y));
+  var n01 = dot(g01, vec2f(fx.z, fy.z));
+  var n11 = dot(g11, vec2f(fx.w, fy.w));
+
+  var fade_xy = fade(Pf.xy);
+  var n_x = mix(vec2f(n00, n01), vec2f(n10, n11), fade_xy.x);
+  var n_xy = mix(n_x.x, n_x.y, fade_xy.y);
+  return 2.3 * n_xy;
+}
+
+fn pnoise(P: vec2f, rep: vec2f) -> f32
+{
+  var Pi = floor(P.xyxy) + vec4f(0.0, 0.0, 1.0, 1.0);
+  var Pf = fract(P.xyxy) - vec4f(0.0, 0.0, 1.0, 1.0);
+  Pi = Pi % rep.xyxy;
+  Pi = mod289(Pi);
+  var ix = Pi.xzxz;
+  var iy = Pi.yyww;
+  var fx = Pf.xzxz;
+  var fy = Pf.yyww;
+
+  var i = permute(permute(ix) + iy);
+
+  var gx = fract(i * (1.0 / 41.0)) * 2.0 - 1.0 ;
+  var gy = abs(gx) - 0.5 ;
+  var tx = floor(gx + 0.5);
+  gx = gx - tx;
+
+  var g00 = vec2f(gx.x,gy.x);
+  var g10 = vec2f(gx.y,gy.y);
+  var g01 = vec2f(gx.z,gy.z);
+  var g11 = vec2f(gx.w,gy.w);
+
+  var norm = taylorInvSqrt(vec4f(dot(g00, g00), dot(g01, g01), dot(g10, g10), dot(g11, g11)));
+  g00 *= norm.x;  
+  g01 *= norm.y;  
+  g10 *= norm.z;  
+  g11 *= norm.w;  
+
+  var n00 = dot(g00, vec2f(fx.x, fy.x));
+  var n10 = dot(g10, vec2f(fx.y, fy.y));
+  var n01 = dot(g01, vec2f(fx.z, fy.z));
+  var n11 = dot(g11, vec2f(fx.w, fy.w));
+
+  var fade_xy = fade(Pf.xy);
+  var n_x = mix(vec2f(n00, n01), vec2f(n10, n11), fade_xy.x);
+  var n_xy = mix(n_x.x, n_x.y, fade_xy.y);
+  return 2.3 * n_xy;
+}
 
 fn sampleObject(input2: vec2f) -> vec3f {
 	var PI = 3.14159265359;
@@ -54,44 +163,45 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var ct_baseThickness = 2.00000000000000000000;
 	var columnShape = 0.00000000000000000000;
 	var numColumnsX = 2.00000000000000000000;
-	var columnSpacing = 3.00000000000000000000;
+	var columnSpacing = 3.50000000000000000000;
 	var halfCenterSpacingX = 3.00000000000000000000;
-	var ref_88612 = numColumnsX / 2;
-	var ref_7093a = 0 - ref_88612;
+	var ref_b8259 = numColumnsX / 2;
+	var ref_714b0 = 0 - ref_b8259;
 	var instanceId = f32(instance_id);
-	var ref_a410f = ref_7093a * columnSpacing;
-	var ref_30fd2 = instanceId / numColumnsX;
-	var ref_0e1c8 = ref_30fd2 * columnSpacing;
-	var ref_6a154 = 3 - ref_0e1c8;
-	var ref_45e8e = Plane(input2);
-	var ref_e2a78 = Cylinder(input2);
-	var ref_085c9 = Sphere(input2);
-	var ref_fea3d_1 = ref_e2a78[0];
-	var ref_fea3d_2 = ref_e2a78[1];
-	var ref_fea3d_3 = ref_e2a78[2];
-	var ref_d2881 = ref_fea3d_2 + 0.5;
-	var ref_24e00 = ref_d2881 * 3.2;
-	var ref_7acc0 = ref_24e00 - columnShape;
-	var ref_2cad0 = ref_7acc0 * ref_7acc0;
-	var ref_b8874 = cos(1.00000000000000000000 * ref_2cad0 + 0.00000000000000000000);
-	var ref_84da8 = ref_b8874 * ref_b8874;
-	var ref_a086d = cos(1.00000000000000000000 * ref_fea3d_1 + 0.00000000000000000000);
-	var ref_b75cb = ref_d2881 * columnHeight;
-	var ref_00c36 = sin(1.00000000000000000000 * ref_fea3d_1 + 0.00000000000000000000);
-	var ref_f0a16 = instanceId % numColumnsX;
-	var ref_ab37d = ref_f0a16 * columnSpacing;
-	var ref_8a81c = ref_ab37d + ref_a410f;
-	var ref_09303 = ct_baseThickness + ref_84da8;
-	var ref_16e35 = ca_baseThickness * ref_09303;
-	var ref_9cc7a = ref_a086d * ref_16e35;
-	var ref_04d28 = ref_00c36 * ref_16e35;
-	var ref_68f9a = vec3f(ref_9cc7a, ref_b75cb, ref_04d28);
-	var ref_e74ac_1 = ref_68f9a[0];
-	var ref_e74ac_2 = ref_68f9a[1];
-	var ref_e74ac_3 = ref_68f9a[2];
-	var ref_f4e96 = ref_e74ac_3 + ref_8a81c;
-	var ref_492c2 = ref_e74ac_1 + ref_6a154;
-	var ref_583ed = vec3f(ref_e74ac_1, ref_e74ac_2, ref_f4e96);
-	return ref_583ed;
+	var ref_97b72 = ref_714b0 * columnSpacing;
+	var ref_2056a = instanceId / numColumnsX;
+	var ref_0f40e = ref_2056a * columnSpacing;
+	var ref_dd71c = 3 - ref_0f40e;
+	var ref_a69b8 = Plane(input2);
+	var ref_91c3c = Cylinder(input2);
+	var ref_0e1f8 = Sphere(input2);
+	var ref_84e9f_1 = ref_91c3c[0];
+	var ref_84e9f_2 = ref_91c3c[1];
+	var ref_84e9f_3 = ref_91c3c[2];
+	var ref_53a4d = ref_84e9f_2 + 0.5;
+	var ref_9ca16 = ref_53a4d * 3.2;
+	var ref_4d8e7 = ref_9ca16 - columnShape;
+	var ref_bfa54 = ref_4d8e7 * ref_4d8e7;
+	var ref_48300 = cos(1.00000000000000000000 * ref_bfa54 + 0.00000000000000000000);
+	var ref_39cd7 = ref_48300 * ref_48300;
+	var ref_89cd5 = ref_53a4d * columnHeight;
+	var ref_2f0f9 = instanceId % numColumnsX;
+	var ref_336ac = ref_2f0f9 * columnSpacing;
+	var ref_5bf06 = ref_336ac + ref_97b72;
+	var ref_3a454 = ref_84e9f_1 * PI;
+	var ref_4e26b = ct_baseThickness + ref_39cd7;
+	var ref_1f326 = ca_baseThickness * ref_4e26b;
+	var ref_2ccbe = cos(1.00000000000000000000 * ref_3a454 + 0.00000000000000000000);
+	var ref_262db = ref_2ccbe * ref_1f326;
+	var ref_7413e = sin(1.00000000000000000000 * ref_3a454 + 0.00000000000000000000);
+	var ref_a0bbe = ref_7413e * ref_1f326;
+	var ref_e3c40 = vec3f(ref_262db, ref_89cd5, ref_a0bbe);
+	var ref_cd701_1 = ref_e3c40[0];
+	var ref_cd701_2 = ref_e3c40[1];
+	var ref_cd701_3 = ref_e3c40[2];
+	var ref_ed779 = ref_cd701_3 + ref_5bf06;
+	var ref_ba25c = ref_cd701_1 + ref_dd71c;
+	var ref_9beb0 = vec3f(ref_cd701_1, ref_cd701_2, ref_ed779);
+	return ref_9beb0;
 
 }
