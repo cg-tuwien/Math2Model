@@ -6,22 +6,17 @@ import { Vector2, Vector3 } from "./exporter/VectorTypes";
 import { mainExport } from "./exporter/GPUInteractionExport";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
 import { analyzeEdges } from "./exporter/EdgeAnalysis";
-import { save, saveFile, saveFileBinary } from "./exporter/FileDownload";
+import { saveFile, saveFileBinary } from "./exporter/FileDownload";
 import { MeshExporter3DFormats } from "./exporter/MeshExporter3DFormats";
-import { NButton, NInput, NText, type UploadFileInfo } from "naive-ui";
-import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
+import { NButton } from "naive-ui";
 import {
   SceneFileName,
   deserializeScene,
   type SerializedScene,
 } from "@/filesystem/scene-file";
 import { assert } from "@stefnotch/typestef/assert";
-import { useStore } from "../stores/store";
-import { computed } from "vue";
 import { useExportStore } from "@/stores/export-store";
 
-const store = useStore();
-//const theme = computed(() => (store.isDark ? darkTheme : lightTheme));
 const exportStore = useExportStore();
 const props = defineProps<{
   gpuDevice: GPUDevice;
@@ -47,7 +42,7 @@ const normalType: Ref<number> = ref(0);
 const downloadTarget = ref("");
 const mergeModels = ref(true);
 const exportInProgress = ref(false);
-const toDownload: Ref<{name: string, currentInstance: number}[]> = ref([]);
+const toDownload: Ref<{ name: string; currentInstance: number }[]> = ref([]);
 const exportProgress: Ref<number> = ref(0);
 
 let exportSteps = 0;
@@ -293,7 +288,7 @@ scene.then((actualScene) => {
       path: model.parametricShader,
       name: model.name,
       uuid: model.id,
-      instanceCount: model.instanceCount
+      instanceCount: model.instanceCount,
     });
   });
 });
@@ -307,7 +302,7 @@ props.fs.watchFromStart((change) => {
           path: "",
           name: "all",
           uuid: "",
-          instanceCount: 0
+          instanceCount: 0,
         },
       ];
       let actualScene = deserializeScene(v);
@@ -316,7 +311,7 @@ props.fs.watchFromStart((change) => {
           path: model.parametricShader,
           name: model.name,
           uuid: model.id,
-          instanceCount: model.instanceCount
+          instanceCount: model.instanceCount,
         })
       );
     });
@@ -358,8 +353,8 @@ async function startExport() {
           model.id
       );
     if (downloadTarget.value == "" || model.id == downloadTarget.value)
-      toDownload.value.push({name:model.id, currentInstance: 0});
-    toDownloadSteps+=model.instanceCount;
+      toDownload.value.push({ name: model.id, currentInstance: 0 });
+    toDownloadSteps += model.instanceCount;
   });
   exportSteps = toDownload.value.length;
   console.log("To download: ", toDownload);
@@ -375,8 +370,8 @@ function cancelExport() {
 }
 </script>
 
-<template :theme="theme">
-  <n-card title="Export Settings" size="small">
+<template>
+  <n-card title="Export Settings" size="small" class="h-full overflow-y-auto">
     <n-space vertical :size="8">
       <n-form-item
         label="Min Size:"
