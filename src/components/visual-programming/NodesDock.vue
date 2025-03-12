@@ -24,8 +24,8 @@ const filter = ref("");
 </script>
 
 <template>
-  <n-infinite-scroll>
-    <n-list show-divide>
+  <n-scrollbar class="h-full">
+    <n-list show-divide class="h-full">
       <template #header>
         <div class="mx-2">
           <div class="m-1 select-none">{{ props.header }}</div>
@@ -53,7 +53,5 @@ const filter = ref("");
         ></MultipleNodesCollapsable>
       </n-list-item>
     </n-list>
-  </n-infinite-scroll>
+  </n-scrollbar>
 </template>
-
-<style scoped></style>

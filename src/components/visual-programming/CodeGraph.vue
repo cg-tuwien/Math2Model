@@ -748,7 +748,7 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
 </script>
 
 <template>
-  <div class="flex w-full border border-gray-500">
+  <div class="flex w-full h-full border border-gray-500">
     <NodesDock
       :display-nodes="uiNodes"
       :editor="editor"
