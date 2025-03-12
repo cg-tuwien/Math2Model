@@ -49,7 +49,12 @@ impl OrbitcamController {
     ) -> CursorCaptureRequest {
         let mut cursor_capture = CursorCaptureRequest::Free;
         let mouse_delta = Vec2::new(input.mouse.motion.0 as f32, input.mouse.motion.1 as f32);
-        if input.mouse.pressed(MouseButton::Right) {
+        if input.mouse.pressed(MouseButton::Right)
+            || (input.mouse.pressed(MouseButton::Left)
+                && input.keyboard.pressed_logical(winit::keyboard::Key::Named(
+                    winit::keyboard::NamedKey::Control,
+                )))
+        {
             self.update_orientation(mouse_delta, settings);
             cursor_capture = CursorCaptureRequest::LockedAndHidden;
         }
