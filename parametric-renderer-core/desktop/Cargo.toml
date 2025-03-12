@@ -7,7 +7,7 @@ version = "0.2.0"
 [dependencies]
 any_spawner = { version = "0.2.0", default-features = false }
 anyhow = "1.0"
-env_logger = { version = "0.11.6", default-features = false }
+env_logger = { version = "0.11.7", default-features = false }
 futures = { version = "0.3.31", default-features = false, features = [
     "executor",
 ] }
@@ -16,7 +16,7 @@ log = { workspace = true }
 nanoserde = "0.1.37"
 renderer-core = { path = "../renderer-core", features = ["desktop"] }
 wgpu = { workspace = true, features = ["wgsl"] }
-wgpu-profiler = "0.21.1"
+wgpu-profiler = "0.22.0"
 winit = { workspace = true }
 
 [features]

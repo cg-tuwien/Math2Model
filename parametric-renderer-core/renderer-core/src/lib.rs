@@ -3,6 +3,7 @@ pub mod buffer;
 pub mod camera;
 pub mod game;
 pub mod input;
+pub mod local_executor;
 pub mod mesh;
 pub mod reactive;
 pub mod renderer;

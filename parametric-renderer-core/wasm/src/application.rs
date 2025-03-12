@@ -1,7 +1,7 @@
 use glam::{Quat, Vec3};
 use log::error;
 use renderer_core::{
-    application::{AppCommand, Application, WasmCanvas, run_on_main},
+    application::{AppCommand, Application, ShaderCompiledCallback, WasmCanvas, run_on_main},
     camera::camera_controller::{self, CameraController},
     game::{ModelInfo, ShaderId, ShaderInfo, TextureData, TextureId, TextureInfo},
     input::WinitAppHelper,
@@ -99,7 +99,11 @@ impl WasmApplication {
             move |app| {
                 let on_shader_compiled = app.on_shader_compiled.clone();
                 app.renderer.as_mut().map(|renderer| {
-                    renderer.set_shader(shader_id.clone(), &info, on_shader_compiled)
+                    any_spawner::Executor::spawn_local(renderer.set_shader(
+                        shader_id.clone(),
+                        &info,
+                        on_shader_compiled,
+                    ))
                 });
                 app.app.set_shader(shader_id, info);
             }
@@ -177,22 +181,24 @@ impl WasmApplication {
         &mut self,
         on_shader_compiled: Option<web_sys::js_sys::Function>,
     ) {
-        let wrapped = on_shader_compiled.map(|on_shader_compiled| -> Arc<dyn Fn(&ShaderId, Vec<wgpu::CompilationMessage>) + 'static> {
-            Arc::new(move |shader_id: &ShaderId, messages: Vec<wgpu::CompilationMessage>| {
-                let this = wasm_bindgen::JsValue::NULL;
-                let messages = messages
-                    .into_iter()
-                    .map(|message| WasmCompilationMessage::from(message))
-                    .collect::<Vec<_>>();
-                match on_shader_compiled.call2(
-                    &this,
-                    &JsValue::from_str(&shader_id.0),
-                    &serde_wasm_bindgen::to_value(&messages).unwrap(),
-                ) {
-                    Ok(_) => (),
-                    Err(e) => error!("Error calling on_shader_compiled: {:?}", e),
-                }
-            })
+        let wrapped = on_shader_compiled.map(|on_shader_compiled| -> ShaderCompiledCallback {
+            ShaderCompiledCallback(Arc::new(
+                move |shader_id: &ShaderId, messages: Vec<wgpu::CompilationMessage>| {
+                    let this = wasm_bindgen::JsValue::NULL;
+                    let messages = messages
+                        .into_iter()
+                        .map(|message| WasmCompilationMessage::from(message))
+                        .collect::<Vec<_>>();
+                    match on_shader_compiled.call2(
+                        &this,
+                        &JsValue::from_str(&shader_id.0),
+                        &serde_wasm_bindgen::to_value(&messages).unwrap(),
+                    ) {
+                        Ok(_) => (),
+                        Err(e) => error!("Error calling on_shader_compiled: {:?}", e),
+                    }
+                },
+            ))
         });
         let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), move |app| {
             app.on_shader_compiled = wrapped;

@@ -1,4 +1,4 @@
-use std::{cell::Cell, sync::Arc};
+use std::cell::Cell;
 
 use criterion::{
     Criterion, Throughput,
@@ -8,6 +8,7 @@ use glam::Vec3;
 use pollster::FutureExt;
 use renderer_core::{
     game::{GameRes, ShaderId, ShaderInfo},
+    local_executor::LocalExecutor,
     renderer::GpuApplicationBuilder,
     window_or_fallback::WindowOrFallback,
 };
@@ -23,6 +24,8 @@ fn main() {
     // Maybe also measure throughput? https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#throughput-measurements
     // See https://github.com/FL33TW00D/wgpu-bench/blob/db76a8dc5508ba183f36df9f6b2551712d582355/src/bench.rs#L165
     // which gets the throughput from https://github.com/FL33TW00D/wgpu-bench/blob/db76a8dc5508ba183f36df9f6b2551712d582355/benches/mlx-gemv/gemv.rs#L114
+
+    any_spawner::Executor::init_local_custom_executor(LocalExecutor::new()).unwrap();
 
     let mut app = GameRes::new();
     app.profiler_settings.gpu = true;
@@ -52,27 +55,16 @@ fn main() {
         instance_count: 1,
     }]);
 
-    // TODO: Why is this needed for benchmarking?
-    let event_loop = winit::event_loop::EventLoop::new().unwrap();
-    #[allow(deprecated)]
-    let window = Arc::new(
-        event_loop
-            .create_window(
-                winit::window::WindowAttributes::default()
-                    .with_inner_size(winit::dpi::LogicalSize::new(1280, 720)),
-            )
-            .unwrap(),
-    );
-    /*WindowOrFallback::Headless {
-        size: Vec2::new(1280, 720),
-    }*/
-    let mut renderer = GpuApplicationBuilder::new(WindowOrFallback::Window(window))
-        .block_on()
-        .unwrap()
-        .build();
-
+    let mut renderer = GpuApplicationBuilder::new(WindowOrFallback::Headless {
+        size: glam::UVec2::new(1280, 720),
+    })
+    .block_on()
+    .unwrap()
+    .build();
     for (shader_id, shader_info) in &app.shaders {
-        renderer.set_shader(shader_id.clone(), shader_info, None);
+        renderer
+            .set_shader(shader_id.clone(), shader_info, None)
+            .block_on();
     }
 
     let mut group = c.benchmark_group("render");
@@ -104,7 +96,7 @@ fn main() {
                 new_size: Default::default(),
                 new_scale_factor: Default::default(),
             });
-            renderer.context.instance.poll_all(true);
+            renderer.force_wait();
             let render_results = renderer.render(&app).unwrap().unwrap();
             timer.increment_query(render_results.profiler_results.unwrap());
         })

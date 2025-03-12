@@ -12,6 +12,9 @@ any_spawner = { version = "0.2.0" }
 anyhow = "1.0"
 bytemuck = { workspace = true }
 encase = { workspace = true }
+futures = { version = "0.3.31", default-features = false, features = [
+    "executor",
+] }
 futures-channel = "0.3.31"
 glam = { workspace = true }
 indexmap = { workspace = true }
@@ -21,7 +24,7 @@ reactive_graph = { workspace = true }
 uuid = { workspace = true }
 web-time = "1.1.0"
 wgpu = { workspace = true }
-wgpu-profiler = "0.21.1"
+wgpu-profiler = "0.22.0"
 winit = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

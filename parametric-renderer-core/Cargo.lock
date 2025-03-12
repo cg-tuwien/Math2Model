@@ -81,7 +81,6 @@ checksum = "41058deaa38c9d9dd933d6d238d825227cffa668e2839b52879f6619c63eee3b"
 dependencies = [
  "futures",
  "thiserror 2.0.12",
- "wasm-bindgen-futures",
 ]
 
 [[package]]
@@ -614,9 +613,9 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.11.6"
+version = "0.11.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcaee3d8e3cfc3fd92428d477bc97fc29ec8716d180c0d74c643bb26166660e0"
+checksum = "c3716d7a920fb4fac5d84e9d4bce8ceb321e9414b4409da61b07b75c1e3d0697"
 dependencies = [
  "env_filter",
  "log",
@@ -1882,6 +1881,7 @@ dependencies = [
  "bytemuck",
  "criterion2",
  "encase",
+ "futures",
  "futures-channel",
  "glam",
  "indexmap",
@@ -2692,9 +2692,9 @@ dependencies = [
 
 [[package]]
 name = "wgpu-profiler"
-version = "0.21.1"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "499e1757dca381db7b9d5e7260e1b4f6f7a272cb7b9b0c6e23cbec2403bf85fe"
+checksum = "cdda2055c0da8af2291581148d7eedcd728e97d8519cfe2a163a0b9d28d595ba"
 dependencies = [
  "parking_lot",
  "thiserror 2.0.12",

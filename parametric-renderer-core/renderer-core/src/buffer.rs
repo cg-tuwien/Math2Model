@@ -125,12 +125,24 @@ where
         &self.buffer
     }
 }
-pub trait CommandEncoderExt<T> {
+pub trait CommandEncoderBufferExt<T> {
     fn copy_tbuffer_to_tbuffer(&mut self, buffer: &TypedBuffer<T>, other: &TypedBuffer<T>);
 }
-impl<T> CommandEncoderExt<T> for wgpu::CommandEncoder {
+impl<T> CommandEncoderBufferExt<T> for wgpu::CommandEncoder {
     fn copy_tbuffer_to_tbuffer(&mut self, buffer: &TypedBuffer<T>, other: &TypedBuffer<T>) {
         self.copy_buffer_to_buffer(&buffer, 0, &other, 0, buffer.size());
+    }
+}
+
+pub trait DeviceBufferExt<T> {
+    fn storage_buffer(&self, label: &str, data: &T, usage: wgpu::BufferUsages) -> TypedBuffer<T>;
+}
+impl<T> DeviceBufferExt<T> for wgpu::Device
+where
+    T: encase::ShaderType + encase::internal::WriteInto,
+{
+    fn storage_buffer(&self, label: &str, data: &T, usage: wgpu::BufferUsages) -> TypedBuffer<T> {
+        TypedBuffer::new_storage(self, label, data, usage)
     }
 }
 
