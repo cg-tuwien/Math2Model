@@ -53,7 +53,7 @@ impl ShaderPipelines {
     }
 }
 
-const MISSING_SHADER: &'static str = include_str!("../../../shaders/DefaultParametric.wgsl");
+const MISSING_SHADER: &str = include_str!("../../../shaders/DefaultParametric.wgsl");
 
 pub fn make_missing_shader(context: &WgpuContext) -> Arc<ShaderPipelines> {
     Arc::new(ShaderPipelines::new(

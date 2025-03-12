@@ -3,7 +3,8 @@ use std::sync::{Arc, Mutex};
 use glam::UVec2;
 use log::{error, info, warn};
 use winit::{
-    application::ApplicationHandler, dpi::PhysicalSize, event_loop::EventLoopProxy, window::Window,
+    application::ApplicationHandler, dpi::PhysicalSize, event::WindowEvent,
+    event_loop::EventLoopProxy, window::Window,
 };
 
 use crate::{
@@ -153,16 +154,21 @@ impl ApplicationHandler<AppCommand> for Application {
 
     fn window_event(
         &mut self,
-        _event_loop: &winit::event_loop::ActiveEventLoop,
+        event_loop: &winit::event_loop::ActiveEventLoop,
         _window_id: winit::window::WindowId,
         event: winit::event::WindowEvent,
     ) {
-        match &event {
-            winit::event::WindowEvent::RedrawRequested => match self.window {
-                Some(ref mut window) => window.request_redraw(),
-                None => {}
-            },
-            _ => {}
+        match event {
+            WindowEvent::CloseRequested => {
+                self.on_exit();
+                event_loop.exit();
+            }
+            WindowEvent::RedrawRequested => {
+                if let Some(window) = &self.window {
+                    window.request_redraw();
+                }
+            }
+            _ => (),
         }
     }
 }
@@ -176,10 +182,6 @@ impl InputHandler for Application {
                 winit::keyboard::NamedKey::Escape,
             ))
         {
-            self.on_exit();
-            return event_loop.exit();
-        }
-        if input.close_requested {
             self.on_exit();
             return event_loop.exit();
         }

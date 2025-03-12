@@ -103,9 +103,8 @@ fn main() {
                 },
                 new_size: Default::default(),
                 new_scale_factor: Default::default(),
-                close_requested: Default::default(),
             });
-            renderer.force_wait();
+            renderer.context.instance.poll_all(true);
             let render_results = renderer.render(&app).unwrap().unwrap();
             timer.increment_query(render_results.profiler_results.unwrap());
         })

@@ -58,6 +58,7 @@ pub struct TextureInfo {
 
 pub enum TextureData {
     Bytes(Vec<u8>),
+    #[cfg(target_arch = "wasm32")]
     Image(web_sys::ImageBitmap),
 }
 

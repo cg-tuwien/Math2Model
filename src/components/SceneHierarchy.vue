@@ -462,7 +462,7 @@ function uploadFile(data: {
           <n-text>Color</n-text>
           <ColorInput
             :value="currentModel.material.color"
-            @update="(v) => change(['material', 'color'], v)"
+            @update="(v: ObjectUpdate) => change(['material', 'color'], v)"
           ></ColorInput>
           <n-text>Roughness</n-text>
           <NumberInput
@@ -479,7 +479,7 @@ function uploadFile(data: {
           <n-text>Emissive</n-text>
           <ColorInput
             :value="currentModel.material.emissive"
-            @update="(v) => change(['material', 'emissive'], v)"
+            @update="(v: ObjectUpdate) => change(['material', 'emissive'], v)"
           ></ColorInput>
           <n-text>Texture</n-text>
           <n-select

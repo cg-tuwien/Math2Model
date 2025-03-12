@@ -53,7 +53,7 @@ impl std::fmt::Display for RustStrLiteral<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut max_hash_count = 0;
         let mut chars = self.0.chars();
-        while let Some(_) = chars.find(|c| *c == '#') {
+        while chars.find(|c| *c == '#').is_some() {
             let count = 1 + chars.by_ref().take_while(|c| *c == '#').count();
             max_hash_count = max_hash_count.max(count);
         }

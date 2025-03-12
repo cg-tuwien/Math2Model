@@ -13,7 +13,7 @@ use glam::UVec2;
 use reactive_graph::{
     computed::Memo,
     effect::{Effect, RenderEffect},
-    owner::{Owner, StoredValue, expect_context, provide_context, take_context, use_context},
+    owner::{Owner, StoredValue, expect_context, provide_context, use_context},
     prelude::*,
     signal::{
         ArcReadSignal, ArcWriteSignal, ReadSignal, RwSignal, WriteSignal, arc_signal, signal,
@@ -66,7 +66,7 @@ pub struct GpuApplication {
     surface: RwSignal<SurfaceOrFallback>,
     profiler: StoredValue<GpuProfiler>,
     profiling_enabled: bool,
-    _runtime: Owner,
+    runtime: Option<Owner>,
     // render_tree: Arc<dyn Fn(&FrameData) -> Result<RenderResults, wgpu::SurfaceError>>,
     render_effect: RenderEffect<Result<Option<RenderResults>, wgpu::SurfaceError>>,
     set_render_data: ArcWriteSignal<FrameData>,
@@ -127,7 +127,7 @@ impl GpuApplication {
             surface,
             profiler,
             profiling_enabled: false,
-            _runtime: runtime,
+            runtime: Some(runtime),
             render_effect,
             set_render_data,
             shaders,
@@ -254,8 +254,10 @@ impl GpuApplication {
 
 impl Drop for GpuApplication {
     fn drop(&mut self) {
-        let ctx = take_context::<Arc<WgpuContext>>();
-        std::mem::drop(ctx);
+        // Make sure to dispose of the Leptos runtime
+        if let Some(runtime) = self.runtime.take() {
+            runtime.unset();
+        }
     }
 }
 
@@ -643,7 +645,11 @@ fn model_component(
     impl Fn(&FrameData, &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>) + use<>,
     impl Fn(&mut wgpu_profiler::OwningScope<'_, wgpu::RenderPass<'_>>) + use<>,
 > {
-    let virtual_model = Arc::new(VirtualModel::new(&wgpu_context(), &render_stage.meshes.read_value(), &format!("ID{}", key)));
+    let virtual_model = Arc::new(VirtualModel::new(
+        &wgpu_context(),
+        &render_stage.meshes.read_value(),
+        &format!("ID{}", key),
+    ));
 
     let lod_stage_component = lod_stage_component(
         surface,
@@ -922,10 +928,7 @@ fn lod_stage_component(
         {
             let mut compute_pass = commands.scoped_compute_pass("Copy Patch Sizes Pass", device);
             compute_pass.set_pipeline(&copy_patches_pipeline.read_value());
-            copy_patches::set_bind_groups(
-                &mut compute_pass.recorder,
-                &copy_patches_bind_group_0,
-            );
+            copy_patches::set_bind_groups(&mut compute_pass.recorder, &copy_patches_bind_group_0);
             compute_pass.dispatch_workgroups(1, 1, 1);
         }
     }

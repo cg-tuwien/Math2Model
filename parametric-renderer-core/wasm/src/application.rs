@@ -123,7 +123,10 @@ impl WasmApplication {
         let info = TextureInfo {
             width: image.width(),
             height: image.height(),
+            #[cfg(target_arch = "wasm32")]
             data: TextureData::Image(image),
+            #[cfg(not(target_arch = "wasm32"))]
+            data: TextureData::Bytes(vec![0, 0, 0]),
         };
 
         let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), {

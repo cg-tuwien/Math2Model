@@ -9,7 +9,6 @@ use super::WindowOrFallback;
 
 pub struct WgpuContext {
     pub instance: wgpu::Instance,
-    pub _adapter: wgpu::Adapter,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub view_format: wgpu::TextureFormat,
@@ -104,7 +103,6 @@ impl WgpuContext {
         Ok((
             WgpuContext {
                 instance,
-                _adapter: adapter,
                 device,
                 queue,
                 view_format,

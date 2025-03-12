@@ -2,12 +2,12 @@ mod application;
 mod config;
 
 use application::run;
+use env_logger::Env;
 use futures::{
     executor::{LocalPool, LocalSpawner},
     task::LocalSpawnExt,
 };
 use std::cell::RefCell;
-use env_logger::Env;
 use std::sync::Arc;
 
 fn main() -> anyhow::Result<()> {
@@ -69,7 +69,7 @@ impl any_spawner::CustomExecutor for ArcSingleThreadedExecutor {
 }
 
 impl ArcSingleThreadedExecutor {
-    fn yeet(&self) {
+    fn _yeet(&self) {
         *self.0.local_pool.borrow_mut() = LocalPool::new();
     }
 }
