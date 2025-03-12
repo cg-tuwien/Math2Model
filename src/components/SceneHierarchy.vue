@@ -373,6 +373,7 @@ function uploadFile(data: {
         @setIsSelected="onNodeSelect"
       >
         <template #node="node">
+          <n-text class="mr-2"><mdi-category-outline /></n-text>
           <n-text>{{ node.label }}</n-text>
         </template>
       </NodeTree>
