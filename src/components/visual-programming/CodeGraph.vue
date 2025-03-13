@@ -73,13 +73,18 @@ import DefaultNodeStyle from "@/components/visual-programming/CustomNodeStyles/D
 import SocketStyle from "@/components/visual-programming/CustomNodeStyles/SocketStyle.vue";
 import ConnectionStyle from "@/components/visual-programming/CustomNodeStyles/ConnectionStyle.vue";
 import {
+  callGenericUpdate,
   Connection,
+  genericUpdate,
+  genericUpdateControl,
   useUiNodes,
   type AreaExtra,
   type Conns,
   type Nodes,
   type Schemes,
 } from "@/vpnodes/nodes-list";
+import { NumberControl } from "@/vpnodes/controls/number";
+import NumberComponent from "@/vpnodes/components/NumberComponent.vue";
 
 const emit = defineEmits<{
   update: [content: string];
@@ -333,6 +338,9 @@ async function createEditor() {
           }
           if (data.payload instanceof SliderControl) {
             return SliderComponent;
+          }
+          if (data.payload instanceof NumberControl) {
+            return NumberComponent;
           }
           if (data.payload instanceof ClassicPreset.InputControl) {
             return VuePresets.classic.Control;
@@ -664,10 +672,17 @@ function serializedNodeToNode(
   let node: Nodes;
   switch (sn.nodeType) {
     case "Number":
-      node = new NumberNode((n) => area.update("node", n.id));
+      node = new NumberNode(
+        (id) => genericUpdate(id, editor, area),
+        (cont) => genericUpdateControl(cont, editor, area)
+      );
       break;
     case "Math":
-      node = new MathOpNode("+", (n) => area.update("node", n.id));
+      node = new MathOpNode(
+        "+",
+        (id) => genericUpdate(id, editor, area),
+        (cont) => genericUpdateControl(cont, editor, area)
+      );
       break;
     case "Vector":
       node = new VectorNode(4, (n) => area.update("node", n.id));
@@ -704,26 +719,18 @@ function serializedNodeToNode(
       break;
     case "Combine":
       node = new CombineNode(
-        (id) => {
-          area.update("node", id);
-          editor.addNode(new NothingNode());
-        },
-        (c) => {
-          area.update("control", c.id);
-        }
+        (id) => genericUpdate(id, editor, area),
+        (cont) => genericUpdateControl(cont, editor, area),
+        (id) => callGenericUpdate(id, editor, area)
       );
       break;
     case "MathFunction":
       node = new MathFunctionNode(
         "",
         "",
-        (id) => {
-          area.update("node", id);
-          editor.addNode(new NothingNode());
-        },
-        (c) => {
-          area.update("control", c.id);
-        }
+        (id) => genericUpdate(id, editor, area),
+        (cont) => genericUpdateControl(cont, editor, area),
+        (id) => callGenericUpdate(id, editor, area)
       );
       break;
     default:

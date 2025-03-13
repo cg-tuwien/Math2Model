@@ -19,7 +19,8 @@ export class CombineNode extends VPNode {
   private cfControl: SliderControl;
   constructor(
     private update: (id: string) => void,
-    private updateControl: (c: ClassicPreset.Control) => void
+    private updateControl: (c: ClassicPreset.Control) => void,
+    private noDebounceUpdate: (id: string) => void
   ) {
     super("Combine Shapes");
 
@@ -35,6 +36,9 @@ export class CombineNode extends VPNode {
       },
       (value) => {
         this.updateControl(this.cfControl);
+      },
+      () => {
+        noDebounceUpdate(this.id);
       }
     );
 
@@ -112,6 +116,7 @@ export class MathFunctionNode extends VPNode {
     private func: string,
     private update: (id: string) => void,
     private updateControl: (c: ClassicPreset.Control) => void,
+    private noDebounceUpdate: (id: string) => void,
     private isApply: boolean = true,
     private inputType: "f32" | "vec2f" | "vec3f" | "vec4f" | "any" = "any",
     private outputType: "f32" | "vec2f" | "vec3f" | "vec4f" | "any" = "any"
@@ -150,7 +155,8 @@ export class MathFunctionNode extends VPNode {
         expr[0],
         true,
         () => this.update(this.id),
-        (value) => this.updateControl(control)
+        (value) => this.updateControl(control),
+        () => this.noDebounceUpdate(this.id)
       );
       this.variableControls.set(
         "{" + variable.split("}")[0] + "}/" + expr[5],

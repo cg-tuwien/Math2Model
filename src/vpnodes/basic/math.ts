@@ -10,23 +10,34 @@ import {
 } from "@/vpnodes/basic/nodes";
 import { type SerializedNode } from "@/vpnodes/serialization/node";
 import { valueToType } from "./functions";
+import { SliderControl } from "../controls/slider";
+import type { Control } from "rete/_types/presets/classic";
+import { NumberControl } from "../controls/number";
 
 export class NumberNode extends VPNode {
-  private valueControl: ClassicPreset.InputControl<"number", number>;
+  private valueControl: NumberControl;
   private nameControl: ClassicPreset.InputControl<"text", string>;
-  constructor(private update?: (node: ClassicPreset.Node) => void) {
+  constructor(
+    private update?: (node: string) => void,
+    private updateControl?: (control: Control) => void
+  ) {
     super("Number");
 
     this.nameControl = new ClassicPreset.InputControl("text", {
       initial: idToVariableName(this.id),
     });
     this.addControl("variable name", this.nameControl);
-    this.valueControl = new ClassicPreset.InputControl("number", {
-      initial: 0.0,
-      change: (value: number) => {
-        if (this.update) this.update(this);
+    this.valueControl = new NumberControl(
+      0.0,
+      0.1,
+      "value",
+      () => {
+        if (this.update) this.update(this.id);
       },
-    });
+      (value) => {
+        if (this.updateControl) this.updateControl(this.valueControl);
+      }
+    );
     this.addControl("value", this.valueControl);
     this.addOutput("value", new ClassicPreset.Output(reteSocket));
 
@@ -34,8 +45,7 @@ export class NumberNode extends VPNode {
   }
 
   data(): { value: NodeReturn } {
-    const control: ClassicPreset.InputControl<"number", number> | null =
-      this.valueControl;
+    const control: SliderControl | null = this.valueControl;
     let result = {
       value: {
         value: parseFloat(control?.value?.toFixed(20) ?? "0.0"),
@@ -49,15 +59,14 @@ export class NumberNode extends VPNode {
       },
     };
 
-    if (this.update) this.update(this);
+    // if (this.update) this.update(this.id);
 
     return result;
   }
 
   serialize(sn: SerializedNode): SerializedNode {
     sn.nodeType = "Number";
-    const control: ClassicPreset.InputControl<"number", number> | null =
-      this.valueControl;
+    const control: SliderControl | null = this.valueControl;
 
     if (control) {
       sn.inputs = [
@@ -88,33 +97,35 @@ export class NumberNode extends VPNode {
 }
 
 export class MathOpNode extends VPNode {
-  private leftControl: ClassicPreset.InputControl<"number", number>;
-  private rightControl: ClassicPreset.InputControl<"number", number>;
+  private leftControl: NumberControl;
+  private rightControl: NumberControl;
   constructor(
     private operator: "+" | "-" | "/" | "*" | "%",
-    private update?: (
-      node: ClassicPreset.Node,
-      control: ClassicPreset.InputControl<"number">
-    ) => void
+    private update?: (node: string) => void,
+    private updateControl?: (control: Control) => void
   ) {
     super(opToName(operator));
 
-    this.leftControl = new ClassicPreset.InputControl<"number", number>(
-      "number",
-      {
-        initial: 0,
-        change: (value: number) => {
-          if (this.update) this.update(this, this.leftControl);
-        },
+    this.leftControl = new NumberControl(
+      0.0,
+      0.1,
+      "left operand",
+      () => {
+        if (this.update) this.update(this.id);
+      },
+      (value) => {
+        if (this.updateControl) this.updateControl(this.leftControl);
       }
     );
-    this.rightControl = new ClassicPreset.InputControl<"number", number>(
-      "number",
-      {
-        initial: 0,
-        change: (value: number) => {
-          if (this.update) this.update(this, this.rightControl);
-        },
+    this.rightControl = new NumberControl(
+      0.0,
+      0.1,
+      "right operand",
+      () => {
+        if (this.update) this.update(this.id);
+      },
+      (value) => {
+        if (this.updateControl) this.updateControl(this.rightControl);
       }
     );
     this.addInput(
@@ -129,6 +140,8 @@ export class MathOpNode extends VPNode {
     this.addControl("left", this.leftControl);
     this.addControl("right", this.rightControl);
     this.addOutput("value", new ClassicPreset.Output(reteSocket, "Result/any"));
+
+    this.extraWidth = 10;
 
     this.updateSize();
   }
@@ -180,7 +193,7 @@ export class MathOpNode extends VPNode {
     //   this.controls?.result as ClassicPreset.InputControl<"number", number>;
     // control?.setValue(value);
 
-    if (this.update) this.update(this, this.rightControl);
+    // if (this.update) this.update(this.id);
 
     return {
       value: {

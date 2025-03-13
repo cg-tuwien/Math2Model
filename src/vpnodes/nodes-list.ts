@@ -41,6 +41,8 @@ import type {
   FunctionScopeNode,
 } from "./basic/functions";
 import type { ConditionNode, LogicScopeNode } from "./basic/logic";
+import type { Control } from "rete/_types/presets/classic";
+import { useDebounceFn } from "@vueuse/core";
 
 export type AreaExtra = VueArea2D<Schemes> | ContextMenuExtra;
 
@@ -88,6 +90,26 @@ export type Conns =
   | Connection<CustomFunctionNode, FunctionScopeNode>;
 
 export type Schemes = GetSchemes<Nodes, Conns>;
+
+export const genericUpdate = useDebounceFn(callGenericUpdate, 1000);
+export const genericUpdateControl = useDebounceFn(callGenericUpdateControl, 0);
+
+export async function callGenericUpdate(
+  id: string,
+  editor: NodeEditor<Schemes>,
+  area: AreaPlugin<Schemes, AreaExtra>
+) {
+  await area.update("node", id);
+  await editor.addNode(new NothingNode());
+}
+
+async function callGenericUpdateControl(
+  control: Control,
+  editor: NodeEditor<Schemes>,
+  area: AreaPlugin<Schemes, AreaExtra>
+) {
+  await area.update("control", control.id);
+}
 
 export function useUiNodes(
   editor: NodeEditor<Schemes>,
@@ -185,11 +207,9 @@ export function useUiNodes(
             get: () => {
               //addNode(n);
               return new CombineNode(
-                (id: string) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => area.update("control", c.id)
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area)
               );
             },
             create: createUINode,
@@ -207,13 +227,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Scale",
                 "mat3x3(vec3f({scale x,1,100,-100,0.1,f32},0.0,0.0), vec3f(0.0,{scale y,1,100,-100,0.1,f32},0.0), vec3f(0.0,0.0,{scale z,1,100,-100,0.1,f32})) * input2",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "vec3f",
                 "vec3f"
@@ -234,13 +250,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Abs",
                 "abs(input2)",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "vec3f",
                 "vec3f"
@@ -261,13 +273,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Sine",
                 "sin({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "any",
                 "any"
@@ -288,13 +296,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Cosine",
                 "cos({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "any",
                 "any"
@@ -315,13 +319,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "asin",
                 "asin({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "any",
                 "any"
@@ -342,13 +342,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "acos",
                 "acos({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "any",
                 "any"
@@ -369,13 +365,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Sawtooth",
                 "(({sawtooth count,0,10,-10,0.1,f32} * input2) - floor({sawtooth count,0,10,-10,0.1,f32} * input2))",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "any",
                 "any"
@@ -396,13 +388,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Pow",
                 "pow(input2, {x1,0,10,-10,0.1,same})",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "any",
                 "any"
@@ -423,13 +411,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Square",
                 "sign(sin(input2*{frequency,1,10,-10,0.1,f32}))",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "any",
                 "any"
@@ -450,13 +434,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Step",
                 "step({edge,1,10,-10,1,same}, input2)",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "any",
                 "any"
@@ -477,13 +457,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Normalize",
                 "normalize(input2)",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "any",
                 "any"
@@ -504,13 +480,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Perlin Noise",
                 "cnoise(input2)",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "vec2f",
                 "f32"
@@ -566,7 +538,10 @@ export function useUiNodes(
             prefix: "",
             image: MathFunction,
             get: () => {
-              return new NumberNode((n) => area.update("node", n.id));
+              return new NumberNode(
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area)
+              );
             },
             create: createUINode,
             draggable: true,
@@ -580,10 +555,11 @@ export function useUiNodes(
             prefix: "",
             image: MathFunction,
             get: () => {
-              return new MathOpNode("+", (node, control) => {
-                area.update("node", node.id);
-                area.update("control", control.id);
-              });
+              return new MathOpNode(
+                "+",
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area)
+              );
             },
             create: createUINode,
             draggable: true,
@@ -597,10 +573,11 @@ export function useUiNodes(
             prefix: "",
             image: MathFunction,
             get: () => {
-              return new MathOpNode("-", (n, c) => {
-                area.update("node", n.id);
-                area.update("control", c.id);
-              });
+              return new MathOpNode(
+                "-",
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area)
+              );
             },
             create: createUINode,
             draggable: true,
@@ -614,10 +591,11 @@ export function useUiNodes(
             prefix: "",
             image: MathFunction,
             get: () => {
-              return new MathOpNode("*", (node, control) => {
-                area.update("node", node.id);
-                area.update("control", control.id);
-              });
+              return new MathOpNode(
+                "*",
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area)
+              );
             },
             create: createUINode,
             draggable: true,
@@ -631,10 +609,11 @@ export function useUiNodes(
             prefix: "",
             image: MathFunction,
             get: () => {
-              return new MathOpNode("/", (n, c) => {
-                area.update("node", n.id);
-                area.update("control", c.id);
-              });
+              return new MathOpNode(
+                "/",
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area)
+              );
             },
             create: createUINode,
             draggable: true,
@@ -648,10 +627,11 @@ export function useUiNodes(
             prefix: "",
             image: MathFunction,
             get: () => {
-              return new MathOpNode("%", (n, c) => {
-                area.update("node", n.id);
-                area.update("control", c.id);
-              });
+              return new MathOpNode(
+                "%",
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area)
+              );
             },
             create: createUINode,
             draggable: true,
@@ -668,13 +648,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Square Root",
                 "sqrt(input2)",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "any",
                 "any"
@@ -695,13 +671,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Floor",
                 "floor(input2)",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "any",
                 "any"
@@ -722,13 +694,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Ceil",
                 "ceil(input2)",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "any",
                 "any"
@@ -749,13 +717,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Exp",
                 "exp(input2)",
-                (id) => {
-                  area.update("node", id);
-                  editor.addNode(new NothingNode());
-                },
-                (c) => {
-                  area.update("control", c.id);
-                },
+                (id) => genericUpdate(id, editor, area),
+                (cont) => genericUpdateControl(cont, editor, area),
+                (id) => callGenericUpdate(id, editor, area),
                 false,
                 "any",
                 "any"
