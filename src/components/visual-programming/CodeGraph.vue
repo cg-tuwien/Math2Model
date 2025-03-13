@@ -43,7 +43,7 @@ import {
   type ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
-import { showError } from "@/notification";
+import { showError, showInfo } from "@/notification";
 import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
 import HeartWGSL from "@/../parametric-renderer-core/graphs/Heart.graph.wgsl?raw";
 import SphereWGSL from "@/../parametric-renderer-core/graphs/Sphere.graph.wgsl?raw";
@@ -149,10 +149,13 @@ const applier = new ArrangeAppliers.TransitionApplier<Schemes, never>({
   },
 });
 
-AreaExtensions.selectableNodes(area, AreaExtensions.selector(), {
+const nodeClipBoard: Nodes[] = [];
+
+const selector = AreaExtensions.selector();
+
+AreaExtensions.selectableNodes(area, selector, {
   accumulating: AreaExtensions.accumulateOnCtrl(),
 });
-
 const nodes = useUiNodes(editor, area);
 let uiNodes: Map<string, Map<string, UINode>> = nodes.uiNodes;
 let shouldUpdate = true;
@@ -229,7 +232,7 @@ async function newConditionNode(
   return new NothingNode();
 }
 
-async function addNodeAtMousePosition(node: Nodes, x: number, y: number) {
+async function addNodeAtPosition(node: Nodes, x: number, y: number) {
   console.log("Adding", node, "at", x, ",", y);
   await editor.addNode(node);
   void area.translate(node.id, { x: x, y: y });
@@ -238,17 +241,42 @@ async function addNodeAtMousePosition(node: Nodes, x: number, y: number) {
 async function rearrange() {
   await arrange.layout({ applier });
   await area.translate(endNode.id, { x: 200, y: 200 });
+  showInfo("Your nodes got automatically arranged! To undo press CTRL+Z.");
   return new NothingNode();
 }
 
-async function redo() {
-  await history.redo();
-  return new NothingNode();
+function copy() {
+  // Clear clipboard
+  while (nodeClipBoard.length > 0) {
+    nodeClipBoard.pop();
+  }
+  // Get selected nodes
+  selector.entities.forEach((entity) => {
+    const node = editor.getNode(entity.id);
+    if (node) {
+      nodeClipBoard.push(node);
+    }
+  });
+
+  console.log(nodeClipBoard);
 }
 
-async function undo() {
-  await history.undo();
-  return new NothingNode();
+async function paste() {
+  if (nodeClipBoard.length == 0) return;
+  shouldUpdate = false;
+  for (let node of nodeClipBoard) {
+    const clone = node.clone();
+    const nodePos = area.nodeViews.get(node.id)?.position;
+    if (clone) {
+      await addNodeAtPosition(
+        clone,
+        area.area.pointer.x + (nodePos?.x ?? 0),
+        area.area.pointer.y + (nodePos?.y ?? 0)
+      );
+    }
+  }
+  shouldUpdate = true;
+  await editor.addNode(new NothingNode());
 }
 
 async function checkForUnsafeConnections(
@@ -320,7 +348,7 @@ async function createEditor() {
           searchBar: false,
           list: [
             {
-              label: "Rearrange (CTRL+S)",
+              label: "Rearrange (CTRL+A)",
               key: "1",
               handler: () => {
                 rearrange();
@@ -401,10 +429,25 @@ async function createEditor() {
       case "KeyZ":
         void history.redo();
         break;
-      case "KeyS":
+      case "KeyA":
         e.preventDefault();
         e.stopPropagation();
         void rearrange();
+        break;
+      case "KeyS":
+        e.preventDefault();
+        e.stopPropagation();
+        editor.addNode(new NothingNode());
+        break;
+      case "KeyC":
+        e.preventDefault();
+        e.stopPropagation();
+        copy();
+        break;
+      case "KeyV":
+        e.preventDefault();
+        e.stopPropagation();
+        void paste();
         break;
       default:
     }
@@ -883,7 +926,7 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
             });
             if (toCreate) {
               area.area.setPointerFrom(ev);
-              addNodeAtMousePosition(
+              addNodeAtPosition(
                 toCreate,
                 area.area.pointer.x,
                 area.area.pointer.y
