@@ -37,7 +37,7 @@ export class ContentStore {
   }
 
   runAction(action: ContentAction) {
-    this.actions.push(action);
+    this.actions.push(action, this.files.length);
     this.redoActions.length = 0;
     // LATER enforce that file name are unique
     const needsFileSorting = this.runActionInternal(action);
@@ -61,7 +61,7 @@ export class ContentStore {
   redo() {
     const redoLastAction = this.redoActions.pop();
     if (redoLastAction === undefined) return;
-    this.actions.push(redoLastAction);
+    this.actions.push(redoLastAction, this.files.length);
     const needsFileSorting = this.runActionInternal(redoLastAction);
     if (needsFileSorting) {
       this.sortFiles();
@@ -83,12 +83,6 @@ export class ContentStore {
       assert(fileIndex !== null);
       this.files[fileIndex] = action.newFile;
       return true;
-    } else if (action.kind === "combined") {
-      let needsFileSorting = false;
-      for (const a of action.actions) {
-        needsFileSorting ||= this.runActionInternal(a);
-      }
-      return needsFileSorting;
     } else {
       assertUnreachable(action);
     }
@@ -114,7 +108,7 @@ class CompressedActionsList {
    *
    * Could be extended to peek further, and to follow renames, and to deal with combined actions.
    */
-  push(action: ContentAction) {
+  push(action: ContentAction, filesCount: number) {
     if (this.actions.length === 0) {
       this.actions.push(action);
       return;
@@ -126,8 +120,11 @@ class CompressedActionsList {
     } else {
       this.actions[this.actions.length - 1] = joined;
     }
-    // TODO: Count number of actions, and trim off at the back.
-    // Waaait a second, if I do "actions.length - files.length", then that's close enough?
+
+    const maxActions = this.limits.max;
+
+    // Good approximation of "number of actions minus add actions per file"
+    const currentActions = this.actions.length - filesCount;
   }
 
   tryJoin(
@@ -190,12 +187,6 @@ export type ContentAction =
       oldFile: ContentFile;
       newFile: ContentFile;
       timestamp: TimestampMs;
-    }
-  | {
-      kind: "combined";
-      actions: ContentAction[];
-      /** Inner timestamps are ignored */
-      timestamp: TimestampMs;
     };
 
 /** Returns the undo variant of a content action */
@@ -217,15 +208,6 @@ export function undoContentAction(action: ContentAction): ContentAction {
       kind: "replace",
       oldFile: action.newFile,
       newFile: action.oldFile,
-      timestamp: action.timestamp,
-    };
-  } else if (action.kind === "combined") {
-    const actions = action.actions
-      .toReversed()
-      .map((v) => undoContentAction(v));
-    return {
-      kind: "combined",
-      actions,
       timestamp: action.timestamp,
     };
   } else {

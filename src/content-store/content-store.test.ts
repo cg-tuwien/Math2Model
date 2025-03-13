@@ -8,25 +8,9 @@ import { ContentFile } from "./content-file";
 
 test("undo(undo(v)) == v", () => {
   const action: ContentAction = {
-    kind: "combined",
-    actions: [
-      {
-        kind: "combined",
-        actions: [],
-        timestamp: 30,
-      },
-      {
-        kind: "add",
-        file: new ContentFile("foo.json", "fooo"),
-        timestamp: 30,
-      },
-      {
-        kind: "remove",
-        file: new ContentFile("bar.json", "hmm"),
-        timestamp: 31,
-      },
-    ],
-    timestamp: 32,
+    kind: "add",
+    file: new ContentFile("foo.json", "fooo"),
+    timestamp: 30,
   };
 
   expect(undoContentAction(undoContentAction(action))).toEqual(action);
