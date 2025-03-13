@@ -598,7 +598,6 @@ async function createEditor() {
   area.use(history);
 
   await deserialize(props.keyedGraph?.code ?? "");
-  await arrange.layout({ applier });
 
   editor.addPipe((context) => {
     if (context.type === "connectioncreated") {
@@ -883,6 +882,7 @@ async function deserialize(json: string, parent?: string) {
 
   shouldUpdate = true;
   await editor.addNode(new NothingNode());
+  await history.clear();
   // await rearrange();
 }
 
