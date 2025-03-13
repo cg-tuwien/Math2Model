@@ -1,5 +1,6 @@
 import { assert, assertUnreachable } from "@stefnotch/typestef/assert";
-import type { ContentFile } from "./content-file";
+import arrayUtils from "@stefnotch/typestef/array-utils";
+import { ContentFile } from "./content-file";
 
 export interface ContentActionLimits {
   /** How many actions do we track.
@@ -10,6 +11,8 @@ export interface ContentActionLimits {
   /** How closely spaced together can actions be. */
   maxTimePerFile?: DurationMs;
 }
+
+export type ContentActionListener = (e: ContentAction) => void;
 
 /**
  * An in-memory content store that periodically syncs itself with the filesystem.
@@ -23,8 +26,18 @@ export class ContentStore {
   /** Can be directly applied in the redo function. */
   private redoActions: ContentAction[] = [];
 
+  private listeners: ContentActionListener[] = [];
+
   public constructor(opts: { actionLimits?: ContentActionLimits }) {
     this.actions = new CompressedActionsList(opts.actionLimits ?? {});
+  }
+
+  addListener(listener: ContentActionListener) {
+    this.listeners.push(listener);
+  }
+
+  removeListener(listener: ContentActionListener) {
+    arrayUtils.remove(this.listeners, listener);
   }
 
   /**
@@ -35,6 +48,58 @@ export class ContentStore {
     return this.files;
   }
 
+  readFile(name: string): ContentFile | null {
+    const index = this.findFileNameIndex(name);
+    if (index === null) return null;
+    return this.files[index];
+  }
+  hasFile(name: string): boolean {
+    return this.findFileNameIndex(name) !== null;
+  }
+  writeTextFile(name: string, content: string) {
+    const index = this.findFileNameIndex(name);
+    assert(index !== null, "File must exist");
+    const oldFile = this.files[index];
+    this.runAction({
+      kind: "replace",
+      oldFile,
+      newFile: new ContentFile(name, content),
+      timestamp: Date.now(),
+    });
+  }
+  writeBinaryFile(name: string, content: ArrayBuffer) {
+    const byteContent = new Uint8Array(content);
+    const index = this.findFileNameIndex(name);
+    assert(index !== null, "File must exist");
+    const oldFile = this.files[index];
+    this.runAction({
+      kind: "replace",
+      oldFile,
+      newFile: new ContentFile(name, byteContent),
+      timestamp: Date.now(),
+    });
+  }
+  renameFile(oldName: string, newName: string) {
+    const index = this.findFileNameIndex(oldName);
+    assert(index !== null, "File must exist");
+    const oldFile = this.files[index];
+    this.runAction({
+      kind: "replace",
+      oldFile,
+      newFile: new ContentFile(newName, oldFile.data),
+      timestamp: Date.now(),
+    });
+  }
+  deleteFile(name: string) {
+    const index = this.findFileNameIndex(name);
+    assert(index !== null, "File must exist");
+    this.runAction({
+      kind: "remove",
+      file: this.files[index],
+      timestamp: Date.now(),
+    });
+  }
+
   runAction(action: ContentAction) {
     this.actions.push(action, this.files.length);
     this.redoActions.length = 0;
@@ -43,6 +108,7 @@ export class ContentStore {
     if (needsFileSorting) {
       this.sortFiles();
     }
+    this.listeners.forEach((l) => l(action));
   }
 
   undo() {
@@ -55,6 +121,7 @@ export class ContentStore {
     if (needsFileSorting) {
       this.sortFiles();
     }
+    this.listeners.forEach((l) => l(undoLastAction));
   }
 
   redo() {
@@ -65,6 +132,7 @@ export class ContentStore {
     if (needsFileSorting) {
       this.sortFiles();
     }
+    this.listeners.forEach((l) => l(redoLastAction));
   }
 
   /** Runs an action and returns whether the array needs to be re-sorted or not. */
@@ -84,6 +152,18 @@ export class ContentStore {
       return true;
     } else {
       assertUnreachable(action);
+    }
+  }
+
+  private findFileNameIndex(fileName: string): number | null {
+    let { index, itemExists } = arrayUtils.getBinaryInsertIndex(
+      this.files,
+      (v) => v.name.localeCompare(fileName)
+    );
+    if (itemExists) {
+      return index;
+    } else {
+      return null;
     }
   }
 

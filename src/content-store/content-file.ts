@@ -17,53 +17,75 @@ export type ContentType =
       kind: "unknown";
     };
 
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
 export class ContentFile {
   constructor(
     public readonly name: string,
     public readonly data: string | Readonly<Uint8Array>
   ) {}
 
+  readText(): string {
+    if (typeof this.data === "string") {
+      return this.data;
+    } else {
+      return textDecoder.decode(this.data);
+    }
+  }
+
+  readBinary(): Readonly<Uint8Array> {
+    if (typeof this.data === "string") {
+      return textEncoder.encode(this.data);
+    } else {
+      return this.data;
+    }
+  }
+
   getType(): ContentType {
-    const extension = getFileExtension(this.name);
-    if (extension === null) {
+    return fileNameToType(this.name);
+  }
+}
+
+export function fileNameToType(name: string): ContentType {
+  const extension = getFileExtension(name);
+  if (extension === null) {
+    return {
+      kind: "unknown",
+    };
+  } else if (extension === "wgsl") {
+    if (name.endsWith(".graph.wgsl")) {
       return {
-        kind: "unknown",
+        kind: "shader",
+        subKind: "graph-generated",
       };
-    } else if (extension === "wgsl") {
-      if (this.name.endsWith(".graph.wgsl")) {
-        return {
-          kind: "shader",
-          subKind: "graph-generated",
-        };
-      } else {
-        return {
-          kind: "shader",
-        };
-      }
-    } else if (extension === "graph") {
-      return {
-        kind: "graph",
-      };
-    } else if (imageFileTypes.has(extension)) {
-      return {
-        kind: "image",
-      };
-    } else if (extension === "json") {
-      if (this.name === "scene.json") {
-        return {
-          kind: "json",
-          subKind: "scene",
-        };
-      } else {
-        return {
-          kind: "json",
-        };
-      }
     } else {
       return {
-        kind: "unknown",
+        kind: "shader",
       };
     }
+  } else if (extension === "graph") {
+    return {
+      kind: "graph",
+    };
+  } else if (imageFileTypes.has(extension)) {
+    return {
+      kind: "image",
+    };
+  } else if (extension === "json") {
+    if (name === "scene.json") {
+      return {
+        kind: "json",
+        subKind: "scene",
+      };
+    } else {
+      return {
+        kind: "json",
+      };
+    }
+  } else {
+    return {
+      kind: "unknown",
+    };
   }
 }
 
