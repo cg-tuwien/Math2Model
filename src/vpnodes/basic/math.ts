@@ -149,6 +149,7 @@ export class MathOpNode extends VPNode {
     this.addOutput("value", new ClassicPreset.Output(reteSocket, "Result/any"));
 
     this.extraWidth = 10;
+    this.extraHeight = 25;
 
     this.updateSize();
   }
@@ -256,8 +257,8 @@ export class MathOpNode extends VPNode {
 
   clone(): Nodes | void {
     const mn = new MathOpNode(this.operator, this.update, this.updateControl);
-    mn.leftControl.value = mn.leftControl.value;
-    mn.rightControl.value = mn.rightControl.value;
+    mn.leftControl.value = this.leftControl.value;
+    mn.rightControl.value = this.rightControl.value;
     return mn;
   }
 }
