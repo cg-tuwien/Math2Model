@@ -15,6 +15,7 @@ import { vec2, vec3 } from "webgpu-matrix";
 import { typeToValue } from "@/vpnodes/basic/functions";
 import { type SerializedNode } from "@/vpnodes/serialization/node";
 import { SliderControl } from "@/vpnodes/controls/slider";
+import type { Nodes } from "../nodes-list";
 
 export class ShapeNode extends VPNode {
   constructor(
@@ -68,6 +69,10 @@ export class ShapeNode extends VPNode {
         }
       }
     }
+  }
+
+  clone(): Nodes | void {
+    return new ShapeNode(this.name, this.code);
   }
 }
 

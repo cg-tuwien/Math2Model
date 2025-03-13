@@ -43,7 +43,7 @@ import {
   type ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
-import { showError } from "@/notification";
+import { showError, showInfo } from "@/notification";
 import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
 import HeartWGSL from "@/../parametric-renderer-core/graphs/Heart.graph.wgsl?raw";
 import SphereWGSL from "@/../parametric-renderer-core/graphs/Sphere.graph.wgsl?raw";
@@ -73,13 +73,20 @@ import DefaultNodeStyle from "@/components/visual-programming/CustomNodeStyles/D
 import SocketStyle from "@/components/visual-programming/CustomNodeStyles/SocketStyle.vue";
 import ConnectionStyle from "@/components/visual-programming/CustomNodeStyles/ConnectionStyle.vue";
 import {
+  callGenericUpdate,
   Connection,
+  genericUpdate,
+  genericUpdateControl,
   useUiNodes,
   type AreaExtra,
   type Conns,
   type Nodes,
   type Schemes,
 } from "@/vpnodes/nodes-list";
+import { NumberControl } from "@/vpnodes/controls/number";
+import NumberComponent from "@/vpnodes/components/NumberComponent.vue";
+import { CustomZoom } from "@/vpnodes/custom-zoom";
+import type { Item } from "rete-context-menu-plugin/_types/types";
 
 const emit = defineEmits<{
   update: [content: string];
@@ -131,6 +138,7 @@ const area: AreaPlugin<Schemes, AreaExtra> = new AreaPlugin<Schemes, AreaExtra>(
   document.createElement("div")
 );
 area.container.classList.add("flex-1");
+area.area.setZoomHandler(new CustomZoom(0.1));
 const scopes = new ScopesPlugin<Schemes>();
 const history = new HistoryPlugin<Schemes, HistoryActions<Schemes>>();
 const applier = new ArrangeAppliers.TransitionApplier<Schemes, never>({
@@ -141,10 +149,13 @@ const applier = new ArrangeAppliers.TransitionApplier<Schemes, never>({
   },
 });
 
-AreaExtensions.selectableNodes(area, AreaExtensions.selector(), {
+const nodeClipBoard: Nodes[] = [];
+
+const selector = AreaExtensions.selector();
+
+AreaExtensions.selectableNodes(area, selector, {
   accumulating: AreaExtensions.accumulateOnCtrl(),
 });
-
 const nodes = useUiNodes(editor, area);
 let uiNodes: Map<string, Map<string, UINode>> = nodes.uiNodes;
 let shouldUpdate = true;
@@ -221,7 +232,7 @@ async function newConditionNode(
   return new NothingNode();
 }
 
-async function addNodeAtMousePosition(node: Nodes, x: number, y: number) {
+async function addNodeAtPosition(node: Nodes, x: number, y: number) {
   console.log("Adding", node, "at", x, ",", y);
   await editor.addNode(node);
   void area.translate(node.id, { x: x, y: y });
@@ -230,7 +241,101 @@ async function addNodeAtMousePosition(node: Nodes, x: number, y: number) {
 async function rearrange() {
   await arrange.layout({ applier });
   await area.translate(endNode.id, { x: 200, y: 200 });
+  showInfo("Your nodes got automatically arranged! To undo press CTRL+Z.");
   return new NothingNode();
+}
+
+function copy() {
+  // Clear clipboard
+  while (nodeClipBoard.length > 0) {
+    nodeClipBoard.pop();
+  }
+  if (selector.entities.size == 0) return;
+  // Get selected nodes
+  selector.entities.forEach((entity) => {
+    const node = editor.getNode(entity.id);
+    if (node) {
+      nodeClipBoard.push(node);
+    }
+  });
+
+  showInfo(
+    "Copied " +
+      nodeClipBoard.length +
+      " node" +
+      (nodeClipBoard.length > 1 ? "s" : "") +
+      " to clipboard."
+  );
+}
+
+async function del() {
+  console.log(selector.entities);
+  if (selector.entities.size == 0) return;
+  const toDelete: string[] = [];
+  selector.entities.forEach((entity) => toDelete.push(entity.id));
+  if (toDelete.length == 0) return;
+  shouldUpdate = false;
+  selector.unselectAll();
+  for (let id of toDelete) {
+    const node = editor.getNode(id);
+    if (node?.label === "input2" || node?.label === "Return") continue;
+    const connections = editor.getConnections().filter((c) => {
+      return c.source === id || c.target === id;
+    });
+
+    for (const connection of connections) {
+      await editor.removeConnection(connection.id);
+    }
+    await editor.removeNode(id);
+  }
+  shouldUpdate = true;
+  showInfo(
+    "Deleted " +
+      toDelete.length +
+      " node" +
+      (toDelete.length > 1 ? "s" : "") +
+      ". Press CTRL + Z to undo deletion of last deleted node."
+  );
+  await editor.addNode(new NothingNode());
+}
+
+async function duplicate() {
+  const oldClipboard = nodeClipBoard.copyWithin(0, 0);
+  copy();
+  await paste();
+
+  while (nodeClipBoard.length > 0) {
+    nodeClipBoard.pop();
+  }
+
+  for (let node of oldClipboard) {
+    nodeClipBoard.push(node);
+  }
+}
+
+async function paste() {
+  if (nodeClipBoard.length == 0) return;
+  shouldUpdate = false;
+  for (let node of nodeClipBoard) {
+    const clone = node.clone();
+    const nodePos = area.nodeViews.get(node.id)?.position;
+    if (clone) {
+      await addNodeAtPosition(
+        clone,
+        area.area.pointer.x + (nodePos?.x ?? 0),
+        area.area.pointer.y + (nodePos?.y ?? 0)
+      );
+    }
+  }
+  shouldUpdate = true;
+  showInfo(
+    "Pasted " +
+      nodeClipBoard.length +
+      " node" +
+      (nodeClipBoard.length > 1 ? "s" : "") +
+      " from clipboard."
+  );
+  await editor.addNode(new NothingNode());
 }
 
 async function checkForUnsafeConnections(
@@ -275,28 +380,123 @@ async function checkForUnsafeConnections(
 const endNode = new ReturnNode("vec3f(input2.x, 0, input2.y)", "Output Vertex");
 
 async function createEditor() {
+  //const contextMenu = new ContextMenuPlugin<Schemes>({
+  //items: ContextMenuPresets.classic.setup([
+  //  ["Rearrange (CTRL+S)", () => rearrange()],
+  //  ["Undo (CTRL+Z)", () => undo()],
+  //  ["Redo (CTRL+Y)", () => redo()],
+  // ["Initialize", () => new InitializeNode()],
+  // [
+  //   "Advanced (experimental)",
+  //   [
+  //     ["Equals", () => newConditionNode("True", "False", area, "==")],
+  //     ["Not Equals", () => newConditionNode("True", "False", area, "!=")],
+  //     ["Lt", () => newConditionNode("True", "False", area, "<")],
+  //     ["Le", () => newConditionNode("True", "False", area, "<=")],
+  //     ["Gt", () => newConditionNode("True", "False", area, ">")],
+  //     ["Ge", () => newConditionNode("True", "False", area, ">=")],
+  //   ],
+  // ],
+  //]),
+  //});
+
   const contextMenu = new ContextMenuPlugin<Schemes>({
-    items: ContextMenuPresets.classic.setup([
-      ["Rearrange", () => rearrange()],
-      ["Initialize", () => new InitializeNode()],
-      [
-        "Advanced (experimental)",
-        [
-          ["Equals", () => newConditionNode("True", "False", area, "==")],
-          ["Not Equals", () => newConditionNode("True", "False", area, "!=")],
-          ["Lt", () => newConditionNode("True", "False", area, "<")],
-          ["Le", () => newConditionNode("True", "False", area, "<=")],
-          ["Gt", () => newConditionNode("True", "False", area, ">")],
-          ["Ge", () => newConditionNode("True", "False", area, ">=")],
-        ],
-      ],
-    ]),
+    items(context, plugin) {
+      if (context === "root") {
+        return {
+          searchBar: false,
+          list: [
+            {
+              label: "Rearrange (CTRL+A)",
+              key: "1",
+              handler: () => {
+                rearrange();
+              },
+            },
+            {
+              label: "Undo (CTRL+Z)",
+              key: "2",
+              handler: () => {
+                history.undo();
+              },
+            },
+            {
+              label: "Redo (CTRL+Y)",
+              key: "3",
+              handler: () => {
+                history.redo();
+              },
+            },
+            {
+              label: "Paste (CTRL+V)",
+              key: "4",
+              handler: () => {
+                void paste();
+              },
+            },
+          ],
+        };
+      }
+      const deleteItem: Item = {
+        label: "Delete (del)",
+        key: "delete",
+        async handler() {
+          if ("source" in context && "target" in context) {
+            // connection
+            const connectionId = context.id;
+
+            await editor.removeConnection(connectionId);
+          } else {
+            // node
+            const nodeId = context.id;
+            const node = editor.getNode(nodeId);
+            if (node?.label === "input2" || node?.label === "Return") return;
+            const connections = editor.getConnections().filter((c) => {
+              return c.source === nodeId || c.target === nodeId;
+            });
+
+            for (const connection of connections) {
+              await editor.removeConnection(connection.id);
+            }
+            await editor.removeNode(nodeId);
+          }
+        },
+      };
+
+      const clone = context.clone?.bind(context);
+      const cloneItem: undefined | Item = clone && {
+        label: "Clone (CTRL+D)",
+        key: "clone",
+        async handler() {
+          const node = clone();
+          if (node) {
+            await editor.addNode(node);
+
+            void area.translate(node.id, area.area.pointer);
+          }
+        },
+      };
+
+      const copyItem: Item = {
+        label: "Copy (CTRL+C)",
+        key: "copy",
+        handler: () => {
+          copy();
+        },
+      };
+
+      return {
+        searchBar: false,
+        list: [deleteItem, ...(cloneItem ? [cloneItem] : []), copyItem],
+      };
+    },
   });
 
   arrange.addPreset(ArrangePresets.classic.setup());
   history.addPreset(HistoryPresets.classic.setup());
 
   document.addEventListener("keydown", (e) => {
+    if (e.code === "Delete") void del();
     if (!e.ctrlKey && !e.metaKey) return;
 
     switch (e.code) {
@@ -306,13 +506,39 @@ async function createEditor() {
       case "KeyZ":
         void history.redo();
         break;
-      case "KeyS":
+      case "KeyA":
         e.preventDefault();
         e.stopPropagation();
         void rearrange();
         break;
+      case "KeyS":
+        e.preventDefault();
+        e.stopPropagation();
+        showInfo("You don't need to save!");
+        editor.addNode(new NothingNode());
+        break;
+      case "KeyC":
+        e.preventDefault();
+        e.stopPropagation();
+        copy();
+        break;
+      case "KeyV":
+        e.preventDefault();
+        e.stopPropagation();
+        void paste();
+        break;
+      case "KeyD":
+        e.preventDefault();
+        e.stopPropagation();
+        void duplicate();
+        break;
       default:
     }
+  });
+
+  document.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
   });
 
   area.use(contextMenu);
@@ -333,6 +559,9 @@ async function createEditor() {
           }
           if (data.payload instanceof SliderControl) {
             return SliderComponent;
+          }
+          if (data.payload instanceof NumberControl) {
+            return NumberComponent;
           }
           if (data.payload instanceof ClassicPreset.InputControl) {
             return VuePresets.classic.Control;
@@ -369,7 +598,6 @@ async function createEditor() {
   area.use(history);
 
   await deserialize(props.keyedGraph?.code ?? "");
-  await arrange.layout({ applier });
 
   editor.addPipe((context) => {
     if (context.type === "connectioncreated") {
@@ -654,6 +882,7 @@ async function deserialize(json: string, parent?: string) {
 
   shouldUpdate = true;
   await editor.addNode(new NothingNode());
+  await history.clear();
   // await rearrange();
 }
 
@@ -664,10 +893,17 @@ function serializedNodeToNode(
   let node: Nodes;
   switch (sn.nodeType) {
     case "Number":
-      node = new NumberNode((n) => area.update("node", n.id));
+      node = new NumberNode(
+        (id) => genericUpdate(id, editor, area),
+        (cont) => genericUpdateControl(cont, editor, area)
+      );
       break;
     case "Math":
-      node = new MathOpNode("+", (n) => area.update("node", n.id));
+      node = new MathOpNode(
+        "+",
+        (id) => genericUpdate(id, editor, area),
+        (cont) => genericUpdateControl(cont, editor, area)
+      );
       break;
     case "Vector":
       node = new VectorNode(4, (n) => area.update("node", n.id));
@@ -704,26 +940,18 @@ function serializedNodeToNode(
       break;
     case "Combine":
       node = new CombineNode(
-        (id) => {
-          area.update("node", id);
-          editor.addNode(new NothingNode());
-        },
-        (c) => {
-          area.update("control", c.id);
-        }
+        (id) => genericUpdate(id, editor, area),
+        (cont) => genericUpdateControl(cont, editor, area),
+        (id) => callGenericUpdate(id, editor, area)
       );
       break;
     case "MathFunction":
       node = new MathFunctionNode(
         "",
         "",
-        (id) => {
-          area.update("node", id);
-          editor.addNode(new NothingNode());
-        },
-        (c) => {
-          area.update("control", c.id);
-        }
+        (id) => genericUpdate(id, editor, area),
+        (cont) => genericUpdateControl(cont, editor, area),
+        (id) => callGenericUpdate(id, editor, area)
       );
       break;
     default:
@@ -781,7 +1009,7 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
             });
             if (toCreate) {
               area.area.setPointerFrom(ev);
-              addNodeAtMousePosition(
+              addNodeAtPosition(
                 toCreate,
                 area.area.pointer.x,
                 area.area.pointer.y

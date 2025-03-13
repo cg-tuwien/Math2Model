@@ -14,12 +14,14 @@ import {
   typeToValueCode,
   valueToType,
 } from "@/vpnodes/basic/functions";
+import type { Nodes } from "../nodes-list";
 
 export class CombineNode extends VPNode {
   private cfControl: SliderControl;
   constructor(
     private update: (id: string) => void,
-    private updateControl: (c: ClassicPreset.Control) => void
+    private updateControl: (c: ClassicPreset.Control) => void,
+    private noDebounceUpdate: (id: string) => void
   ) {
     super("Combine Shapes");
 
@@ -35,6 +37,9 @@ export class CombineNode extends VPNode {
       },
       (value) => {
         this.updateControl(this.cfControl);
+      },
+      () => {
+        this.noDebounceUpdate(this.id);
       }
     );
 
@@ -103,6 +108,16 @@ export class CombineNode extends VPNode {
       }
     }
   }
+
+  clone(): Nodes | void {
+    const cn = new CombineNode(
+      this.update,
+      this.updateControl,
+      this.noDebounceUpdate
+    );
+    cn.cfControl.value = this.cfControl.value;
+    return cn;
+  }
 }
 
 export class MathFunctionNode extends VPNode {
@@ -112,6 +127,7 @@ export class MathFunctionNode extends VPNode {
     private func: string,
     private update: (id: string) => void,
     private updateControl: (c: ClassicPreset.Control) => void,
+    private noDebounceUpdate: (id: string) => void,
     private isApply: boolean = true,
     private inputType: "f32" | "vec2f" | "vec3f" | "vec4f" | "any" = "any",
     private outputType: "f32" | "vec2f" | "vec3f" | "vec4f" | "any" = "any"
@@ -150,7 +166,8 @@ export class MathFunctionNode extends VPNode {
         expr[0],
         true,
         () => this.update(this.id),
-        (value) => this.updateControl(control)
+        (value) => this.updateControl(control),
+        () => this.noDebounceUpdate(this.id)
       );
       this.variableControls.set(
         "{" + variable.split("}")[0] + "}/" + expr[5],
@@ -283,5 +300,27 @@ export class MathFunctionNode extends VPNode {
       }
     }
     super.deserialize(sn);
+  }
+
+  clone(): Nodes | void {
+    const mfn = new MathFunctionNode(
+      this.name,
+      this.func,
+      this.update,
+      this.updateControl,
+      this.noDebounceUpdate,
+      this.isApply,
+      this.inputType,
+      this.outputType
+    );
+    for (let key of this.variableControls.keys()) {
+      const k = key.split("/");
+      const control = this.variableControls.get(key);
+      const otherControl = mfn.variableControls.get(key);
+      if (otherControl && control) {
+        otherControl.value = control.value;
+      }
+    }
+    return mfn;
   }
 }
