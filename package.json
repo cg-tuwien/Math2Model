@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "build": "vite build && vitepress build docs",
     "docs:dev": "vitepress dev docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "test": "vitest"
   },
   "dependencies": {
     "@gltf-transform/core": "^4.1.1",
@@ -56,6 +57,7 @@
     "vite": "^6.2.0",
     "vite-plugin-checker": "^0.9.0",
     "vitepress": "^1.6.3",
+    "vitest": "^3.0.8",
     "vue-tsc": "^2.2.8"
   },
   "browserslist": [
