@@ -38,6 +38,7 @@ const props = defineProps<{
     :min="props.data.min"
     :max="props.data.max"
     v-on:update-value="(v: number | null) => props.data.change(v)"
+    v-on:click="(v: number | null) => props.data.updateValue(v ?? 0.0)"
     v-on:pointerdown.stop=""
   >
   </n-input-number>

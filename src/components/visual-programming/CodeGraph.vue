@@ -85,6 +85,7 @@ import {
 } from "@/vpnodes/nodes-list";
 import { NumberControl } from "@/vpnodes/controls/number";
 import NumberComponent from "@/vpnodes/components/NumberComponent.vue";
+import { CustomZoom } from "@/vpnodes/custom-zoom";
 
 const emit = defineEmits<{
   update: [content: string];
@@ -136,6 +137,7 @@ const area: AreaPlugin<Schemes, AreaExtra> = new AreaPlugin<Schemes, AreaExtra>(
   document.createElement("div")
 );
 area.container.classList.add("flex-1");
+area.area.setZoomHandler(new CustomZoom(0.1));
 const scopes = new ScopesPlugin<Schemes>();
 const history = new HistoryPlugin<Schemes, HistoryActions<Schemes>>();
 const applier = new ArrangeAppliers.TransitionApplier<Schemes, never>({
@@ -320,7 +322,12 @@ async function createEditor() {
     }
   });
 
-  area.use(contextMenu);
+  document.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  // area.use(contextMenu);
 
   const connection = new ConnectionPlugin<Schemes, AreaExtra>();
 
@@ -365,7 +372,7 @@ async function createEditor() {
     })
   );
 
-  render.addPreset(VuePresets.contextMenu.setup());
+  // render.addPreset(VuePresets.contextMenu.setup());
   scopes.addPreset(ScopesPresets.classic.setup());
 
   editor.use(area);
