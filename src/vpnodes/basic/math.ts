@@ -23,6 +23,9 @@ export class NumberNode extends VPNode {
     this.addControl("variable name", this.nameControl);
     this.valueControl = new ClassicPreset.InputControl("number", {
       initial: 0.0,
+      change: (value: number) => {
+        if (this.update) this.update(this);
+      },
     });
     this.addControl("value", this.valueControl);
     this.addOutput("value", new ClassicPreset.Output(reteSocket));
@@ -100,12 +103,18 @@ export class MathOpNode extends VPNode {
       "number",
       {
         initial: 0,
+        change: (value: number) => {
+          if (this.update) this.update(this, this.leftControl);
+        },
       }
     );
     this.rightControl = new ClassicPreset.InputControl<"number", number>(
       "number",
       {
         initial: 0,
+        change: (value: number) => {
+          if (this.update) this.update(this, this.rightControl);
+        },
       }
     );
     this.addInput(
