@@ -14,6 +14,7 @@ import {
   typeToValueCode,
   valueToType,
 } from "@/vpnodes/basic/functions";
+import type { Nodes } from "../nodes-list";
 
 export class CombineNode extends VPNode {
   private cfControl: SliderControl;
@@ -38,7 +39,7 @@ export class CombineNode extends VPNode {
         this.updateControl(this.cfControl);
       },
       () => {
-        noDebounceUpdate(this.id);
+        this.noDebounceUpdate(this.id);
       }
     );
 
@@ -106,6 +107,16 @@ export class CombineNode extends VPNode {
         }
       }
     }
+  }
+
+  clone(): Nodes | void {
+    const cn = new CombineNode(
+      this.update,
+      this.updateControl,
+      this.noDebounceUpdate
+    );
+    cn.cfControl.value = this.cfControl.value;
+    return cn;
   }
 }
 
@@ -289,5 +300,27 @@ export class MathFunctionNode extends VPNode {
       }
     }
     super.deserialize(sn);
+  }
+
+  clone(): Nodes | void {
+    const mfn = new MathFunctionNode(
+      this.name,
+      this.func,
+      this.update,
+      this.updateControl,
+      this.noDebounceUpdate,
+      this.isApply,
+      this.inputType,
+      this.outputType
+    );
+    for (let key of this.variableControls.keys()) {
+      const k = key.split("/");
+      const control = this.variableControls.get(key);
+      const otherControl = mfn.variableControls.get(key);
+      if (otherControl && control) {
+        otherControl.value = control.value;
+      }
+    }
+    return mfn;
   }
 }

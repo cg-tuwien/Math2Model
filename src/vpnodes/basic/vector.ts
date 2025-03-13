@@ -8,6 +8,7 @@ import {
   VPNode,
 } from "@/vpnodes/basic/nodes";
 import { type SerializedNode } from "@/vpnodes/serialization/node";
+import type { Nodes } from "../nodes-list";
 
 export class VectorNode extends VPNode {
   private xControl: ClassicPreset.InputControl<"number", number>;
@@ -16,7 +17,7 @@ export class VectorNode extends VPNode {
   private wControl: ClassicPreset.InputControl<"number", number>;
   constructor(
     private n: 2 | 3 | 4,
-    private update?: (node: ClassicPreset.Node) => void,
+    private update?: (node: ClassicPreset.Node) => void
   ) {
     super("Vector" + n.toString());
 
@@ -292,6 +293,10 @@ export class SeparateNode extends VPNode {
     this.addOutput("z", this.zOutput);
     this.addOutput("w", this.wOutput);
   }
+
+  clone(): Nodes | void {
+    return new SeparateNode(this.update);
+  }
 }
 
 export class JoinNode extends VPNode {
@@ -375,5 +380,9 @@ export class JoinNode extends VPNode {
     super.deserialize(sn);
     this.addInput("z", this.zInput);
     this.addInput("w", this.wInput);
+  }
+
+  clone(): Nodes | void {
+    return new JoinNode(this.update);
   }
 }

@@ -3,6 +3,7 @@ import { Area, AreaPlugin } from "rete-area-plugin";
 import { type SerializedNode } from "@/vpnodes/serialization/node";
 
 import { vec2, vec3, vec4 } from "webgpu-matrix";
+import type { Nodes } from "../nodes-list";
 
 export const reteSocket = new ClassicPreset.Socket("socket");
 
@@ -69,6 +70,7 @@ export class NothingNode extends ClassicPreset.Node {
   }
 
   deserialize(sn: SerializedNode) {}
+  clone() {}
 }
 
 export class VPNode extends ClassicPreset.Node {
@@ -102,6 +104,8 @@ export class VPNode extends ClassicPreset.Node {
   deserialize(sn: SerializedNode) {
     this.updateSize();
   }
+
+  clone(): Nodes | void {}
 }
 
 export class NodeReturn {

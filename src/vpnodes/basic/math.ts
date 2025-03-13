@@ -13,6 +13,7 @@ import { valueToType } from "./functions";
 import { SliderControl } from "../controls/slider";
 import type { Control } from "rete/_types/presets/classic";
 import { NumberControl } from "../controls/number";
+import type { Nodes } from "../nodes-list";
 
 export class NumberNode extends VPNode {
   private valueControl: NumberControl;
@@ -93,6 +94,12 @@ export class NumberNode extends VPNode {
     }
 
     super.deserialize(sn);
+  }
+
+  clone(): Nodes | void {
+    const nn = new NumberNode(this.update, this.updateControl);
+    nn.valueControl.value = this.valueControl.value;
+    return nn;
   }
 }
 
@@ -245,5 +252,12 @@ export class MathOpNode extends VPNode {
     }
 
     super.deserialize(sn);
+  }
+
+  clone(): Nodes | void {
+    const mn = new MathOpNode(this.operator, this.update, this.updateControl);
+    mn.leftControl.value = mn.leftControl.value;
+    mn.rightControl.value = mn.rightControl.value;
+    return mn;
   }
 }

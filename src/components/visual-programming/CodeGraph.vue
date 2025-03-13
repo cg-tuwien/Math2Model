@@ -86,6 +86,7 @@ import {
 import { NumberControl } from "@/vpnodes/controls/number";
 import NumberComponent from "@/vpnodes/components/NumberComponent.vue";
 import { CustomZoom } from "@/vpnodes/custom-zoom";
+import type { Item } from "rete-context-menu-plugin/_types/types";
 
 const emit = defineEmits<{
   update: [content: string];
@@ -240,6 +241,16 @@ async function rearrange() {
   return new NothingNode();
 }
 
+async function redo() {
+  await history.redo();
+  return new NothingNode();
+}
+
+async function undo() {
+  await history.undo();
+  return new NothingNode();
+}
+
 async function checkForUnsafeConnections(
   connection: ClassicPreset.Connection<Nodes, Nodes>
 ) {
@@ -282,22 +293,99 @@ async function checkForUnsafeConnections(
 const endNode = new ReturnNode("vec3f(input2.x, 0, input2.y)", "Output Vertex");
 
 async function createEditor() {
+  //const contextMenu = new ContextMenuPlugin<Schemes>({
+  //items: ContextMenuPresets.classic.setup([
+  //  ["Rearrange (CTRL+S)", () => rearrange()],
+  //  ["Undo (CTRL+Z)", () => undo()],
+  //  ["Redo (CTRL+Y)", () => redo()],
+  // ["Initialize", () => new InitializeNode()],
+  // [
+  //   "Advanced (experimental)",
+  //   [
+  //     ["Equals", () => newConditionNode("True", "False", area, "==")],
+  //     ["Not Equals", () => newConditionNode("True", "False", area, "!=")],
+  //     ["Lt", () => newConditionNode("True", "False", area, "<")],
+  //     ["Le", () => newConditionNode("True", "False", area, "<=")],
+  //     ["Gt", () => newConditionNode("True", "False", area, ">")],
+  //     ["Ge", () => newConditionNode("True", "False", area, ">=")],
+  //   ],
+  // ],
+  //]),
+  //});
+
   const contextMenu = new ContextMenuPlugin<Schemes>({
-    items: ContextMenuPresets.classic.setup([
-      ["Rearrange", () => rearrange()],
-      ["Initialize", () => new InitializeNode()],
-      [
-        "Advanced (experimental)",
-        [
-          ["Equals", () => newConditionNode("True", "False", area, "==")],
-          ["Not Equals", () => newConditionNode("True", "False", area, "!=")],
-          ["Lt", () => newConditionNode("True", "False", area, "<")],
-          ["Le", () => newConditionNode("True", "False", area, "<=")],
-          ["Gt", () => newConditionNode("True", "False", area, ">")],
-          ["Ge", () => newConditionNode("True", "False", area, ">=")],
-        ],
-      ],
-    ]),
+    items(context, plugin) {
+      if (context === "root") {
+        return {
+          searchBar: false,
+          list: [
+            {
+              label: "Rearrange (CTRL+S)",
+              key: "1",
+              handler: () => {
+                rearrange();
+              },
+            },
+            {
+              label: "Undo (CTRL+Z)",
+              key: "2",
+              handler: () => {
+                history.undo();
+              },
+            },
+            {
+              label: "Redo (CTRL+Y)",
+              key: "3",
+              handler: () => {
+                history.redo();
+              },
+            },
+          ],
+        };
+      }
+      const deleteItem: Item = {
+        label: "Delete",
+        key: "delete",
+        async handler() {
+          if ("source" in context && "target" in context) {
+            // connection
+            const connectionId = context.id;
+
+            await editor.removeConnection(connectionId);
+          } else {
+            // node
+            const nodeId = context.id;
+            const connections = editor.getConnections().filter((c) => {
+              return c.source === nodeId || c.target === nodeId;
+            });
+
+            for (const connection of connections) {
+              await editor.removeConnection(connection.id);
+            }
+            await editor.removeNode(nodeId);
+          }
+        },
+      };
+
+      const clone = context.clone?.bind(context);
+      const cloneItem: undefined | Item = clone && {
+        label: "Clone",
+        key: "clone",
+        async handler() {
+          const node = clone();
+          if (node) {
+            await editor.addNode(node);
+
+            void area.translate(node.id, area.area.pointer);
+          }
+        },
+      };
+
+      return {
+        searchBar: false,
+        list: [deleteItem, ...(cloneItem ? [cloneItem] : [])],
+      };
+    },
   });
 
   arrange.addPreset(ArrangePresets.classic.setup());
@@ -327,7 +415,7 @@ async function createEditor() {
     e.stopPropagation();
   });
 
-  // area.use(contextMenu);
+  area.use(contextMenu);
 
   const connection = new ConnectionPlugin<Schemes, AreaExtra>();
 
@@ -372,7 +460,7 @@ async function createEditor() {
     })
   );
 
-  // render.addPreset(VuePresets.contextMenu.setup());
+  render.addPreset(VuePresets.contextMenu.setup());
   scopes.addPreset(ScopesPresets.classic.setup());
 
   editor.use(area);
