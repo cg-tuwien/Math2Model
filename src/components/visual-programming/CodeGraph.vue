@@ -250,6 +250,7 @@ function copy() {
   while (nodeClipBoard.length > 0) {
     nodeClipBoard.pop();
   }
+  if (selector.entities.size == 0) return;
   // Get selected nodes
   selector.entities.forEach((entity) => {
     const node = editor.getNode(entity.id);
@@ -258,7 +259,58 @@ function copy() {
     }
   });
 
-  console.log(nodeClipBoard);
+  showInfo(
+    "Copied " +
+      nodeClipBoard.length +
+      " node" +
+      (nodeClipBoard.length > 1 ? "s" : "") +
+      " to clipboard."
+  );
+}
+
+async function del() {
+  console.log(selector.entities);
+  if (selector.entities.size == 0) return;
+  const toDelete: string[] = [];
+  selector.entities.forEach((entity) => toDelete.push(entity.id));
+  if (toDelete.length == 0) return;
+  shouldUpdate = false;
+  selector.unselectAll();
+  for (let id of toDelete) {
+    const node = editor.getNode(id);
+    if (node?.label === "input2" || node?.label === "Return") continue;
+    const connections = editor.getConnections().filter((c) => {
+      return c.source === id || c.target === id;
+    });
+
+    for (const connection of connections) {
+      await editor.removeConnection(connection.id);
+    }
+    await editor.removeNode(id);
+  }
+  shouldUpdate = true;
+  showInfo(
+    "Deleted " +
+      toDelete.length +
+      " node" +
+      (toDelete.length > 1 ? "s" : "") +
+      ". Press CTRL + Z to undo deletion of last deleted node."
+  );
+  await editor.addNode(new NothingNode());
+}
+
+async function duplicate() {
+  const oldClipboard = nodeClipBoard.copyWithin(0, 0);
+  copy();
+  await paste();
+
+  while (nodeClipBoard.length > 0) {
+    nodeClipBoard.pop();
+  }
+
+  for (let node of oldClipboard) {
+    nodeClipBoard.push(node);
+  }
 }
 
 async function paste() {
@@ -276,6 +328,13 @@ async function paste() {
     }
   }
   shouldUpdate = true;
+  showInfo(
+    "Pasted " +
+      nodeClipBoard.length +
+      " node" +
+      (nodeClipBoard.length > 1 ? "s" : "") +
+      " from clipboard."
+  );
   await editor.addNode(new NothingNode());
 }
 
@@ -368,11 +427,18 @@ async function createEditor() {
                 history.redo();
               },
             },
+            {
+              label: "Paste (CTRL+V)",
+              key: "4",
+              handler: () => {
+                void paste();
+              },
+            },
           ],
         };
       }
       const deleteItem: Item = {
-        label: "Delete",
+        label: "Delete (del)",
         key: "delete",
         async handler() {
           if ("source" in context && "target" in context) {
@@ -383,6 +449,8 @@ async function createEditor() {
           } else {
             // node
             const nodeId = context.id;
+            const node = editor.getNode(nodeId);
+            if (node?.label === "input2" || node?.label === "Return") return;
             const connections = editor.getConnections().filter((c) => {
               return c.source === nodeId || c.target === nodeId;
             });
@@ -397,7 +465,7 @@ async function createEditor() {
 
       const clone = context.clone?.bind(context);
       const cloneItem: undefined | Item = clone && {
-        label: "Clone",
+        label: "Clone (CTRL+D)",
         key: "clone",
         async handler() {
           const node = clone();
@@ -409,9 +477,17 @@ async function createEditor() {
         },
       };
 
+      const copyItem: Item = {
+        label: "Copy (CTRL+C)",
+        key: "copy",
+        handler: () => {
+          copy();
+        },
+      };
+
       return {
         searchBar: false,
-        list: [deleteItem, ...(cloneItem ? [cloneItem] : [])],
+        list: [deleteItem, ...(cloneItem ? [cloneItem] : []), copyItem],
       };
     },
   });
@@ -420,6 +496,7 @@ async function createEditor() {
   history.addPreset(HistoryPresets.classic.setup());
 
   document.addEventListener("keydown", (e) => {
+    if (e.code === "Delete") void del();
     if (!e.ctrlKey && !e.metaKey) return;
 
     switch (e.code) {
@@ -437,6 +514,7 @@ async function createEditor() {
       case "KeyS":
         e.preventDefault();
         e.stopPropagation();
+        showInfo("You don't need to save!");
         editor.addNode(new NothingNode());
         break;
       case "KeyC":
@@ -448,6 +526,11 @@ async function createEditor() {
         e.preventDefault();
         e.stopPropagation();
         void paste();
+        break;
+      case "KeyD":
+        e.preventDefault();
+        e.stopPropagation();
+        void duplicate();
         break;
       default:
     }
