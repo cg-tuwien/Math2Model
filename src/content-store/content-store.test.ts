@@ -54,6 +54,24 @@ test("illegal removal", () => {
   ).toThrow();
 });
 
+test("illegal replacement", () => {
+  const store = new ContentStore({});
+  const fooFile = new ContentFile("foo.json", "fooo");
+  store.runAction({
+    kind: "add",
+    file: new ContentFile("bar.json", "cute"),
+    timestamp: 30,
+  });
+  expect(() =>
+    store.runAction({
+      kind: "replace",
+      oldFile: new ContentFile("foo.json", "hehe"),
+      newFile: new ContentFile("foo.json", "this one is valid"),
+      timestamp: 30,
+    })
+  ).toThrow();
+});
+
 test("undo-redo", () => {
   const store = new ContentStore({});
   const fooFile = new ContentFile("foo.json", "fooo");
@@ -146,6 +164,47 @@ test("compress actions", () => {
   expect(store.getFiles()).toEqual([]);
 
   // Redoes the entire thing
+  store.redo();
+  expect(store.getFiles()).toEqual([newFooFile]);
+});
+
+test("forget actions", () => {
+  const store = new ContentStore({
+    actionLimits: {
+      max: 1,
+    },
+  });
+  const fooFile = new ContentFile("foo.json", "fooo");
+  store.runAction({
+    kind: "add",
+    file: fooFile,
+    timestamp: 30,
+  });
+  const newFooFile = new ContentFile("foo.json", "new file");
+  store.runAction({
+    kind: "replace",
+    oldFile: fooFile,
+    newFile: newFooFile,
+    timestamp: 31,
+  });
+
+  const nekoFile = new ContentFile("neko.json", "catkeeper");
+  store.runAction({
+    kind: "replace",
+    oldFile: newFooFile,
+    newFile: nekoFile,
+    timestamp: 31,
+  });
+  expect(store.getFiles()).toEqual([nekoFile]);
+  store.undo();
+  expect(store.getFiles()).toEqual([newFooFile]);
+  store.undo();
+  expect(store.getFiles()).toEqual([fooFile]);
+
+  // Does not do anything (was trimmed away)
+  store.undo();
+  expect(store.getFiles()).toEqual([fooFile]);
+
   store.redo();
   expect(store.getFiles()).toEqual([newFooFile]);
 });

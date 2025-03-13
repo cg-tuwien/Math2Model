@@ -1,5 +1,4 @@
 import { assert, assertUnreachable } from "@stefnotch/typestef/assert";
-import arrayUtils from "@stefnotch/typestef/array-utils";
 import type { ContentFile } from "./content-file";
 
 export interface ContentActionLimits {
@@ -101,7 +100,9 @@ export class ContentStore {
 class CompressedActionsList {
   /** Actions that were applied. */
   private actions: ContentAction[] = [];
-  constructor(public limits: ContentActionLimits) {}
+  constructor(public limits: ContentActionLimits) {
+    assert(limits.max === undefined || limits.max >= 1);
+  }
 
   /**
    * Compresses adjacent replace actions on the same file.
@@ -122,9 +123,15 @@ class CompressedActionsList {
     }
 
     const maxActions = this.limits.max;
-
-    // Good approximation of "number of actions minus add actions per file"
-    const currentActions = this.actions.length - filesCount;
+    if (maxActions !== undefined) {
+      // Good approximation of "number of actions minus add actions per file"
+      const currentActions = this.actions.length - filesCount;
+      if (currentActions > maxActions) {
+        const delta = currentActions - maxActions;
+        // Trim off the oldest actions
+        this.actions = this.actions.slice(delta);
+      }
+    }
   }
 
   tryJoin(
@@ -188,6 +195,7 @@ export type ContentAction =
       newFile: ContentFile;
       timestamp: TimestampMs;
     };
+// Combined actions should probably still be flat. So I'd model them as {kind: "combined", /** counts backwards */ count: number}
 
 /** Returns the undo variant of a content action */
 export function undoContentAction(action: ContentAction): ContentAction {
