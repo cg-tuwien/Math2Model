@@ -4,18 +4,35 @@ import DefaultParametric from "@/../parametric-renderer-core/shaders/DefaultPara
 import { ReadonlyEulerAngles } from "./scene-state";
 import type { ImportFilesList } from "@/stores/fs-store";
 
+import sceneJson from "./example-scene/heart-sphere-morph/scene.json?raw";
+import heartSphereGraph from "./example-scene/heart-sphere-morph/heart-sphere.graph?raw";
+import heartSphereGraphWgsl from "./example-scene/heart-sphere-morph/heart-sphere.graph.wgsl?raw";
+import heartTextureUrl from "./example-scene/heart-sphere-morph/heart-texture.jpg";
+
 const textEncoder = new TextEncoder();
 
-const heartSphereMorph = import.meta.glob(
-  "./example-scene/heart-sphere-morph/*",
-  {
-    query: "?raw",
-    import: "default",
-    eager: true,
-  }
-);
-
-export const DefaultScene = toProject(heartSphereMorph);
+// The default scene has entirely different perfomance requirements, so we don't do the lazy loading
+export const DefaultScene: ImportFilesList = {
+  type: "in-memory",
+  value: [
+    {
+      name: "scene.json",
+      value: textEncoder.encode(sceneJson),
+    },
+    {
+      name: "heart-sphere.graph",
+      value: textEncoder.encode(heartSphereGraph),
+    },
+    {
+      name: "heart-sphere.graph.wgsl",
+      value: textEncoder.encode(heartSphereGraphWgsl),
+    },
+    {
+      name: "heart-texture.jpg",
+      value: await fetch(heartTextureUrl).then((v) => v.arrayBuffer()),
+    },
+  ],
+};
 
 // Unused, shows how to programmatically create an example scene.
 function createDefaultProject(): ImportFilesList {
@@ -55,18 +72,6 @@ function createDefaultProject(): ImportFilesList {
         value: textEncoder.encode(shader),
       },
     ],
-  };
-}
-
-function toProject(files: Record<string, unknown>): ImportFilesList {
-  return {
-    type: "in-memory",
-    value: Object.entries(files).map(([name, contents]) => {
-      return {
-        name: fileName(name),
-        value: textEncoder.encode(contents as string),
-      };
-    }),
   };
 }
 
