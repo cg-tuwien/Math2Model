@@ -1,6 +1,7 @@
 import { assertUnreachable } from "@stefnotch/typestef/assert";
 import { ContentFile, fileNameToType } from "./content-file";
 import { ContentStore } from "./content-store";
+import { setInterval } from "node:timers";
 
 /** Loads everything from the FS into the content store, and then periodically syncs it back to the FS. */
 export async function syncedContentStore(): Promise<ContentStore> {
@@ -30,22 +31,52 @@ export async function syncedContentStore(): Promise<ContentStore> {
     }
   }
 
-  const filesOnDisk = new Set<string>(
-    contentStore.getFiles().map((v) => v.name)
-  );
-
+  // Makes a list of the latest state of all changed files
+  let filesToSync = new Map<string, Uint8Array | string | null>();
   contentStore.addListener((action) => {
-    // TODO: Track the changed files, and periodically sync them back
-    // https://stackoverflow.com/a/65620774/3492994
+    if (action.kind === "add") {
+      filesToSync.set(action.file.name, action.file.data);
+    } else if (action.kind === "remove") {
+      filesToSync.set(action.file.name, null);
+    } else if (action.kind === "replace") {
+      filesToSync.set(action.oldFile.name, null);
+      filesToSync.set(action.newFile.name, action.newFile.data);
+    } else {
+      assertUnreachable(action);
+    }
   });
+
+  // Periodically sync the state
+  let isSyncing = false;
+  setInterval(async () => {
+    if (filesToSync.size === 0) return;
+    if (isSyncing) return;
+
+    isSyncing = true;
+    const toSync = filesToSync;
+    filesToSync = new Map();
+    const sceneDirectory = await getSceneDirectory();
+    for (const [name, data] of toSync) {
+      if (data === null) {
+        await sceneDirectory.removeEntry(name);
+      } else {
+        const fileHandle = await sceneDirectory.getFileHandle(name, {
+          create: true,
+        });
+        const writable = await fileHandle.createWritable();
+        try {
+          await writable.write(data);
+        } finally {
+          await writable.close();
+        }
+      }
+    }
+
+    isSyncing = false;
+  }, 5000);
 
   return contentStore;
 }
-
-async function syncFiles(
-  contentStore: ContentStore,
-  filesOnDisk: Set<string>
-) {}
 
 /** Returns whether this is a text file or not. */
 function isTextFile(name: string): boolean | null {
