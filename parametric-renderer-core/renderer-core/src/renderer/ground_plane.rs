@@ -74,11 +74,18 @@ pub fn ground_plane_component(
                     ),
                     fragment: Some(ground_plane::fragment_state(
                         &shader,
-                        &ground_plane::fs_main_entry([Some(wgpu::ColorTargetState {
-                            format: context.view_format,
-                            blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                            write_mask: wgpu::ColorWrites::ALL,
-                        })]),
+                        &ground_plane::fs_main_entry([
+                            Some(wgpu::ColorTargetState {
+                                format: context.view_format,
+                                blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                                write_mask: wgpu::ColorWrites::ALL,
+                            }),
+                            Some(wgpu::ColorTargetState {
+                                format: wgpu::TextureFormat::R32Uint,
+                                blend: None,
+                                write_mask: wgpu::ColorWrites::empty(),
+                            }),
+                        ]),
                     )),
                     primitive: Default::default(),
                     depth_stencil: Some(wgpu::DepthStencilState {

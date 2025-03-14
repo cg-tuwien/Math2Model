@@ -186,11 +186,18 @@ fn create_render_pipeline(
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
                 entry_point: Some(shader::ENTRY_FS_MAIN),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: context.view_format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
+                targets: &[
+                    Some(wgpu::ColorTargetState {
+                        format: context.view_format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                    Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::R32Uint,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::empty(),
+                    }),
+                ],
                 compilation_options: Default::default(),
             }),
             primitive: wgpu::PrimitiveState {

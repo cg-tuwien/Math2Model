@@ -292,6 +292,14 @@ fn render_component(
         )
     });
 
+    let object_id_texture = Memo::new_computed(move |_| {
+        Texture::create_object_id_texture(
+            &get_context().device,
+            surface.read().size(),
+            "Object ID Texture",
+        )
+    });
+
     let scene_data = StoredValue::new(SceneData::new(&context.device));
     let render_bind_group_0 = StoredValue::new(
         scene_data.with_value(|scene_data| scene_data.as_bind_group_0(&context.device)),
@@ -437,14 +445,18 @@ fn render_component(
                 "Render Pass",
                 wgpu::RenderPassDescriptor {
                     label: Some("Render Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view: surface_texture.texture_view(),
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: Default::default(),
-                            store: wgpu::StoreOp::Store,
-                        },
-                    })],
+                    color_attachments: &[
+                        Some(wgpu::RenderPassColorAttachment {
+                            view: surface_texture.texture_view(),
+                            resolve_target: None,
+                            ops: Default::default(),
+                        }),
+                        Some(wgpu::RenderPassColorAttachment {
+                            view: &object_id_texture.read().view,
+                            resolve_target: None,
+                            ops: Default::default(),
+                        }),
+                    ],
                     depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                         view: &depth_texture.read().view,
                         depth_ops: Some(wgpu::Operations {
@@ -841,6 +853,7 @@ fn render_model_component(
         "Model Buffer",
         &shader::Model {
             model_similarity: glam::Mat4::IDENTITY,
+            object_id: 0,
         },
         wgpu::BufferUsages::COPY_DST,
     ));
@@ -885,6 +898,7 @@ fn render_model_component(
             queue,
             &shader::Model {
                 model_similarity: model.transform.to_matrix(),
+                object_id: 0, // TODO: set this
             },
         );
         material_buffer

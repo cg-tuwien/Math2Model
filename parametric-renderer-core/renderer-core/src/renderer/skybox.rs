@@ -30,11 +30,18 @@ pub fn skybox_component(
             ),
             fragment: Some(shaders::skybox::fragment_state(
                 &shader,
-                &shaders::skybox::fs_main_entry([Some(wgpu::ColorTargetState {
-                    format: context.view_format,
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })]),
+                &shaders::skybox::fs_main_entry([
+                    Some(wgpu::ColorTargetState {
+                        format: context.view_format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    }),
+                    Some(wgpu::ColorTargetState {
+                        format: wgpu::TextureFormat::R32Uint,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::empty(),
+                    }),
+                ]),
             )),
             primitive: wgpu::PrimitiveState {
                 cull_mode: Some(wgpu::Face::Back),

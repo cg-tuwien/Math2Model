@@ -188,6 +188,7 @@ struct VertexInput {
 
 struct Model {
     model_similarity: mat4x4<f32>,
+    object_id: u32
 }
 
 struct Material {
@@ -588,8 +589,13 @@ fn vs_main(
     return out;
 }
 
+struct FragmentOutput {
+  @location(0) color: vec4f,
+  @location(1) object_id: u32,
+}
+
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput) -> FragmentOutput {
     let v = normalize(camera.world_position.xyz - in.world_position);
     // let n = normalize(in.world_normal);
     let n = normalize(-cross(dpdxFine(in.world_position), dpdyFine(in.world_position)));
@@ -654,7 +660,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         + ambient 
         + material.emissive_metallic.rgb;
 
-    return vec4<f32>(color, 1.0);
+    var fragmentOutput: FragmentOutput;
+    fragmentOutput.color = vec4f(color, 1.0);
+    fragmentOutput.object_id = model.object_id;
+    return fragmentOutput;
     // return in.color; TODO: Why does this cause z-buffer fighting?
 }
 

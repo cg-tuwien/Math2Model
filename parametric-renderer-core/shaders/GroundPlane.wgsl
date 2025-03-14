@@ -14,6 +14,13 @@ struct VertexOutput {
     @location(0) uv: vec2f
 }
 
+// TODO: Remove this code duplication
+struct FragmentOutput {
+  @location(0) color: vec4f,
+  @location(1) object_id: u32,
+}
+
+
 @vertex
 fn vs_main(
     in: VertexInput,
@@ -52,7 +59,7 @@ fn grid_to_color(grid: f32) -> f32 {
 fn fs_main(
     @location(0) uv: vec2f,
     @builtin(position) pos: vec4f
-) -> @location(0) vec4f {
+) -> FragmentOutput {
     let coord = uv.xy * uniforms.grid_scale;
 
     let large_grid = make_grid(coord, vec2f(0.5), 0.6);
@@ -64,6 +71,8 @@ fn fs_main(
     let fade_factor = fade_from_center(coord);
 
     let gradient = vec4f(vec3f(1.0), light_gradient(coord));
-    return gradient + vec4f(vec3f(1.0), color * fade_factor);
+    var output: FragmentOutput;
+    output.color = gradient + vec4f(vec3f(1.0), color * fade_factor);
+    return output;
 }
 
