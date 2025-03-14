@@ -832,15 +832,15 @@ async function deserialize(json: string, parent?: string) {
     emit("save", json);
   }
   const sg = graphFromJSON(json);
-  const idMap = new Map<string, string>();
   const nodes = new Map<string, Nodes>();
 
   for (let snObj of sg.graph) {
     const sn = toSerializedNode(snObj);
-    const node = serializedNodeToNode(sn, idMap);
+    const node = serializedNodeToNode(sn);
     nodes.set(sn.uuid, node);
     node.deserialize(sn);
     await editor.addNode(node);
+    node.id = sn.uuid;
     if (sn.position)
       void area.translate(node.id, { x: sn.position[0], y: sn.position[1] });
   }
@@ -860,7 +860,8 @@ async function deserialize(json: string, parent?: string) {
         .update(parent ?? node.id)
         .catch((reason) => showError("Could not update parent", reason));
     } else if (node && !node.parent && sn.parent) {
-      node.parent = idMap.get(sn.parent);
+      // node.parent = idMap.get(sn.parent);
+      node.parent = sn.parent;
       scopes
         .update(node.parent ?? node.id)
         .catch((reason) => showError("Could not update parent", reason));
@@ -869,9 +870,9 @@ async function deserialize(json: string, parent?: string) {
       if (input.type === "node") {
         await editor.addConnection(
           new ClassicPreset.Connection(
-            editor.getNodes().filter((n) => n.id === idMap.get(input.value))[0],
+            editor.getNodes().filter((n) => n.id === input.value)[0],
             input.keyFrom,
-            editor.getNodes().filter((n) => n.id === idMap.get(sn.uuid))[0],
+            editor.getNodes().filter((n) => n.id === sn.uuid)[0],
             input.keyTo
           )
         );
@@ -886,10 +887,7 @@ async function deserialize(json: string, parent?: string) {
   // await rearrange();
 }
 
-function serializedNodeToNode(
-  sn: SerializedNode,
-  idMap: Map<string, string>
-): Nodes {
+function serializedNodeToNode(sn: SerializedNode): Nodes {
   let node: Nodes;
   switch (sn.nodeType) {
     case "Number":
@@ -957,8 +955,8 @@ function serializedNodeToNode(
     default:
       return new NothingNode();
   }
-
-  idMap.set(sn.uuid, node.id);
+  node.id = sn.uuid;
+  // idMap.set(sn.uuid, node.id);
   node.width = sn.size[0];
   node.height = sn.size[1];
   //node.parent = sn.parent;
