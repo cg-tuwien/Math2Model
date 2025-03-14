@@ -9,13 +9,13 @@ use super::{
     camera_controller::{GeneralController, GeneralControllerSettings, IsCameraController},
 };
 
-struct LogarithmicDistance(f32);
+pub struct LogarithmicDistance(f32);
 impl LogarithmicDistance {
-    fn new(distance: f32) -> Self {
+    pub fn new(distance: f32) -> Self {
         Self(distance.ln())
     }
 
-    fn distance(&self) -> f32 {
+  pub  fn distance(&self) -> f32 {
         self.0.exp()
     }
 }
@@ -24,7 +24,7 @@ pub struct OrbitcamController {
     pub center: Vec3,
     pub pitch: Angle,
     pub yaw: Angle,
-    logarithmic_distance: LogarithmicDistance,
+  pub  logarithmic_distance: LogarithmicDistance,
 }
 
 impl OrbitcamController {

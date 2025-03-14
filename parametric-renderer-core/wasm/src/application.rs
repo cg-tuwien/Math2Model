@@ -1,8 +1,12 @@
-use glam::{Quat, Vec3};
+use glam::Vec3;
 use log::error;
 use renderer_core::{
     application::{AppCommand, Application, ShaderCompiledCallback, WasmCanvas, run_on_main},
-    camera::camera_controller::{self, CameraController},
+    camera::{
+        Angle,
+        camera_controller::{self, CameraController, IsCameraController},
+        orbitcam_controller::LogarithmicDistance,
+    },
     game::{ModelInfo, ShaderId, ShaderInfo, TextureData, TextureId, TextureInfo},
     input::WinitAppHelper,
     time::TimeStats,
@@ -45,13 +49,13 @@ impl WasmApplication {
         self.time_stats = application.time_stats.clone();
         application.app.profiler_settings.gpu = true;
         application.app.camera_controller = CameraController::new(
-            camera_controller::GeneralController {
-                position: Vec3::new(3.0, 7.0, 6.0),
-                // TODO: Do this once glam updoots
-                // orientation: Quat::look_at_rh(Vec3::new(3.0, 7.0, 6.0), Vec3::ZERO, Camera::up()),
-                orientation: Quat::from_euler(glam::EulerRot::YXZ, 0.5, -0.6, 0.0),
-                distance_to_center: 4.0,
-            },
+            renderer_core::camera::orbitcam_controller::OrbitcamController {
+                center: Vec3::ZERO,
+                pitch: Angle::from_degrees(-20.),
+                yaw: Angle::from_degrees(190.),
+                logarithmic_distance: LogarithmicDistance::new(8.0),
+            }
+            .general_controller(),
             application.app.camera_controller.settings,
             camera_controller::ChosenKind::Orbitcam,
         );
