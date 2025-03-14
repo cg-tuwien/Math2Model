@@ -208,7 +208,7 @@ fn create_render_pipeline(
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: Texture::DEPTH_FORMAT,
                 depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Greater,
+                depth_compare: wgpu::CompareFunction::Greater, // Reverse Z
                 stencil: Default::default(),
                 bias: Default::default(),
             }),

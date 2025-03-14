@@ -9,13 +9,13 @@ use crate::{
     texture::Texture,
 };
 
-use super::{FrameData, wgpu_context, wgpu_context::SurfaceOrFallback};
+use super::{FrameData, get_context, wgpu_context::SurfaceOrFallback};
 
 /// Renders the ground plane
 pub fn ground_plane_component(
     surface: RwSignal<SurfaceOrFallback>,
 ) -> impl Fn(&FrameData, &mut wgpu_profiler::OwningScope<'_, wgpu::RenderPass<'_>>) {
-    let context = &wgpu_context();
+    let context = &get_context();
     let quad_mesh = Mesh::new_tesselated_quad(&context.device, 2);
 
     let shader_source = RwSignal::new(ground_plane::SOURCE.to_string());
@@ -49,7 +49,7 @@ pub fn ground_plane_component(
 
     let shader = Memo::new_computed({
         move |_| {
-            let context = &wgpu_context();
+            let context = &get_context();
             context
                 .device
                 .create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -61,7 +61,7 @@ pub fn ground_plane_component(
 
     let pipeline = Memo::new_computed({
         move |_| {
-            let context = &wgpu_context();
+            let context = &get_context();
             let shader = shader.read();
             context
                 .device
@@ -83,8 +83,8 @@ pub fn ground_plane_component(
                     primitive: Default::default(),
                     depth_stencil: Some(wgpu::DepthStencilState {
                         format: Texture::DEPTH_FORMAT,
-                        depth_write_enabled: true,
-                        depth_compare: wgpu::CompareFunction::Greater,
+                        depth_write_enabled: false,
+                        depth_compare: wgpu::CompareFunction::GreaterEqual,
                         stencil: Default::default(),
                         bias: Default::default(),
                     }),
@@ -98,8 +98,8 @@ pub fn ground_plane_component(
     let uniforms = context.device.uniform_buffer(
         "Ground Plane Uniforms",
         &ground_plane::Uniforms {
-            model_matrix: glam::Mat4::IDENTITY,
-            view_projection_matrix: glam::Mat4::IDENTITY,
+            model_matrix: Default::default(),
+            view_projection_matrix: Default::default(),
             grid_scale: 0.0,
         },
         wgpu::BufferUsages::COPY_DST,
@@ -113,7 +113,7 @@ pub fn ground_plane_component(
     );
 
     move |render_data: &FrameData, render_pass| {
-        let context = &wgpu_context();
+        let context = &get_context();
         #[cfg(feature = "desktop")]
         let _watcher = &_file_watcher;
         let size = 100.0;
@@ -126,8 +126,7 @@ pub fn ground_plane_component(
                     glam::Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2),
                     glam::Vec3::new(-size / 2., 0.0, size / 2.),
                 ),
-                view_projection_matrix: render_data.camera.projection_matrix(surface.read().size())
-                    * render_data.camera.view_matrix(),
+                view_projection_matrix: render_data.view_projection_matrix(surface.read().size()),
                 grid_scale,
             },
         );

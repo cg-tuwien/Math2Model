@@ -39,6 +39,12 @@ impl Mesh {
 
         Mesh::with_contents(device, &vertices, &indices)
     }
+
+    pub fn cubemap_cube(device: &wgpu::Device, min: Vec3, max: Vec3) -> Self {
+        let (vertices, indices) = cubemap_cube(min, max);
+
+        Mesh::with_contents(device, &vertices, &indices)
+    }
 }
 
 fn tesselated_quad(split_count: u32) -> (Vec<shader::VertexInput>, Vec<u16>) {
@@ -72,6 +78,64 @@ fn tesselated_quad(split_count: u32) -> (Vec<shader::VertexInput>, Vec<u16>) {
             indices.push(i3 as u16);
         }
     }
+    (vertices, indices)
+}
+
+fn cubemap_cube(min: Vec3, max: Vec3) -> (Vec<shader::VertexInput>, Vec<u16>) {
+    let vertices = [
+        (-1, 1, -1),
+        (-1, -1, -1),
+        (1, -1, -1),
+        (1, -1, -1),
+        (1, 1, -1),
+        (-1, 1, -1),
+        //
+        (-1, -1, 1),
+        (-1, -1, -1),
+        (-1, 1, -1),
+        (-1, 1, -1),
+        (-1, 1, 1),
+        (-1, -1, 1),
+        //
+        (1, -1, -1),
+        (1, -1, 1),
+        (1, 1, 1),
+        (1, 1, 1),
+        (1, 1, -1),
+        (1, -1, -1),
+        //
+        (-1, -1, 1),
+        (-1, 1, 1),
+        (1, 1, 1),
+        (1, 1, 1),
+        (1, -1, 1),
+        (-1, -1, 1),
+        //
+        (-1, 1, -1),
+        (1, 1, -1),
+        (1, 1, 1),
+        (1, 1, 1),
+        (-1, 1, 1),
+        (-1, 1, -1),
+        //
+        (-1, -1, -1),
+        (-1, -1, 1),
+        (1, -1, -1),
+        (1, -1, -1),
+        (-1, -1, 1),
+        (1, -1, 1),
+    ]
+    .into_iter()
+    .map(|(x, y, z)| shader::VertexInput {
+        position: Vec3::new(
+            if x < 0 { min.x } else { max.x },
+            if y < 0 { min.y } else { max.y },
+            if z < 0 { min.z } else { max.z },
+        ),
+        uv: Vec2::ZERO,
+    })
+    .collect::<Vec<_>>();
+    let indices = (0u16..(vertices.len() as u16)).collect();
     (vertices, indices)
 }
 

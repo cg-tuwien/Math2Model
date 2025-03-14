@@ -1,11 +1,13 @@
 mod frame_data;
 mod ground_plane;
 mod scene;
+mod skybox;
 mod virtual_model;
 mod wgpu_context;
 
 pub use frame_data::FrameData;
 use ground_plane::ground_plane_component;
+use skybox::skybox_component;
 use wgpu::BufferUsages;
 
 use std::{collections::HashMap, sync::Arc};
@@ -263,7 +265,7 @@ impl Drop for GpuApplication {
     }
 }
 
-pub fn wgpu_context() -> Arc<WgpuContext> {
+pub fn get_context() -> Arc<WgpuContext> {
     expect_context::<Arc<WgpuContext>>()
 }
 
@@ -278,13 +280,13 @@ fn render_component(
     textures: RwSignal<HashMap<TextureId, Arc<Texture>>>,
     models: SignalVec<ModelInfo>,
 ) -> impl Fn(&FrameData) -> Result<Option<RenderResults>, wgpu::SurfaceError> {
-    let context = &wgpu_context();
+    let context = &get_context();
     let frame_counter = RwSignal::new(FrameCounter::new());
     let new_frame_time = move || frame_counter.write().new_frame();
 
     let depth_texture = Memo::new_computed(move |_| {
         Texture::create_depth_texture(
-            &wgpu_context().device,
+            &get_context().device,
             surface.read().size(),
             "Depth Texture",
         )
@@ -353,7 +355,7 @@ fn render_component(
     Effect::new({
         let new_size = Memo::new(move |_| desired_size.get());
         move |_| {
-            surface.write().try_resize(&wgpu_context(), new_size.get());
+            surface.write().try_resize(&get_context(), new_size.get());
         }
     });
 
@@ -366,6 +368,7 @@ fn render_component(
             .collect::<Vec<_>>(),
     );
 
+    let skybox_component = skybox_component(surface);
     let ground_plane_component = ground_plane_component(surface);
 
     let models_components = ForEach::new(
@@ -392,7 +395,7 @@ fn render_component(
     );
 
     move |render_data: &FrameData| {
-        let context = &wgpu_context();
+        let context = &get_context();
         let frame_time = new_frame_time();
         // 2. Render
         let surface_texture = match surface.with(|surface| surface.surface_texture(&context)) {
@@ -438,12 +441,7 @@ fn render_component(
                         view: surface_texture.texture_view(),
                         resolve_target: None,
                         ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: 0.1,
-                                g: 0.2,
-                                b: 0.3,
-                                a: 1.0,
-                            }),
+                            load: Default::default(),
                             store: wgpu::StoreOp::Store,
                         },
                     })],
@@ -465,7 +463,10 @@ fn render_component(
                 (v.render_stage)(&mut render_pass);
             });
 
-            // Render transparent objects
+            // Skybox is rendered after opaque objects
+            (skybox_component)(render_data, &mut render_pass);
+
+            // And now overlay transparent objects
             (ground_plane_component)(render_data, &mut render_pass);
         };
         profiler.update_value(|profiler| profiler.resolve_queries(&mut command_encoder));
@@ -515,7 +516,7 @@ fn model_component(
     impl Fn(&mut wgpu_profiler::OwningScope<'_, wgpu::RenderPass<'_>>) + use<>,
 > {
     let virtual_model = Arc::new(VirtualModel::new(
-        &wgpu_context(),
+        &get_context(),
         &render_stage.meshes.read_value(),
         &format!("ID{}", key),
     ));
@@ -559,7 +560,7 @@ fn lod_stage_component(
     copy_patches_pipeline: StoredValue<wgpu::ComputePipeline>,
     threshold_factor: ReadSignal<f32>,
 ) -> impl Fn(&FrameData, &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>) {
-    let context = &wgpu_context();
+    let context = &get_context();
     let device = &context.device;
     let id = model.read_untracked().id.clone(); // I wonder if this ID stays the same
 
@@ -673,7 +674,7 @@ fn lod_stage_component(
     });
 
     move |frame_data: &FrameData, commands: &mut wgpu_profiler::Scope<'_, wgpu::CommandEncoder>| {
-        let context = &wgpu_context();
+        let context = &get_context();
         let queue = &context.queue;
         force_render_uniform.write_buffer(queue, &compute_patches::ForceRenderFlag { flag: 0 });
         let model_view_projection = frame_data.camera.projection_matrix(surface.read().size())
@@ -833,7 +834,7 @@ fn render_model_component(
         }
     });
 
-    let context = &wgpu_context();
+    let context = &get_context();
     let device = &context.device;
 
     let model_buffer = RwSignal::new(device.uniform_buffer(
@@ -855,7 +856,7 @@ fn render_model_component(
         let virtual_model = virtual_model.clone();
         move |_| {
             let _m = model.read();
-            let context = &wgpu_context();
+            let context = &get_context();
             let device = &context.device;
             let model_buffer = model_buffer.read();
             let material_buffer = material_buffer.read();
@@ -879,7 +880,7 @@ fn render_model_component(
     });
     Effect::new(move |_| {
         let model = model.read();
-        let queue = &wgpu_context().queue;
+        let queue = &get_context().queue;
         model_buffer.read().write_buffer(
             queue,
             &shader::Model {
