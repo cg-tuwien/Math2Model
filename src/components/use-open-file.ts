@@ -115,6 +115,14 @@ export function useOpenFile(
     });
   }
 
+  fs.watchFromStart((change) => {
+    if (change.type === "remove") {
+      if (change.key === openedFileName.value) {
+        openedFileName.value = null;
+      }
+    }
+  });
+
   const setNewCode = useDebounceFn((newCode: () => string) => {
     const value = newCode();
     if (keyedCode.value === null) {
