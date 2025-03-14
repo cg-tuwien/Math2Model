@@ -5,10 +5,12 @@ import { computed, h, ref } from "vue";
 import IconMoon from "~icons/mdi/moon-and-stars";
 import IconSun from "~icons/mdi/white-balance-sunny";
 import IconGithub from "~icons/mdi/github";
+import IconDocumentation from "~icons/mdi/book";
 import { homepage, version } from "@/../package.json";
 import { useFsStore } from "@/stores/fs-store";
 import { useExportStore } from "@/stores/export-store";
 import { ExampleProjects } from "@/scenes/example-scenes";
+import { NText } from "naive-ui";
 
 const store = useStore();
 const fsStore = useFsStore();
@@ -102,9 +104,20 @@ const viewOptions = computed((): ActionDropdownOption[] => {
 const helpOptions = computed((): ActionDropdownOption[] => {
   return [
     {
+      label: "Documentation",
+      key: "documentation",
+      icon: () => h(IconDocumentation),
+      action: () => {
+        window.open("./docs", "_blank");
+      },
+    },
+    {
       label: `Version ${version}`,
       key: "version",
-      action: () => {},
+      icon: () => h(NText, null, "V"),
+      action: () => {
+        navigator.clipboard.writeText(version);
+      },
     },
     {
       label: "GitHub",
