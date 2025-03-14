@@ -136,6 +136,16 @@ impl<T> CommandEncoderBufferExt<T> for wgpu::CommandEncoder {
 
 pub trait DeviceBufferExt<T> {
     fn storage_buffer(&self, label: &str, data: &T, usage: wgpu::BufferUsages) -> TypedBuffer<T>;
+    fn storage_buffer_with_array(
+        &self,
+        label: &str,
+        data: &T,
+        count: u64,
+        usage: wgpu::BufferUsages,
+    ) -> TypedBuffer<T>
+    where
+        T: encase::CalculateSizeFor;
+    fn uniform_buffer(&self, label: &str, data: &T, usage: wgpu::BufferUsages) -> TypedBuffer<T>;
 }
 impl<T> DeviceBufferExt<T> for wgpu::Device
 where
@@ -143,6 +153,21 @@ where
 {
     fn storage_buffer(&self, label: &str, data: &T, usage: wgpu::BufferUsages) -> TypedBuffer<T> {
         TypedBuffer::new_storage(self, label, data, usage)
+    }
+    fn storage_buffer_with_array(
+        &self,
+        label: &str,
+        data: &T,
+        count: u64,
+        usage: wgpu::BufferUsages,
+    ) -> TypedBuffer<T>
+    where
+        T: encase::CalculateSizeFor,
+    {
+        TypedBuffer::new_storage_with_runtime_array(self, label, data, count, usage)
+    }
+    fn uniform_buffer(&self, label: &str, data: &T, usage: wgpu::BufferUsages) -> TypedBuffer<T> {
+        TypedBuffer::new_uniform(self, label, data, usage)
     }
 }
 

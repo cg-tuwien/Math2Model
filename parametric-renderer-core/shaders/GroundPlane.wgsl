@@ -32,7 +32,8 @@ fn make_grid(pos: vec2f, scale: vec2f, thicc: f32) -> f32 {
 }
 
 fn fade_from_center(coord: vec2f, center: vec2f) -> f32 {
-    let dist = length(coord - center) / 10.0;
+    // The / 50.0 should match the radius of the grid
+    let dist = length(coord - center) / 50.0;
     return 1.0 - dist;
 }
 
