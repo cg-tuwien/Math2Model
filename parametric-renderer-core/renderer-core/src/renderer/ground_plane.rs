@@ -1,4 +1,8 @@
-use reactive_graph::{computed::Memo, signal::RwSignal, traits::Read};
+use reactive_graph::{
+    computed::Memo,
+    signal::RwSignal,
+    traits::{Read, Set},
+};
 
 use crate::{
     buffer::DeviceBufferExt, mesh::Mesh, reactive::MemoComputed, shaders::ground_plane,
@@ -16,32 +20,32 @@ pub fn ground_plane_component(
 
     let shader_source = RwSignal::new(ground_plane::SOURCE.to_string());
 
-    // #[cfg(feature = "desktop")]
-    // let _file_watcher = {
-    //     let source_path = "./shaders/GroundPlane.wgsl";
-    //     let mut file_watcher = notify_debouncer_full::new_debouncer(
-    //         std::time::Duration::from_millis(1000),
-    //         None,
-    //         move |result: notify_debouncer_full::DebounceEventResult| match result {
-    //             Ok(events) => {
-    //                 let any_modification = events.into_iter().any(|e| e.kind.is_modify());
-    //                 if any_modification {
-    //                     let contents = std::fs::read_to_string(source_path).unwrap();
-    //                     shader_source.set(contents);
-    //                 }
-    //             }
-    //             Err(err) => log::error!("Error watching shaders: {:?}", err),
-    //         },
-    //     )
-    //     .unwrap();
-    //     file_watcher
-    //         .watch(
-    //             "./shaders",
-    //             notify_debouncer_full::notify::RecursiveMode::Recursive,
-    //         )
-    //         .unwrap();
-    //     file_watcher
-    // };
+    #[cfg(feature = "desktop")]
+    let _file_watcher = {
+        let source_path = "./shaders/GroundPlane.wgsl";
+        let mut file_watcher = notify_debouncer_full::new_debouncer(
+            std::time::Duration::from_millis(1000),
+            None,
+            move |result: notify_debouncer_full::DebounceEventResult| match result {
+                Ok(events) => {
+                    let any_modification = events.into_iter().any(|e| e.kind.is_modify());
+                    if any_modification {
+                        let contents = std::fs::read_to_string(source_path).unwrap();
+                        shader_source.set(contents);
+                    }
+                }
+                Err(err) => log::error!("Error watching shaders: {:?}", err),
+            },
+        )
+        .unwrap();
+        file_watcher
+            .watch(
+                "./shaders",
+                notify_debouncer_full::notify::RecursiveMode::Recursive,
+            )
+            .unwrap();
+        file_watcher
+    };
 
     let shader = Memo::new_computed({
         move |_| {
@@ -110,8 +114,8 @@ pub fn ground_plane_component(
 
     move |render_data: &FrameData, render_pass| {
         let context = &wgpu_context();
-        // #[cfg(feature = "desktop")]
-        // let _watcher = &_file_watcher;
+        #[cfg(feature = "desktop")]
+        let _watcher = &_file_watcher;
         let size = 100.0;
         let grid_scale = 1.0;
         uniforms.write_buffer(

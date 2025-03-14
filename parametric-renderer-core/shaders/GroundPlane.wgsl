@@ -31,10 +31,16 @@ fn make_grid(pos: vec2f, scale: vec2f, thicc: f32) -> f32 {
     return line;
 }
 
-fn fade_from_center(coord: vec2f, center: vec2f) -> f32 {
+fn fade_from_center(coord: vec2f) -> f32 {
     // The / 50.0 should match the radius of the grid
-    let dist = length(coord - center) / 50.0;
+    let dist = length(coord) / 50.0;
     return 1.0 - dist;
+}
+
+fn light_gradient(coord: vec2f) -> f32 {
+    let dist = length(coord);
+    let attenuation = 1.0 / (2.2 + 0.2 * dist + 0.05 * dist * dist);
+    return attenuation;
 }
 
 fn grid_to_color(grid: f32) -> f32 {
@@ -55,7 +61,9 @@ fn fs_main(
     // See https://madebyevan.com/shaders/grid/
     color += grid_to_color(small_grid) * 0.05;
 
-    let fade_factor = fade_from_center(coord, vec2f(0.0));
-    return vec4f(vec3f(1.0), color * fade_factor);
+    let fade_factor = fade_from_center(coord);
+
+    let gradient = vec4f(vec3f(1.0), light_gradient(coord));
+    return gradient + vec4f(vec3f(1.0), color * fade_factor);
 }
 
