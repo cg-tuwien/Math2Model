@@ -29,10 +29,10 @@
           0.01,
           0,
           0
-        ]
+        ],
+        "diffuseTexture": "heart-texture.jpg"
       },
       "instanceCount": 1
     }
-  ],
-  "description": "Please change the Slider in the 'Combine Shapes' node to morph between a parametrically-defined Sphere and a parametrically-defined Heart. The shape changes gradually based on the parametric formulation of both objects."
+  ]
 }

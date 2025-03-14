@@ -7,9 +7,9 @@
       ],
       "position": [
         12,
-        349.5
+        362
       ],
-      "uuid": "327eadc880f80d22",
+      "uuid": "63e203ccba62af19",
       "inputs": [],
       "nodeType": "VariableOut",
       "extraStringInformation": [
@@ -38,10 +38,10 @@
         160
       ],
       "position": [
-        979.5,
+        992,
         12
       ],
-      "uuid": "c5eae76d7282c687",
+      "uuid": "ed4832997e78aea9",
       "inputs": [
         {
           "key": "def",
@@ -55,7 +55,7 @@
         },
         {
           "type": "node",
-          "value": "35e5a825cb908a14",
+          "value": "fe0bc153c73ad7a9",
           "keyFrom": "value",
           "keyTo": "returnIn"
         }
@@ -68,14 +68,14 @@
         180
       ],
       "position": [
-        503,
+        510.5,
         99.5
       ],
-      "uuid": "183a25a559e691ae",
+      "uuid": "831ed1af1e18b969",
       "inputs": [
         {
           "type": "node",
-          "value": "327eadc880f80d22",
+          "value": "63e203ccba62af19",
           "keyFrom": "value",
           "keyTo": "param"
         }
@@ -94,14 +94,14 @@
         180
       ],
       "position": [
-        273,
-        409.5
+        275.5,
+        434.5
       ],
-      "uuid": "7a6810eedd495c1e",
+      "uuid": "fd7fa8844a2bfa6c",
       "inputs": [
         {
           "type": "node",
-          "value": "327eadc880f80d22",
+          "value": "63e203ccba62af19",
           "keyFrom": "value",
           "keyTo": "param"
         }
@@ -120,20 +120,20 @@
         250
       ],
       "position": [
-        749.5,
+        762,
         87
       ],
-      "uuid": "35e5a825cb908a14",
+      "uuid": "fe0bc153c73ad7a9",
       "inputs": [
         {
           "type": "node",
-          "value": "183a25a559e691ae",
+          "value": "831ed1af1e18b969",
           "keyFrom": "value",
           "keyTo": "param1"
         },
         {
           "type": "node",
-          "value": "aaae32d3f20a8aae",
+          "value": "28c457e9a3a4ae48",
           "keyFrom": "value",
           "keyTo": "param2"
         }
@@ -142,29 +142,29 @@
       "extraNumberInformation": [
         {
           "key": "cf",
-          "value": 0.7
+          "value": 1
         }
       ]
     },
     {
       "size": [
-        180,
-        230
+        190,
+        255
       ],
       "position": [
-        503,
+        505.5,
         299.5
       ],
-      "uuid": "aaae32d3f20a8aae",
+      "uuid": "28c457e9a3a4ae48",
       "inputs": [
         {
           "type": "number",
-          "value": 0.4,
+          "value": 0.3,
           "key": "right"
         },
         {
           "type": "node",
-          "value": "7a6810eedd495c1e",
+          "value": "fd7fa8844a2bfa6c",
           "keyFrom": "value",
           "keyTo": "left"
         }
