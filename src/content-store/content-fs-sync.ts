@@ -32,7 +32,7 @@ export async function syncedContentStore(): Promise<ContentStore> {
   }
 
   // Makes a list of the latest state of all changed files
-  let filesToSync = new Map<string, Uint8Array | string | null>();
+  let filesToSync: FilesToSync = new Map();
   contentStore.addListener((action) => {
     if (action.kind === "add") {
       filesToSync.set(action.file.name, action.file.data);
@@ -48,34 +48,40 @@ export async function syncedContentStore(): Promise<ContentStore> {
 
   // Periodically sync the state
   let isSyncing = false;
-  setInterval(async () => {
+  setInterval(() => {
     if (filesToSync.size === 0) return;
     if (isSyncing) return;
 
     isSyncing = true;
     const toSync = filesToSync;
     filesToSync = new Map();
-    const sceneDirectory = await getSceneDirectory();
-    for (const [name, data] of toSync) {
-      if (data === null) {
-        await sceneDirectory.removeEntry(name);
-      } else {
-        const fileHandle = await sceneDirectory.getFileHandle(name, {
-          create: true,
-        });
-        const writable = await fileHandle.createWritable();
-        try {
-          await writable.write(data);
-        } finally {
-          await writable.close();
-        }
-      }
-    }
-
-    isSyncing = false;
+    syncFiles(toSync).finally(() => {
+      isSyncing = false;
+    });
   }, 5000);
 
   return contentStore;
+}
+
+type FilesToSync = Map<string, Uint8Array | string | null>;
+
+async function syncFiles(toSync: FilesToSync) {
+  const sceneDirectory = await getSceneDirectory();
+  for (const [name, data] of toSync) {
+    if (data === null) {
+      await sceneDirectory.removeEntry(name);
+    } else {
+      const fileHandle = await sceneDirectory.getFileHandle(name, {
+        create: true,
+      });
+      const writable = await fileHandle.createWritable();
+      try {
+        await writable.write(data);
+      } finally {
+        await writable.close();
+      }
+    }
+  }
 }
 
 /** Returns whether this is a text file or not. */
