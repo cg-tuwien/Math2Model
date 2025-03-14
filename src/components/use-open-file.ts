@@ -16,7 +16,18 @@ export function useOpenFile(
 ) {
   const openedFileName = ref<FilePath | null>(startFile);
   const keyedCode = ref<KeyedCode | null>(null);
-  const editorType = ref<EditorType>("shader");
+  const editorType = computed<EditorType>(() => {
+    const fileName = openedFileName.value;
+    if (fileName === null) {
+      return "shader";
+    } else if (fileName.endsWith(".wgsl")) {
+      return "shader";
+    } else if (fileName.endsWith(".graph")) {
+      return "graph";
+    } else {
+      return "shader";
+    }
+  });
   const markers = computed<Marker[]>(() => {
     if (openedFileName.value === null) return [];
     const messages = errorMessages.get(openedFileName.value) ?? [];
@@ -54,14 +65,6 @@ export function useOpenFile(
       code: "",
       name: fileName,
     };
-
-    if (fileName.endsWith(".wgsl")) {
-      editorType.value = "shader";
-    } else if (fileName.endsWith(".graph")) {
-      editorType.value = "graph";
-    } else {
-      editorType.value = "shader";
-    }
 
     // And now asynchronously load the file
     let file = fs.readTextFile(fileName);
@@ -140,7 +143,7 @@ export function useOpenFile(
 
   return {
     path: computed(() => openedFileName.value),
-    editorType: computed(() => editorType.value),
+    editorType,
     isReadonly,
     code: computed(() => keyedCode.value),
     markers,
