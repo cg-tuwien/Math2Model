@@ -121,6 +121,7 @@ export class VirtualScene {
     return {
       $schema: SceneFileSchemaUrl,
       models,
+      description: this.state.value.description,
     };
   }
 
