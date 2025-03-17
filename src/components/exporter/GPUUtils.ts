@@ -39,7 +39,7 @@ export function createBufferWith(
 /**
  * simpleBindGroup
  */
-export function simpleBindGroupLayout(
+export function createBindGroupLayout(
   shaderStage: GPUShaderStageFlags,
   types: string[],
   device: any,
@@ -104,7 +104,7 @@ export function simpleB2BSameSize(
   );
 }
 
-export function makeShaderFromCodeAndPipeline(
+export function createShaderWithPipeline(
   code: string,
   shaderPipelineLayout: GPUPipelineLayout,
   device: GPUDevice

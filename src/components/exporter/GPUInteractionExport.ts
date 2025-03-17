@@ -11,16 +11,16 @@ import { ref, type Ref } from "vue";
 import type { LodStageBuffers } from "@/webgpu-hook";
 import {
   simpleB2BSameSize,
-  simpleBindGroupLayout,
+  createBindGroupLayout,
   createSimpleBindGroup,
   createBufferWith,
   concatArrayBuffers,
-  makeShaderFromCodeAndPipeline,
+  createShaderWithPipeline,
 } from "./GPUUtils";
 // Unchanging props! No need to watch them.
 // Base structure Taken from https://webgpu.github.io/webgpu-samples/?sample=rotatingCube#main.ts
 
-const compiledShaders = ref<
+const shaderPipelinesMap = ref<
   Map<
     FilePath,
     {
@@ -43,16 +43,16 @@ export async function mainExport(
   props: any,
   lodExportParametersRefs: any,
   onFrame: any
-) {
+) : Promise<any> {
   const _adapter = await navigator.gpu.requestAdapter(); // Wait for Rust backend to be in business
   const device = props.gpuDevice;
-  const sceneUniformsLayout = simpleBindGroupLayout(
+  const sceneUniformsLayout = createBindGroupLayout(
     GPUShaderStage.COMPUTE,
     ["uniform", "uniform", "uniform"],
     device,
     "scene uniforms"
   );
-  const layout1 = simpleBindGroupLayout(
+  const layout1 = createBindGroupLayout(
     GPUShaderStage.COMPUTE,
     [
       "uniform",
@@ -66,35 +66,35 @@ export async function mainExport(
     device,
     "layout1"
   );
-  const layout2 = simpleBindGroupLayout(
+  const layout2 = createBindGroupLayout(
     GPUShaderStage.COMPUTE,
     ["storage", "read-only-storage", "storage", "uniform"],
     device,
     "layout2"
   );
 
-  const prepVerticesBinding0 = simpleBindGroupLayout(
+  const prepVerticesBinding0 = createBindGroupLayout(
     GPUShaderStage.COMPUTE,
     ["read-only-storage", "storage"],
     device,
     "prep vertices"
   );
 
-  const vertexOutputLayout = simpleBindGroupLayout(
+  const vertexOutputLayout = createBindGroupLayout(
     GPUShaderStage.COMPUTE,
     ["read-only-storage", "storage"],
     device,
     "patch output"
   );
 
-  const instanceSelectionLayout = simpleBindGroupLayout(
+  const instanceSelectionLayout = createBindGroupLayout(
     GPUShaderStage.COMPUTE,
     ["uniform"],
     device,
     "target instance id"
   );
 
-  const indirectDispatchTransformerBindGroupLayout = simpleBindGroupLayout(
+  const indirectDispatchTransformerBindGroupLayout = createBindGroupLayout(
     GPUShaderStage.COMPUTE,
     ["storage"],
     device,
@@ -117,7 +117,7 @@ export async function mainExport(
       bindGroupLayouts: [indirectDispatchTransformerBindGroupLayout],
     });
 
-  let v = makeShaderFromCodeAndPipeline(
+  let v = createShaderWithPipeline(
     IndirectDispatchRebalanceSource,
     indirectDispatchTransformerLayout,
     device
@@ -125,7 +125,7 @@ export async function mainExport(
   const indirectDispatchRebalancePipeline = v.pipeline;
   const indirectDispatchRebalanceShader = v.shader;
 
-  async function getShaderCode(
+  async function fetchAndInjectShaderCode(
     fs: ReactiveFilesystem,
     key: FilePath
   ): Promise<{
@@ -155,7 +155,7 @@ export async function mainExport(
     return result;
   }
 
-  let prepVerticesStageShaderAndPipeline = makeShaderFromCodeAndPipeline(
+  let prepVerticesShaderWithPipeline = createShaderWithPipeline(
     PrepVerticesStageWgsl,
     prepVerticesStageLayout,
     device
@@ -186,15 +186,15 @@ export async function mainExport(
   props.fs.watchFromStart((change: any) => {
     if (!change.key.endsWith(".wgsl")) return;
     if (change.type === "insert" || change.type === "update") {
-      getShaderCode(props.fs, change.key).then(
+      fetchAndInjectShaderCode(props.fs, change.key).then(
         ({ lodStage, verticesStage, code }) => {
-          compiledShaders.value.set(change.key, {
-            lodStage: makeShaderFromCodeAndPipeline(
+          shaderPipelinesMap.value.set(change.key, {
+            lodStage: createShaderWithPipeline(
               lodStage,
               pipelineLayout,
               device
             ),
-            verticesStage: makeShaderFromCodeAndPipeline(
+            verticesStage: createShaderWithPipeline(
               verticesStage,
               outputVerticesLayout,
               device
@@ -203,7 +203,7 @@ export async function mainExport(
         }
       );
     } else {
-      compiledShaders.value.delete(change.key);
+      shaderPipelinesMap.value.delete(change.key);
     }
   });
 
@@ -258,13 +258,13 @@ export async function mainExport(
     GPUBufferUsage.COPY_SRC
   );
 
-  const forceRenderFalse = createBufferWith(
+  const forceRenderFalseBuffer = createBufferWith(
     props,
     concatArrayBuffers(props, [new Uint32Array([0])]),
     GPUBufferUsage.COPY_SRC
   );
 
-  const forceRenderTrue = createBufferWith(
+  const forceRenderTrueBuffer = createBufferWith(
     props,
     concatArrayBuffers(props, [new Uint32Array([1])]),
     GPUBufferUsage.COPY_SRC
@@ -305,7 +305,7 @@ export async function mainExport(
     );
   }
 
-  let target_instance_id_buffer: GPUBuffer = 
+  let targetInstanceIdBuffer: GPUBuffer = 
     createBufferWith(
       props,
       concatArrayBuffers(props, [new Uint32Array([0])]),
@@ -313,7 +313,7 @@ export async function mainExport(
     );
 
 
-  let userInputBindGroup: any = null;
+  let sceneUniformsBindGroup: any = null;
 
   function lodStageCallback(
     shaderPath: string,
@@ -339,7 +339,7 @@ export async function mainExport(
       }
     });
 
-    const compiledShader = compiledShaders.value.get(makeFilePath(shaderPath));
+    const compiledShader = shaderPipelinesMap.value.get(makeFilePath(shaderPath));
     if (!compiledShader) {
       // The shader probably didn't load yet
       // console.error("Shader not found: ", shaderPath);
@@ -348,8 +348,8 @@ export async function mainExport(
     const pipeline = compiledShader.lodStage.pipeline;
 
     // We inefficiently recreate the bind groups every time.
-    if (userInputBindGroup == null)
-      userInputBindGroup = createSimpleBindGroup(
+    if (sceneUniformsBindGroup == null)
+      sceneUniformsBindGroup = createSimpleBindGroup(
         [buffers.time, buffers.screen, buffers.mouse],
         sceneUniformsLayout,
         device,
@@ -440,14 +440,14 @@ export async function mainExport(
 
       let computePassPing = commandEncoder.beginComputePass();
       computePassPing.setPipeline(pipeline);
-      computePassPing.setBindGroup(0, userInputBindGroup);
+      computePassPing.setBindGroup(0, sceneUniformsBindGroup);
       computePassPing.setBindGroup(1, toRenderPatchesBindGroup);
       computePassPing.setBindGroup(2, pingPongPatchesBindGroup[0]);
       computePassPing.dispatchWorkgroupsIndirect(buffers.indirectDispatch0, 0);
       computePassPing.end();
       // Pong
       if (isLastRound) {
-        simpleB2BSameSize(forceRenderTrue, buffers.forceRender, commandEncoder);
+        simpleB2BSameSize(forceRenderTrueBuffer, buffers.forceRender, commandEncoder);
       }
 
       simpleB2BSameSize(patchesBufferReset, buffers.patches0, commandEncoder);
@@ -467,7 +467,7 @@ export async function mainExport(
 
       let computePassPong = commandEncoder.beginComputePass({ label: "Pong" });
       computePassPong.setPipeline(pipeline);
-      computePassPong.setBindGroup(0, userInputBindGroup);
+      computePassPong.setBindGroup(0, sceneUniformsBindGroup);
       computePassPong.setBindGroup(1, toRenderPatchesBindGroup);
       computePassPong.setBindGroup(2, pingPongPatchesBindGroup[1]);
       computePassPong.dispatchWorkgroupsIndirect(buffers.indirectDispatch1, 0);
@@ -475,7 +475,7 @@ export async function mainExport(
 
       if (isLastRound) {
         simpleB2BSameSize(
-          forceRenderFalse,
+          forceRenderFalseBuffer,
           buffers.forceRender,
           commandEncoder
         );
@@ -546,7 +546,7 @@ export async function mainExport(
       );
 
       let instanceSelectionBindGroup = createSimpleBindGroup(
-        [target_instance_id_buffer],
+        [targetInstanceIdBuffer],
         instanceSelectionLayout,
         device,
         null
@@ -554,7 +554,7 @@ export async function mainExport(
       let computePassPrep = commandEncoder.beginComputePass({
         label: "prepareVertexOutput",
       });
-      computePassPrep.setPipeline(prepVerticesStageShaderAndPipeline.pipeline);
+      computePassPrep.setPipeline(prepVerticesShaderWithPipeline.pipeline);
       computePassPrep.setBindGroup(0, bindGroupVertPrep);
       computePassPrep.dispatchWorkgroups(1);
       computePassPrep.end();
@@ -567,7 +567,7 @@ export async function mainExport(
 
       simpleB2BSameSize(
         numberBuffersArray[instanceToDownload],
-        target_instance_id_buffer,
+        targetInstanceIdBuffer,
         commandEncoder
       );
       // Run vertex output shader
@@ -575,7 +575,7 @@ export async function mainExport(
         label: "vertexOutputStage",
       });
       computePassVertices.setPipeline(compiledShader.verticesStage.pipeline);
-      computePassVertices.setBindGroup(0, userInputBindGroup);
+      computePassVertices.setBindGroup(0, sceneUniformsBindGroup);
       computePassVertices.setBindGroup(1, outputVerticesBindGroup);
       computePassVertices.setBindGroup(2, instanceSelectionBindGroup);
       computePassVertices.dispatchWorkgroupsIndirect(dispatchVerticesStage, 0);
@@ -614,4 +614,5 @@ export async function mainExport(
     }
   }
   await props.engine.setLodStage(lodStageCallback);
+  return lodStageCallback;
 }

@@ -47,50 +47,41 @@ const exportProgress: Ref<number> = ref(0);
 
 let exportSteps = 0;
 let exportStepsDone = 0;
-let stepProgress = 0;
 
 let meshBuffer: any[] = [];
-let bufferedNames: Ref<string[]> = ref([]);
-let lastMeshBufferUpdate = 0;
-
-let frameCount = 0;
 let canceled = false;
 function onFrame() {
-  frameCount++;
 }
 
 async function exportMeshBuffer(name: string) {
-  let exportProgressBase = 0;
   let exportProgressPerStep = 1 / meshBuffer.length;
   let i = 0;
   if (!canceled) {
     if (mergeModels.value) {
-      exportMeshList(meshBuffer, name);
+      exportMeshes(meshBuffer, name);
     } else {
       meshBuffer.forEach((mesh) => {
         exportProgress.value = i * exportProgressPerStep;
-        exportMeshList([mesh], mesh.name, exportProgressPerStep);
+        exportMeshes([mesh], mesh.name, exportProgressPerStep);
         i++;
       });
     }
   }
 
   meshBuffer = [];
-  bufferedNames.value = [];
-  lastMeshBufferUpdate = frameCount;
   exportInProgress.value = false;
   triggerDownload.value = false;
   exportProgress.value = 0;
   exportStepsDone = 0;
   canceled = false;
+  toggleExportPreview();
 }
 
-async function exportMeshList(
+async function exportMeshes(
   meshes: any[],
   name: string,
   progressToMake?: number
 ) {
-  let exportProgressPerStep = 1 / meshBuffer.length;
   let modelExporter = new MeshExporter3DFormats(meshes);
   modelExporter.useUvs = includeUVs.value;
   let format = fileFormat.value;
@@ -113,7 +104,6 @@ async function exportMeshList(
   let filename = name + "." + format;
   let binary = fileContent.binary;
   let data = fileContent.data;
-  let successful = fileContent.error;
   if (fileContent.errors) {
     fileContent.errors.forEach((errorModel) => {
       alert("Did not successfully export " + errorModel);
@@ -127,13 +117,13 @@ async function exportMeshList(
   }
 }
 
-async function readSceneFile(): Promise<string> {
+async function loadSceneFile(): Promise<string> {
   let f: File | null = await props.fs.readFile(SceneFileName);
   let text: string | undefined = await f?.text();
   assert(text !== undefined, "Missing scene file");
   return text as string;
 }
-async function accumulateMeshForExport(
+async function bufferMeshesForExport(
   instanceMapPatches: Map<number, any>,
   includeUVs: boolean,
   uuid: string,
@@ -147,8 +137,7 @@ async function accumulateMeshForExport(
     looped = true;
   }
 
-  let scenePromise = getScene();
-  lastMeshBufferUpdate = frameCount;
+  let scenePromise = fetchScene();
 
   exportProgress.value = progressPerStep * (exportStepsDone + 0.5);
   let scene = await scenePromise;
@@ -176,9 +165,7 @@ async function accumulateMeshForExport(
         });
       }
     });
-    console.log("Known models: ", models);
-    console.log("Scene models: ", scene.models);
-
+    
     assert(sceneModel != null);
     meshBuffer.push({
       name: sceneModel.name,
@@ -205,8 +192,8 @@ async function accumulateMeshForExport(
   exportMeshBuffer(name);
 }
 
-async function getScene(): Promise<SerializedScene> {
-  let sceneFile = readSceneFile();
+async function fetchScene(): Promise<SerializedScene> {
+  let sceneFile = loadSceneFile();
   let scene = deserializeScene(await sceneFile);
   return scene;
 }
@@ -231,7 +218,6 @@ function exportMeshFromPatches(
     let vertex = slicedStream.slice(index, index + 3);
     let uv = slicedStream.slice(index + 4, index + 6);
     let instance = instance_id[index + 6];
-    let latestPatch = 0;
     if (vertex[0] == 0 && vertex[1] == 0 && vertex[2] == 0) {
       let endofdata = true;
       for (let x = 0; x < 10; x++) {
@@ -266,7 +252,7 @@ function exportMeshFromPatches(
   }
 
   console.log(
-    "Got request to export mesh " + name + " patch verts: " + patch_verts.length
+    "Got request to export mesh " + name
   );
   console.log(toDownload.value);
   for (const [instance_id, patchstructure] of patches) {
@@ -278,10 +264,10 @@ function exportMeshFromPatches(
     }
   }
 
-  accumulateMeshForExport(patches, includeUVs, name, buffer);
+  bufferMeshesForExport(patches, includeUVs, name, buffer);
 }
 
-let scene = getScene();
+let scene = fetchScene();
 scene.then((actualScene) => {
   actualScene.models.forEach((model) => {
     models.value.push({
@@ -319,7 +305,7 @@ props.fs.watchFromStart((change) => {
 });
 
 // Main function
-mainExport(
+let lodStageCallback = await mainExport(
   triggerDownload,
   exportMeshFromPatches,
   props,
@@ -330,20 +316,21 @@ mainExport(
     includeUVs: includeUVs,
     models: models,
     downloadTarget: downloadTarget,
-    bufferedNames: bufferedNames,
     subdivisionSteps: subdivisionSteps,
     toDownload: toDownload,
   },
   onFrame
 );
 
-async function startExport() {
+async function beginExportProcess() {
+  canceled = false;
   triggerDownload.value = true;
   exportInProgress.value = true;
   toDownload.value.length = 0;
-  let sceneFile = readSceneFile();
+  let sceneFile = loadSceneFile();
   let toDownloadSteps = 0;
   let scene = deserializeScene(await sceneFile);
+  props.engine.setLodStage(lodStageCallback);
   scene.models.forEach((model) => {
     if (downloadTarget.value !== "")
       console.log(
@@ -360,18 +347,30 @@ async function startExport() {
   console.log("To download: ", toDownload);
 }
 
-function cancelExport() {
+function abortExport() {
   exportStore.isExportMode = false;
   meshBuffer = [];
   exportInProgress.value = false;
   exportProgress.value = 0;
   toDownload.value = [];
   canceled = true;
+  toggleExportPreview();
 }
-</script>
 
+function toggleExportPreview() {
+  if (exportStore.showExportPreview) props.engine.setLodStage(lodStageCallback);
+  else props.engine.setLodStage(null);
+}
+toggleExportPreview();
+</script>
 <template>
   <n-card title="Export Settings" size="small" class="h-full overflow-y-auto">
+    <n-checkbox
+      v-model:checked="exportStore.showExportPreview"
+      @click="toggleExportPreview()"
+      :disabled="exportInProgress"
+      >Display Preview</n-checkbox
+    >
     <n-space vertical :size="8">
       <n-form-item
         label="Min Size:"
@@ -497,7 +496,7 @@ function cancelExport() {
       </n-form-item>
 
       <n-button
-        @click="startExport"
+        @click="beginExportProcess"
         :disabled="exportInProgress"
         type="primary"
         block
@@ -507,7 +506,7 @@ function cancelExport() {
 
       <n-progress v-if="exportInProgress" :percentage="exportProgress * 100" />
 
-      <n-button @click="cancelExport()" type="error" block> Cancel </n-button>
+      <n-button @click="abortExport()" type="error" block> Cancel </n-button>
     </n-space>
   </n-card>
 </template>
