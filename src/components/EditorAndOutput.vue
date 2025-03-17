@@ -35,6 +35,7 @@ import { useErrorStore } from "@/stores/error-store";
 import { syncFilesystem } from "@/engine/sync-filesystem";
 import { useExportStore } from "@/stores/export-store";
 import { DefaultScene } from "@/scenes/default-scene";
+import FocusObject from "./FocusObject.vue";
 
 import WebGpu from "@/components/WebGpu.vue";
 import { useOpenFile } from "./use-open-file";
@@ -365,6 +366,13 @@ watchImmediate(
                 </n-card>
                 <div class="absolute top-2.5 right-2.5">
                   <img src="./../assets/TUWien.png" class="size-12" />
+                </div>
+                <div class="absolute top-2.5 left-2.5 w-48">
+                  <FocusObject
+                    class="dark:bg-slate-800"
+                    :engine="props.engine"
+                    :models="scene.state.value.models"
+                  />
                 </div>
                 <div class="absolute bottom-0 left-1 text-gray-900">
                   CPU {{ (fpsCounter.avg_delta_time * 1000.0).toFixed(1) }} ms /

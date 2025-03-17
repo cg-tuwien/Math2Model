@@ -16,7 +16,9 @@ use wasm_bindgen::{JsError, JsValue, prelude::wasm_bindgen};
 use web_sys::{HtmlCanvasElement, ImageBitmap};
 use winit::event_loop::{EventLoop, EventLoopProxy};
 
-use crate::wasm_abi::{WasmCompilationMessage, WasmFrameTime, WasmModelInfo, WasmShaderInfo};
+use crate::wasm_abi::{
+    WasmCompilationMessage, WasmFrameTime, WasmModelInfo, WasmPosition, WasmShaderInfo,
+};
 
 #[wasm_bindgen]
 pub struct WasmApplication {
@@ -225,6 +227,13 @@ impl WasmApplication {
             if let Some(renderer) = &app.renderer {
                 renderer.set_threshold_factor(factor);
             }
+        })
+        .await;
+    }
+
+    pub async fn focus_on(&self, position: WasmPosition) {
+        let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), move |app| {
+            app.app.camera_controller.focus_on(position.into());
         })
         .await;
     }

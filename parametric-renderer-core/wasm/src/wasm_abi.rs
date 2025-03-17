@@ -24,6 +24,16 @@ pub struct WasmTransform {
 
 #[derive(Tsify, Serialize, Deserialize)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct WasmPosition([f32; 3]);
+
+impl From<WasmPosition> for glam::Vec3 {
+    fn from(value: WasmPosition) -> Self {
+        glam::Vec3::new(value.0[0], value.0[1], value.0[2])
+    }
+}
+
+#[derive(Tsify, Serialize, Deserialize)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub struct WasmFrameTime {
     pub avg_delta_time: f32,
     pub avg_gpu_time: f32,
