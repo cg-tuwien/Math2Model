@@ -6,16 +6,16 @@
       "id": "7dd4ce0b-4331-4638-858b-9de119ebe860",
       "name": "Terrain",
       "position": [
+        -50,
         0,
-        -7.5,
-        0
+        -50
       ],
       "rotation": [
         0,
         0,
         0
       ],
-      "scale": 30,
+      "scale": 1,
       "parametricShader": "Terrain1722025_165522.graph.wgsl",
       "material": {
         "color": [
@@ -39,16 +39,16 @@
       "id": "c43a8275-bc71-49f6-b5c9-094da43c82cf",
       "name": "Trees",
       "position": [
-        15,
-        -1,
-        15
+        0,
+        0.2,
+        0
       ],
       "rotation": [
         0,
         0,
         0
       ],
-      "scale": 1,
+      "scale": 2,
       "parametricShader": "Trees1722025_172843.wgsl",
       "material": {
         "color": [
@@ -65,8 +65,7 @@
         ],
         "diffuseTexture": "treetexture.jpg"
       },
-      "instanceCount": 12
+      "instanceCount": 120
     }
-  ],
-  "description": "The terrain and trees have been generated procedurally on the GPU. By adjusting the instance count of the trees, you can adjust the nubmer of trees."
+  ]
 }

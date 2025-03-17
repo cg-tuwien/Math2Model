@@ -142,7 +142,7 @@
         },
         {
           "type": "node",
-          "value": "034925cb121a4a52",
+          "value": "fd03cb19b2beb1b6",
           "keyFrom": "value",
           "keyTo": "returnIn"
         }
@@ -258,7 +258,7 @@
       "inputs": [
         {
           "type": "number",
-          "value": 0.3,
+          "value": 0.4,
           "key": "value"
         },
         {
@@ -271,8 +271,8 @@
     },
     {
       "size": [
-        180,
-        230
+        190,
+        255
       ],
       "position": [
         717.95,
@@ -302,8 +302,8 @@
     },
     {
       "size": [
-        180,
-        230
+        190,
+        255
       ],
       "position": [
         717.95,
@@ -333,8 +333,8 @@
     },
     {
       "size": [
-        180,
-        230
+        190,
+        255
       ],
       "position": [
         1313.45,
@@ -364,8 +364,8 @@
     },
     {
       "size": [
-        180,
-        230
+        190,
+        255
       ],
       "position": [
         1313.45,
@@ -395,8 +395,8 @@
     },
     {
       "size": [
-        180,
-        200
+        190,
+        225
       ],
       "position": [
         992.95,
@@ -427,8 +427,8 @@
     },
     {
       "size": [
-        180,
-        200
+        190,
+        225
       ],
       "position": [
         992.95,
@@ -459,8 +459,8 @@
     },
     {
       "size": [
-        180,
-        200
+        190,
+        225
       ],
       "position": [
         992.95,
@@ -623,8 +623,8 @@
     },
     {
       "size": [
-        180,
-        200
+        190,
+        225
       ],
       "position": [
         1574.45,
@@ -655,8 +655,8 @@
     },
     {
       "size": [
-        180,
-        200
+        190,
+        225
       ],
       "position": [
         1574.45,
@@ -687,8 +687,8 @@
     },
     {
       "size": [
-        180,
-        200
+        190,
+        225
       ],
       "position": [
         1574.45,
@@ -719,8 +719,8 @@
     },
     {
       "size": [
-        180,
-        200
+        190,
+        225
       ],
       "position": [
         1855.7,
@@ -751,8 +751,8 @@
     },
     {
       "size": [
-        180,
-        200
+        190,
+        225
       ],
       "position": [
         2224.7,
@@ -812,6 +812,63 @@
         }
       ],
       "nodeType": "Join"
+    },
+    {
+      "size": [
+        180,
+        390
+      ],
+      "position": [
+        3018.0454673312497,
+        254.5442333156613
+      ],
+      "uuid": "fd03cb19b2beb1b6",
+      "inputs": [
+        {
+          "key": "isApply",
+          "value": 0,
+          "type": "number"
+        },
+        {
+          "type": "node",
+          "value": "034925cb121a4a52",
+          "keyFrom": "value",
+          "keyTo": "param"
+        }
+      ],
+      "nodeType": "MathFunction",
+      "extraStringInformation": [
+        {
+          "key": "name",
+          "value": "Scale"
+        },
+        {
+          "key": "func",
+          "value": "mat3x3(vec3f({scale x,1,100,-100,0.1,f32},0.0,0.0), vec3f(0.0,{scale y,1,100,-100,0.1,f32},0.0), vec3f(0.0,0.0,{scale z,1,100,-100,0.1,f32})) * input2"
+        },
+        {
+          "key": "inputType",
+          "value": "vec3f"
+        },
+        {
+          "key": "outputType",
+          "value": "vec3f"
+        }
+      ],
+      "extraNumberInformation": [
+        {
+          "key": "{scale x,1,100,-100,0.1,f32}/f32",
+          "value": 100
+        },
+        {
+          "key": "{scale y,1,100,-100,0.1,f32}/f32",
+          "value": 10
+        },
+        {
+          "key": "{scale z,1,100,-100,0.1,f32}/f32",
+          "value": 100
+        }
+      ]
     }
   ]
 }

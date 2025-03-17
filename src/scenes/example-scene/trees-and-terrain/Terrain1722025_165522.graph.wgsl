@@ -1,4 +1,3 @@
-
 fn Heart(input2: vec2f) -> vec3f {
 	var PI = 3.14159265359;
 	var HALF_PI = 3.14159265359 / 2.0;
@@ -43,6 +42,18 @@ fn Cylinder(input2: vec2f) -> vec3f {
     var z = sy;
 
     return vec3f(x, y, z);
+}
+fn Cube(input2: vec2f) -> vec3f {
+	var PI = 3.14159265359;
+	var HALF_PI = 3.14159265359 / 2.0;
+	var TWO_PI = 3.14159265359 * 2.0;
+    var u = input2.x * TWO_PI;
+    var v = input2.y * TWO_PI;
+    let x = sign(sin(u));
+    let y = sign(sin(u * v));
+    let z = sign(sin(v));
+	var result = vec3f(x, y, z);
+	return result;
 }
 fn mod289(x: vec4f) -> vec4f
 {
@@ -151,7 +162,7 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var ref_0f4d7 = vec2f(ref_96e8f_1, ref_96e8f_2);
 	var ref_64b01 = vec2f(ref_96e8f_2, ref_96e8f_1);
 	var hillyness = 1.30000000000000004441;
-	var hillHeight = 0.29999999999999998890;
+	var hillHeight = 0.40000000000000002220;
 	var ref_3ce74 = hillyness * 2;
 	var ref_9d2a3 = hillyness * 0.5;
 	var ref_0c4ef = hillHeight * 2;
@@ -168,6 +179,7 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var ref_3c079 = ref_c49d3 + ref_d17b8;
 	var ref_52c00 = ref_3c079 + ref_41355;
 	var ref_03492 = vec3f(ref_96e8f_1, ref_52c00, ref_96e8f_2);
-	return ref_03492;
+	var ref_fd03c = mat3x3(vec3f(100.00000000000000000000,0.0,0.0), vec3f(0.0,10.00000000000000000000,0.0), vec3f(0.0,0.0,100.00000000000000000000)) * ref_03492;
+	return ref_fd03c;
 
 }

@@ -181,8 +181,8 @@ fn tree_at(phi: f32, height: f32) -> vec3f {
 }
 
 fn sampleObject(input: vec2f) -> vec3f {
-    // Calculate positions for the whole trees:
-    var adaptToTerrain = 1.0;
+    // CHANGE the value to 1.0 to make the trees be aligned to the terrain
+    var adaptToTerrain = 0.0;
     var f = f32(instance_id / 3) * 5.0;
     var r = 1.0 + sqrt(f) * 1.5;
     var fu = f * 2.8;
@@ -232,7 +232,8 @@ fn sampleObject(input: vec2f) -> vec3f {
 
     // Position the tree at and according to the terrain:
     p.x += treePosX;
-    p.y += groundPos.y - 0.1;
+    p.y += groundPos.y;
+    p.y *= 1.2;
     p.z += treePosZ;
 
     return p;    
