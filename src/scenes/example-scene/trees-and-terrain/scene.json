@@ -5,31 +5,15 @@
       "type": "model",
       "id": "7dd4ce0b-4331-4638-858b-9de119ebe860",
       "name": "Terrain",
-      "position": [
-        -50,
-        0,
-        -50
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ],
+      "position": [-50, 0, -50],
+      "rotation": [0, 0, 0],
       "scale": 1,
       "parametricShader": "Terrain1722025_165522.graph.wgsl",
       "material": {
-        "color": [
-          0.9686968341336242,
-          0.16922567209124928,
-          0.17567598090622094
-        ],
+        "color": [0.9686968341336242, 0.16922567209124928, 0.17567598090622094],
         "roughness": 0.8413164801701143,
         "metallic": 0.003707993097993023,
-        "emissive": [
-          0,
-          0,
-          0
-        ],
+        "emissive": [0, 0, 0],
         "diffuseTexture": "grassytexture.jpg"
       },
       "instanceCount": 1
@@ -38,34 +22,19 @@
       "type": "model",
       "id": "c43a8275-bc71-49f6-b5c9-094da43c82cf",
       "name": "Trees",
-      "position": [
-        0,
-        0.2,
-        0
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ],
+      "position": [0, 0.2, 0],
+      "rotation": [0, 0, 0],
       "scale": 2,
       "parametricShader": "Trees1722025_172843.wgsl",
       "material": {
-        "color": [
-          0.6389353015195036,
-          0.6924126219340543,
-          0.94356905080533
-        ],
+        "color": [0.6389353015195036, 0.6924126219340543, 0.94356905080533],
         "roughness": 0.5976841271871804,
         "metallic": 0.43101668677131566,
-        "emissive": [
-          0,
-          0,
-          0
-        ],
+        "emissive": [0, 0, 0],
         "diffuseTexture": "treetexture.jpg"
       },
-      "instanceCount": 120
+      "instanceCount": 90
     }
-  ]
+  ],
+  "description": "This example shows a terrain with hills and trees. In the code graph of the 'Terrain' object you can adjust the values of the 'hillyness' and 'hillHeight' nodes to change the amount and height of hills on the terrain. In the code of the 'Trees' object you can change the 'adaptToTerrain' variable to either 0.0 (false) or 1.0 (true) to make the trees either not adapt to the terrain or to adapt to the terrain. To change the amount of trees in the scene you can change the 'Instance Count' on the 'Trees' object to a multiple of 3. Warning: Increasing the 'Instance Count' can cause some trees to appear off the terrain."
 }
