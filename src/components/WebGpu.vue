@@ -361,6 +361,7 @@ function toggleExportPreview() {
   if (exportStore.showExportPreview) props.engine.setLodStage(lodStageCallback);
   else props.engine.setLodStage(null);
 }
+
 toggleExportPreview();
 </script>
 <template>
@@ -489,7 +490,7 @@ toggleExportPreview();
         <n-slider
           v-model:value="subdivisionSteps"
           :min="1"
-          :max="5"
+          :max="4"
           :step="1"
           :disabled="exportInProgress"
         />
