@@ -6,6 +6,7 @@ import {
 import LodStageWgsl from "../lod_stage.wgsl?raw";
 import PrepVerticesStageWgsl from "../prep_vertices_stage.wgsl?raw";
 import OutputVerticesWgsl from "../vertices_stage.wgsl?raw";
+import FilterInstancesWgsl from "../filter-instance.wgsl?raw";
 import IndirectDispatchRebalanceSource from "../indirect_dispatch_rebalance.wgsl?raw";
 import { ref, type Ref } from "vue";
 import type { LodStageBuffers } from "@/webgpu-hook";
@@ -43,7 +44,7 @@ export async function mainExport(
   props: any,
   lodExportParametersRefs: any,
   onFrame: any
-) : Promise<any> {
+): Promise<any> {
   const _adapter = await navigator.gpu.requestAdapter(); // Wait for Rust backend to be in business
   const device = props.gpuDevice;
   const sceneUniformsLayout = createBindGroupLayout(
@@ -52,7 +53,7 @@ export async function mainExport(
     device,
     "scene uniforms"
   );
-  const layout1 = createBindGroupLayout(
+  const renderBuffersBindGroupLayout = createBindGroupLayout(
     GPUShaderStage.COMPUTE,
     [
       "uniform",
@@ -64,7 +65,7 @@ export async function mainExport(
       "uniform",
     ],
     device,
-    "layout1"
+    "renderBuffersBindGroupLayout"
   );
   const layout2 = createBindGroupLayout(
     GPUShaderStage.COMPUTE,
@@ -102,14 +103,26 @@ export async function mainExport(
   );
 
   const pipelineLayout = device.createPipelineLayout({
-    bindGroupLayouts: [sceneUniformsLayout, layout1, layout2],
+    bindGroupLayouts: [
+      sceneUniformsLayout,
+      renderBuffersBindGroupLayout,
+      layout2,
+    ],
   });
 
   const prepVerticesStageLayout = device.createPipelineLayout({
     bindGroupLayouts: [prepVerticesBinding0],
   });
   const outputVerticesLayout = device.createPipelineLayout({
-    bindGroupLayouts: [sceneUniformsLayout, vertexOutputLayout, instanceSelectionLayout],
+    bindGroupLayouts: [
+      sceneUniformsLayout,
+      vertexOutputLayout,
+      instanceSelectionLayout,
+    ],
+  });
+
+  const filterInstancesStageLayout = device.createPipelineLayout({
+    bindGroupLayouts: [layout2, instanceSelectionLayout],
   });
 
   const indirectDispatchTransformerLayout: GPUPipelineLayout =
@@ -158,6 +171,12 @@ export async function mainExport(
   let prepVerticesShaderWithPipeline = createShaderWithPipeline(
     PrepVerticesStageWgsl,
     prepVerticesStageLayout,
+    device
+  );
+
+  let filterInstanceIdPipeline = createShaderWithPipeline(
+    FilterInstancesWgsl,
+    filterInstancesStageLayout,
     device
   );
 
@@ -287,15 +306,8 @@ export async function mainExport(
     GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM
   );
 
-  const lodStageParametersStagingBuffer = createBufferWith(
-    props,
-    concatArrayBuffers(props, [lodStageParameters]),
-    GPUBufferUsage.MAP_WRITE | GPUBufferUsage.COPY_SRC
-  );
-
   let numberBuffersArray: GPUBuffer[] = [];
-  for(let i = 0; i < 100; i++)
-  {
+  for (let i = 0; i < 100; i++) {
     numberBuffersArray.push(
       createBufferWith(
         props,
@@ -305,13 +317,11 @@ export async function mainExport(
     );
   }
 
-  let targetInstanceIdBuffer: GPUBuffer = 
-    createBufferWith(
-      props,
-      concatArrayBuffers(props, [new Uint32Array([0])]),
-      GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM
-    );
-
+  let targetInstanceIdBuffer: GPUBuffer = createBufferWith(
+    props,
+    concatArrayBuffers(props, [new Uint32Array([0])]),
+    GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM
+  );
 
   let sceneUniformsBindGroup: any = null;
 
@@ -339,7 +349,45 @@ export async function mainExport(
       }
     });
 
-    const compiledShader = shaderPipelinesMap.value.get(makeFilePath(shaderPath));
+    let downloadTarget = lodExportParametersRefs.downloadTarget.value;
+    let downloadAll = downloadTarget == "";
+    let isRightDownloadTarget = downloadAll || downloadTarget == uuid;
+    let toDownload = lodExportParametersRefs.toDownload.value;
+    let toDownloadModel = null;
+    let toDownloadIndex = 0;
+    for (let i = 0; i < toDownload.length; i++) {
+      if (
+        toDownload[i].name == uuid &&
+        toDownload[i].currentInstance <= instanceCount
+      ) {
+        toDownloadModel = toDownload[i];
+        toDownloadIndex = i;
+        break;
+      }
+    }
+    if (
+      toDownload.length != 0 &&
+      (!isRightDownloadTarget || toDownloadModel == null  || triggerDownload.value == false)
+    ) {
+      return;
+    }
+    let instanceToDownload = toDownloadModel == null ? 0 : toDownloadModel.currentInstance;
+
+
+
+
+    if (toDownload.length != 0)
+    {
+      if (instanceToDownload >= instanceCount) {
+        toDownload.splice(toDownloadIndex, 1);
+        console.log("Removed " + toDownload + " because it was done");
+        return;
+      }
+      console.log("Downloading instance: ", instanceToDownload,"of",name);
+    }
+    const compiledShader = shaderPipelinesMap.value.get(
+      makeFilePath(shaderPath)
+    );
     if (!compiledShader) {
       // The shader probably didn't load yet
       // console.error("Shader not found: ", shaderPath);
@@ -368,7 +416,7 @@ export async function mainExport(
         buffers.finalPatches32,
         lodStageParametersBuffer,
       ],
-      layout1,
+      renderBuffersBindGroupLayout,
       device,
       uuid
     );
@@ -426,7 +474,35 @@ export async function mainExport(
       0,
       lodStageParameters.length
     );
-    let rebalanceCounter = 0;
+
+    simpleB2BSameSize(
+      numberBuffersArray[instanceToDownload],
+      targetInstanceIdBuffer,
+      commandEncoder
+    );
+
+    let instanceSelectionBindGroup = createSimpleBindGroup(
+      [targetInstanceIdBuffer],
+      instanceSelectionLayout,
+      device,
+      null
+    );
+
+    if(toDownload.length != 0)
+    {
+      let computePassFilterInstance = commandEncoder.beginComputePass();
+      computePassFilterInstance.setPipeline(filterInstanceIdPipeline.pipeline);
+      computePassFilterInstance.setBindGroup(0, pingPongPatchesBindGroup[0]);
+      computePassFilterInstance.setBindGroup(1, instanceSelectionBindGroup);
+      computePassFilterInstance.dispatchWorkgroupsIndirect(
+        buffers.indirectDispatch0,
+        0
+      );
+      computePassFilterInstance.end();
+      simpleB2BSameSize(buffers.patches1, buffers.patches0, commandEncoder);
+    }
+
+//    console.log("Rendering ", name);
     // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
     for (let i = 0; i < doubleNumberOfRounds; i++) {
       const isLastRound = i === doubleNumberOfRounds - 1;
@@ -445,9 +521,14 @@ export async function mainExport(
       computePassPing.setBindGroup(2, pingPongPatchesBindGroup[0]);
       computePassPing.dispatchWorkgroupsIndirect(buffers.indirectDispatch0, 0);
       computePassPing.end();
+
       // Pong
       if (isLastRound) {
-        simpleB2BSameSize(forceRenderTrueBuffer, buffers.forceRender, commandEncoder);
+        simpleB2BSameSize(
+          forceRenderTrueBuffer,
+          buffers.forceRender,
+          commandEncoder
+        );
       }
 
       simpleB2BSameSize(patchesBufferReset, buffers.patches0, commandEncoder);
@@ -463,7 +544,6 @@ export async function mainExport(
       rebalancePass.dispatchWorkgroups(1, 1, 1);
 
       rebalancePass.end();
-      
 
       let computePassPong = commandEncoder.beginComputePass({ label: "Pong" });
       computePassPong.setPipeline(pipeline);
@@ -485,51 +565,17 @@ export async function mainExport(
       rebalancePass2.setPipeline(indirectDispatchRebalancePipeline);
       rebalancePass2.setBindGroup(0, indirectRebalanceBindGroups[1]);
       rebalancePass2.dispatchWorkgroups(1, 1, 1);
-      
       rebalancePass2.end();
     }
 
-    /*if (frame++ === 0) {
-      setTimeout(() => {
-      rebalanceResults
-        .mapAsync(GPUMapMode.READ, 0, rebalanceResults.size)
-        .then((value) => {
-          let data = new Uint32Array(
-            rebalanceResults.getMappedRange(0, rebalanceResults.size)
-          );
-          console.log("This frames data on rebalancing: ");
-          console.log(data);
-          rebalanceResults.unmap();
-        }),1});
-    }*/
     if (!triggerDownload.value) {
       return;
-    }
-    let downloadTarget = lodExportParametersRefs.downloadTarget.value;
-    let downloadAll = downloadTarget == "";
-    let isRightDownloadTarget = downloadAll || downloadTarget == uuid;
-    let toDownload = lodExportParametersRefs.toDownload.value;
-    let toDownloadModel = null;
-    let toDownloadIndex = 0;
-    for (let i = 0; i < toDownload.length; i++) {
-      if (
-        toDownload[i].name == uuid &&
-        toDownload[i].currentInstance <= instanceCount
-      ) {
-        toDownloadModel = toDownload[i];
-        toDownloadIndex = i;
-      }
     }
     if (isRightDownloadTarget && toDownloadModel != null) {
       console.log("Exporting " + name);
       triggerDownload.value = false;
-      let instanceToDownload = toDownloadModel.currentInstance++;
       // Prepare vertices output
 
-      if (instanceToDownload >= instanceCount) {
-        toDownload.splice(toDownloadIndex, 1);
-        console.log("Removed " + toDownload + " because it was done");
-      }
 
       let bindGroupVertPrep = createSimpleBindGroup(
         [buffers.finalPatches2, dispatchVerticesStage],
@@ -543,13 +589,6 @@ export async function mainExport(
         vertexOutputLayout,
         device,
         uuid
-      );
-
-      let instanceSelectionBindGroup = createSimpleBindGroup(
-        [targetInstanceIdBuffer],
-        instanceSelectionLayout,
-        device,
-        null
       );
       let computePassPrep = commandEncoder.beginComputePass({
         label: "prepareVertexOutput",
@@ -565,11 +604,6 @@ export async function mainExport(
         commandEncoder
       );
 
-      simpleB2BSameSize(
-        numberBuffersArray[instanceToDownload],
-        targetInstanceIdBuffer,
-        commandEncoder
-      );
       // Run vertex output shader
       let computePassVertices = commandEncoder.beginComputePass({
         label: "vertexOutputStage",
@@ -586,6 +620,7 @@ export async function mainExport(
         vertReadableBuffer
           .mapAsync(GPUMapMode.READ, 0, vertReadableBuffer.size)
           .then(() => {
+            toDownloadModel.currentInstance++;
             console.log(
               "Memory mapped the buffer for " +
                 name +
@@ -601,8 +636,9 @@ export async function mainExport(
             if (downloadAll) {
               triggerDownload.value = true;
             }
+            
 
-            console.log("exportMeshFromPatches called");
+            console.log(vertexStream);
             exportMeshFromPatches(
               vertexStream,
               lodExportParametersRefs.includeUVs.value,
