@@ -7,7 +7,7 @@
       ],
       "position": [
         12,
-        362
+        564.5
       ],
       "uuid": "63e203ccba62af19",
       "inputs": [],
@@ -38,7 +38,7 @@
         160
       ],
       "position": [
-        992,
+        1462.5,
         12
       ],
       "uuid": "ed4832997e78aea9",
@@ -55,7 +55,7 @@
         },
         {
           "type": "node",
-          "value": "fe0bc153c73ad7a9",
+          "value": "4fde15f601ecdd78",
           "keyFrom": "value",
           "keyTo": "returnIn"
         }
@@ -68,8 +68,8 @@
         180
       ],
       "position": [
-        510.5,
-        99.5
+        514,
+        284.5
       ],
       "uuid": "831ed1af1e18b969",
       "inputs": [
@@ -94,8 +94,8 @@
         180
       ],
       "position": [
-        275.5,
-        434.5
+        279,
+        619.5
       ],
       "uuid": "fd7fa8844a2bfa6c",
       "inputs": [
@@ -120,8 +120,8 @@
         250
       ],
       "position": [
-        762,
-        87
+        765.5,
+        272
       ],
       "uuid": "fe0bc153c73ad7a9",
       "inputs": [
@@ -152,8 +152,8 @@
         255
       ],
       "position": [
-        505.5,
-        299.5
+        509,
+        484.5
       ],
       "uuid": "28c457e9a3a4ae48",
       "inputs": [
@@ -176,6 +176,58 @@
           "value": "*"
         }
       ]
+    },
+    {
+      "size": [
+        180,
+        220
+      ],
+      "position": [
+        995.5,
+        137
+      ],
+      "uuid": "5d4073ff75725dd4",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "fe0bc153c73ad7a9",
+          "keyFrom": "value",
+          "keyTo": "vector"
+        }
+      ],
+      "nodeType": "Separate"
+    },
+    {
+      "size": [
+        180,
+        240
+      ],
+      "position": [
+        1232.5,
+        87
+      ],
+      "uuid": "4fde15f601ecdd78",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "5d4073ff75725dd4",
+          "keyFrom": "x",
+          "keyTo": "y"
+        },
+        {
+          "type": "node",
+          "value": "5d4073ff75725dd4",
+          "keyFrom": "y",
+          "keyTo": "x"
+        },
+        {
+          "type": "node",
+          "value": "5d4073ff75725dd4",
+          "keyFrom": "z",
+          "keyTo": "z"
+        }
+      ],
+      "nodeType": "Join"
     }
   ]
 }

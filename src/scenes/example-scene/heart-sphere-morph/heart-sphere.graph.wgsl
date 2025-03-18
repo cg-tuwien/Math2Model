@@ -158,6 +158,10 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var ref_fd7fa = Heart(input2);
 	var ref_28c45 = ref_fd7fa * 0.3;
 	var ref_fe0bc = mix(ref_831ed, ref_28c45, 1);
-	return ref_fe0bc;
+	var ref_5d407_1 = ref_fe0bc[0];
+	var ref_5d407_2 = ref_fe0bc[1];
+	var ref_5d407_3 = ref_fe0bc[2];
+	var ref_4fde1 = vec3f(ref_5d407_2, ref_5d407_1, ref_5d407_3);
+	return ref_4fde1;
 
 }
