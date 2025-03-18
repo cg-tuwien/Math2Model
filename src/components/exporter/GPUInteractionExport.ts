@@ -136,7 +136,6 @@ export async function mainExport(
     device
   );
   const indirectDispatchRebalancePipeline = v.pipeline;
-  const indirectDispatchRebalanceShader = v.shader;
 
   async function fetchAndInjectShaderCode(
     fs: ReactiveFilesystem,
@@ -162,8 +161,6 @@ export async function mainExport(
         );
       result.lodStage = replaceWithCode(result.lodStage);
       result.verticesStage = replaceWithCode(result.verticesStage);
-      ///console.log("LOD STAGE: " + result.lodStage);
-      //console.log("VERTICES STAGE: " + result.verticesStage);
     }
     return result;
   }
@@ -195,7 +192,6 @@ export async function mainExport(
       GPUBufferUsage.COPY_DST |
       GPUBufferUsage.STORAGE,
   });
-  //  alert("Actual size: " + vertOutputBuffer.size)
   let vertReadableBuffer = device.createBuffer({
     label: "VertReadableBuffer",
     size: vertOutputBufferSize,
@@ -225,36 +221,6 @@ export async function mainExport(
       shaderPipelinesMap.value.delete(change.key);
     }
   });
-
-  const patchesBufferDebug = createBufferWith(
-    props,
-    // Fill however many slots you want to debug print
-    concatArrayBuffers(props, [new Uint32Array([0, 0, 0, 0, 0, 0, 0, 0])]),
-    GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ
-  );
-  let hasDebugInfo = false;
-  const debugPrintBuffer = (
-    buffer: GPUBuffer,
-    commandEncoder: GPUCommandEncoder
-  ) => {
-    if (!hasDebugInfo) {
-      hasDebugInfo = true;
-      const size = Math.min(patchesBufferDebug.size, buffer.size);
-      commandEncoder.copyBufferToBuffer(buffer, 0, patchesBufferDebug, 0, size);
-      // Need to wait until *after* submit has happened to be able to call mapAsync
-      setTimeout(() => {
-        patchesBufferDebug.mapAsync(GPUMapMode.READ, 0, size).then(() => {
-          const arrayBuffer = patchesBufferDebug
-            .getMappedRange(0, size)
-            .slice(0);
-          const uint32Array = new Uint32Array(arrayBuffer);
-          console.log("patchesBufferDebug", uint32Array);
-          patchesBufferDebug.unmap();
-          hasDebugInfo = false;
-        });
-      }, 0);
-    }
-  };
 
   const patchesBufferReset = createBufferWith(
     props,
@@ -367,30 +333,27 @@ export async function mainExport(
     }
     if (
       toDownload.length != 0 &&
-      (!isRightDownloadTarget || toDownloadModel == null  || triggerDownload.value == false)
+      (!isRightDownloadTarget ||
+        toDownloadModel == null ||
+        triggerDownload.value == false)
     ) {
       return;
     }
-    let instanceToDownload = toDownloadModel == null ? 0 : toDownloadModel.currentInstance;
+    let instanceToDownload =
+      toDownloadModel == null ? 0 : toDownloadModel.currentInstance;
 
-
-
-
-    if (toDownload.length != 0)
-    {
+    if (toDownload.length != 0) {
       if (instanceToDownload >= instanceCount) {
         toDownload.splice(toDownloadIndex, 1);
         console.log("Removed " + toDownload + " because it was done");
         return;
       }
-      console.log("Downloading instance: ", instanceToDownload,"of",name);
     }
     const compiledShader = shaderPipelinesMap.value.get(
       makeFilePath(shaderPath)
     );
     if (!compiledShader) {
       // The shader probably didn't load yet
-      // console.error("Shader not found: ", shaderPath);
       return;
     }
     const pipeline = compiledShader.lodStage.pipeline;
@@ -403,8 +366,6 @@ export async function mainExport(
         device,
         uuid
       );
-
-    //      console.log(buffers);
 
     const toRenderPatchesBindGroup = createSimpleBindGroup(
       [
@@ -488,8 +449,7 @@ export async function mainExport(
       null
     );
 
-    if(toDownload.length != 0)
-    {
+    if (toDownload.length != 0) {
       let computePassFilterInstance = commandEncoder.beginComputePass();
       computePassFilterInstance.setPipeline(filterInstanceIdPipeline.pipeline);
       computePassFilterInstance.setBindGroup(0, pingPongPatchesBindGroup[0]);
@@ -501,8 +461,6 @@ export async function mainExport(
       computePassFilterInstance.end();
       simpleB2BSameSize(buffers.patches1, buffers.patches0, commandEncoder);
     }
-
-//    console.log("Rendering ", name);
     // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
     for (let i = 0; i < doubleNumberOfRounds; i++) {
       const isLastRound = i === doubleNumberOfRounds - 1;
@@ -572,10 +530,8 @@ export async function mainExport(
       return;
     }
     if (isRightDownloadTarget && toDownloadModel != null) {
-      console.log("Exporting " + name);
       triggerDownload.value = false;
       // Prepare vertices output
-
 
       let bindGroupVertPrep = createSimpleBindGroup(
         [buffers.finalPatches2, dispatchVerticesStage],
@@ -630,15 +586,12 @@ export async function mainExport(
             const arrayBuffer = vertReadableBuffer
               .getMappedRange(0, vertReadableBuffer.size)
               .slice(0);
-            let size = arrayBuffer[0];
             const vertexStream = new Float32Array(arrayBuffer);
             vertReadableBuffer.unmap();
             if (downloadAll) {
               triggerDownload.value = true;
             }
-            
 
-            console.log(vertexStream);
             exportMeshFromPatches(
               vertexStream,
               lodExportParametersRefs.includeUVs.value,

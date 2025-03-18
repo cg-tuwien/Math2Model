@@ -343,7 +343,7 @@ async function beginExportProcess() {
       toDownload.value.push({ name: model.id, currentInstance: 0 });
     toDownloadSteps += model.instanceCount;
   });
-  exportSteps = toDownload.value.length;
+  exportSteps = toDownloadSteps;//toDownload.value.length;
   console.log("To download: ", toDownload);
 }
 
