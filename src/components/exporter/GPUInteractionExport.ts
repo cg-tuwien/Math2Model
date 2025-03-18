@@ -342,6 +342,8 @@ export async function mainExport(
     let instanceToDownload =
       toDownloadModel == null ? 0 : toDownloadModel.currentInstance;
 
+    if(!isRightDownloadTarget)
+      return;
     if (toDownload.length != 0) {
       if (instanceToDownload >= instanceCount) {
         toDownload.splice(toDownloadIndex, 1);
@@ -570,7 +572,7 @@ export async function mainExport(
       computePassVertices.setBindGroup(2, instanceSelectionBindGroup);
       computePassVertices.dispatchWorkgroupsIndirect(dispatchVerticesStage, 0);
       computePassVertices.end();
-
+      lodExportParametersRefs.currentItem.value = name + instanceToDownload;
       simpleB2BSameSize(vertOutputBuffer, vertReadableBuffer, commandEncoder);
       setTimeout(() => {
         vertReadableBuffer

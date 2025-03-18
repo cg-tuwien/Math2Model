@@ -44,6 +44,7 @@ const mergeModels = ref(true);
 const exportInProgress = ref(false);
 const toDownload: Ref<{ name: string; currentInstance: number }[]> = ref([]);
 const exportProgress: Ref<number> = ref(0);
+const currentDownloadItem: Ref<string> = ref("Nothing");
 
 let exportSteps = 0;
 let exportStepsDone = 0;
@@ -318,6 +319,7 @@ let lodStageCallback = await mainExport(
     downloadTarget: downloadTarget,
     subdivisionSteps: subdivisionSteps,
     toDownload: toDownload,
+    currentItem: currentDownloadItem,
   },
   onFrame
 );
@@ -505,8 +507,8 @@ toggleExportPreview();
         Download
       </n-button>
 
-      <n-progress v-if="exportInProgress" :percentage="exportProgress * 100" />
-
+      <n-progress v-if="exportInProgress" :percentage="Math.floor(exportProgress * 100)" />
+      <n-text v-if="exportInProgress">{{currentDownloadItem}}</n-text>
       <n-button @click="abortExport()" type="error" block> Cancel </n-button>
     </n-space>
   </n-card>
