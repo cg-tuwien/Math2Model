@@ -84,6 +84,18 @@ impl CameraController {
     pub fn update(&mut self, input: &WindowInputs, delta_time: f32) -> CursorCaptureRequest {
         self.chosen.update(input, delta_time, &self.settings)
     }
+
+    /// Only does something when the orbit cam is in use
+    pub fn focus_on(&mut self, position: Vec3) {
+        match &mut self.chosen {
+            ChosenController::Orbitcam(orbitcam_controller) => {
+                orbitcam_controller.center = position;
+            }
+            ChosenController::Freecam(_freecam_controller) => {
+                // I could do the look-at math here I guess
+            }
+        }
+    }
 }
 
 impl IsCameraController for CameraController {

@@ -90,4 +90,9 @@ export class WgpuEngine {
     );
     await this.taskQueue;
   }
+
+  async focusOn(position: [number, number, number]) {
+    this.taskQueue = this.taskQueue.then(() => this.engine.focus_on(position));
+    await this.taskQueue;
+  }
 }
