@@ -24,7 +24,8 @@ It assumes basic GPU shader programming knowledge.
 
 ## Exporting scenes
 
-[Read mode](./exporter.md)
+Export your 3D objects to commonly used mesh based 3D file formats for further usage.
+[Read more](./exporter.md)
 
 
 ## For Leo and Ferris

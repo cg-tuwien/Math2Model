@@ -16,6 +16,7 @@ import {
 } from "@/filesystem/scene-file";
 import { assert } from "@stefnotch/typestef/assert";
 import { useExportStore } from "@/stores/export-store";
+const activeTab = ref("preview"); // Default active tab
 
 const exportStore = useExportStore();
 const props = defineProps<{
@@ -26,7 +27,7 @@ const props = defineProps<{
 
 const triggerDownload = ref(false);
 const minSize = ref(0.1);
-const maxCurvature = ref(2.5);
+const maxCurvature = ref(1.);
 const acceptablePlanarity = ref(0.99999);
 const includeUVs = ref(false);
 const fileFormat = ref("glb");
@@ -51,31 +52,34 @@ let exportStepsDone = 0;
 
 let meshBuffer: any[] = [];
 let canceled = false;
-function onFrame() {
-}
+function onFrame() {}
 
 async function exportMeshBuffer(name: string) {
   let exportProgressPerStep = 1 / meshBuffer.length;
   let i = 0;
   if (!canceled) {
     if (mergeModels.value) {
-      exportMeshes(meshBuffer, name);
+      console.log("Mesh buffer:",meshBuffer);
+      await exportMeshes(meshBuffer, name);
+      meshBuffer.length = 0;
     } else {
-      meshBuffer.forEach((mesh) => {
+      for(let mesh of meshBuffer)
+      {
         exportProgress.value = i * exportProgressPerStep;
-        exportMeshes([mesh], mesh.name, exportProgressPerStep);
+        await exportMeshes([mesh], mesh.name, exportProgressPerStep);
         i++;
-      });
+      }
     }
   }
 
-  meshBuffer = [];
+  toDownload.value = [];
+  meshBuffer.length = 0;
   exportInProgress.value = false;
   triggerDownload.value = false;
   exportProgress.value = 0;
   exportStepsDone = 0;
   canceled = false;
-  toggleExportPreview();
+  updateExportPreview();
 }
 
 async function exportMeshes(
@@ -145,6 +149,7 @@ async function bufferMeshesForExport(
   for (const [instance_id, patches] of instanceMapPatches) {
     // Bake edge information
     let edgeInformation = analyzeEdges(patches);
+    console.log(edgeInformation);
     let exporterInstance: ExporterInstance = new ExporterInstance(
       patches,
       edgeInformation
@@ -156,6 +161,7 @@ async function bufferMeshesForExport(
     exporterInstance.exportProgressToDo = progressPerStep * 0.5;
     exporterInstance.Run();
 
+    console.log("Exporter instance gave out ",exporterInstance.tris.length);
     let sceneModel: any = null;
     models.value.forEach((localModel) => {
       if (localModel.uuid == uuid) {
@@ -166,7 +172,7 @@ async function bufferMeshesForExport(
         });
       }
     });
-    
+
     assert(sceneModel != null);
     meshBuffer.push({
       name: sceneModel.name,
@@ -214,6 +220,9 @@ function exportMeshFromPatches(
     number,
     { vert: Vector3; uv: Vector2; globalIndex?: number }[][]
   > = new Map();
+  let progressForStep = (index / slicedStream.length) * progressPerStep;
+  progressForStep /= 2;
+  exportProgress.value = progressPerStep * (exportStepsDone + progressForStep);
 
   while (index < slicedStream.length) {
     let vertex = slicedStream.slice(index, index + 3);
@@ -221,11 +230,11 @@ function exportMeshFromPatches(
     let instance = instance_id[index + 6];
     if (vertex[0] == 0 && vertex[1] == 0 && vertex[2] == 0) {
       let endofdata = true;
-      for (let x = 0; x < 10; x++) {
+      for (let x = 0; x < 100; x++) {
         if (slicedStream[index + x] != 0) {
           endofdata = false;
         }
-      }
+      } 
       if (endofdata) {
         break;
       }
@@ -246,15 +255,9 @@ function exportMeshFromPatches(
     patches.get(instance)?.push(patch_verts);
 
     patch_verts = [];
-    let progressForStep = (index / slicedStream.length) * progressPerStep;
-    progressForStep /= 2;
-    exportProgress.value =
-      progressPerStep * (exportStepsDone + progressForStep);
   }
 
-  console.log(
-    "Got request to export mesh " + name
-  );
+  console.log("Got request to export mesh " + name);
   console.log(toDownload.value);
   for (const [instance_id, patchstructure] of patches) {
     for (let i = 0; i < patchstructure.length; i++) {
@@ -341,11 +344,17 @@ async function beginExportProcess() {
           " candidate: " +
           model.id
       );
-    if (downloadTarget.value == "" || model.id == downloadTarget.value)
+    if (downloadTarget.value == "") {
       toDownload.value.push({ name: model.id, currentInstance: 0 });
-    toDownloadSteps += model.instanceCount;
+      toDownloadSteps += model.instanceCount;
+    }
+    if (model.id == downloadTarget.value) {
+      toDownload.value.push({ name: model.id, currentInstance: 0 });
+      toDownloadSteps += model.instanceCount;
+      return;
+    }
   });
-  exportSteps = toDownloadSteps;//toDownload.value.length;
+  exportSteps = toDownloadSteps; //toDownload.value.length;
   console.log("To download: ", toDownload);
 }
 
@@ -356,161 +365,201 @@ function abortExport() {
   exportProgress.value = 0;
   toDownload.value = [];
   canceled = true;
-  toggleExportPreview();
+  updateExportPreview();
 }
 
-function toggleExportPreview() {
+function updateExportPreview() {
   if (exportStore.showExportPreview) props.engine.setLodStage(lodStageCallback);
   else props.engine.setLodStage(null);
 }
+function toggleExportPreview() {
+  exportStore.showExportPreview = !exportStore.showExportPreview;
+  updateExportPreview();
+}
 
-toggleExportPreview();
+updateExportPreview();
 </script>
 <template>
-  <n-card title="Export Settings" size="small" class="h-full overflow-y-auto">
-    <n-checkbox
-      v-model:checked="exportStore.showExportPreview"
-      @click="toggleExportPreview()"
-      :disabled="exportInProgress"
-      >Display Preview</n-checkbox
-    >
-    <n-space vertical :size="8">
-      <n-form-item
-        label="Min Size:"
-        label-placement="left"
-        class="compact-form-item"
-      >
-        <n-slider
-          v-model:value="minSize"
-          :min="0"
-          :max="30"
-          :step="0.001"
-          :disabled="exportInProgress"
-        />
-        <n-input-number v-model:value="minSize" />
-      </n-form-item>
+  <n-card title="Exporter" size="small" class="h-full overflow-y-auto">
+    <!-- Tab Navigation -->
+    <n-tabs v-model:selected="activeTab">
+      <n-tab-pane name="preview" tab="LOD Configuration">
+        <n-space vertical :size="0">
+          <!-- Enable Preview Toggle -->
+          <n-form-item class="compact-form-item">
+            <n-button
+              :type="exportStore.showExportPreview ? 'success' : 'error'"
+              @click="toggleExportPreview"
+              block
+            >
+              Preview {{ exportStore.showExportPreview ? "On" : "Off" }}
+            </n-button>
+          </n-form-item>
+          <!-- Target Model Selection -->
+          <n-form-item
+            label="Target Model:"
+            label-placement="left"
+            class="compact-form-item"
+          >
+            <n-select
+              v-model:value="downloadTarget"
+              :disabled="exportInProgress"
+              :options="
+                models.map((model) => ({
+                  label: model.name,
+                  value: model.uuid,
+                }))
+              "
+            />
+          </n-form-item>
 
-      <n-form-item
-        label="Max Curvature:"
-        label-placement="left"
-        class="compact-form-item"
-      >
-        <n-slider
-          v-model:value="maxCurvature"
-          :min="0"
-          :max="3"
-          :step="0.01"
-          :disabled="exportInProgress"
-        />
-        <n-input-number v-model:value="maxCurvature" />
-      </n-form-item>
+          <!-- Min Size Slider -->
+          <n-form-item
+            label="Min Size:"
+            label-placement="left"
+            class="compact-form-item"
+          >
+            <n-slider
+              v-model:value="minSize"
+              :min="0"
+              :max="30"
+              :step="0.0001"
+              :disabled="exportInProgress"
+            />
+            <n-input-number v-model:value="minSize" />
+          </n-form-item>
 
-      <n-form-item
-        label="Planarity Criterium:"
-        label-placement="left"
-        class="compact-form-item"
-      >
-        <n-slider
-          v-model:value="acceptablePlanarity"
-          :min="0.97"
-          :max="1"
-          :step="0.00001"
-          :disabled="exportInProgress"
-        />
-        <n-input-number v-model:value="acceptablePlanarity" />
-      </n-form-item>
+          <!-- Max Curvature Slider -->
+          <n-form-item
+            label="Max Curvature:"
+            label-placement="left"
+            class="compact-form-item"
+          >
+            <n-slider
+              v-model:value="maxCurvature"
+              :min="0"
+              :max="1"
+              :step="0.01"
+              :disabled="exportInProgress"
+            />
+            <n-input-number v-model:value="maxCurvature" />
+          </n-form-item>
 
-      <n-form-item
-        label="File Format:"
-        label-placement="left"
-        class="compact-form-item"
-      >
-        <n-select
-          v-model:value="fileFormat"
-          :disabled="exportInProgress"
-          :options="[
-            { label: 'OBJ', value: 'obj' },
-            { label: 'GLB', value: 'glb' },
-          ]"
-        />
-      </n-form-item>
-      <n-form-item
-        label="Target Model:"
-        label-placement="left"
-        class="compact-form-item"
-      >
-        <n-select
-          v-model:value="downloadTarget"
-          :disabled="exportInProgress"
-          :options="
-            models.map((model) => ({ label: model.name, value: model.uuid }))
-          "
-        />
-      </n-form-item>
+          <!-- Planarity Criterium Slider -->
+          <n-form-item
+            label="Planarity Criterium:"
+            label-placement="left"
+            class="compact-form-item"
+          >
+            <n-slider
+              v-model:value="acceptablePlanarity"
+              :min="0.0"
+              :max="1"
+              :step="0.000001"
+              :disabled="exportInProgress"
+            />
+            <n-input-number v-model:value="acceptablePlanarity" />
+          </n-form-item>
 
-      <n-form-item
-        v-if="downloadTarget == ''"
-        label="Merge Model Files"
-        label-placement="left"
-        class="compact-form-item"
-      >
-        <n-checkbox
-          v-model:checked="mergeModels"
-          :disabled="exportInProgress"
-        />
-      </n-form-item>
+          <!-- Division Steps Slider -->
+          <n-form-item
+            label="Division Steps:"
+            label-placement="left"
+            class="compact-form-item"
+          >
+            <n-slider
+              v-model:value="subdivisionSteps"
+              :min="1"
+              :max="4"
+              :step="1"
+              :disabled="exportInProgress"
+            />
+          </n-form-item>
+        </n-space>
+      </n-tab-pane>
 
-      <n-form-item
-        label="Include UVs:"
-        label-placement="left"
-        class="compact-form-item"
-      >
-        <n-checkbox v-model:checked="includeUVs" :disabled="exportInProgress" />
-      </n-form-item>
+      <n-tab-pane name="export" tab="Export Settings">
+        <n-space vertical :size="8">
+          <!-- File Format Selection -->
+          <n-form-item
+            label="File Format:"
+            label-placement="left"
+            class="compact-form-item"
+          >
+            <n-select
+              v-model:value="fileFormat"
+              :disabled="exportInProgress"
+              :options="[
+                { label: 'OBJ', value: 'obj' },
+                { label: 'GLB', value: 'glb' },
+              ]"
+            />
+          </n-form-item>
 
-      <n-form-item
-        label="Normal Direction:"
-        label-placement="left"
-        class="compact-form-item"
-      >
-        <n-select
-          v-model:value="normalType"
-          :disabled="exportInProgress"
-          :options="[
-            { label: 'Default', value: 0 },
-            { label: 'Inverse', value: 1 },
-            { label: 'Double Sided', value: 2 },
-          ]"
-        />
-      </n-form-item>
+          <!-- Merge Model Files Checkbox -->
+          <n-form-item
+            v-if="downloadTarget == ''"
+            label="Merge Model Files"
+            label-placement="left"
+            class="compact-form-item"
+          >
+            <n-checkbox
+              v-model:checked="mergeModels"
+              :disabled="exportInProgress"
+            />
+          </n-form-item>
 
-      <n-form-item
-        label="Division Steps:"
-        label-placement="left"
-        class="compact-form-item"
-      >
-        <n-slider
-          v-model:value="subdivisionSteps"
-          :min="1"
-          :max="4"
-          :step="1"
-          :disabled="exportInProgress"
-        />
-      </n-form-item>
+          <!-- Include UVs Checkbox -->
+          <n-form-item
+            label="Include UVs:"
+            label-placement="left"
+            class="compact-form-item"
+          >
+            <n-checkbox
+              v-model:checked="includeUVs"
+              :disabled="exportInProgress"
+            />
+          </n-form-item>
 
-      <n-button
-        @click="beginExportProcess"
-        :disabled="exportInProgress"
-        type="primary"
-        block
-      >
-        Download
-      </n-button>
+          <!-- Normal Direction Selection -->
+          <n-form-item
+            label="Normal Direction:"
+            label-placement="left"
+            class="compact-form-item"
+          >
+            <n-select
+              v-model:value="normalType"
+              :disabled="exportInProgress"
+              :options="[
+                { label: 'Default', value: 0 },
+                { label: 'Inverse', value: 1 },
+                { label: 'Double Sided', value: 2 },
+              ]"
+            />
+          </n-form-item>
 
-      <n-progress v-if="exportInProgress" :percentage="Math.floor(exportProgress * 100)" />
-      <n-text v-if="exportInProgress">{{currentDownloadItem}}</n-text>
-      <n-button @click="abortExport()" type="error" block> Cancel </n-button>
-    </n-space>
+          <!-- Download Button -->
+          <n-button
+            @click="beginExportProcess"
+            :disabled="exportInProgress"
+            type="primary"
+            block
+          >
+            Download
+          </n-button>
+
+          <!-- Progress and Cancel -->
+          <n-progress
+            v-if="exportInProgress"
+            :percentage="Math.floor(exportProgress * 100)"
+          />
+          <n-text v-if="exportInProgress">{{ currentDownloadItem }}</n-text>
+          <n-button @click="abortExport()" type="error" block>
+            Cancel
+          </n-button>
+        </n-space>
+      </n-tab-pane>
+    </n-tabs>
   </n-card>
 </template>
 

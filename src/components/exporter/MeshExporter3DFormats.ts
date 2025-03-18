@@ -122,6 +122,7 @@ export class MeshExporter3DFormats {
       let meshBuf = meshes[x];
       if (!(meshBuf.verts.length > 0)) {
         errorModels.push(meshBuf.name);
+        console.log("Vert buffer for ",meshBuf,"is empty, cant export");
         continue;
       }
       let inMaterial = meshBuf.material;
@@ -171,6 +172,7 @@ export class MeshExporter3DFormats {
         .setType("SCALAR")
         .setArray(new Uint32Array(meshBuf.tris))
         .setBuffer(buffer);
+      console.log("Exporter received tris: ", meshBuf.tris.length);
 
       const prim = doc
         .createPrimitive()

@@ -195,6 +195,9 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
     let normalb = calculateNormalOfPatch(patch_decode(patch_top_right));
     let normalc = calculateNormalOfPatch(patch_decode(patch_bottom_right));
     let normald = calculateNormalOfPatch(patch_decode(patch_bottom_left));
+    let simad = cosinesim(normala, normald);
+    let simcb = cosinesim(normalc, normalb);
+
     let simab = cosinesim(normala, normalb);
     let simcd = cosinesim(normalc, normald);
     let size = calculateWorldSpaceSizeOfPatch(quad);
@@ -211,12 +214,12 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
 
     let totalVLength = v_length[0] + v_length[1] + v_length[2] + v_length[3];
     let totalULength = u_length[0] + u_length[1] + u_length[2] + u_length[3];
-    let avg = (cap + cbp + ccp + cdp) / 4f;
-    let isflat = simab + simcd > export_config.earlyExitMaxCurvature;
+    let avg = (cap + cbp ) / 2f;
+    let isflat = (simab + simcd)/2f >= export_config.earlyExitMaxCurvature;
     let isSmall = totalULength + totalVLength < export_config.earlyExitMinSize;
     let acceptable_size = 0.1f;
     let planarityThreshold = export_config.acceptablePlanarity;
-    let shouldRender = isflat || isSmall || planarity > planarityThreshold;
+    let shouldRender = isflat || isSmall || planarity >= planarityThreshold;
     if force_render.flag == 1u || shouldRender {
         force_render_internal(quad_encoded);
     } else {
@@ -318,21 +321,26 @@ fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>,
     );
 
     if sample_index == 0 {
+        
     // --- Compute planarity from the point cloud in u_samples ---
+        // Sum up all the points
         var sum_points: vec3<f32> = vec3<f32>(0.0, 0.0, 0.0);
         for (var y: u32 = 0u; y < U_Y; y = y + 1u) {
             for (var x: u32 = 0u; x < U_X; x = x + 1u) {
                 sum_points = sum_points + u_samples[y][x];
             }
         }
+        // Get centroid by calculating average point of the point cloud
         let local_centroid = sum_points / f32(U_X * U_Y);
         var cov: mat3x3<f32> = mat3x3<f32>(
             vec3<f32>(0.0, 0.0, 0.0),
             vec3<f32>(0.0, 0.0, 0.0),
             vec3<f32>(0.0, 0.0, 0.0)
         );
+
         for (var y: u32 = 0u; y < U_Y; y = y + 1u) {
             for (var x: u32 = 0u; x < U_X; x = x + 1u) {
+                // Calculate difference from centroid
                 let d = u_samples[y][x] - local_centroid;
                 cov = cov + mat3x3<f32>(
                     vec3<f32>(d.x * d.x, d.x * d.y, d.x * d.z),
@@ -341,6 +349,7 @@ fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>,
                 );
             }
         }
+        // Covariance per sample
         cov = cov * (1. / f32(U_X * U_Y));
         let invCov = inverse3x3(cov);
         var v_vec: vec3<f32> = normalize(vec3<f32>(1.0, 1.0, 1.0));
@@ -352,7 +361,6 @@ fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>,
         let trace = cov[0][0] + cov[1][1] + cov[2][2];
         let planarity_local = 1.0 - (lambda_min / trace);
         planarity_score = planarity_local;
-    
         if(patch_index <= 1000000u)
         {
             split_patch(quad_encoded, quad, u_length, v_length, planarity_local);

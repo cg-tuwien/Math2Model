@@ -228,9 +228,9 @@ export async function mainExport(
     GPUBufferUsage.COPY_SRC
   );
 
-  let reset = new Uint32Array(vertOutputBufferSize / 32);
+  let reset = new Uint32Array(vertOutputBuffer.size/32);
   reset[0] = 0;
-  reset[1] = vertOutputBufferSize;
+  reset[1] = vertOutputBufferSize/32;
   const vertOutputBufferReset = createBufferWith(
     props,
     concatArrayBuffers(props, [reset]),
@@ -342,8 +342,7 @@ export async function mainExport(
     let instanceToDownload =
       toDownloadModel == null ? 0 : toDownloadModel.currentInstance;
 
-    if(!isRightDownloadTarget)
-      return;
+    if (!isRightDownloadTarget) return;
     if (toDownload.length != 0) {
       if (instanceToDownload >= instanceCount) {
         toDownload.splice(toDownloadIndex, 1);
@@ -427,7 +426,7 @@ export async function mainExport(
     lodStageParameters = new Float32Array([
       lodExportParametersRefs.minSize.value,
       lodExportParametersRefs.maxCurvature.value,
-      lodExportParametersRefs.acceptablePlanarity.value,
+      lodExportParametersRefs.acceptablePlanarity.value * 0.05 + 0.95,
     ]);
 
     device.queue.writeBuffer(
@@ -574,6 +573,11 @@ export async function mainExport(
       computePassVertices.end();
       lodExportParametersRefs.currentItem.value = name + instanceToDownload;
       simpleB2BSameSize(vertOutputBuffer, vertReadableBuffer, commandEncoder);
+      simpleB2BSameSize(
+        vertOutputBufferReset,
+        vertOutputBuffer,
+        commandEncoder
+      );
       setTimeout(() => {
         vertReadableBuffer
           .mapAsync(GPUMapMode.READ, 0, vertReadableBuffer.size)
@@ -585,10 +589,15 @@ export async function mainExport(
                 " instance " +
                 instanceToDownload
             );
+            if (instanceToDownload >= instanceCount - 1) {
+              toDownload.splice(toDownloadIndex, 1);
+              console.log("Removed " + toDownload + " because it was done");
+            }
             const arrayBuffer = vertReadableBuffer
               .getMappedRange(0, vertReadableBuffer.size)
               .slice(0);
             const vertexStream = new Float32Array(arrayBuffer);
+            console.log(vertexStream);
             vertReadableBuffer.unmap();
             if (downloadAll) {
               triggerDownload.value = true;
