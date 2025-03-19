@@ -258,6 +258,12 @@ export async function mainExport(
   const dispatchVerticesStage = createBufferWith(
     props,
     concatArrayBuffers(props, [new Uint32Array([1, 1, 1])]),
+    GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT
+  );
+
+  const dispatchVerticesStageResetBuffer = createBufferWith(
+    props,
+    concatArrayBuffers(props, [new Uint32Array([1, 1, 1])]),
     GPUBufferUsage.COPY_SRC | GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT
   );
 
@@ -578,6 +584,12 @@ export async function mainExport(
         vertOutputBuffer,
         commandEncoder
       );
+
+      simpleB2BSameSize(
+        dispatchVerticesStageResetBuffer,
+        dispatchVerticesStage,
+        commandEncoder
+      );
       setTimeout(() => {
         vertReadableBuffer
           .mapAsync(GPUMapMode.READ, 0, vertReadableBuffer.size)
@@ -591,13 +603,13 @@ export async function mainExport(
             );
             if (instanceToDownload >= instanceCount - 1) {
               toDownload.splice(toDownloadIndex, 1);
-              console.log("Removed " + toDownload + " because it was done");
+              //console.log("Removed " + toDownload + " because it was done");
             }
             const arrayBuffer = vertReadableBuffer
               .getMappedRange(0, vertReadableBuffer.size)
               .slice(0);
             const vertexStream = new Float32Array(arrayBuffer);
-            console.log(vertexStream);
+            console.log(vertexStream.slice(0,1000));
             vertReadableBuffer.unmap();
             if (downloadAll) {
               triggerDownload.value = true;

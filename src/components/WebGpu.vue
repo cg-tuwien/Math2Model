@@ -148,8 +148,9 @@ async function bufferMeshesForExport(
   let scene = await scenePromise;
   for (const [instance_id, patches] of instanceMapPatches) {
     // Bake edge information
+    console.log("Patch count",patches.length);
     let edgeInformation = analyzeEdges(patches);
-    console.log(edgeInformation);
+
     let exporterInstance: ExporterInstance = new ExporterInstance(
       patches,
       edgeInformation
@@ -227,7 +228,6 @@ function exportMeshFromPatches(
   while (index < slicedStream.length) {
     let vertex = slicedStream.slice(index, index + 3);
     let uv = slicedStream.slice(index + 4, index + 6);
-    let instance = instance_id[index + 6];
     if (vertex[0] == 0 && vertex[1] == 0 && vertex[2] == 0) {
       let endofdata = true;
       for (let x = 0; x < 100; x++) {
@@ -249,10 +249,10 @@ function exportMeshFromPatches(
       continue;
     }
 
-    if (!patches.has(instance)) {
-      patches.set(instance, []);
+    if (!patches.has(0)) {
+      patches.set(0, []);
     }
-    patches.get(instance)?.push(patch_verts);
+    patches.get(0)?.push(patch_verts);
 
     patch_verts = [];
   }
@@ -267,7 +267,6 @@ function exportMeshFromPatches(
       }
     }
   }
-
   bufferMeshesForExport(patches, includeUVs, name, buffer);
 }
 
