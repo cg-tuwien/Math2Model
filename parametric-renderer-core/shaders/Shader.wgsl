@@ -14,7 +14,26 @@ fn getColor(input: vec2f) -> vec3f {
     return material.color_roughness.rgb;
   }
 }
+
+// following https://www.martinpalko.com/triplanar-mapping/
+fn calculateTriplanarColor(input: vec3f, normal: vec3f) -> vec3f {
+  if material.has_texture != 0u {
+    let yuv = input.xz;
+    let zuv = input.xy;
+    let xuv = input.zy;
+
+    let yDiff = textureSample (t_diffuse, linear_sampler, yuv).rgb;
+    let xDiff = textureSample (t_diffuse, linear_sampler, xuv).rgb;
+    let zDiff = textureSample (t_diffuse, linear_sampler, zuv).rgb;
+    let blendWeights = normalize(abs(normal));
+
+  	return xDiff * blendWeights.x + yDiff * blendWeights.y + zDiff * blendWeights.z;
+  } else {
+    return material.color_roughness.rgb;
+  }
+}
 //// END getColor
+
 var<private> instance_id: u32;
 
 ////#include "./Common.wgsl"
@@ -600,8 +619,10 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     // let n = normalize(in.world_normal);
     let n = normalize(-cross(dpdxFine(in.world_position), dpdyFine(in.world_position)));
 
+    let triplanarColor = calculateTriplanarColor(fract(in.world_position),in.world_normal);
     var materialInfo = MaterialInfo(
-        getColor(in.texture_coords),
+        //getColor(in.texture_coords),
+        triplanarColor,
         vec3f(0.04),
         vec3f(1.0),
         vec3f(0.0),
