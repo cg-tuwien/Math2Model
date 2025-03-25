@@ -849,7 +849,7 @@ fn render_model_component(
     let context = &get_context();
     let device = &context.device;
 
-    let model_buffer = RwSignal::new(device.uniform_buffer(
+    let model_buffer = StoredValue::new(device.uniform_buffer(
         "Model Buffer",
         &shader::Model {
             model_similarity: glam::Mat4::IDENTITY,
@@ -858,32 +858,27 @@ fn render_model_component(
         wgpu::BufferUsages::COPY_DST,
     ));
 
-    let material_buffer = RwSignal::new(device.uniform_buffer(
+    let material_buffer = StoredValue::new(device.uniform_buffer(
         "Material Buffer",
         &MaterialInfo::missing().to_shader(),
         wgpu::BufferUsages::COPY_DST,
     ));
 
     let bind_group_1 = Memo::new_computed({
-        let model = model.clone();
         let virtual_model = virtual_model.clone();
         move |_| {
-            let _m = model.read();
             let context = &get_context();
-            let device = &context.device;
-            let model_buffer = model_buffer.read();
-            let material_buffer = material_buffer.read();
             let t_diffuse = texture.read();
             virtual_model
                 .render_buffer
                 .iter()
                 .map(|render| {
                     shader::bind_groups::BindGroup1::from_bindings(
-                        device,
+                        &context.device,
                         shader::bind_groups::BindGroupLayout1 {
-                            model: model_buffer.as_entire_buffer_binding(),
+                            model: model_buffer.read_value().as_entire_buffer_binding(),
                             render_buffer: render.as_entire_buffer_binding(),
-                            material: material_buffer.as_entire_buffer_binding(),
+                            material: material_buffer.read_value().as_entire_buffer_binding(),
                             t_diffuse: &t_diffuse.view,
                         },
                     )
@@ -894,7 +889,7 @@ fn render_model_component(
     Effect::new(move |_| {
         let model = model.read();
         let queue = &get_context().queue;
-        model_buffer.read().write_buffer(
+        model_buffer.read_value().write_buffer(
             queue,
             &shader::Model {
                 model_similarity: model.transform.to_matrix(),
@@ -902,7 +897,7 @@ fn render_model_component(
             },
         );
         material_buffer
-            .read()
+            .read_value()
             .write_buffer(queue, &model.material_info.to_shader());
     });
 

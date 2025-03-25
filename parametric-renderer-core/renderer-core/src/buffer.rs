@@ -10,6 +10,7 @@ where
     _phantom: PhantomData<T>,
 }
 
+#[derive(Copy, Clone)]
 enum TypedBufferVariant {
     Uniform,
     Storage,
@@ -179,6 +180,19 @@ where
 
     fn deref(&self) -> &Self::Target {
         &self.buffer
+    }
+}
+
+impl<T> Clone for TypedBuffer<T>
+where
+    T: ?Sized,
+{
+    fn clone(&self) -> Self {
+        Self {
+            buffer: self.buffer.clone(),
+            variant: self.variant,
+            _phantom: self._phantom.clone(),
+        }
     }
 }
 

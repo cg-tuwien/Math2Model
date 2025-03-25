@@ -186,12 +186,7 @@ function useTabs() {
       splitSize.value = newSize;
     }
   }
-  return {
-    splitSize,
-    updateSplitSize,
-    selectedTab,
-    toggleTabSize,
-  };
+  return { splitSize, updateSplitSize, selectedTab, toggleTabSize };
 }
 const tabs = useTabs();
 
@@ -432,7 +427,7 @@ watchImmediate(
                   @save="
                     (content) => {
                       if (openFile.path.value !== null) {
-                        props.fs.writeTextFile(openFile.path.value, content);
+                        openFile.setNewCode(() => content);
                       } else {
                         console.error('Invalid state!');
                       }
