@@ -419,7 +419,7 @@ async function createEditor() {
               label: "Paste (CTRL+V)",
               key: "4",
               handler: () => {
-                void paste();
+                paste();
               },
             },
           ],
@@ -483,53 +483,17 @@ async function createEditor() {
   arrange.addPreset(ArrangePresets.classic.setup());
   history.addPreset(HistoryPresets.classic.setup());
 
-  document.addEventListener("keydown", (e) => {
-    if (e.code === "Delete") void del();
-    if (!e.ctrlKey && !e.metaKey) return;
-
-    switch (e.code) {
-      case "KeyY":
-        void history.undo();
-        break;
-      case "KeyZ":
-        void history.redo();
-        break;
-      case "KeyA":
-        e.preventDefault();
-        e.stopPropagation();
-        void rearrange();
-        break;
-      case "KeyS":
-        e.preventDefault();
-        e.stopPropagation();
-        showInfo("You don't need to save!");
-        editor.addNode(new NothingNode());
-        break;
-      case "KeyC":
-        e.preventDefault();
-        e.stopPropagation();
-        copy();
-        break;
-      case "KeyV":
-        e.preventDefault();
-        e.stopPropagation();
-        void paste();
-        break;
-      case "KeyD":
-        e.preventDefault();
-        e.stopPropagation();
-        void duplicate();
-        break;
-      default:
-    }
-  });
-
-  document.addEventListener("dblclick", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  });
-
   area.use(contextMenu);
+
+  area.addPipe(async (context) => {
+    // prevent zooming with double click
+    if (context.type === "zoom") {
+      if (context.data.source === "dblclick") {
+        return;
+      }
+    }
+    return context;
+  });
 
   const connection = new ConnectionPlugin<Schemes, AreaExtra>();
 
@@ -949,6 +913,120 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
   //node.parent = sn.parent;
   return node;
 }
+
+const documentInputElement = ref<HTMLElement>();
+
+function useGraphContainer() {
+  function dragover(ev: DragEvent) {
+    ev.preventDefault();
+    if (ev.dataTransfer) ev.dataTransfer.dropEffect = "copy";
+  }
+  function drop(ev: DragEvent) {
+    ev.preventDefault();
+    if (ev.dataTransfer == null) return;
+    const node = JSON.parse(ev.dataTransfer.getData("text/plain")) as UINode;
+    let toCreate: Nodes | null = null;
+    uiNodes.forEach((value: Map<string, UINode>) => {
+      if (value && value.has(node.name)) {
+        const uiNode = value.get(node.name);
+        toCreate = uiNode ? uiNode.get() : null;
+      }
+    });
+    if (toCreate) {
+      area.area.setPointerFrom(ev);
+      addNodeAtPosition(toCreate, area.area.pointer.x, area.area.pointer.y);
+    }
+  }
+
+  function keydown(ev: KeyboardEvent) {
+    if (ev.code === "Delete") {
+      del();
+    }
+    if (!ev.ctrlKey && !ev.metaKey) return;
+
+    let wasHandled = true;
+    if (ev.code === "KeyY") {
+      history.undo();
+    } else if (ev.code === "KeyZ") {
+      history.redo();
+    } else if (ev.code === "KeyA") {
+      rearrange();
+    } else if (ev.code === "KeyS") {
+      showInfo("You don't need to save!");
+      editor.addNode(new NothingNode());
+    } else if (ev.code === "KeyD") {
+      duplicate();
+    } else {
+      wasHandled = false;
+    }
+
+    if (wasHandled) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+  }
+
+  function input(nativeEvent: Event) {
+    if (!("inputType" in nativeEvent)) return;
+    const ev = nativeEvent as InputEvent;
+
+    /*
+    This needs the whole funny document.execCommand dance for resetting the undo-redo history.
+    So nope.
+    if (ev.inputType === "historyUndo") {
+      history.undo();
+    } else if (ev.inputType === "historyRedo") {
+      history.redo();
+    }
+    */
+  }
+
+  async function copyHandler(ev: ClipboardEvent) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    // Clear clipboard
+    nodeClipBoard.length = 0;
+    if (selector.entities.size == 0) return;
+    // Get selected nodes
+    selector.entities.forEach((entity) => {
+      const node = editor.getNode(entity.id);
+      if (node) {
+        nodeClipBoard.push(node);
+      }
+    });
+
+    showInfo(
+      "Copied " +
+        nodeClipBoard.length +
+        " node" +
+        (nodeClipBoard.length > 1 ? "s" : "") +
+        " to clipboard."
+    );
+  }
+  async function cutHandler(ev: ClipboardEvent) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    // not implemented
+  }
+
+  async function pasteHandler(ev: ClipboardEvent) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    await paste();
+  }
+
+  return {
+    dragover,
+    drop,
+    input,
+    keydown,
+    copy: copyHandler,
+    cut: cutHandler,
+    paste: pasteHandler,
+  };
+}
+
+const graphContainer = useGraphContainer();
 </script>
 <template>
   <div class="flex w-full h-full border border-gray-500">
@@ -957,41 +1035,28 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
       :editor="editor"
       style="width: 25%"
     ></NodesDock>
-    <div class="flex flex-1 relative">
+    <div
+      class="flex flex-1 relative"
+      tabindex="-1"
+      @focus="documentInputElement?.focus({ preventScroll: true })"
+    >
+      <input
+        class="input-element fixed"
+        ref="documentInputElement"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+        @copy="graphContainer.copy"
+        @cut="graphContainer.cut"
+        @paste="graphContainer.paste"
+        @input="graphContainer.input"
+        @keydown="graphContainer.keydown"
+      />
       <div
         class="flex flex-1"
         ref="container"
-        @dragover="
-          (ev) => {
-            ev.preventDefault();
-            if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'copy';
-          }
-        "
-        @drop="
-          (ev) => {
-            ev.preventDefault();
-            console.log(ev);
-            if (ev.dataTransfer == null) return;
-            const node = JSON.parse(
-              ev.dataTransfer.getData('text/plain')
-            ) as UINode;
-            let toCreate: Nodes | null = null;
-            uiNodes.forEach((value: Map<string, UINode>, key: string) => {
-              if (value && value.has(node.name)) {
-                const uiNode = value.get(node.name);
-                toCreate = uiNode ? uiNode.get() : null;
-              }
-            });
-            if (toCreate) {
-              area.area.setPointerFrom(ev);
-              addNodeAtPosition(
-                toCreate,
-                area.area.pointer.x,
-                area.area.pointer.y
-              );
-            }
-          }
-        "
+        @dragover="graphContainer.dragover"
+        @drop="graphContainer.drop"
       ></div>
       <div class="absolute top-2 right-2">
         <n-button
@@ -1009,3 +1074,14 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
     </div>
   </div>
 </template>
+<style>
+/** Stolen with permission from my QuantumSheet project :) */
+.input-element2 {
+  transform: scale(0);
+  resize: none;
+  position: fixed;
+  clip: rect(0 0 0 0);
+  width: 0px;
+  height: 0px;
+}
+</style>
