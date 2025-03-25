@@ -172,7 +172,7 @@ export class MeshExporter3DFormats {
         .setType("SCALAR")
         .setArray(new Uint32Array(meshBuf.tris))
         .setBuffer(buffer);
-      console.log("Exporter received tris: ", meshBuf.tris.length);
+      console.log("Exporter received tris: ", meshBuf.tris.length + " For mesh " + meshBuf.name);
 
       const prim = doc
         .createPrimitive()

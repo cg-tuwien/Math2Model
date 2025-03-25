@@ -84,6 +84,8 @@ export function createSimpleBindGroup(
     layout: bindgroupLayout,
     entries: entries,
   });
+  if(guid)
+    bindGroup.label = guid;
 
   
   return bindGroup;

@@ -54,17 +54,20 @@ export function analyzeEdges(patches: Vertex[][]): any {
     if (!rightRanges[right]) rightRanges[right] = [];
     insertSorted(rightRanges[right], vedgeRight);
   }
-  for (const key in topRanges) topRanges[key].sort((a, b) => a.start - b.start);
-  for (const key in botRanges) botRanges[key].sort((a, b) => a.start - b.start);
-  for (const key in leftRanges) leftRanges[key].sort((a, b) => a.start - b.start);
-  for (const key in rightRanges) rightRanges[key].sort((a, b) => a.start - b.start);
+  for (const key in topRanges)
+    topRanges[key].sort((a, b) => a.start - b.start);
+  for (const key in botRanges)
+    botRanges[key].sort((a, b) => a.start - b.start);
+  for (const key in leftRanges)
+    leftRanges[key].sort((a, b) => a.start - b.start);
+  for (const key in rightRanges)
+    rightRanges[key].sort((a, b) => a.start - b.start);
 
   return ranges;
 }
 function insertSorted(rangeList: VertexRange[], range: VertexRange): void {
   rangeList.push(range); // No sorting here
 }
-
 
 // Helper function to create a VertexRange object
 function createVertexRange(

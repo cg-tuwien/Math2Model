@@ -148,7 +148,7 @@ async function bufferMeshesForExport(
   let scene = await scenePromise;
   for (const [instance_id, patches] of instanceMapPatches) {
     // Bake edge information
-    console.log("Patch count",patches.length);
+    console.log("Patch count",patches.length, " on mesh " + uuid);
     let edgeInformation = analyzeEdges(patches);
 
     let exporterInstance: ExporterInstance = new ExporterInstance(

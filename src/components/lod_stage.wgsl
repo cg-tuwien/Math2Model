@@ -1,3 +1,4 @@
+const EPSILON = 0.0001;
 ////#include "./Common.wgsl"
 //// AUTOGEN 6de14edf9918265eb2e1232f93b94c84430d0069898214379635e51c3d4c9550
 struct EncodedPatch {
@@ -40,6 +41,19 @@ struct LODConfigParameters {
   earlyExitMinSize: f32,
   earlyExitMaxCurvature: f32,
   acceptablePlanarity: f32
+}
+
+struct BufferDebugInfo {
+    index: atomic<u32>,
+    patch_count: atomic<u32>,
+    patch_infos: array<PatchInfo>
+}
+
+struct PatchInfo {
+    p : Patch,
+    curvature: f32,
+    planarity: f32,
+    size: f32,
 }
 
 fn ceil_div(a: u32, b: u32) -> u32 { return (a + b - 1u) / b; }
@@ -150,16 +164,13 @@ struct ForceRenderFlag {
 
 @group(1) @binding(0) var<uniform> input_buffer : InputBuffer;
 @group(1) @binding(1) var<storage, read_write> render_buffer_2 : RenderBuffer;
-@group(1) @binding(2) var<storage, read_write> render_buffer_4 : RenderBuffer;
-@group(1) @binding(3) var<storage, read_write> render_buffer_8 : RenderBuffer;
-@group(1) @binding(4) var<storage, read_write> render_buffer_16 : RenderBuffer;
-@group(1) @binding(5) var<storage, read_write> render_buffer_32 : RenderBuffer;
-@group(1) @binding(6) var<uniform> export_config: LODConfigParameters;
+@group(1) @binding(2) var<uniform> export_config: LODConfigParameters;
 
 @group(2) @binding(0) var<storage, read_write> dispatch_next : DispatchIndirectArgs;
 @group(2) @binding(1) var<storage, read> patches_from_buffer : PatchesRead;
 @group(2) @binding(2) var<storage, read_write> patches_to_buffer : Patches;
 @group(2) @binding(3) var<uniform> force_render: ForceRenderFlag;
+@group(2) @binding(4) var<storage, read_write> debugBuffer: BufferDebugInfo;
 
 fn triangle_area(a: vec3<f32>, b: vec3<f32>, c: vec3<f32>) -> f32 {
     return 0.5 * length(cross(b - a, c - a));
@@ -183,9 +194,7 @@ fn force_render_internal(quad_encoded: EncodedPatch) {
         render_buffer_2.patches[write_index] = quad_encoded;
     }
 }
-
-fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>, planarity: f32) {
-    
+fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y>, v_length: array<f32, U_Y>, planarity: f32) { 
     let patch_top_left = patch_top_left_child(quad_encoded);
     let patch_top_right = patch_top_right_child(quad_encoded);
     let patch_bottom_right = patch_bottom_right_child(quad_encoded);
@@ -195,31 +204,34 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
     let normalb = calculateNormalOfPatch(patch_decode(patch_top_right));
     let normalc = calculateNormalOfPatch(patch_decode(patch_bottom_right));
     let normald = calculateNormalOfPatch(patch_decode(patch_bottom_left));
-    let simad = cosinesim(normala, normald);
-    let simcb = cosinesim(normalc, normalb);
-
     let simab = cosinesim(normala, normalb);
     let simcd = cosinesim(normalc, normald);
-    let size = calculateWorldSpaceSizeOfPatch(quad);
 
-    let quad_point_a = quad.min;
-    let quad_point_b = vec2f(quad.min.x, quad.max.y);
-    let quad_point_c = quad.max;
-    let quad_point_d = vec2f(quad.max.x, quad.min.y);
+    // Compute additional debug info.
+    let size_val = calculateWorldSpaceSizeOfPatch(quad);
+    let curvature = simab + simcd; // Example curvature computation.
+    // Add a debug entry into debugBuffer:
+    // debugBuffer.patch_infos[debug_index].p.instance = 500u;
+    // debugBuffer.patch_infos[debug_index].p.in = vec2(-10.1,-10.2);
+    // debugBuffer.patch_infos[debug_index].p.max = vec2(-20.1,-20.2);
+    // debugBuffer.patch_infos[debug_index].planarity = -30.0f;
+    // debugBuffer.patch_infos[debug_index].size = -40.0f;
+    // debugBuffer.patch_infos[debug_index].curvature = -50.0f;
 
-    let cap = sampleObject(quad_point_a);
-    let cbp = sampleObject(quad_point_b);
-    let ccp = sampleObject(quad_point_c);
-    let cdp = sampleObject(quad_point_d);
+    // --- End of debug entry addition
 
+    //let isflat = (simab + simcd) >= export_config.earlyExitMaxCurvature;
     let totalVLength = v_length[0] + v_length[1] + v_length[2] + v_length[3];
     let totalULength = u_length[0] + u_length[1] + u_length[2] + u_length[3];
-    let avg = (cap + cbp ) / 2f;
-    let isflat = (simab + simcd)/2f >= export_config.earlyExitMaxCurvature;
     let isSmall = totalULength + totalVLength < export_config.earlyExitMinSize;
     let acceptable_size = 0.1f;
     let planarityThreshold = export_config.acceptablePlanarity;
-    let shouldRender = isflat || isSmall || planarity >= planarityThreshold;
+    
+    let debug_index = atomicAdd(&debugBuffer.index, 1u);
+    debugBuffer.patch_infos[debug_index] = PatchInfo(quad, curvature, planarity, size_val);
+    atomicAdd(&debugBuffer.patch_count, 1u);
+    
+    let shouldRender = isSmall || planarity >= planarityThreshold;
     if force_render.flag == 1u || shouldRender {
         force_render_internal(quad_encoded);
     } else {
@@ -233,6 +245,7 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
         }
     }
 }
+
 
 fn calculateWorldSpaceSizeOfPatch(quad: Patch) -> f32 {
     let quad_point_a = quad.min;
@@ -262,9 +275,14 @@ fn calculateNormalOfPatch(p: Patch) -> vec3<f32> {
     let ccp = sampleObject(quad_point_c);
     let cdp = sampleObject(quad_point_d);
 
-    let tnorma = normalize(cross((cbp - cap), (cdp - cap)));
-    let tnormc = normalize(cross((cbp - ccp), (cdp - ccp)));
-    return normalize((tnorma + tnormc) / 2.0f);
+    // Calculate two vectors lying on the plane
+    let v1 = cbp - cap;  // Edge from A to B
+    let v2 = cdp - cap;  // Edge from A to D
+
+    // Compute the cross product of the two vectors to get the normal
+    let normal = normalize(cross(v1, v2));
+
+    return normal;  // Return the calculated normal
 }
 
 @compute @workgroup_size(WORKGROUP_SIZE, 1, 1)
@@ -356,10 +374,12 @@ fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>,
         for (var iter: u32 = 0u; iter < 10u; iter = iter + 1u) {
             v_vec = normalize(invCov * v_vec);
         }
-        let lambda_inv = dot(v_vec, invCov * v_vec);
+        var lambda_inv = dot(v_vec, invCov * v_vec);
         let lambda_min = 1.0 / lambda_inv;
         let trace = cov[0][0] + cov[1][1] + cov[2][2];
-        let planarity_local = 1.0 - (lambda_min / trace);
+        var planarity_local = 1.0 - (lambda_min);
+        // wgsl hack, if planarity would be exactly one, aka a perfect plane, the function breaks down and returns NaN, but min() returns the non NaN value when possible
+        planarity_local = min(1.,planarity_local); 
         planarity_score = planarity_local;
         if(patch_index <= 1000000u)
         {

@@ -2,7 +2,7 @@
 @group(0) @binding(1) var<storage, read> patches_from_buffer : PatchesRead;
 @group(0) @binding(2) var<storage, read_write> patches_to_buffer : Patches;
 @group(0) @binding(3) var<uniform> force_render: ForceRenderFlag;
-
+@group(0) @binding(4) var<storage> debug: array<f32>;
 //@group(1) @binding(0) var<storage, read_write> dispatch_this : DispatchIndirectArgs;
 
 @group(1) @binding(0) var<uniform> target_instance_id: u32;

@@ -37,6 +37,43 @@ const shaderPipelinesMap = ref<
   >
 >(new Map());
 
+function parseOutDebugInfo(buf: ArrayBuffer)
+{
+  const floats = new Float32Array(buf);
+  const ints = new Int32Array(buf);
+  let index = ints[0];
+  let count = ints[1];
+  let i = 2;
+  while(i < floats.length)
+  {
+    var minX = floats[i++];
+    var minY = floats[i++];
+    var maxX = floats[i++];
+    var maxY = floats[i++];
+    var instance = ints[i++];
+    i++;
+    var curvature = floats[i++];
+    var planarity = floats[i++];
+    var size = floats[i++];
+    i++;
+    var structure = {
+      min: [minX, minY],
+      max: [maxX, maxY],
+      instance: instance,
+      criteria: {
+        planarity: planarity,
+        size: size,
+        curvature: curvature
+      }
+    }
+    console.log("DEBUG STRUCT: ", structure);
+    if(size == 0)
+    {
+      return;
+    }
+  }
+}
+
 // Main function
 export async function mainExport(
   triggerDownload: any,
@@ -55,21 +92,13 @@ export async function mainExport(
   );
   const renderBuffersBindGroupLayout = createBindGroupLayout(
     GPUShaderStage.COMPUTE,
-    [
-      "uniform",
-      "storage",
-      "storage",
-      "storage",
-      "storage",
-      "storage",
-      "uniform",
-    ],
+    ["uniform", "storage", "uniform"],
     device,
     "renderBuffersBindGroupLayout"
   );
   const layout2 = createBindGroupLayout(
     GPUShaderStage.COMPUTE,
-    ["storage", "read-only-storage", "storage", "uniform"],
+    ["storage", "read-only-storage", "storage", "uniform", "storage"],
     device,
     "layout2"
   );
@@ -228,9 +257,9 @@ export async function mainExport(
     GPUBufferUsage.COPY_SRC
   );
 
-  let reset = new Uint32Array(vertOutputBuffer.size/32);
+  let reset = new Uint32Array(vertOutputBuffer.size / 32);
   reset[0] = 0;
-  reset[1] = vertOutputBufferSize/32;
+  reset[1] = vertOutputBufferSize / 32;
   const vertOutputBufferReset = createBufferWith(
     props,
     concatArrayBuffers(props, [reset]),
@@ -258,7 +287,10 @@ export async function mainExport(
   const dispatchVerticesStage = createBufferWith(
     props,
     concatArrayBuffers(props, [new Uint32Array([1, 1, 1])]),
-    GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE | GPUBufferUsage.INDIRECT
+    GPUBufferUsage.COPY_SRC |
+      GPUBufferUsage.COPY_DST |
+      GPUBufferUsage.STORAGE |
+      GPUBufferUsage.INDIRECT
   );
 
   const dispatchVerticesStageResetBuffer = createBufferWith(
@@ -277,6 +309,24 @@ export async function mainExport(
     concatArrayBuffers(props, [lodStageParameters]),
     GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM
   );
+  const debugBufferSize = 64 * 1024; // 64KB (adjust as needed)
+
+  const debugInfoBuffer = device.createBuffer({
+    label: "Debug info buffer",
+    size: debugBufferSize,
+    usage:
+      GPUBufferUsage.COPY_DST |
+      GPUBufferUsage.COPY_SRC |
+      GPUBufferUsage.STORAGE,
+  });
+
+  const debugOutBuffer = device.createBuffer({
+    label: "Debug out buffer",
+    size: debugBufferSize,
+    usage:
+      GPUBufferUsage.COPY_DST |
+      GPUBufferUsage.MAP_READ
+  });
 
   let numberBuffersArray: GPUBuffer[] = [];
   for (let i = 0; i < 100; i++) {
@@ -378,16 +428,18 @@ export async function mainExport(
       [
         buffers.computePatchesInput,
         buffers.finalPatches2,
-        buffers.finalPatches4,
-        buffers.finalPatches8,
-        buffers.finalPatches16,
-        buffers.finalPatches32,
+        // buffers.finalPatches4,
+        // buffers.finalPatches8,
+        // buffers.finalPatches16,
+        // buffers.finalPatches32,
         lodStageParametersBuffer,
       ],
       renderBuffersBindGroupLayout,
       device,
       uuid
     );
+
+    toRenderPatchesBindGroup.label = "to render patches bind group";
 
     const pingPongPatchesBindGroup = [
       createSimpleBindGroup(
@@ -396,10 +448,11 @@ export async function mainExport(
           buffers.patches0,
           buffers.patches1,
           buffers.forceRender,
+          debugInfoBuffer,
         ],
         layout2,
         device,
-        null
+        "Ping bind group"
       ),
       createSimpleBindGroup(
         [
@@ -407,10 +460,11 @@ export async function mainExport(
           buffers.patches1,
           buffers.patches0,
           buffers.forceRender,
+          debugInfoBuffer,
         ],
         layout2,
         device,
-        null
+        "Pong bind group"
       ),
     ];
 
@@ -453,11 +507,13 @@ export async function mainExport(
       [targetInstanceIdBuffer],
       instanceSelectionLayout,
       device,
-      null
+      "instance selection bg"
     );
 
     if (toDownload.length != 0) {
+      console.log("Filtering!");
       let computePassFilterInstance = commandEncoder.beginComputePass();
+      computePassFilterInstance.label = "filter instance pass";
       computePassFilterInstance.setPipeline(filterInstanceIdPipeline.pipeline);
       computePassFilterInstance.setBindGroup(0, pingPongPatchesBindGroup[0]);
       computePassFilterInstance.setBindGroup(1, instanceSelectionBindGroup);
@@ -466,6 +522,7 @@ export async function mainExport(
         0
       );
       computePassFilterInstance.end();
+      console.log("Filtering done");
       simpleB2BSameSize(buffers.patches1, buffers.patches0, commandEncoder);
     }
     // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
@@ -504,6 +561,7 @@ export async function mainExport(
       );
 
       let rebalancePass = commandEncoder.beginComputePass();
+      rebalancePass.label = "rebalance 1";
       rebalancePass.setPipeline(indirectDispatchRebalancePipeline);
       rebalancePass.setBindGroup(0, indirectRebalanceBindGroups[0]);
       rebalancePass.dispatchWorkgroups(1, 1, 1);
@@ -527,6 +585,7 @@ export async function mainExport(
       }
 
       let rebalancePass2 = commandEncoder.beginComputePass();
+      rebalancePass.label = "rebalance pass";
       rebalancePass2.setPipeline(indirectDispatchRebalancePipeline);
       rebalancePass2.setBindGroup(0, indirectRebalanceBindGroups[1]);
       rebalancePass2.dispatchWorkgroups(1, 1, 1);
@@ -546,6 +605,7 @@ export async function mainExport(
         device,
         uuid
       );
+      bindGroupVertPrep.label = "bind group vert prep";
 
       let outputVerticesBindGroup = createSimpleBindGroup(
         [buffers.finalPatches2, vertOutputBuffer],
@@ -553,6 +613,7 @@ export async function mainExport(
         device,
         uuid
       );
+      outputVerticesBindGroup.label = "output vertices bind group";
       let computePassPrep = commandEncoder.beginComputePass({
         label: "prepareVertexOutput",
       });
@@ -571,6 +632,7 @@ export async function mainExport(
       let computePassVertices = commandEncoder.beginComputePass({
         label: "vertexOutputStage",
       });
+
       computePassVertices.setPipeline(compiledShader.verticesStage.pipeline);
       computePassVertices.setBindGroup(0, sceneUniformsBindGroup);
       computePassVertices.setBindGroup(1, outputVerticesBindGroup);
@@ -590,7 +652,19 @@ export async function mainExport(
         dispatchVerticesStage,
         commandEncoder
       );
+
+      simpleB2BSameSize(debugInfoBuffer,debugOutBuffer,commandEncoder);
       setTimeout(() => {
+        debugOutBuffer.mapAsync(
+          GPUMapMode.READ, 0, debugOutBuffer.size
+        ).then(
+          () => 
+          {
+            var data: any = debugOutBuffer.getMappedRange().slice();
+            debugOutBuffer.unmap();
+            parseOutDebugInfo(data);
+          }
+        );
         vertReadableBuffer
           .mapAsync(GPUMapMode.READ, 0, vertReadableBuffer.size)
           .then(() => {
@@ -607,9 +681,9 @@ export async function mainExport(
             }
             const arrayBuffer = vertReadableBuffer
               .getMappedRange(0, vertReadableBuffer.size)
-              .slice(0);
+              .slice();
             const vertexStream = new Float32Array(arrayBuffer);
-            console.log(vertexStream.slice(0,1000));
+            console.log(vertexStream.slice(0, 1000));
             vertReadableBuffer.unmap();
             if (downloadAll) {
               triggerDownload.value = true;
