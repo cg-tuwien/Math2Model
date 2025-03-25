@@ -162,8 +162,7 @@ onMounted(() => {
 
 watch(
   () => props.keyedGraph?.id,
-  async (id) => {
-    console.log("watch keyedGraph.id", { id });
+  async () => {
     shouldUpdate = false;
     let code = props.keyedGraph?.code ?? "";
     await editor.clear();
@@ -950,17 +949,7 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
   //node.parent = sn.parent;
   return node;
 }
-
-function replaceOrAddGraph(filePath: FilePath, add: boolean) {
-  props.fs
-    .readTextFile(filePath)
-    ?.then((content) =>
-      replaceOrAddDeserialize(filePath.replace(".graph", ""), content, add)
-    )
-    .catch((reason) => showError("Could not load graph " + filePath, reason));
-}
 </script>
-
 <template>
   <div class="flex w-full h-full border border-gray-500">
     <NodesDock
@@ -972,13 +961,13 @@ function replaceOrAddGraph(filePath: FilePath, add: boolean) {
       <div
         class="flex flex-1"
         ref="container"
-        v-on:dragover="
+        @dragover="
           (ev) => {
             ev.preventDefault();
             if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'copy';
           }
         "
-        v-on:drop="
+        @drop="
           (ev) => {
             ev.preventDefault();
             console.log(ev);
