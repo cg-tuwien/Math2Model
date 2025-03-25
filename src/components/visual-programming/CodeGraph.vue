@@ -740,7 +740,6 @@ async function logCode() {
     (await orderedCode(allNodes, visited, "\t"));
 
   fullCode += "\n}";
-  console.log(fullCode);
   emit("update", fullCode);
 }
 
