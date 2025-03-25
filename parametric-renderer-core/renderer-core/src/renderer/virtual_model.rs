@@ -278,7 +278,12 @@ fn replace_compute_code<'a>(source: &'a str, sample_object_code: &str) -> String
 
     let mut result = String::new();
     result.push_str(&source[..start_1]);
-    result.push_str(sample_object_code);
+    if sample_object_code.contains("fn getColor") {
+        let get_color = sample_object_code.find("fn getColor").unwrap();
+        result.push_str(&sample_object_code[0..get_color]);
+    } else {
+        result.push_str(sample_object_code);
+    }
     result.push_str(&source[end_1..]);
     result
 }
