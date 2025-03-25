@@ -231,6 +231,15 @@ impl WasmApplication {
         .await;
     }
 
+    pub async fn set_hot_value(&self, value: f32) {
+        let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), move |app| {
+            if let Some(renderer) = &app.renderer {
+                renderer.set_hot_value(value);
+            }
+        })
+        .await;
+    }
+
     pub async fn focus_on(&self, position: WasmPosition) {
         let _ = run_on_main(self.event_loop_proxy.clone().unwrap(), move |app| {
             app.app.camera_controller.focus_on(position.into());
