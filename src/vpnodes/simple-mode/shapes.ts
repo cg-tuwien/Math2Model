@@ -11,10 +11,8 @@ import {
   VPNode,
 } from "@/vpnodes/basic/nodes";
 import { ClassicPreset } from "rete";
-import { vec2, vec3 } from "webgpu-matrix";
-import { typeToValue } from "@/vpnodes/basic/functions";
+import { vec3 } from "webgpu-matrix";
 import { type SerializedNode } from "@/vpnodes/serialization/node";
-import { SliderControl } from "@/vpnodes/controls/slider";
 import type { Nodes } from "../nodes-list";
 
 export class ShapeNode extends VPNode {

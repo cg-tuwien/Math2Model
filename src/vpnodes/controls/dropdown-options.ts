@@ -1,5 +1,4 @@
 import type { CustomFunctionNode } from "@/vpnodes/basic/functions";
-import type { DropdownControl } from "@/vpnodes/controls/dropdown";
 
 export const typeOptions = [
   { label: "int", value: "i32" },
@@ -59,13 +58,13 @@ export function notify() {
 }
 
 export function subscribe(
-  listener: (change: { label: string; value: string }[]) => void,
+  listener: (change: { label: string; value: string }[]) => void
 ) {
   listeners.push(listener);
 }
 
 export function unsubscribe(
-  listener: (change: { label: string; value: string }[]) => void,
+  listener: (change: { label: string; value: string }[]) => void
 ) {
   let index = -1;
   for (let i = 0; i < listeners.length; i++) {

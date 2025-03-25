@@ -9,11 +9,7 @@ import { SliderControl } from "@/vpnodes/controls/slider";
 import { ClassicPreset } from "rete";
 import { vec2, vec3 } from "webgpu-matrix";
 import { type SerializedNode } from "@/vpnodes/serialization/node";
-import {
-  typeToValue,
-  typeToValueCode,
-  valueToType,
-} from "@/vpnodes/basic/functions";
+import { typeToValueCode, valueToType } from "@/vpnodes/basic/functions";
 import type { Nodes } from "../nodes-list";
 
 export class CombineNode extends VPNode {

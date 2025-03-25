@@ -7,16 +7,12 @@ import {
   ConnectionPlugin,
   Presets as ConnectionPresets,
 } from "rete-connection-plugin";
-import {
-  ContextMenuPlugin,
-  Presets as ContextMenuPresets,
-} from "rete-context-menu-plugin";
+import { ContextMenuPlugin } from "rete-context-menu-plugin";
 import {
   FunctionCallNode,
   InitializeNode,
   NothingNode,
   ReturnNode,
-  typeToValueCode,
   VariableInNode,
   VariableOutNode,
 } from "@/vpnodes/basic/nodes";
@@ -39,7 +35,6 @@ import { graphFromJSON, SerializedGraph } from "@/vpnodes/serialization/graph";
 import { SerializedNode, toSerializedNode } from "@/vpnodes/serialization/node";
 import {
   type FilePath,
-  makeFilePath,
   type ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
@@ -56,12 +51,7 @@ import {
   HistoryPlugin,
   Presets as HistoryPresets,
 } from "rete-history-plugin";
-import {
-  newHeartShape,
-  newPlaneShape,
-  newSphereShape,
-  ShapeNode,
-} from "@/vpnodes/simple-mode/shapes";
+import { ShapeNode } from "@/vpnodes/simple-mode/shapes";
 import { CombineNode, MathFunctionNode } from "@/vpnodes/simple-mode/apply";
 import NodesDock from "@/components/visual-programming/NodesDock.vue";
 import type { UINode } from "@/vpnodes/ui/uinode";
@@ -85,7 +75,6 @@ import {
 } from "@/vpnodes/nodes-list";
 import { NumberControl } from "@/vpnodes/controls/number";
 import NumberComponent from "@/vpnodes/components/NumberComponent.vue";
-import { CustomZoom } from "@/vpnodes/custom-zoom";
 import type { Item } from "rete-context-menu-plugin/_types/types";
 
 const emit = defineEmits<{
@@ -138,7 +127,7 @@ const area: AreaPlugin<Schemes, AreaExtra> = new AreaPlugin<Schemes, AreaExtra>(
   document.createElement("div")
 );
 area.container.classList.add("flex-1");
-area.area.setZoomHandler(new CustomZoom(0.1));
+// area.area.setZoomHandler(new CustomZoom(0.1));
 const scopes = new ScopesPlugin<Schemes>();
 const history = new HistoryPlugin<Schemes, HistoryActions<Schemes>>();
 const applier = new ArrangeAppliers.TransitionApplier<Schemes, never>({
