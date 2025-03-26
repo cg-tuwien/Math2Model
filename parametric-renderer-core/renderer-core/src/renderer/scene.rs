@@ -7,6 +7,7 @@ pub struct SceneData {
     pub time_buffer: TypedBuffer<shader::Time>,
     pub screen_buffer: TypedBuffer<shader::Screen>,
     pub mouse_buffer: TypedBuffer<shader::Mouse>,
+    pub extra_buffer: TypedBuffer<shader::Extra>,
     pub camera_buffer: TypedBuffer<shader::Camera>,
     pub light_buffer: TypedBuffer<shader::Lights>,
     pub linear_sampler: wgpu::Sampler,
@@ -41,6 +42,12 @@ impl SceneData {
                     pos: Vec2::ZERO,
                     buttons: 0,
                 },
+                wgpu::BufferUsages::COPY_DST,
+            ),
+            extra_buffer: TypedBuffer::new_uniform(
+                device,
+                "Mouse Buffer",
+                &shader::Extra { hot_value: 0. },
                 wgpu::BufferUsages::COPY_DST,
             ),
             camera_buffer: TypedBuffer::new_uniform(
@@ -103,6 +110,7 @@ impl SceneData {
                 camera: self.camera_buffer.as_entire_buffer_binding(),
                 time: self.time_buffer.as_entire_buffer_binding(),
                 screen: self.screen_buffer.as_entire_buffer_binding(),
+                extra: self.extra_buffer.as_entire_buffer_binding(),
                 mouse: self.mouse_buffer.as_entire_buffer_binding(),
                 lights: self.light_buffer.as_entire_buffer_binding(),
                 linear_sampler: &self.linear_sampler,

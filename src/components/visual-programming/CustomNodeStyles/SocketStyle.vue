@@ -1,7 +1,7 @@
 ﻿<template>
   <n-icon
     class="socket"
-    :title="data.name"
+    :title="props.data.name"
     :component="SquareDot"
     size="32"
   ></n-icon>

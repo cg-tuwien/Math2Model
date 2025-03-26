@@ -9,7 +9,7 @@ const props = defineProps<{
 
 <template>
   <div>
-    <n-icon :component="uiNode.image" size="48px" :color="color"></n-icon>
+    <n-icon :component="uiNode.image" size="48px" :color="props.color"></n-icon>
     <div>
       {{ uiNode.type }} <br />
       {{ uiNode.prefix }} {{ uiNode.name }}

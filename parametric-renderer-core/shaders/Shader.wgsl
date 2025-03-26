@@ -144,20 +144,23 @@ fn assert(condition: bool) {
 //// END OF AUTOGEN
 
 ////#include "./EvaluateImage.wgsl"
-//// AUTOGEN 961c21364e8c69d94e53b62808c484d25210f06c0cbf6045824e429da62423c4
+//// AUTOGEN ced6a506909abff01241bc184a7d6c3a0bede71b7a4d6b1f07430a81dbc637e9
 struct Time {
   elapsed: f32,
   delta: f32,
   frame: u32,
-};
+}
 struct Screen {
   resolution: vec2<u32>,
   inv_resolution: vec2<f32>,
-};
+}
 struct Mouse {
   pos: vec2<f32>,
   buttons: u32,
-};
+}
+struct Extra {
+  hot_value: f32
+}
 fn mouse_held(button: u32) -> bool {
   return (mouse.buttons & button) != 0u;
 }
@@ -165,6 +168,7 @@ fn mouse_held(button: u32) -> bool {
 @group(0) @binding(0) var<uniform> time : Time;
 @group(0) @binding(1) var<uniform> screen : Screen;
 @group(0) @binding(2) var<uniform> mouse : Mouse;
+@group(0) @binding(3) var<uniform> extra : Extra;
 
 //// END OF AUTOGEN
 
@@ -221,9 +225,9 @@ struct Material {
     has_texture: u32
 }
 
-@group(0) @binding(3) var<uniform> camera: Camera;
-@group(0) @binding(4) var<storage, read> lights: Lights;
-@group(0) @binding(5) var linear_sampler: sampler;
+@group(0) @binding(4) var<uniform> camera: Camera;
+@group(0) @binding(5) var<storage, read> lights: Lights;
+@group(0) @binding(6) var linear_sampler: sampler;
 @group(1) @binding(1) var<uniform> model: Model;
 @group(1) @binding(2) var<storage, read> render_buffer: RenderBufferRead;
 @group(1) @binding(3) var<uniform> material: Material;

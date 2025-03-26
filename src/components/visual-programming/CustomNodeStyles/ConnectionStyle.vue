@@ -1,6 +1,6 @@
 ﻿<template>
   <svg data-testid="connection">
-    <path :d="path"></path>
+    <path :d="props.path"></path>
   </svg>
 </template>
 

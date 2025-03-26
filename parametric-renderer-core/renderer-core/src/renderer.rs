@@ -81,6 +81,8 @@ pub struct GpuApplication {
     set_force_wait: WriteSignal<bool>,
     /// Sets the threshold factor for the LOD algorithm
     set_threshold_factor: WriteSignal<f32>,
+    /// Sets the value for hot slider updates
+    set_hot_value: WriteSignal<f32>,
     cursor_capture: WindowCursorCapture,
     models: SignalVec<ModelInfo>,
 }
@@ -104,6 +106,7 @@ impl GpuApplication {
         let profiler = StoredValue::new(create_profiler(&context));
         let (force_wait, set_force_wait) = signal(false);
         let (threshold_factor, set_threshold_factor) = signal(1.0f32);
+        let (hot_value, set_hot_value) = signal(0.0f32);
         let models = SignalVec::new();
 
         provide_context(MissingShader(make_missing_shader(&context)));
@@ -117,6 +120,7 @@ impl GpuApplication {
                 profiler,
                 desired_size,
                 threshold_factor,
+                hot_value,
                 force_wait,
                 shaders,
                 textures,
@@ -140,6 +144,7 @@ impl GpuApplication {
 
             set_desired_size,
             set_threshold_factor,
+            set_hot_value,
             set_force_wait,
             cursor_capture: WindowCursorCapture::Free,
             models,
@@ -246,6 +251,10 @@ impl GpuApplication {
             .set(factor.clamp(0.0001, 100000.0));
     }
 
+    pub fn set_hot_value(&self, hot_value: f32) {
+        self.set_hot_value.set(hot_value);
+    }
+
     fn update_cursor_capture(&mut self, cursor_capture: WindowCursorCapture) {
         if let Some(window) = self.surface.with_untracked(|surface| match surface {
             wgpu_context::SurfaceOrFallback::Surface { window, .. } => Some(window.clone()),
@@ -275,6 +284,7 @@ fn render_component(
     profiler: StoredValue<GpuProfiler>,
     desired_size: ReadSignal<UVec2>,
     threshold_factor: ReadSignal<f32>,
+    hot_value: ReadSignal<f32>,
     force_wait: ReadSignal<bool>,
     shaders: RwSignal<HashMap<ShaderId, Arc<ShaderPipelines>>>,
     textures: RwSignal<HashMap<TextureId, Arc<Texture>>>,
@@ -313,6 +323,7 @@ fn render_component(
                     mouse: scene_data.mouse_buffer.as_entire_buffer_binding(),
                     screen: scene_data.screen_buffer.as_entire_buffer_binding(),
                     time: scene_data.time_buffer.as_entire_buffer_binding(),
+                    extra: scene_data.extra_buffer.as_entire_buffer_binding(),
                 },
             )
         }),
@@ -375,6 +386,17 @@ fn render_component(
             .map(|splits| Mesh::new_tesselated_quad(&context.device, splits))
             .collect::<Vec<_>>(),
     );
+
+    Effect::new(move |_| {
+        let context = &get_context();
+        let current_hot_value = hot_value.get();
+        scene_data.read_value().extra_buffer.write_buffer(
+            &context.queue,
+            &shader::Extra {
+                hot_value: current_hot_value,
+            },
+        );
+    });
 
     let skybox_component = skybox_component(surface);
     let ground_plane_component = ground_plane_component(surface);

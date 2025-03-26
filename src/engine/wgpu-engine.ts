@@ -90,6 +90,12 @@ export class WgpuEngine {
     );
     await this.taskQueue;
   }
+  async setHotValue(value: number) {
+    this.taskQueue = this.taskQueue.then(() =>
+      this.engine.set_hot_value(value)
+    );
+    await this.taskQueue;
+  }
 
   async focusOn(position: [number, number, number]) {
     this.taskQueue = this.taskQueue.then(() => this.engine.focus_on(position));
