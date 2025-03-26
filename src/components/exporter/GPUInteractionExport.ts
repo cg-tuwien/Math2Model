@@ -43,7 +43,8 @@ function parseOutDebugInfo(buf: ArrayBuffer)
   const ints = new Int32Array(buf);
   let index = ints[0];
   let count = ints[1];
-  let i = 2;
+  debugger;
+  let i = 4;
   while(i < floats.length)
   {
     var minX = floats[i++];
@@ -55,7 +56,17 @@ function parseOutDebugInfo(buf: ArrayBuffer)
     var curvature = floats[i++];
     var planarity = floats[i++];
     var size = floats[i++];
-    i++;
+    i+=3;
+    var vec1x = floats[i++];
+    var vec1y = floats[i++];
+    var vec1z = floats[i++];
+    var vec1w = floats[i++];
+    
+    var vec2x = floats[i++];
+    var vec2y = floats[i++];
+    var vec2z = floats[i++];
+    var vec2w = floats[i++];
+
     var structure = {
       min: [minX, minY],
       max: [maxX, maxY],
@@ -64,6 +75,18 @@ function parseOutDebugInfo(buf: ArrayBuffer)
         planarity: planarity,
         size: size,
         curvature: curvature
+      },
+      v1: {
+        x: vec1x,
+        y: vec1y,
+        z: vec1z,
+        z2: vec1w,
+      },
+      v2: {
+        x: vec2x,
+        y: vec2y,
+        z: vec2z,
+        z2: vec2w
       }
     }
     console.log("DEBUG STRUCT: ", structure);
@@ -303,6 +326,7 @@ export async function mainExport(
     lodExportParametersRefs.minSize.value,
     lodExportParametersRefs.maxCurvature,
     lodExportParametersRefs.acceptablePlanarity.value,
+    0,0,0
   ]);
   const lodStageParametersBuffer = createBufferWith(
     props,
@@ -487,7 +511,15 @@ export async function mainExport(
       lodExportParametersRefs.minSize.value,
       lodExportParametersRefs.maxCurvature.value,
       lodExportParametersRefs.acceptablePlanarity.value * 0.05 + 0.95,
+      0,
+      0,
+      0
     ]);
+
+    let boolaccess = new Uint32Array(lodStageParameters.buffer);
+    boolaccess[3] = lodExportParametersRefs.ignoreMinSize.value ? 1 : 0;
+    boolaccess[4] = lodExportParametersRefs.ignoreCurvature.value ? 1 : 0;
+    boolaccess[5] = lodExportParametersRefs.ignorePlanarity.value ? 1 : 0;
 
     device.queue.writeBuffer(
       lodStageParametersBuffer,

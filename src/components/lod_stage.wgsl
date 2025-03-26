@@ -40,7 +40,10 @@ struct DispatchIndirectArgs { // From https://docs.rs/wgpu/latest/wgpu/util/stru
 struct LODConfigParameters {
   earlyExitMinSize: f32,
   earlyExitMaxCurvature: f32,
-  acceptablePlanarity: f32
+  acceptablePlanarity: f32,
+  ignoreMinSize: u32,
+  ignoreMaxCurvature: u32,
+  ignorePlanarity: u32
 }
 
 struct BufferDebugInfo {
@@ -54,6 +57,8 @@ struct PatchInfo {
     curvature: f32,
     planarity: f32,
     size: f32,
+    v1: vec4f,
+    v2: vec4f
 }
 
 fn ceil_div(a: u32, b: u32) -> u32 { return (a + b - 1u) / b; }
@@ -204,35 +209,70 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
     let normalb = calculateNormalOfPatch(patch_decode(patch_top_right));
     let normalc = calculateNormalOfPatch(patch_decode(patch_bottom_right));
     let normald = calculateNormalOfPatch(patch_decode(patch_bottom_left));
+
+    let verifyNormals = length(normala)+length(normalb)+length(normalc)+length(normald);
+
     let simab = cosinesim(normala, normalb);
     let simcd = cosinesim(normalc, normald);
 
     // Compute additional debug info.
     let size_val = calculateWorldSpaceSizeOfPatch(quad);
     let curvature = simab + simcd; // Example curvature computation.
+    var debug_index = atomicAdd(&debugBuffer.index, 1u);
     // Add a debug entry into debugBuffer:
     // debugBuffer.patch_infos[debug_index].p.instance = 500u;
-    // debugBuffer.patch_infos[debug_index].p.in = vec2(-10.1,-10.2);
+    // debugBuffer.patch_infos[debug_index].p.min = vec2(-10.1,-10.2);
     // debugBuffer.patch_infos[debug_index].p.max = vec2(-20.1,-20.2);
     // debugBuffer.patch_infos[debug_index].planarity = -30.0f;
     // debugBuffer.patch_infos[debug_index].size = -40.0f;
     // debugBuffer.patch_infos[debug_index].curvature = -50.0f;
+    // debugBuffer.patch_infos[debug_index].v1 = vec4f(1.,2.,3,4.);
+    // debugBuffer.patch_infos[debug_index].v2 = vec4f(5,6.,7.,8.);
 
     // --- End of debug entry addition
 
-    //let isflat = (simab + simcd) >= export_config.earlyExitMaxCurvature;
+    let isflat = (export_config.ignoreMaxCurvature != 0u) && (curvature/2f >= export_config.earlyExitMaxCurvature);
     let totalVLength = v_length[0] + v_length[1] + v_length[2] + v_length[3];
     let totalULength = u_length[0] + u_length[1] + u_length[2] + u_length[3];
-    let isSmall = totalULength + totalVLength < export_config.earlyExitMinSize;
-    let acceptable_size = 0.1f;
+    let isSmall = (export_config.ignoreMinSize != 0u) && (totalULength + totalVLength < export_config.earlyExitMinSize && totalULength + totalVLength > EPSILON/100f);
+
     let planarityThreshold = export_config.acceptablePlanarity;
     
-    let debug_index = atomicAdd(&debugBuffer.index, 1u);
-    debugBuffer.patch_infos[debug_index] = PatchInfo(quad, curvature, planarity, size_val);
+
+    let firstStep = abs(quad.max.x-quad.min.x) >= 0.99f;
+    let shouldRender = isSmall ||
+      (
+        (
+            isflat && (verifyNormals > 3.8f)
+        )
+        ||
+         (planarity >= planarityThreshold && export_config.ignorePlanarity != 0u));
+
+    // debugBuffer.patch_infos[debug_index].planarity = planarity;
+    // debugBuffer.patch_infos[debug_index].curvature = (simab + simcd);
+    // debugBuffer.patch_infos[debug_index].size = 5f;
+   debugBuffer.patch_infos[debug_index] = PatchInfo(quad, curvature, planarity, max(EPSILON,size_val), vec4f(normala,0.), vec4f(verifyNormals,0f,0f,0f));
     atomicAdd(&debugBuffer.patch_count, 1u);
+
     
-    let shouldRender = isSmall || planarity >= planarityThreshold;
-    if force_render.flag == 1u || shouldRender {
+    // var p = getWorldPatch(quad);
+
+    // var x = p[0].x;
+    // var y=  p[0].y;
+    // var z = p[0].z;
+    // debugBuffer.patch_infos[debug_index] = PatchInfo(quad, x,y,z);
+    // atomicAdd(&debugBuffer.patch_count, 1u);
+    
+    // debug_index = atomicAdd(&debugBuffer.index, 1u);
+    // p = getWorldPatch(quad);
+
+    // x = p[2].x;
+    // y=  p[2].y;
+    // z = p[2].z;
+    // debugBuffer.patch_infos[debug_index] = PatchInfo(quad, x,y,z);
+    // atomicAdd(&debugBuffer.patch_count, 1u);
+    
+    if force_render.flag == 1u || (!firstStep && shouldRender) {
         force_render_internal(quad_encoded);
     } else {
         let write_index = atomicAdd(&patches_to_buffer.patches_length, 4u);
@@ -260,7 +300,25 @@ fn calculateWorldSpaceSizeOfPatch(quad: Patch) -> f32 {
 }
 
 fn cosinesim(v1: vec3<f32>, v2: vec3<f32>) -> f32 {
-    return (dot(v1, v2) + 1.) / 2.;
+    
+    return max(-100f,(dot(v1, v2) + 1.) / 2.);
+}
+
+fn getWorldPatch(p: Patch) -> mat4x3<f32> {
+    let quad = p;
+    let quad_point_a = quad.min;
+    let quad_point_b = vec2f(quad.min.x, quad.max.y);
+    let quad_point_c = quad.max;
+    let quad_point_d = vec2f(quad.max.x, quad.min.y);
+
+    let cap = sampleObject(quad_point_a);
+    let cbp = sampleObject(quad_point_b);
+    let ccp = sampleObject(quad_point_c);
+    let cdp = sampleObject(quad_point_d);
+
+    let wp = mat4x3(cap,cbp,ccp,cdp);
+
+    return wp;
 }
 
 fn calculateNormalOfPatch(p: Patch) -> vec3<f32> {
@@ -379,7 +437,7 @@ fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>,
         let trace = cov[0][0] + cov[1][1] + cov[2][2];
         var planarity_local = 1.0 - (lambda_min);
         // wgsl hack, if planarity would be exactly one, aka a perfect plane, the function breaks down and returns NaN, but min() returns the non NaN value when possible
-        planarity_local = min(1.,planarity_local); 
+        planarity_local = max(0.,planarity_local); 
         planarity_score = planarity_local;
         if(patch_index <= 1000000u)
         {

@@ -49,7 +49,10 @@ export class ExporterInstance {
     this.patches.forEach((patch: any[]) => {
       patch.forEach((vertex: any) => {
         let uv = vertex.uv;
-        let uvKey = Math.floor(uv.x*4096)+ uv.y; // Use an array as the key
+        let p = vertex.vert;
+        let uvKey =
+          Math.floor(p.x * 4096 * 4096) + Math.floor(p.y * 4096) + p.z;
+        // let uvKey = Math.floor(uv.x*4096)+ uv.y; // Use combination of uv as key
 
         // Check if the UV position already exists in the mapping
         if (!vertsMapping.has(uvKey)) {

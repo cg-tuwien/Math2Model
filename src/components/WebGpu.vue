@@ -46,6 +46,9 @@ const exportInProgress = ref(false);
 const toDownload: Ref<{ name: string; currentInstance: number }[]> = ref([]);
 const exportProgress: Ref<number> = ref(0);
 const currentDownloadItem: Ref<string> = ref("Nothing");
+const ignoreMinSize: Ref<boolean> = ref(true);
+const ignoreCurvature: Ref<boolean> = ref(true);
+const ignorePlanarity: Ref<boolean> = ref(true);
 
 let exportSteps = 0;
 let exportStepsDone = 0;
@@ -322,6 +325,9 @@ let lodStageCallback = await mainExport(
     subdivisionSteps: subdivisionSteps,
     toDownload: toDownload,
     currentItem: currentDownloadItem,
+    ignoreMinSize: ignoreMinSize,
+    ignoreCurvature: ignoreCurvature,
+    ignorePlanarity: ignorePlanarity,
   },
   onFrame
 );
@@ -380,11 +386,9 @@ updateExportPreview();
 </script>
 <template>
   <n-card title="Exporter" size="small" class="h-full overflow-y-auto">
-    <!-- Tab Navigation -->
     <n-tabs v-model:selected="activeTab">
       <n-tab-pane name="preview" tab="LOD Configuration">
         <n-space vertical :size="0">
-          <!-- Enable Preview Toggle -->
           <n-form-item class="compact-form-item">
             <n-button
               :type="exportStore.showExportPreview ? 'success' : 'error'"
@@ -394,164 +398,84 @@ updateExportPreview();
               Preview {{ exportStore.showExportPreview ? "On" : "Off" }}
             </n-button>
           </n-form-item>
-          <!-- Target Model Selection -->
-          <n-form-item
-            label="Target Model:"
-            label-placement="left"
-            class="compact-form-item"
-          >
+
+          <n-form-item label="Target Model:" label-placement="left" class="compact-form-item">
             <n-select
               v-model:value="downloadTarget"
               :disabled="exportInProgress"
-              :options="
-                models.map((model) => ({
-                  label: model.name,
-                  value: model.uuid,
-                }))
-              "
+              :options="models.map((model) => ({ label: model.name, value: model.uuid }))"
             />
           </n-form-item>
 
-          <!-- Min Size Slider -->
-          <n-form-item
-            label="Min Size:"
-            label-placement="left"
-            class="compact-form-item"
-          >
-            <n-slider
-              v-model:value="minSize"
-              :min="0"
-              :max="30"
-              :step="0.0001"
-              :disabled="exportInProgress"
-            />
-            <n-input-number v-model:value="minSize" />
+          <!-- Min Size Toggle & Slider -->
+          <n-form-item label="Use Min Size" label-placement="left" class="compact-form-item">
+            <n-switch v-model:value="ignoreMinSize" />
           </n-form-item>
+          <template v-if="ignoreMinSize">
+            <n-form-item label="Min Size:" label-placement="left" class="compact-form-item">
+              <n-slider v-model:value="minSize" :min="0" :max="30" :step="0.0001" :disabled="exportInProgress" />
+              <n-input-number v-model:value="minSize" />
+            </n-form-item>
+          </template>
 
-          <!-- Max Curvature Slider -->
-          <n-form-item
-            label="Max Curvature:"
-            label-placement="left"
-            class="compact-form-item"
-          >
-            <n-slider
-              v-model:value="maxCurvature"
-              :min="0"
-              :max="1"
-              :step="0.01"
-              :disabled="exportInProgress"
-            />
-            <n-input-number v-model:value="maxCurvature" />
+          <!-- Max Curvature Toggle & Slider -->
+          <n-form-item label="Use Curvature" label-placement="left" class="compact-form-item">
+            <n-switch v-model:value="ignoreCurvature" />
           </n-form-item>
+          <template v-if="ignoreCurvature">
+            <n-form-item label="Max Curvature:" label-placement="left" class="compact-form-item">
+              <n-slider v-model:value="maxCurvature" :min="0" :max="1" :step="0.01" :disabled="exportInProgress" />
+              <n-input-number v-model:value="maxCurvature" />
+            </n-form-item>
+          </template>
 
-          <!-- Planarity Criterium Slider -->
-          <n-form-item
-            label="Planarity Criterium:"
-            label-placement="left"
-            class="compact-form-item"
-          >
-            <n-slider
-              v-model:value="acceptablePlanarity"
-              :min="0.0"
-              :max="1"
-              :step="0.000001"
-              :disabled="exportInProgress"
-            />
-            <n-input-number v-model:value="acceptablePlanarity" />
+          <!-- Planarity Toggle & Slider -->
+          <n-form-item label="Use Planarity" label-placement="left" class="compact-form-item">
+            <n-switch v-model:value="ignorePlanarity" />
           </n-form-item>
+          <template v-if="ignorePlanarity">
+            <n-form-item label="Planarity Criterium:" label-placement="left" class="compact-form-item">
+              <n-slider v-model:value="acceptablePlanarity" :min="0.0" :max="1" :step="0.000001" :disabled="exportInProgress" />
+              <n-input-number v-model:value="acceptablePlanarity" />
+            </n-form-item>
+          </template>
 
-          <!-- Division Steps Slider -->
-          <n-form-item
-            label="Division Steps:"
-            label-placement="left"
-            class="compact-form-item"
-          >
-            <n-slider
-              v-model:value="subdivisionSteps"
-              :min="1"
-              :max="4"
-              :step="1"
-              :disabled="exportInProgress"
-            />
+          <n-form-item label="Division Steps:" label-placement="left" class="compact-form-item">
+            <n-slider v-model:value="subdivisionSteps" :min="1" :max="5" :step="1" :disabled="exportInProgress" />
           </n-form-item>
         </n-space>
       </n-tab-pane>
 
       <n-tab-pane name="export" tab="Export Settings">
         <n-space vertical :size="8">
-          <!-- File Format Selection -->
-          <n-form-item
-            label="File Format:"
-            label-placement="left"
-            class="compact-form-item"
-          >
-            <n-select
-              v-model:value="fileFormat"
-              :disabled="exportInProgress"
-              :options="[
-                { label: 'OBJ', value: 'obj' },
-                { label: 'GLB', value: 'glb' },
-              ]"
-            />
+          <n-form-item label="File Format:" label-placement="left" class="compact-form-item">
+            <n-select v-model:value="fileFormat" :disabled="exportInProgress" :options="[
+              { label: 'OBJ', value: 'obj' },
+              { label: 'GLB', value: 'glb' }
+            ]" />
           </n-form-item>
 
-          <!-- Merge Model Files Checkbox -->
-          <n-form-item
-            v-if="downloadTarget == ''"
-            label="Merge Model Files"
-            label-placement="left"
-            class="compact-form-item"
-          >
-            <n-checkbox
-              v-model:checked="mergeModels"
-              :disabled="exportInProgress"
-            />
+          <n-form-item v-if="downloadTarget == ''" label="Merge Model Files" label-placement="left" class="compact-form-item">
+            <n-checkbox v-model:checked="mergeModels" :disabled="exportInProgress" />
           </n-form-item>
 
-          <!-- Include UVs Checkbox -->
-          <n-form-item
-            label="Include UVs:"
-            label-placement="left"
-            class="compact-form-item"
-          >
-            <n-checkbox
-              v-model:checked="includeUVs"
-              :disabled="exportInProgress"
-            />
+          <n-form-item label="Include UVs:" label-placement="left" class="compact-form-item">
+            <n-checkbox v-model:checked="includeUVs" :disabled="exportInProgress" />
           </n-form-item>
 
-          <!-- Normal Direction Selection -->
-          <n-form-item
-            label="Normal Direction:"
-            label-placement="left"
-            class="compact-form-item"
-          >
-            <n-select
-              v-model:value="normalType"
-              :disabled="exportInProgress"
-              :options="[
-                { label: 'Default', value: 0 },
-                { label: 'Inverse', value: 1 },
-                { label: 'Double Sided', value: 2 },
-              ]"
-            />
+          <n-form-item label="Normal Direction:" label-placement="left" class="compact-form-item">
+            <n-select v-model:value="normalType" :disabled="exportInProgress" :options="[
+              { label: 'Default', value: 0 },
+              { label: 'Inverse', value: 1 },
+              { label: 'Double Sided', value: 2 }
+            ]" />
           </n-form-item>
 
-          <!-- Download Button -->
-          <n-button
-            @click="beginExportProcess"
-            :disabled="exportInProgress"
-            type="primary"
-            block
-          >
+          <n-button @click="beginExportProcess" :disabled="exportInProgress" type="primary" block>
             Download
           </n-button>
 
-          <!-- Progress and Cancel -->
-          <n-progress
-            v-if="exportInProgress"
-            :percentage="Math.floor(exportProgress * 100)"
-          />
+          <n-progress v-if="exportInProgress" :percentage="Math.floor(exportProgress * 100)" />
           <n-text v-if="exportInProgress">{{ currentDownloadItem }}</n-text>
           <n-button @click="abortExport()" type="error" block>
             Cancel
@@ -561,6 +485,7 @@ updateExportPreview();
     </n-tabs>
   </n-card>
 </template>
+
 
 <style scoped>
 .compact-form-item {
