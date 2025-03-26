@@ -231,7 +231,7 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
 
     // --- End of debug entry addition
 
-    let isflat = (export_config.ignoreMaxCurvature != 0u) && (curvature/2f >= export_config.earlyExitMaxCurvature);
+    let isflat = (export_config.ignoreMaxCurvature != 0u) && (curvature/2f > export_config.earlyExitMaxCurvature);
     let totalVLength = v_length[0] + v_length[1] + v_length[2] + v_length[3];
     let totalULength = u_length[0] + u_length[1] + u_length[2] + u_length[3];
     let isSmall = (export_config.ignoreMinSize != 0u) && (totalULength + totalVLength < export_config.earlyExitMinSize && totalULength + totalVLength > EPSILON/100f);
@@ -243,15 +243,18 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
     let shouldRender = isSmall ||
       (
         (
-            isflat && (verifyNormals > 3.8f)
+            isflat && (verifyNormals > 3.8f) && size_val > 0f
         )
         ||
-         (planarity >= planarityThreshold && export_config.ignorePlanarity != 0u));
+         (planarity >= planarityThreshold && export_config.ignorePlanarity != 0u)
+      );
 
     // debugBuffer.patch_infos[debug_index].planarity = planarity;
     // debugBuffer.patch_infos[debug_index].curvature = (simab + simcd);
     // debugBuffer.patch_infos[debug_index].size = 5f;
    debugBuffer.patch_infos[debug_index] = PatchInfo(quad, curvature, planarity, max(EPSILON,size_val), vec4f(normala,0.), vec4f(verifyNormals,0f,0f,0f));
+    debugBuffer.patch_infos[debug_index].v1 = vec4f(sampleObject(quad.min),0.);
+    debugBuffer.patch_infos[debug_index].v2 = vec4f(sampleObject(quad.max),55.);
     atomicAdd(&debugBuffer.patch_count, 1u);
 
     
@@ -272,7 +275,7 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
     // debugBuffer.patch_infos[debug_index] = PatchInfo(quad, x,y,z);
     // atomicAdd(&debugBuffer.patch_count, 1u);
     
-    if force_render.flag == 1u || (!firstStep && shouldRender) {
+    if force_render.flag == 1u || (shouldRender) {
         force_render_internal(quad_encoded);
     } else {
         let write_index = atomicAdd(&patches_to_buffer.patches_length, 4u);
