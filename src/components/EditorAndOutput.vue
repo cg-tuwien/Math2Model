@@ -415,6 +415,7 @@ watchImmediate(
                   v-else-if="openFile.editorType.value === 'graph'"
                   :fs="props.fs"
                   :keyedGraph="openFile.code.value"
+                  :engine="props.engine"
                   @update="
                     (content) => {
                       if (openFile.path.value !== null) {

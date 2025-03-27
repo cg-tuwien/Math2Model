@@ -67,6 +67,7 @@ import {
   Connection,
   genericUpdate,
   genericUpdateControl,
+  sliderUpdateConrol,
   useUiNodes,
   type AreaExtra,
   type Conns,
@@ -76,6 +77,7 @@ import {
 import { NumberControl } from "@/vpnodes/controls/number";
 import NumberComponent from "@/vpnodes/components/NumberComponent.vue";
 import type { Item } from "rete-context-menu-plugin/_types/types";
+import type { WgpuEngine } from "@/engine/wgpu-engine";
 
 const emit = defineEmits<{
   update: [content: string];
@@ -91,6 +93,7 @@ export interface KeyedGraph {
 const props = defineProps<{
   fs: ReactiveFilesystem;
   keyedGraph: DeepReadonly<KeyedGraph> | null;
+  engine: WgpuEngine;
 }>();
 
 const fileNames = ref(new Set<FilePath>());
@@ -101,21 +104,6 @@ props.fs.watchFromStart((change) => {
   } else if (change.type === "remove") {
     fileNames.value.delete(change.key);
   }
-});
-
-const graphsDropdown = computed<SelectMixedOption[]>(() => {
-  return [...fileNames.value]
-    .toSorted()
-    .filter((fileName) => fileName.endsWith(".graph"))
-    .map(
-      (fileName): SelectMixedOption => ({
-        label: fileName.substring(
-          0,
-          fileName.valueOf().length - ".graph".length
-        ),
-        value: fileName,
-      })
-    );
 });
 
 const container = ref<HTMLElement | null>(null);
@@ -145,12 +133,9 @@ const selector = AreaExtensions.selector();
 AreaExtensions.selectableNodes(area, selector, {
   accumulating: AreaExtensions.accumulateOnCtrl(),
 });
-const nodes = useUiNodes(editor, area);
+const nodes = useUiNodes(editor, area, engine, props.engine, update);
 let uiNodes: Map<string, Map<string, UINode>> = nodes.uiNodes;
 let shouldUpdate = true;
-
-let loading = ref<boolean>(false);
-let loadName = ref<string>("no file selected");
 
 watch(container, (container) => {
   container?.append(area.container);
@@ -171,55 +156,6 @@ watch(
   }
 );
 
-async function newConditionNode(
-  scope1: string,
-  scope2: string,
-  area: AreaPlugin<Schemes, AreaExtra>,
-  operator: "==" | "!=" | ">" | "<" | ">=" | "<="
-): Promise<Nodes> {
-  shouldUpdate = false;
-  const sc1 = new LogicScopeNode(
-    scope1,
-    (n) => area.update("node", n.id),
-    (n) => editor.addNode(n),
-    (n) => editor.removeNode(n.id)
-  );
-  const sc2 = new LogicScopeNode(
-    scope2,
-    (n) => area.update("node", n.id),
-    (n) => editor.addNode(n),
-    (n) => editor.removeNode(n.id)
-  );
-
-  await editor.addNode(sc1).catch((e) => console.log(e));
-  await editor.addNode(sc2).catch((e) => console.log(e));
-
-  let pointer_offset = 300;
-
-  let xsc = area.area.pointer.x + pointer_offset;
-  let ysc1 = area.area.pointer.y + pointer_offset;
-  let ysc2 = area.area.pointer.y - pointer_offset;
-
-  const c = new ConditionNode(operator, operator);
-
-  await editor.addNode(c).catch((e) => console.log(e));
-  await editor
-    .addConnection(new Connection(c, "true", sc1, "context"))
-    .catch((e) => console.log(e));
-  await editor
-    .addConnection(new Connection(c, "false", sc2, "context"))
-    .catch((e) => console.log(e));
-
-  // await arrange.layout({ applier });
-  void area.translate(c.id, area.area.pointer);
-  void area.translate(sc2.id, { x: xsc, y: ysc1 });
-  void area.translate(sc1.id, { x: xsc, y: ysc2 });
-
-  shouldUpdate = true;
-
-  return new NothingNode();
-}
-
 async function addNodeAtPosition(node: Nodes, x: number, y: number) {
   console.log("Adding", node, "at", x, ",", y);
   await editor.addNode(node);
@@ -228,7 +164,6 @@ async function addNodeAtPosition(node: Nodes, x: number, y: number) {
 
 async function rearrange() {
   await arrange.layout({ applier });
-  await area.translate(endNode.id, { x: 200, y: 200 });
   showInfo("Your nodes got automatically arranged! To undo press CTRL+Z.");
   return new NothingNode();
 }
@@ -365,31 +300,9 @@ async function checkForUnsafeConnections(
   await editor.addNode(new NothingNode());
 }
 
-const endNode = new ReturnNode("vec3f(input2.x, 0, input2.y)", "Output Vertex");
-
 async function createEditor() {
-  //const contextMenu = new ContextMenuPlugin<Schemes>({
-  //items: ContextMenuPresets.classic.setup([
-  //  ["Rearrange (CTRL+S)", () => rearrange()],
-  //  ["Undo (CTRL+Z)", () => undo()],
-  //  ["Redo (CTRL+Y)", () => redo()],
-  // ["Initialize", () => new InitializeNode()],
-  // [
-  //   "Advanced (experimental)",
-  //   [
-  //     ["Equals", () => newConditionNode("True", "False", area, "==")],
-  //     ["Not Equals", () => newConditionNode("True", "False", area, "!=")],
-  //     ["Lt", () => newConditionNode("True", "False", area, "<")],
-  //     ["Le", () => newConditionNode("True", "False", area, "<=")],
-  //     ["Gt", () => newConditionNode("True", "False", area, ">")],
-  //     ["Ge", () => newConditionNode("True", "False", area, ">=")],
-  //   ],
-  // ],
-  //]),
-  //});
-
   const contextMenu = new ContextMenuPlugin<Schemes>({
-    items(context, plugin) {
+    items(context) {
       if (context === "root") {
         return {
           searchBar: false,
@@ -489,15 +402,15 @@ async function createEditor() {
 
     switch (e.code) {
       case "KeyY":
-        void history.undo();
+        history.undo();
         break;
       case "KeyZ":
-        void history.redo();
+        history.redo();
         break;
       case "KeyA":
         e.preventDefault();
         e.stopPropagation();
-        void rearrange();
+        rearrange();
         break;
       case "KeyS":
         e.preventDefault();
@@ -513,12 +426,12 @@ async function createEditor() {
       case "KeyV":
         e.preventDefault();
         e.stopPropagation();
-        void paste();
+        paste();
         break;
       case "KeyD":
         e.preventDefault();
         e.stopPropagation();
-        void duplicate();
+        duplicate();
         break;
       default:
     }
@@ -585,8 +498,6 @@ async function createEditor() {
   area.use(arrange);
   area.use(history);
 
-  await deserialize(props.keyedGraph?.code ?? "");
-
   editor.addPipe((context) => {
     if (context.type === "connectioncreated") {
       if (shouldUpdate) {
@@ -594,6 +505,9 @@ async function createEditor() {
           context.data as ClassicPreset.Connection<Nodes, Nodes>
         ).then(update); // TODO: FIX IT!;
       }
+    }
+    if (context.type === "nodecreated") {
+      setTimeout(() => context.data.updateSize(area), 0);
     }
     if (
       [
@@ -609,18 +523,14 @@ async function createEditor() {
     return context;
   });
 
+  await deserialize(props.keyedGraph?.code ?? "");
+
   await logCode();
 }
 
 function update() {
   if (!shouldUpdate) return;
   engine.reset();
-
-  editor
-    .getNodes()
-    .filter((n) => !(n instanceof LogicScopeNode))
-    .forEach((n) => n.updateSize(area));
-
   saveGraphThrottled();
 }
 
@@ -800,18 +710,6 @@ async function serialize() {
   emit("save", sg.toJSON());
 }
 
-async function replaceOrAddDeserialize(
-  name: string,
-  json: string,
-  add: boolean
-) {
-  if (!add) {
-    await editor.clear();
-    await deserialize(json);
-  }
-  // add parameter is fragment of custom functions in node graph. This feature has been removed for now, as it was very broken
-}
-
 async function deserialize(json: string, parent?: string) {
   shouldUpdate = false;
   if (json === "") {
@@ -879,15 +777,15 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
   switch (sn.nodeType) {
     case "Number":
       node = new NumberNode(
-        (id) => genericUpdate(id, editor, area),
-        (cont) => genericUpdateControl(cont, editor, area)
+        (id) => genericUpdate(id, editor, area, engine, update),
+        (cont) => genericUpdateControl(cont, area)
       );
       break;
     case "Math":
       node = new MathOpNode(
         "+",
-        (id) => genericUpdate(id, editor, area),
-        (cont) => genericUpdateControl(cont, editor, area)
+        (id) => genericUpdate(id, editor, area, engine, update),
+        (cont) => genericUpdateControl(cont, area)
       );
       break;
     case "Vector":
@@ -925,28 +823,24 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
       break;
     case "Combine":
       node = new CombineNode(
-        (id) => genericUpdate(id, editor, area),
-        (cont) => genericUpdateControl(cont, editor, area),
-        (id) => callGenericUpdate(id, editor, area)
+        (id) => genericUpdate(id, editor, area, engine, update),
+        (cont) => sliderUpdateConrol(cont, area, props.engine),
+        (id) => callGenericUpdate(id, editor, area, engine, update)
       );
       break;
     case "MathFunction":
       node = new MathFunctionNode(
         "",
         "",
-        (id) => genericUpdate(id, editor, area),
-        (cont) => genericUpdateControl(cont, editor, area),
-        (id) => callGenericUpdate(id, editor, area)
+        (id) => genericUpdate(id, editor, area, engine, update),
+        (cont) => sliderUpdateConrol(cont, area, props.engine),
+        (id) => callGenericUpdate(id, editor, area, engine, update)
       );
       break;
     default:
       return new NothingNode();
   }
   node.id = sn.uuid;
-  // idMap.set(sn.uuid, node.id);
-  node.width = sn.size[0];
-  node.height = sn.size[1];
-  //node.parent = sn.parent;
   return node;
 }
 </script>
@@ -976,7 +870,7 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
               ev.dataTransfer.getData('text/plain')
             ) as UINode;
             let toCreate: Nodes | null = null;
-            uiNodes.forEach((value: Map<string, UINode>, key: string) => {
+            uiNodes.forEach((value: Map<string, UINode>) => {
               if (value && value.has(node.name)) {
                 const uiNode = value.get(node.name);
                 toCreate = uiNode ? uiNode.get() : null;

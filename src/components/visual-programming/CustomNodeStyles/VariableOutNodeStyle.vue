@@ -78,16 +78,6 @@
 <script setup lang="ts">
 import { Ref } from "rete-vue-plugin";
 
-function sortByIndex(entries: any) {
-  entries.sort((a: any, b: any) => {
-    const ai = (a[1] && a[1].index) || 0;
-    const bi = (b[1] && b[1].index) || 0;
-
-    return ai - bi;
-  });
-  return entries;
-}
-
 const props = defineProps<{
   data: {
     id: string;
@@ -111,13 +101,13 @@ function nodeStyles() {
 }
 
 function inputs() {
-  return sortByIndex(Object.entries(props.data.inputs));
+  return Object.entries(props.data.inputs) as any[];
 }
 function controls() {
-  return sortByIndex(Object.entries(props.data.controls));
+  return Object.entries(props.data.controls) as any[];
 }
 function outputs() {
-  return sortByIndex(Object.entries(props.data.outputs));
+  return Object.entries(props.data.outputs) as any[];
 }
 </script>
 

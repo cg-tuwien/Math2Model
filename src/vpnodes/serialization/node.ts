@@ -1,5 +1,4 @@
 export class SerializedNode {
-  public size: [number, number] = [0, 0];
   public position: [number, number] = [0, 0];
   public uuid: string = "";
   public inputs: NodeInput[] = [];
@@ -22,7 +21,6 @@ export class SerializedNode {
 }
 
 export function toSerializedNode(obj: {
-  size: [number, number];
   position: [number, number];
   uuid: string;
   inputs: NodeInput[];
@@ -32,7 +30,6 @@ export function toSerializedNode(obj: {
   extraNumberInformation?: ExtraNumberInformation[];
 }) {
   const sn = new SerializedNode();
-  sn.size = obj.size;
   sn.position = obj.position;
   sn.uuid = obj.uuid;
   sn.inputs = obj.inputs;

@@ -3,6 +3,7 @@ fn sampleObject(input: vec2f) -> vec3f {
   let a = time;
   let b = screen;
   let c = mouse;
+  let d = extra;
   return vec3(input, 0.0); 
 }
 //// END sampleObject

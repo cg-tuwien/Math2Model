@@ -9,14 +9,18 @@ import { SliderControl } from "@/vpnodes/controls/slider";
 import { ClassicPreset } from "rete";
 import { vec2, vec3 } from "webgpu-matrix";
 import { type SerializedNode } from "@/vpnodes/serialization/node";
-import { typeToValueCode, valueToType } from "@/vpnodes/basic/functions";
+import {
+  typeToValueCode,
+  typeToValueStringCode,
+  valueToType,
+} from "@/vpnodes/basic/functions";
 import type { Nodes } from "../nodes-list";
 
 export class CombineNode extends VPNode {
   private cfControl: SliderControl;
   constructor(
     private update: (id: string) => void,
-    private updateControl: (c: ClassicPreset.Control) => void,
+    private updateControl: (c: SliderControl) => void,
     private noDebounceUpdate: (id: string) => void
   ) {
     super("Combine Shapes");
@@ -68,7 +72,7 @@ export class CombineNode extends VPNode {
     const { param1, param2, param3 } = inputs;
     const p1 = param1 ? param1[0].refId : "vec3f(0.0, 0.0, 0.0)";
     const p2 = param2 ? param2[0].refId : "vec3f(0.0, 0.0, 0.0)";
-    const p3 = param3 ? param3[0].refId : this.cfControl.value;
+    const p3 = param3 ? param3[0].refId : this.cfControl.sliderValue;
     if (param3 && this.hasControl("cfactor")) {
       this.removeControl("cfactor");
     } else if (!param3 && !this.hasControl("cfactor")) {
@@ -122,7 +126,7 @@ export class MathFunctionNode extends VPNode {
     private name: string,
     private func: string,
     private update: (id: string) => void,
-    private updateControl: (c: ClassicPreset.Control) => void,
+    private updateControl: (c: SliderControl) => void,
     private noDebounceUpdate: (id: string) => void,
     private isApply: boolean = true,
     private inputType: "f32" | "vec2f" | "vec3f" | "vec4f" | "any" = "any",
@@ -196,23 +200,23 @@ export class MathFunctionNode extends VPNode {
       if (k[1] === "same") {
         funcCall = funcCall.replaceAll(
           k[0],
-          typeToValueCode(
+          typeToValueStringCode(
             valueToType(param ? param[0].value : vec2.create(0.0, 0.0)),
-            control?.value ?? 0.0,
-            control?.value ?? 0.0,
-            control?.value ?? 0.0,
-            control?.value ?? 0.0
+            control?.sliderValue ?? "0.0",
+            control?.sliderValue ?? "0.0",
+            control?.sliderValue ?? "0.0",
+            control?.sliderValue ?? "0.0"
           )
         );
       } else {
         funcCall = funcCall.replaceAll(
           k[0],
-          typeToValueCode(
+          typeToValueStringCode(
             k[1],
-            control?.value ?? 0.0,
-            control?.value ?? 0.0,
-            control?.value ?? 0.0,
-            control?.value ?? 0.0
+            control?.sliderValue ?? "0.0",
+            control?.sliderValue ?? "0.0",
+            control?.sliderValue ?? "0.0",
+            control?.sliderValue ?? "0.0"
           )
         );
       }
