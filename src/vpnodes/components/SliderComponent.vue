@@ -2,6 +2,7 @@
 const props = defineProps<{
   data: {
     value: number;
+    hotValue: boolean;
     step: number;
     max: number;
     min: number;
@@ -26,8 +27,19 @@ const props = defineProps<{
     :step="props.data.step"
     :max="props.data.max"
     :min="props.data.min"
-    v-on:update-value="(v: number) => props.data.updateValue(v)"
-    v-on:dragend="() => props.data.noDebounceChange()"
+    v-on:update-value="
+      (v: number) => {
+        props.data.noDebounceChange(v);
+        props.data.updateValue(v ?? 0.0);
+      }
+    "
+    v-on:dragstart="props.data.hotValue = true"
+    v-on:dragend="
+      () => {
+        props.data.hotValue = false;
+        props.data.noDebounceChange();
+      }
+    "
     v-on:pointerdown.stop=""
     tooltip
   ></n-slider>
@@ -37,7 +49,12 @@ const props = defineProps<{
     :step="props.data.step"
     :min="props.data.min"
     :max="props.data.max"
-    v-on:update-value="(v: number | null) => props.data.change(v)"
+    v-on:update-value="
+      (v: number | null) => {
+        props.data.change(v);
+        props.data.updateValue(v ?? 0.0);
+      }
+    "
     v-on:click="(v: number | null) => props.data.updateValue(v ?? 0.0)"
     v-on:pointerdown.stop=""
   >

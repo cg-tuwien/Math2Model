@@ -427,6 +427,29 @@ export function typeToValueCode(
   }
 }
 
+export function typeToValueStringCode(
+  type: string,
+  valueX?: string,
+  valueY?: string,
+  valueZ?: string,
+  valueW?: string
+): string {
+  switch (type) {
+    case "i32":
+      return valueX?.toString() ?? "0";
+    case "f32":
+      return valueX ?? "0.0";
+    case "vec2f":
+      return `vec2f(${valueX ?? "0.0"}, ${valueY ?? "0.0"})`;
+    case "vec3f":
+      return `vec3f(${valueX ?? "0.0"}, ${valueY ?? "0.0"}, ${valueZ ?? "0.0"})`;
+    case "vec4f":
+      return `vec4f(${valueX ?? "0.0"}, ${valueY ?? "0.0"}, ${valueZ ?? "0.0"}, ${valueW ?? "0.0"})`;
+    default:
+      return "";
+  }
+}
+
 export function typeToValue(
   type: string,
   valueX?: number,

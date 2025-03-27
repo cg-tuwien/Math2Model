@@ -84,26 +84,25 @@ export class VPNode extends ClassicPreset.Node {
 
   updateSize(area?: AreaPlugin<any, any>) {
     this.width = 180 + (this.extraWidth ?? 0);
-    this.height =
-      140 +
-      (this.extraHeight ?? 0) +
-      (20 + (this.extraHeightSockets ?? 0)) *
-        (Object.keys(this.inputs).length + Object.keys(this.outputs).length) +
-      (30 + (this.extraHeightControls ?? 0)) *
+    this.height = 140 + (this.extraHeight ?? 0);
+    if (this.inputs && this.outputs)
+      this.height +=
+        (20 + (this.extraHeightSockets ?? 0)) *
+        (Object.keys(this.inputs).length + Object.keys(this.outputs).length);
+    if (this.controls)
+      this.height +=
+        (30 + (this.extraHeightControls ?? 0)) *
         Object.keys(this.controls).length;
     if (area) area.update("node", this.id);
   }
 
   serialize(sn: SerializedNode) {
-    sn.size = [this.width, this.height];
     sn.parent = this.parent;
     sn.uuid = this.id;
     return sn;
   }
 
-  deserialize(sn: SerializedNode) {
-    this.updateSize();
-  }
+  deserialize(sn: SerializedNode) {}
 
   clone(): Nodes | void {}
 }
@@ -178,6 +177,7 @@ export class VariableOutNode extends VPNode {
     super(ref ?? "Variable");
 
     this.addOutput("value", new ClassicPreset.Output(reteSocket, "out"));
+    this.updateSize();
   }
 
   data(): { value: NodeReturn } {
@@ -223,6 +223,7 @@ export class VariableInNode extends VPNode {
     super(ref);
 
     this.addInput("value", new ClassicPreset.Input(reteSocket, "set"));
+    this.updateSize();
   }
 
   data(inputs: { value: NodeReturn[] }): { value: NodeReturn } {
@@ -280,6 +281,7 @@ export class FunctionCallNode extends VPNode {
     }
 
     this.addOutput("value", new ClassicPreset.Output(reteSocket, "Result"));
+    this.updateSize();
   }
 
   data(inputs: {
@@ -391,6 +393,7 @@ export class InitializeNode extends VPNode {
       new ClassicPreset.InputControl("text", { initial: "vec3f(0, 0, 0)" })
     );
     this.addOutput("value", new ClassicPreset.Output(reteSocket, "Value"));
+    this.updateSize();
   }
 
   data(): { value: NodeReturn } {

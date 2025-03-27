@@ -46,7 +46,7 @@ export class NumberNode extends VPNode {
   }
 
   data(): { value: NodeReturn } {
-    const control: SliderControl | null = this.valueControl;
+    const control: NumberControl | null = this.valueControl;
     let result = {
       value: {
         value: parseFloat(control?.value?.toFixed(20) ?? "0.0"),
@@ -67,7 +67,7 @@ export class NumberNode extends VPNode {
 
   serialize(sn: SerializedNode): SerializedNode {
     sn.nodeType = "Number";
-    const control: SliderControl | null = this.valueControl;
+    const control: NumberControl | null = this.valueControl;
 
     if (control) {
       sn.inputs = [
@@ -147,7 +147,6 @@ export class MathOpNode extends VPNode {
     this.addControl("left", this.leftControl);
     this.addControl("right", this.rightControl);
     this.addOutput("value", new ClassicPreset.Output(reteSocket, "Result/any"));
-
     this.extraWidth = 10;
     this.extraHeight = 25;
 
@@ -186,9 +185,6 @@ export class MathOpNode extends VPNode {
     }
 
     const value = applyOperator(leftValue, rightValue, this.operator);
-    console.log("LeftValue " + valueToType(leftValue));
-    console.log("RightValue " + valueToType(rightValue));
-    console.log("MathOp result " + valueToType(value));
     const code =
       nodeToVariableDeclaration(this) +
       " = " +
