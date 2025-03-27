@@ -18,6 +18,7 @@ import {
   concatArrayBuffers,
   createShaderWithPipeline,
 } from "./GPUUtils";
+const DEBUGGER_ACTIVE = false;
 // Unchanging props! No need to watch them.
 // Base structure Taken from https://webgpu.github.io/webgpu-samples/?sample=rotatingCube#main.ts
 const iif = (cond: any, obj: any) => (cond ? [obj] : []);
@@ -38,7 +39,12 @@ const shaderPipelinesMap = ref<
 >(new Map());
 
 function parseOutDebugInfo(buf: ArrayBuffer) {
-  return;
+  if(!DEBUGGER_ACTIVE)
+  {
+    console.log("Debugger inactive");
+    return;
+  }
+  console.log("Debugger:");
   const floats = new Float32Array(buf);
   const ints = new Int32Array(buf);
   let index = ints[0];
@@ -336,24 +342,20 @@ export async function mainExport(
   );
   const debugBufferSize = 64 * 1024; // 64KB Debug Buffer
 
-  const debugInfoBuffer = import.meta.env.DEV
-    ? device.createBuffer({
+  const debugInfoBuffer = device.createBuffer({
         label: "Debug info buffer",
         size: debugBufferSize,
         usage:
           GPUBufferUsage.COPY_DST |
           GPUBufferUsage.COPY_SRC |
           GPUBufferUsage.STORAGE,
-      })
-    : null;
+      });
 
-  const debugOutBuffer = import.meta.env.DEV
-    ? device.createBuffer({
+  const debugOutBuffer = device.createBuffer({
         label: "Debug out buffer",
         size: debugBufferSize,
         usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-      })
-    : null;
+      });
 
   let numberBuffersArray: GPUBuffer[] = [];
   for (let i = 0; i < 200; i++) {
@@ -701,15 +703,17 @@ export async function mainExport(
         dispatchVerticesStage,
         commandEncoder
       );
-      if (import.meta.env.DEV)
+      if (import.meta.env.DEV && DEBUGGER_ACTIVE)
         simpleB2BSameSize(debugInfoBuffer, debugOutBuffer, commandEncoder);
       setTimeout(() => {
-        if (import.meta.env.DEV) {
+        if (import.meta.env.DEV  && DEBUGGER_ACTIVE) 
+          {
           debugOutBuffer
             .mapAsync(GPUMapMode.READ, 0, debugOutBuffer.size)
             .then(() => {
               var data: any = debugOutBuffer.getMappedRange().slice();
               debugOutBuffer.unmap();
+              console.log("Got debug buffer data");
               parseOutDebugInfo(data);
             });
         }

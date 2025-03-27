@@ -176,7 +176,7 @@ struct ForceRenderFlag {
 @group(2) @binding(2) var<storage, read_write> patches_to_buffer : Patches;
 @group(2) @binding(3) var<uniform> force_render: ForceRenderFlag;
 
-// @group(2) @binding(4) var<storage, read_write> debugBuffer: BufferDebugInfo;
+@group(2) @binding(4) var<storage, read_write> debugBuffer: BufferDebugInfo;
 fn triangle_area(a: vec3<f32>, b: vec3<f32>, c: vec3<f32>) -> f32 {
     return 0.5 * length(cross(b - a, c - a));
 }
@@ -234,7 +234,7 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
 
     // --- End of debug entry addition
 
-    let isflat = (export_config.ignoreMaxCurvature != 0u) && (curvature/6f > export_config.earlyExitMaxCurvature);
+    let isflat = (export_config.ignoreMaxCurvature != 0u) && (curvature/6f >= export_config.earlyExitMaxCurvature);
     let totalVLength = v_length[0] + v_length[1] + v_length[2] + v_length[3];
     let totalULength = u_length[0] + u_length[1] + u_length[2] + u_length[3];
     let isSmall = (export_config.ignoreMinSize != 0u) && (totalULength + totalVLength < export_config.earlyExitMinSize && totalULength + totalVLength > EPSILON/100f);
@@ -249,7 +249,7 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
             isflat && (verifyNormals > 3.8f) && size_val > 0f
         )
         ||
-         (planarity >= planarityThreshold && export_config.ignorePlanarity != 0u)
+         ((planarity >= planarityThreshold || (planarity < 0. && curvature >= 6.-EPSILON)) && export_config.ignorePlanarity != 0u)
       );
 
     // debugBuffer.patch_infos[debug_index].planarity = planarity;
@@ -444,7 +444,7 @@ fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>,
         let trace = cov[0][0] + cov[1][1] + cov[2][2];
         var planarity_local = 1.0 - (lambda_min);
         // wgsl hack, if planarity would be exactly one, aka a perfect plane, the function breaks down and returns NaN, but min() returns the non NaN value when possible
-        planarity_local = max(0.,planarity_local); 
+        planarity_local = max(-1.,planarity_local); 
         planarity_score = planarity_local;
         if(patch_index <= 1000000u)
         {
