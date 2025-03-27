@@ -249,7 +249,9 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
             isflat && (verifyNormals > 3.8f) && size_val > 0f
         )
         ||
-         ((planarity >= planarityThreshold || (planarity < 0. && curvature >= 6.-EPSILON)) && export_config.ignorePlanarity != 0u)
+         ((planarity >= planarityThreshold) && export_config.ignorePlanarity != 0u)
+         ||
+         (planarity < 0. && curvature >= 6.-EPSILON)
       );
 
     // debugBuffer.patch_infos[debug_index].planarity = planarity;
