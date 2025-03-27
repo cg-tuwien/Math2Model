@@ -20,7 +20,7 @@ import {
 } from "./GPUUtils";
 // Unchanging props! No need to watch them.
 // Base structure Taken from https://webgpu.github.io/webgpu-samples/?sample=rotatingCube#main.ts
-
+const iif = (cond: any, obj: any) => (cond ? [obj] : []);
 const shaderPipelinesMap = ref<
   Map<
     FilePath,
@@ -37,16 +37,14 @@ const shaderPipelinesMap = ref<
   >
 >(new Map());
 
-function parseOutDebugInfo(buf: ArrayBuffer)
-{
+function parseOutDebugInfo(buf: ArrayBuffer) {
+  return;
   const floats = new Float32Array(buf);
   const ints = new Int32Array(buf);
   let index = ints[0];
   let count = ints[1];
-  debugger;
   let i = 4;
-  while(i < floats.length)
-  {
+  while (i < floats.length) {
     var minX = floats[i++];
     var minY = floats[i++];
     var maxX = floats[i++];
@@ -56,12 +54,12 @@ function parseOutDebugInfo(buf: ArrayBuffer)
     var curvature = floats[i++];
     var planarity = floats[i++];
     var size = floats[i++];
-    i+=3;
+    i += 3;
     var vec1x = floats[i++];
     var vec1y = floats[i++];
     var vec1z = floats[i++];
     var vec1w = floats[i++];
-    
+
     var vec2x = floats[i++];
     var vec2y = floats[i++];
     var vec2z = floats[i++];
@@ -74,7 +72,7 @@ function parseOutDebugInfo(buf: ArrayBuffer)
       criteria: {
         planarity: planarity,
         size: size,
-        curvature: curvature
+        curvature: curvature,
       },
       v1: {
         x: vec1x,
@@ -86,12 +84,11 @@ function parseOutDebugInfo(buf: ArrayBuffer)
         x: vec2x,
         y: vec2y,
         z: vec2z,
-        z2: vec2w
-      }
-    }
+        z2: vec2w,
+      },
+    };
     console.log("DEBUG STRUCT: ", structure);
-    if(size == 0)
-    {
+    if (size == 0) {
       return;
     }
   }
@@ -107,6 +104,8 @@ export async function mainExport(
 ): Promise<any> {
   const _adapter = await navigator.gpu.requestAdapter(); // Wait for Rust backend to be in business
   const device = props.gpuDevice;
+
+  console.log("Setting up exporter");
   const sceneUniformsLayout = createBindGroupLayout(
     GPUShaderStage.COMPUTE,
     ["uniform", "uniform", "uniform"],
@@ -326,34 +325,38 @@ export async function mainExport(
     lodExportParametersRefs.minSize.value,
     lodExportParametersRefs.maxCurvature,
     lodExportParametersRefs.acceptablePlanarity.value,
-    0,0,0
+    0,
+    0,
+    0,
   ]);
   const lodStageParametersBuffer = createBufferWith(
     props,
     concatArrayBuffers(props, [lodStageParameters]),
     GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM
   );
-  const debugBufferSize = 64 * 1024; // 64KB (adjust as needed)
+  const debugBufferSize = 64 * 1024; // 64KB Debug Buffer
 
-  const debugInfoBuffer = device.createBuffer({
-    label: "Debug info buffer",
-    size: debugBufferSize,
-    usage:
-      GPUBufferUsage.COPY_DST |
-      GPUBufferUsage.COPY_SRC |
-      GPUBufferUsage.STORAGE,
-  });
+  const debugInfoBuffer = import.meta.env.DEV
+    ? device.createBuffer({
+        label: "Debug info buffer",
+        size: debugBufferSize,
+        usage:
+          GPUBufferUsage.COPY_DST |
+          GPUBufferUsage.COPY_SRC |
+          GPUBufferUsage.STORAGE,
+      })
+    : null;
 
-  const debugOutBuffer = device.createBuffer({
-    label: "Debug out buffer",
-    size: debugBufferSize,
-    usage:
-      GPUBufferUsage.COPY_DST |
-      GPUBufferUsage.MAP_READ
-  });
+  const debugOutBuffer = import.meta.env.DEV
+    ? device.createBuffer({
+        label: "Debug out buffer",
+        size: debugBufferSize,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+      })
+    : null;
 
   let numberBuffersArray: GPUBuffer[] = [];
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 200; i++) {
     numberBuffersArray.push(
       createBufferWith(
         props,
@@ -411,25 +414,38 @@ export async function mainExport(
         break;
       }
     }
+    if (!isRightDownloadTarget) {
+      // console.log("Not right download target");
+      return;
+    }
+    // if(toDownload.length != 0)
+    //   console.log("Trying to download ",  toDownloadModel, " index ", toDownloadIndex);
     if (
       toDownload.length != 0 &&
       (!isRightDownloadTarget ||
         toDownloadModel == null ||
         triggerDownload.value == false)
     ) {
+      // console.log("Early exit because is wrong download target: ", !isRightDownloadTarget);
+      // console.log("or maybe to download model doesnt exist??", toDownloadModel == null);
+      // console.log("Is download not triggered?",triggerDownload.value == false)
       return;
     }
     let instanceToDownload =
       toDownloadModel == null ? 0 : toDownloadModel.currentInstance;
 
-    if (!isRightDownloadTarget) return;
     if (toDownload.length != 0) {
       if (instanceToDownload >= instanceCount) {
-        toDownload.splice(toDownloadIndex, 1);
-        console.log("Removed " + toDownload + " because it was done");
+        console.log(`Finished exporting instances of ${uuid}`);
+        //toDownload[toDownloadIndex].currentInstance++;
+        //if (toDownload[toDownloadIndex].currentInstance >= instanceCount) {
+        //  toDownload.splice(toDownloadIndex, 1);
+        //  console.log("Removed " + uuid + " because it was done");
+        //}
         return;
       }
     }
+
     const compiledShader = shaderPipelinesMap.value.get(
       makeFilePath(shaderPath)
     );
@@ -513,7 +529,7 @@ export async function mainExport(
       lodExportParametersRefs.acceptablePlanarity.value * 0.05 + 0.95,
       0,
       0,
-      0
+      0,
     ]);
 
     let boolaccess = new Uint32Array(lodStageParameters.buffer);
@@ -543,7 +559,7 @@ export async function mainExport(
     );
 
     if (toDownload.length != 0) {
-      console.log("Filtering!");
+      // console.log("Filtering!");
       let computePassFilterInstance = commandEncoder.beginComputePass();
       computePassFilterInstance.label = "filter instance pass";
       computePassFilterInstance.setPipeline(filterInstanceIdPipeline.pipeline);
@@ -554,7 +570,7 @@ export async function mainExport(
         0
       );
       computePassFilterInstance.end();
-      console.log("Filtering done");
+      // console.log("Filtering done");
       simpleB2BSameSize(buffers.patches1, buffers.patches0, commandEncoder);
     }
     // loop entire process, duplicate entire commandEncoder procedure "doubleNumberOfRounds" times to get more subdivision levels
@@ -629,6 +645,7 @@ export async function mainExport(
     }
     if (isRightDownloadTarget && toDownloadModel != null) {
       triggerDownload.value = false;
+      console.log("Started download of " + toDownloadModel.name);
       // Prepare vertices output
 
       let bindGroupVertPrep = createSimpleBindGroup(
@@ -684,29 +701,28 @@ export async function mainExport(
         dispatchVerticesStage,
         commandEncoder
       );
-
-      simpleB2BSameSize(debugInfoBuffer,debugOutBuffer,commandEncoder);
+      if (import.meta.env.DEV)
+        simpleB2BSameSize(debugInfoBuffer, debugOutBuffer, commandEncoder);
       setTimeout(() => {
-        debugOutBuffer.mapAsync(
-          GPUMapMode.READ, 0, debugOutBuffer.size
-        ).then(
-          () => 
-          {
-            var data: any = debugOutBuffer.getMappedRange().slice();
-            debugOutBuffer.unmap();
-            parseOutDebugInfo(data);
-          }
-        );
+        if (import.meta.env.DEV) {
+          debugOutBuffer
+            .mapAsync(GPUMapMode.READ, 0, debugOutBuffer.size)
+            .then(() => {
+              var data: any = debugOutBuffer.getMappedRange().slice();
+              debugOutBuffer.unmap();
+              parseOutDebugInfo(data);
+            });
+        }
         vertReadableBuffer
           .mapAsync(GPUMapMode.READ, 0, vertReadableBuffer.size)
           .then(() => {
             toDownloadModel.currentInstance++;
-            console.log(
-              "Memory mapped the buffer for " +
-                name +
-                " instance " +
-                instanceToDownload
-            );
+            // console.log(
+            //   "Memory mapped the buffer for " +
+            //     name +
+            //     " instance " +
+            //     instanceToDownload
+            // );
             if (instanceToDownload >= instanceCount - 1) {
               toDownload.splice(toDownloadIndex, 1);
               //console.log("Removed " + toDownload + " because it was done");
@@ -715,18 +731,18 @@ export async function mainExport(
               .getMappedRange(0, vertReadableBuffer.size)
               .slice();
             const vertexStream = new Float32Array(arrayBuffer);
-            console.log(vertexStream.slice(0, 1000));
+            // console.log(vertexStream.slice(0, 1000));
             vertReadableBuffer.unmap();
-            if (downloadAll) {
-              triggerDownload.value = true;
-            }
 
             exportMeshFromPatches(
               vertexStream,
               lodExportParametersRefs.includeUVs.value,
               uuid,
-              downloadAll
+              toDownload.length > 0
             );
+            if (downloadAll || toDownload.length > 0) {
+              triggerDownload.value = true;
+            }
           });
       }, 1);
     }

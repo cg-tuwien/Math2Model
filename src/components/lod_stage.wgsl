@@ -175,8 +175,8 @@ struct ForceRenderFlag {
 @group(2) @binding(1) var<storage, read> patches_from_buffer : PatchesRead;
 @group(2) @binding(2) var<storage, read_write> patches_to_buffer : Patches;
 @group(2) @binding(3) var<uniform> force_render: ForceRenderFlag;
-@group(2) @binding(4) var<storage, read_write> debugBuffer: BufferDebugInfo;
 
+// @group(2) @binding(4) var<storage, read_write> debugBuffer: BufferDebugInfo;
 fn triangle_area(a: vec3<f32>, b: vec3<f32>, c: vec3<f32>) -> f32 {
     return 0.5 * length(cross(b - a, c - a));
 }
@@ -214,11 +214,14 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
 
     let simab = cosinesim(normala, normalb);
     let simcd = cosinesim(normalc, normald);
+    let simac = cosinesim(normala, normalc);
+    let simbd = cosinesim(normalb, normald);
+    let simad = cosinesim(normala, normald);
+    let simbc = cosinesim(normalb, normalc);
 
     // Compute additional debug info.
     let size_val = calculateWorldSpaceSizeOfPatch(quad);
-    let curvature = simab + simcd; // Example curvature computation.
-    var debug_index = atomicAdd(&debugBuffer.index, 1u);
+    let curvature = simab+simcd+simac+simbd+simad+simbc; // curvature computation.
     // Add a debug entry into debugBuffer:
     // debugBuffer.patch_infos[debug_index].p.instance = 500u;
     // debugBuffer.patch_infos[debug_index].p.min = vec2(-10.1,-10.2);
@@ -231,7 +234,7 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
 
     // --- End of debug entry addition
 
-    let isflat = (export_config.ignoreMaxCurvature != 0u) && (curvature/2f > export_config.earlyExitMaxCurvature);
+    let isflat = (export_config.ignoreMaxCurvature != 0u) && (curvature/6f > export_config.earlyExitMaxCurvature);
     let totalVLength = v_length[0] + v_length[1] + v_length[2] + v_length[3];
     let totalULength = u_length[0] + u_length[1] + u_length[2] + u_length[3];
     let isSmall = (export_config.ignoreMinSize != 0u) && (totalULength + totalVLength < export_config.earlyExitMinSize && totalULength + totalVLength > EPSILON/100f);
@@ -252,10 +255,11 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
     // debugBuffer.patch_infos[debug_index].planarity = planarity;
     // debugBuffer.patch_infos[debug_index].curvature = (simab + simcd);
     // debugBuffer.patch_infos[debug_index].size = 5f;
-   debugBuffer.patch_infos[debug_index] = PatchInfo(quad, curvature, planarity, max(EPSILON,size_val), vec4f(normala,0.), vec4f(verifyNormals,0f,0f,0f));
-    debugBuffer.patch_infos[debug_index].v1 = vec4f(sampleObject(quad.min),0.);
-    debugBuffer.patch_infos[debug_index].v2 = vec4f(sampleObject(quad.max),55.);
-    atomicAdd(&debugBuffer.patch_count, 1u);
+//     var debug_index = atomicAdd(&debugBuffer.index, 1u);
+//    debugBuffer.patch_infos[debug_index] = PatchInfo(quad, curvature, planarity, max(EPSILON,size_val), vec4f(normala,0.), vec4f(verifyNormals,0f,0f,0f));
+//     debugBuffer.patch_infos[debug_index].v1 = vec4f(sampleObject(quad.min),0.);
+//     debugBuffer.patch_infos[debug_index].v2 = vec4f(sampleObject(quad.max),55.);
+//     atomicAdd(&debugBuffer.patch_count, 1u);
 
     
     // var p = getWorldPatch(quad);

@@ -1,3 +1,5 @@
+import { number } from "zod";
+
 export class ExporterInstance {
   public vertPositions: { x: number; y: number; z: number }[] = [];
   public tris: number[] = [];
@@ -224,6 +226,7 @@ export class ExporterInstance {
   }
 
   private EarClipping(vp: any[]): void {
+
     let baseIndex = this.vertPositions.length;
     let indexMapping: number[] = new Array(vp.length).fill(-1);
     let j = 0;
@@ -255,7 +258,7 @@ export class ExporterInstance {
       const v1 = vp[(i + offset) % vp.length];
       const v2 = vp[(i + 1 + offset) % vp.length];
       const v3 = vp[(i + 2 + offset) % vp.length];
-
+      
       loopDetection++;
       if (vp.length === 2 && loopDetection > vp.length) {
         vp.length = 0; // Clear array
@@ -267,7 +270,7 @@ export class ExporterInstance {
         (v1.uv.x === v2.uv.x && v2.uv.x === v3.uv.x) ||
         (v1.uv.y === v2.uv.y && v2.uv.y === v3.uv.y)
       ) {
-        if (loopDetection > 1000) {
+        if (loopDetection > 100) {
           vp.length = 0; // Clear array to prevent infinite loops
           break;
         }
@@ -276,6 +279,10 @@ export class ExporterInstance {
 
       vp.splice((i + 1 + offset) % vp.length, 1); // Remove ear vertex
 
+      if (v1.globalIndex == v2.globalIndex || v2.globalIndex == v3.globalIndex || v1.globalIndex == v3.globalIndex)
+        {
+          continue;
+        }
       switch (this.normalsType) {
         case 1:
           this.tris.push(v1.globalIndex, v3.globalIndex, v2.globalIndex);

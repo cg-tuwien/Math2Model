@@ -16,6 +16,7 @@ import {
 } from "@/filesystem/scene-file";
 import { assert } from "@stefnotch/typestef/assert";
 import { useExportStore } from "@/stores/export-store";
+
 const activeTab = ref("preview"); // Default active tab
 
 const exportStore = useExportStore();
@@ -49,6 +50,7 @@ const currentDownloadItem: Ref<string> = ref("Nothing");
 const ignoreMinSize: Ref<boolean> = ref(true);
 const ignoreCurvature: Ref<boolean> = ref(true);
 const ignorePlanarity: Ref<boolean> = ref(true);
+const somethingInProgress: Ref<boolean> = ref(false);
 
 let exportSteps = 0;
 let exportStepsDone = 0;
@@ -62,7 +64,7 @@ async function exportMeshBuffer(name: string) {
   let i = 0;
   if (!canceled) {
     if (mergeModels.value) {
-      console.log("Mesh buffer:",meshBuffer);
+      // console.log("Mesh buffer:",meshBuffer);
       await exportMeshes(meshBuffer, name);
       meshBuffer.length = 0;
     } else {
@@ -137,13 +139,14 @@ async function bufferMeshesForExport(
   uuid: string,
   buffer: boolean
 ) {
+  console.log("Buffer meshes for export call started");
   let progressPerStep = 1 / exportSteps;
   let name = uuid;
-  let looped = false;
-  if (toDownload.value.length == 0) {
-    buffer = false;
-    looped = true;
-  }
+  //let looped = false;
+  //if (toDownload.value.length == 0) {
+  //  buffer = false;
+  //  looped = true;
+  //}
 
   let scenePromise = fetchScene();
 
@@ -151,7 +154,7 @@ async function bufferMeshesForExport(
   let scene = await scenePromise;
   for (const [instance_id, patches] of instanceMapPatches) {
     // Bake edge information
-    console.log("Patch count",patches.length, " on mesh " + uuid);
+    // console.log("Patch count",patches.length, " on mesh " + uuid);
     let edgeInformation = analyzeEdges(patches);
 
     let exporterInstance: ExporterInstance = new ExporterInstance(
@@ -165,7 +168,7 @@ async function bufferMeshesForExport(
     exporterInstance.exportProgressToDo = progressPerStep * 0.5;
     exporterInstance.Run();
 
-    console.log("Exporter instance gave out ",exporterInstance.tris.length);
+    // console.log("Exporter instance gave out ",exporterInstance.tris.length);
     let sceneModel: any = null;
     models.value.forEach((localModel) => {
       if (localModel.uuid == uuid) {
@@ -191,15 +194,19 @@ async function bufferMeshesForExport(
       instance_id: instance_id,
     });
     name = sceneModel.name;
-    console.log(
-      "Mesh has " +
-        exporterInstance.vertPositions.length +
-        " vertices on instance#" +
-        instance_id
-    );
+    // console.log(
+    //   "Mesh has " +
+    //     exporterInstance.vertPositions.length +
+    //     " vertices on instance#" +
+    //     instance_id
+    // );
   }
   exportStepsDone++;
-  if (toDownload.value.length != 0) return;
+  // console.log("To download: ", toDownload);
+  
+  console.log("Buffer meshes for export call checking if export done");
+  if (buffer) return;
+  console.log("Downloading. To download: ", JSON.stringify(toDownload.value));
   exportMeshBuffer(name);
 }
 
@@ -260,8 +267,8 @@ function exportMeshFromPatches(
     patch_verts = [];
   }
 
-  console.log("Got request to export mesh " + name);
-  console.log(toDownload.value);
+  // console.log("Got request to export mesh " + name);
+  // console.log(toDownload.value);
   for (const [instance_id, patchstructure] of patches) {
     for (let i = 0; i < patchstructure.length; i++) {
       for (let j = 0; j < 4; j++) {
@@ -331,7 +338,6 @@ let lodStageCallback = await mainExport(
   },
   onFrame
 );
-
 async function beginExportProcess() {
   canceled = false;
   triggerDownload.value = true;
@@ -342,13 +348,13 @@ async function beginExportProcess() {
   let scene = deserializeScene(await sceneFile);
   props.engine.setLodStage(lodStageCallback);
   scene.models.forEach((model) => {
-    if (downloadTarget.value !== "")
-      console.log(
-        "Searching for download target " +
-          downloadTarget.value +
-          " candidate: " +
-          model.id
-      );
+    // if (downloadTarget.value !== "")
+    //   console.log(
+    //     "Searching for download target " +
+    //       downloadTarget.value +
+    //       " candidate: " +
+    //       model.id
+    //   );
     if (downloadTarget.value == "") {
       toDownload.value.push({ name: model.id, currentInstance: 0 });
       toDownloadSteps += model.instanceCount;
@@ -360,7 +366,7 @@ async function beginExportProcess() {
     }
   });
   exportSteps = toDownloadSteps; //toDownload.value.length;
-  console.log("To download: ", toDownload);
+  // console.log("To download: ", toDownload);
 }
 
 function abortExport() {
@@ -384,6 +390,8 @@ function toggleExportPreview() {
 
 updateExportPreview();
 </script>
+
+
 <template>
   <n-card title="Exporter" size="small" class="h-full overflow-y-auto">
     <n-tabs v-model:selected="activeTab">
