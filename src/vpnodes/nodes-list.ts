@@ -349,6 +349,29 @@ export function useUiNodes(
           },
         ],
         [
+          "Arcus Tangens 2",
+          {
+            name: "Arcus Tangens 2",
+            type: "APPLY",
+            prefix: "",
+            image: WaveSine,
+            get: () => {
+              return new MathFunctionNode(
+                "atan2",
+                "atan2(input2.x, input2.y)",
+                (id) => genericUpdate(id, editor, area, engine, update),
+                (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
+                (id) => callGenericUpdate(id, editor, area, engine, update),
+                false,
+                "vec2f",
+                "any"
+              );
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
+        [
           "Arcus Cosine",
           {
             name: "Arcus Cosine",
