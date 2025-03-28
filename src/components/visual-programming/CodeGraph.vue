@@ -2,7 +2,15 @@
 import { AreaExtensions, AreaPlugin } from "rete-area-plugin";
 import { Presets as VuePresets, VuePlugin } from "rete-vue-plugin";
 import { ClassicPreset, NodeEditor } from "rete";
-import { computed, type DeepReadonly, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  type DeepReadonly,
+  onDeactivated,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+} from "vue";
 import {
   ConnectionPlugin,
   Presets as ConnectionPresets,
@@ -145,6 +153,10 @@ onMounted(() => {
   createEditor();
 });
 
+onUnmounted(() => {
+  document.removeEventListener("keydown", keyListener);
+});
+
 watch(
   () => props.keyedGraph?.id,
   async () => {
@@ -261,6 +273,47 @@ async function paste() {
   await editor.addNode(new NothingNode());
 }
 
+function keyListener(e: KeyboardEvent) {
+  if (e.code === "Delete") del();
+  if (!e.ctrlKey && !e.metaKey) return;
+
+  switch (e.code) {
+    case "KeyY":
+      history.undo();
+      break;
+    case "KeyZ":
+      history.redo();
+      break;
+    case "KeyA":
+      e.preventDefault();
+      e.stopPropagation();
+      rearrange();
+      break;
+    case "KeyS":
+      e.preventDefault();
+      e.stopPropagation();
+      showInfo("You don't need to save!");
+      editor.addNode(new NothingNode());
+      break;
+    case "KeyC":
+      e.preventDefault();
+      e.stopPropagation();
+      copy();
+      break;
+    case "KeyV":
+      e.preventDefault();
+      e.stopPropagation();
+      paste();
+      break;
+    case "KeyD":
+      e.preventDefault();
+      e.stopPropagation();
+      duplicate();
+      break;
+    default:
+  }
+}
+
 async function checkForUnsafeConnections(
   connection: ClassicPreset.Connection<Nodes, Nodes>
 ) {
@@ -332,7 +385,7 @@ async function createEditor() {
               label: "Paste (CTRL+V)",
               key: "4",
               handler: () => {
-                void paste();
+                paste();
               },
             },
           ],
@@ -396,50 +449,16 @@ async function createEditor() {
   arrange.addPreset(ArrangePresets.classic.setup());
   history.addPreset(HistoryPresets.classic.setup());
 
-  document.addEventListener("keydown", (e) => {
-    if (e.code === "Delete") void del();
-    if (!e.ctrlKey && !e.metaKey) return;
+  document.addEventListener("keydown", keyListener);
 
-    switch (e.code) {
-      case "KeyY":
-        history.undo();
-        break;
-      case "KeyZ":
-        history.redo();
-        break;
-      case "KeyA":
-        e.preventDefault();
-        e.stopPropagation();
-        rearrange();
-        break;
-      case "KeyS":
-        e.preventDefault();
-        e.stopPropagation();
-        showInfo("You don't need to save!");
-        editor.addNode(new NothingNode());
-        break;
-      case "KeyC":
-        e.preventDefault();
-        e.stopPropagation();
-        copy();
-        break;
-      case "KeyV":
-        e.preventDefault();
-        e.stopPropagation();
-        paste();
-        break;
-      case "KeyD":
-        e.preventDefault();
-        e.stopPropagation();
-        duplicate();
-        break;
-      default:
+  area.addPipe(async (context) => {
+    // prevent zooming with double click
+    if (context.type === "zoom") {
+      if (context.data.source === "dblclick") {
+        return;
+      }
     }
-  });
-
-  document.addEventListener("dblclick", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    return context;
   });
 
   area.use(contextMenu);
