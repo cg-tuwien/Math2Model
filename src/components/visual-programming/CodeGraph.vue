@@ -320,13 +320,9 @@ function keyListener(e: KeyboardEvent) {
       editor.addNode(new NothingNode());
       break;
     case "KeyC":
-      e.preventDefault();
-      e.stopPropagation();
       copy();
       break;
     case "KeyV":
-      e.preventDefault();
-      e.stopPropagation();
       paste();
       break;
     case "KeyD":
@@ -515,7 +511,10 @@ async function createEditor() {
           if (context.payload instanceof ReturnNode) {
             return ReturnNodeStyle;
           }
-          if (context.payload instanceof VariableOutNode) {
+          if (
+            context.payload instanceof VariableOutNode ||
+            context.payload instanceof InstanceCountNode
+          ) {
             return VariableOutNodeStyle;
           }
           return DefaultNodeStyle;

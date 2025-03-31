@@ -52,7 +52,7 @@
         "emissive": [0, 0, 0],
         "diffuseTexture": "istockphoto-1360384091-170667a.jpg"
       },
-      "instanceCount": 6
+      "instanceCount": 2
     },
     {
       "type": "model",
@@ -69,7 +69,7 @@
         "emissive": [0, 0, 0],
         "diffuseTexture": "istockphoto-1360384091-170667a.jpg"
       },
-      "instanceCount": 5
+      "instanceCount": 2
     },
     {
       "type": "model",
@@ -86,7 +86,7 @@
         "emissive": [0, 0, 0],
         "diffuseTexture": "istockphoto-1360384091-170667a.jpg"
       },
-      "instanceCount": 38
+      "instanceCount": 13
     },
     {
       "type": "model",
