@@ -128,7 +128,11 @@ const container = ref<HTMLElement | null>(null);
 
 const editor = new NodeEditor<Schemes>();
 
-watchArray(props.models, () => update());
+const instanceCounts = computed(() => props.models.map((m) => m.instanceCount));
+watchArray(instanceCounts, () => {
+  console.log("Models changed, updating...");
+  update();
+});
 
 const engine = new DataflowEngine<Schemes>();
 const arrange = new AutoArrangePlugin<Schemes>();
