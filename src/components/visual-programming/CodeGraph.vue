@@ -32,7 +32,9 @@ import { ConditionNode, LogicScopeNode } from "@/vpnodes/basic/logic";
 import type { Structures } from "rete-structures/_types/types";
 import {
   useThrottleFn,
+  watchArray,
   watchDebounced,
+  watchDeep,
   watchImmediate,
   watchThrottled,
 } from "@vueuse/core";
@@ -109,7 +111,7 @@ const props = defineProps<{
   fs: ReactiveFilesystem;
   keyedGraph: DeepReadonly<KeyedGraph> | null;
   engine: WgpuEngine;
-  models: VirtualModelState[];
+  models: DeepReadonly<VirtualModelState>[];
 }>();
 
 const fileNames = ref(new Set<FilePath>());
@@ -126,9 +128,7 @@ const container = ref<HTMLElement | null>(null);
 
 const editor = new NodeEditor<Schemes>();
 
-watchThrottled(props.models, () => {
-  update();
-});
+watchArray(props.models, () => update());
 
 const engine = new DataflowEngine<Schemes>();
 const arrange = new AutoArrangePlugin<Schemes>();
