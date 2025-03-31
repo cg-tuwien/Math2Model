@@ -13,6 +13,39 @@ fn Cylinder(input2: vec2f) -> vec3f {
     return vec3f(x, y, z);
 }
 
+// Brick function taken from https://www.shadertoy.com/view/flSBDK
+fn brickWall(input2: vec2f) -> vec3f {
+    var uv = input2.xy;
+
+    // HERE - change the amount of bricks on the wall
+    var brickCount = 20.;
+    // HERE - change the height of the bricks [2, 2.5]
+    var height = 2.3;
+
+    var localUV = uv * brickCount;
+    
+    var xOffset = localUV.y % (height * 2.);
+    xOffset = step(height, xOffset);
+    
+    localUV.x += xOffset;
+    localUV.x = localUV.x % height;
+    localUV.y = localUV.y % 2.;
+    localUV -= vec2f(1., 1.);
+   
+    // HERE - change the spacing between the bricks horizontally [0, 1]
+    var brickSpacingX = 0.7;
+    var mask = 1. - step(brickSpacingX, localUV.y) * step(-brickSpacingX, localUV.y);
+    
+    // HERE - change the spacing between the bricks vertically [0, 1]
+    var brickSpacingY = 0.9;
+    mask *= 1. - (step(brickSpacingY, localUV.x) * step(-brickSpacingY, localUV.x));
+    
+    var brickColor = mask * vec3(1., 0.9, 0.);
+    var mortarColor = (1. - mask) * vec3(1., 0.5, 1.);
+    
+    return brickColor + mortarColor;
+}
+
 fn sampleObject(input: vec2f) -> vec3f {
   var positionUpdated = Cylinder(input);
   var x = positionUpdated.x;
@@ -56,9 +89,12 @@ fn sampleObject(input: vec2f) -> vec3f {
   positionUpdated.y -= 0.41;
 
   positionUpdated.y *= 4;
-  var sf = 2.3;
-  var sawtooth = ((sf * positionUpdated) - floor(sf * positionUpdated));
-  //sawtooth = sign(sin(positionUpdated*6.0));
-  //sawtooth = step(vec3f(1.9), positionUpdated);
-  return vec3f(sawtooth.x * positionUpdated.x, positionUpdated.y, sawtooth.z * positionUpdated.z);
+
+  var bricks = brickWall(input);
+  var merged = positionUpdated + bricks;
+  if (step(0.5, merged.z) == 1) {
+    merged.z = 0;
+  }
+
+  return merged;
 }

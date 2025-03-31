@@ -1,4 +1,3 @@
-
 fn Heart(input2: vec2f) -> vec3f {
 	var PI = 3.14159265359;
 	var HALF_PI = 3.14159265359 / 2.0;
@@ -43,6 +42,18 @@ fn Cylinder(input2: vec2f) -> vec3f {
     var z = sy;
 
     return vec3f(x, y, z);
+}
+fn Cube(input2: vec2f) -> vec3f {
+	var PI = 3.14159265359;
+	var HALF_PI = 3.14159265359 / 2.0;
+	var TWO_PI = 3.14159265359 * 2.0;
+    var u = input2.x * TWO_PI;
+    var v = input2.y * TWO_PI;
+    let x = sign(sin(u));
+    let y = sign(sin(u * v));
+    let z = sign(sin(v));
+	var result = vec3f(x, y, z);
+	return result;
 }
 fn mod289(x: vec4f) -> vec4f
 {
@@ -150,15 +161,15 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var ref_fb3af_1 = ref_1b67e[0];
 	var ref_fb3af_2 = ref_1b67e[1];
 	var ref_fb3af_3 = ref_1b67e[2];
-	var ref_75fae = sign(sin(ref_1b67e*1.00000000000000000000));
+	var ref_75fae = sign(sin(ref_1b67e*1));
 	var instanceId = f32(instance_id);
 	var ref_2733c = instanceId * HALF_PI;
 	var ref_480cf = ref_fb3af_2 * 1.5;
 	var ref_f7960_1 = ref_75fae[0];
 	var ref_f7960_2 = ref_75fae[1];
 	var ref_f7960_3 = ref_75fae[2];
-	var ref_b7133 = sin(1.00000000000000000000 * ref_2733c + 0.00000000000000000000);
-	var ref_7efc3 = cos(1.00000000000000000000 * ref_2733c + 0.00000000000000000000);
+	var ref_b7133 = sin(1 * ref_2733c + 0);
+	var ref_7efc3 = cos(1 * ref_2733c + 0);
 	var ref_b07c1 = ref_b7133 * ref_f7960_3;
 	var ref_76e38 = ref_fb3af_1 * ref_7efc3;
 	var ref_a33df = ref_fb3af_1 + ref_7efc3;
