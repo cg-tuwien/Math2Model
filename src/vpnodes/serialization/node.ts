@@ -86,4 +86,5 @@ type NodeType =
   | "Condition"
   | "Shape"
   | "Combine"
-  | "MathFunction";
+  | "MathFunction"
+  | "InstanceCount";

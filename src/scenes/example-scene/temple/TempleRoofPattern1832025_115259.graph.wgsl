@@ -158,7 +158,7 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var HALF_PI = 3.14159265359 / 2.0;
 	var TWO_PI = 3.14159265359 * 2.0;
 	var ref_73429 = Cylinder(input2);
-	var ref_79318 = mat3x3(vec3f(1.69999999999999995559,0.0,0.0), vec3f(0.0,1.00000000000000000000,0.0), vec3f(0.0,0.0,0.20000000000000001110)) * ref_73429;
+	var ref_79318 = mat3x3(vec3f(1.7,0.0,0.0), vec3f(0.0,1,0.0), vec3f(0.0,0.0,0.2)) * ref_73429;
 	var ref_4292c_1 = ref_79318[0];
 	var ref_4292c_2 = ref_79318[1];
 	var ref_4292c_3 = ref_79318[2];

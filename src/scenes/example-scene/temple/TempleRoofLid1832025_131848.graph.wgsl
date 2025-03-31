@@ -158,7 +158,7 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var HALF_PI = 3.14159265359 / 2.0;
 	var TWO_PI = 3.14159265359 * 2.0;
 	var ref_3cd77 = Plane(input2);
-	var ref_fd368 = mat3x3(vec3f(3.00000000000000000000,0.0,0.0), vec3f(0.0,1.00000000000000000000,0.0), vec3f(0.0,0.0,5.00000000000000000000)) * ref_3cd77;
+	var ref_fd368 = mat3x3(vec3f(3,0.0,0.0), vec3f(0.0,1,0.0), vec3f(0.0,0.0,5)) * ref_3cd77;
 	return ref_fd368;
 
 }

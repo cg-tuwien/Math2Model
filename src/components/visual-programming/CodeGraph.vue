@@ -19,6 +19,7 @@ import { ContextMenuPlugin } from "rete-context-menu-plugin";
 import {
   FunctionCallNode,
   InitializeNode,
+  InstanceCountNode,
   NothingNode,
   ReturnNode,
   VariableInNode,
@@ -29,7 +30,12 @@ import { structures } from "rete-structures";
 import { Presets as ScopesPresets, ScopesPlugin } from "rete-scopes-plugin";
 import { ConditionNode, LogicScopeNode } from "@/vpnodes/basic/logic";
 import type { Structures } from "rete-structures/_types/types";
-import { useThrottleFn } from "@vueuse/core";
+import {
+  useThrottleFn,
+  watchDebounced,
+  watchImmediate,
+  watchThrottled,
+} from "@vueuse/core";
 import {
   ArrangeAppliers,
   AutoArrangePlugin,
@@ -86,6 +92,7 @@ import { NumberControl } from "@/vpnodes/controls/number";
 import NumberComponent from "@/vpnodes/components/NumberComponent.vue";
 import type { Item } from "rete-context-menu-plugin/_types/types";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
+import type { VirtualModelState } from "@/scenes/scene-state";
 
 const emit = defineEmits<{
   update: [content: string];
@@ -102,6 +109,7 @@ const props = defineProps<{
   fs: ReactiveFilesystem;
   keyedGraph: DeepReadonly<KeyedGraph> | null;
   engine: WgpuEngine;
+  models: VirtualModelState[];
 }>();
 
 const fileNames = ref(new Set<FilePath>());
@@ -117,6 +125,11 @@ props.fs.watchFromStart((change) => {
 const container = ref<HTMLElement | null>(null);
 
 const editor = new NodeEditor<Schemes>();
+
+watchThrottled(props.models, () => {
+  update();
+});
+
 const engine = new DataflowEngine<Schemes>();
 const arrange = new AutoArrangePlugin<Schemes>();
 const area: AreaPlugin<Schemes, AreaExtra> = new AreaPlugin<Schemes, AreaExtra>(
@@ -141,7 +154,14 @@ const selector = AreaExtensions.selector();
 AreaExtensions.selectableNodes(area, selector, {
   accumulating: AreaExtensions.accumulateOnCtrl(),
 });
-const nodes = useUiNodes(editor, area, engine, props.engine, update);
+const nodes = useUiNodes(
+  editor,
+  area,
+  engine,
+  props.engine,
+  update,
+  props.models
+);
 let uiNodes: Map<string, Map<string, UINode>> = nodes.uiNodes;
 let shouldUpdate = true;
 
@@ -621,6 +641,12 @@ async function getNodesCode(
         falseCode +
         (await getNodesCode(content, visited, graph, indent));
     }
+  } else if (node instanceof InstanceCountNode) {
+    const icNode = node as InstanceCountNode;
+    const instanceCount = props.models.find(
+      (m) => m.id === icNode.modelId
+    )?.instanceCount;
+    fullCode += indent + nodeData.value.code + "f32(" + instanceCount + ");\n";
   } else {
     if (nodeData.value.code !== "")
       fullCode += indent + nodeData.value.code + "\n";
@@ -855,6 +881,9 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
         (cont) => sliderUpdateConrol(cont, area, props.engine),
         (id) => callGenericUpdate(id, editor, area, engine, update)
       );
+      break;
+    case "InstanceCount":
+      node = new InstanceCountNode("");
       break;
     default:
       return new NothingNode();

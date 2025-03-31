@@ -8,6 +8,7 @@ import { MathOpNode, NumberNode } from "./basic/math";
 import {
   FunctionCallNode,
   InitializeNode,
+  InstanceCountNode,
   NothingNode,
   ReturnNode,
   VariableInNode,
@@ -46,6 +47,7 @@ import { useDebounceFn } from "@vueuse/core";
 import type { DataflowEngine } from "rete-engine";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
 import type { SliderControl } from "./controls/slider";
+import type { VirtualModelState } from "@/scenes/scene-state";
 
 export type AreaExtra = VueArea2D<Schemes> | ContextMenuExtra;
 
@@ -67,7 +69,8 @@ export type Nodes =
   | CallCustomFunctionNode
   | FunctionScopeNode
   | ShapeNode
-  | MathFunctionNode;
+  | MathFunctionNode
+  | InstanceCountNode;
 
 export class Connection<
   A extends Nodes,
@@ -90,7 +93,8 @@ export type Conns =
   | Connection<NumberNode, FunctionCallNode>
   | Connection<InitializeNode, LogicScopeNode>
   | Connection<ConditionNode, LogicScopeNode>
-  | Connection<CustomFunctionNode, FunctionScopeNode>;
+  | Connection<CustomFunctionNode, FunctionScopeNode>
+  | Connection<InstanceCountNode, VectorNode>;
 
 export type Schemes = GetSchemes<Nodes, Conns>;
 
@@ -130,7 +134,8 @@ export function useUiNodes(
   area: AreaPlugin<Schemes, AreaExtra>,
   engine: DataflowEngine<Schemes>,
   wgpuEngine: WgpuEngine,
-  update: () => void
+  update: () => void,
+  models: VirtualModelState[]
 ) {
   async function addNode(node: Nodes) {
     await editor.addNode(node);
@@ -914,5 +919,23 @@ export function useUiNodes(
       ]),
     ],
   ]);
-  return { uiNodes };
+
+  function addConstant(name: string, value: number, id: string) {
+    uiNodes.get("Constants")?.set(name, {
+      name: name,
+      type: "CONSTANT",
+      prefix: "",
+      image: MathFunction,
+      get: () => {
+        return new InstanceCountNode(id, name);
+      },
+      create: createUINode,
+      draggable: true,
+    });
+  }
+
+  for (let model of models) {
+    addConstant(model.name + " Instance Count", model.instanceCount, model.id);
+  }
+  return { uiNodes, addConstant };
 }

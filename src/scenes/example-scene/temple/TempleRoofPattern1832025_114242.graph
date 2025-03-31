@@ -1,10 +1,6 @@
 {
   "graph": [
     {
-      "size": [
-        180,
-        160
-      ],
       "position": [
         12,
         652
@@ -33,10 +29,6 @@
       ]
     },
     {
-      "size": [
-        180,
-        160
-      ],
       "position": [
         12,
         292
@@ -62,10 +54,6 @@
       ]
     },
     {
-      "size": [
-        180,
-        160
-      ],
       "position": [
         12,
         112
@@ -91,10 +79,6 @@
       ]
     },
     {
-      "size": [
-        180,
-        160
-      ],
       "position": [
         12,
         472
@@ -120,13 +104,9 @@
       ]
     },
     {
-      "size": [
-        180,
-        160
-      ],
       "position": [
-        932,
-        12
+        969.1726822709638,
+        -3.7581950086745035
       ],
       "uuid": "f31d28786c21c0d5",
       "inputs": [
@@ -142,7 +122,7 @@
         },
         {
           "type": "node",
-          "value": "42662dce6b1243f3",
+          "value": "32e5c9ca94635ef3",
           "keyFrom": "value",
           "keyTo": "returnIn"
         }
@@ -150,23 +130,12 @@
       "nodeType": "Return"
     },
     {
-      "size": [
-        180,
-        180
-      ],
       "position": [
         242,
         557
       ],
       "uuid": "52d1bde63534b52c",
-      "inputs": [
-        {
-          "type": "node",
-          "value": "7e5ce4217d03bfc8",
-          "keyFrom": "value",
-          "keyTo": "param"
-        }
-      ],
+      "inputs": [],
       "nodeType": "Shape",
       "extraStringInformation": [
         {
@@ -176,13 +145,9 @@
       ]
     },
     {
-      "size": [
-        180,
-        390
-      ],
       "position": [
-        702,
-        87
+        726.6546639194786,
+        76.4337615282246
       ],
       "uuid": "42662dce6b1243f3",
       "inputs": [
@@ -193,7 +158,7 @@
         },
         {
           "type": "node",
-          "value": "a2deba8dec5077fa",
+          "value": "f102f3a9f0d89354",
           "keyFrom": "value",
           "keyTo": "param"
         }
@@ -224,19 +189,15 @@
         },
         {
           "key": "{scale y,1,100,-100,0.1,f32}/f32",
-          "value": 1.25
+          "value": 0.7
         },
         {
           "key": "{scale z,1,100,-100,0.1,f32}/f32",
-          "value": 2.5
+          "value": 1.6
         }
       ]
     },
     {
-      "size": [
-        180,
-        250
-      ],
       "position": [
         472,
         392
@@ -278,6 +239,119 @@
         {
           "key": "{frequency,1,10,-10,0.1,f32}/f32",
           "value": 1
+        }
+      ]
+    },
+    {
+      "position": [
+        1003.9577787145596,
+        346.40118977045256
+      ],
+      "uuid": "108a2aa64cc32778",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "42662dce6b1243f3",
+          "keyFrom": "value",
+          "keyTo": "vector"
+        }
+      ],
+      "nodeType": "Separate"
+    },
+    {
+      "position": [
+        1338.9733871261394,
+        152.8938400750622
+      ],
+      "uuid": "32e5c9ca94635ef3",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "108a2aa64cc32778",
+          "keyFrom": "x",
+          "keyTo": "x"
+        },
+        {
+          "type": "node",
+          "value": "108a2aa64cc32778",
+          "keyFrom": "y",
+          "keyTo": "y"
+        },
+        {
+          "type": "node",
+          "value": "86ddb6d7f92db860",
+          "keyFrom": "value",
+          "keyTo": "z"
+        }
+      ],
+      "nodeType": "Join"
+    },
+    {
+      "position": [
+        914.7116346826767,
+        724.7549267037383
+      ],
+      "uuid": "aa0e42bfed3baf8c",
+      "inputs": [],
+      "nodeType": "InstanceCount",
+      "extraStringInformation": [
+        {
+          "key": "modelId",
+          "value": "5df2b917-337b-48f4-a615-a33f7a5d31c6"
+        },
+        {
+          "key": "name",
+          "value": "TempleColumnsFront Instance Count"
+        }
+      ]
+    },
+    {
+      "position": [
+        1509.2049372836475,
+        479.1574518969691
+      ],
+      "uuid": "86ddb6d7f92db860",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "108a2aa64cc32778",
+          "keyFrom": "z",
+          "keyTo": "left"
+        },
+        {
+          "type": "node",
+          "value": "aa0e42bfed3baf8c",
+          "keyFrom": "value",
+          "keyTo": "right"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "*"
+        }
+      ]
+    },
+    {
+      "position": [
+        351.8336851191705,
+        315.0312367759348
+      ],
+      "uuid": "f102f3a9f0d89354",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "7e5ce4217d03bfc8",
+          "keyFrom": "value",
+          "keyTo": "param"
+        }
+      ],
+      "nodeType": "Shape",
+      "extraStringInformation": [
+        {
+          "key": "name",
+          "value": "Cube"
         }
       ]
     }

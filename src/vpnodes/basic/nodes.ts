@@ -171,12 +171,13 @@ export class ReturnNode extends VPNode {
 export class VariableOutNode extends VPNode {
   constructor(
     public value: any,
-    private code: any,
+    public code: any,
     public ref?: string
   ) {
     super(ref ?? "Variable");
 
     this.addOutput("value", new ClassicPreset.Output(reteSocket, "out"));
+    if (this.ref && this.ref.length > 15) this.extraWidth = this.ref.length * 5;
     this.updateSize();
   }
 
@@ -214,6 +215,7 @@ export class VariableOutNode extends VPNode {
         }
       }
     }
+    if (this.ref && this.ref.length > 15) this.extraWidth = this.ref.length * 5;
     super.deserialize(sn);
   }
 }
@@ -435,6 +437,53 @@ export class InitializeNode extends VPNode {
           valueCont.setValue(info.value);
       }
     }
+    super.deserialize(sn);
+  }
+}
+
+export class InstanceCountNode extends VPNode {
+  constructor(
+    public modelId: string,
+    public name?: string
+  ) {
+    super(name ?? "Instance Count");
+
+    this.addOutput("value", new ClassicPreset.Output(reteSocket, "out"));
+    if (this.name && this.name.length > 15)
+      this.extraWidth = this.name.length * 5;
+    this.updateSize();
+  }
+
+  data(): { value: NodeReturn } {
+    return {
+      value: {
+        value: 0.0,
+        code: nodeToVariableDeclaration(this) + " = ",
+        refId: idToVariableName(this.id),
+      },
+    };
+  }
+
+  serialize(sn: SerializedNode) {
+    sn.nodeType = "InstanceCount";
+    sn.extraStringInformation = [{ key: "modelId", value: this.modelId }];
+    if (this.name)
+      sn.extraStringInformation.push({ key: "name", value: this.name });
+    return super.serialize(sn);
+  }
+
+  deserialize(sn: SerializedNode) {
+    if (sn.extraStringInformation) {
+      for (let info of sn.extraStringInformation) {
+        if (info.key === "modelId") this.modelId = info.value;
+        if (info.key === "name") {
+          this.name = info.value;
+          this.label = info.value;
+        }
+      }
+    }
+    if (this.name && this.name.length > 15)
+      this.extraWidth = this.name.length * 5;
     super.deserialize(sn);
   }
 }

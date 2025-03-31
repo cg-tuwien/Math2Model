@@ -169,10 +169,13 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var ref_859b4 = ref_2a961_1 * 0.7;
 	var ref_0f4c3 = columnSpacing * 0.5;
 	var ref_4882b = ref_0f4c3 + ref_859b4;
+	var ref_f7c2c = f32(2);
+	var ref_70310 = ref_f7c2c / 2;
 	var ref_e0aef = abs(ref_f7af6);
 	var ref_6c1f4 = roofShape - ref_e0aef;
 	var ref_64916 = ref_2a961_2 + ref_6c1f4;
-	var ref_84713 = vec3f(ref_4882b, ref_64916, ref_2a961_3);
+	var ref_2c080 = ref_2a961_3 * ref_70310;
+	var ref_84713 = vec3f(ref_4882b, ref_64916, ref_2c080);
 	return ref_84713;
 
 }

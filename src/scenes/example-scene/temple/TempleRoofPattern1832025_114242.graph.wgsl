@@ -157,9 +157,16 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var PI = 3.14159265359;
 	var HALF_PI = 3.14159265359 / 2.0;
 	var TWO_PI = 3.14159265359 * 2.0;
-	var ref_52d1b = Cylinder(input2);
-	var ref_a2deb = sign(sin(ref_52d1b*1.00000000000000000000));
-	var ref_42662 = mat3x3(vec3f(1.50000000000000000000,0.0,0.0), vec3f(0.0,1.25000000000000000000,0.0), vec3f(0.0,0.0,2.50000000000000000000)) * ref_a2deb;
-	return ref_42662;
+	var ref_52d1b = Cylinder(vec2f(0.0, 0.0));
+	var ref_a2deb = sign(sin(ref_52d1b*1));
+	var ref_aa0e4 = f32(2);
+	var ref_f102f = Cube(input2);
+	var ref_42662 = mat3x3(vec3f(1.5,0.0,0.0), vec3f(0.0,0.7,0.0), vec3f(0.0,0.0,1.6)) * ref_f102f;
+	var ref_108a2_1 = ref_42662[0];
+	var ref_108a2_2 = ref_42662[1];
+	var ref_108a2_3 = ref_42662[2];
+	var ref_86ddb = ref_108a2_3 * ref_aa0e4;
+	var ref_32e5c = vec3f(ref_108a2_1, ref_108a2_2, ref_86ddb);
+	return ref_32e5c;
 
 }

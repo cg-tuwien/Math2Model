@@ -416,6 +416,7 @@ watchImmediate(
                   :fs="props.fs"
                   :keyedGraph="openFile.code.value"
                   :engine="props.engine"
+                  :models="scene.state.value.models"
                   @update="
                     (content) => {
                       if (openFile.path.value !== null) {
