@@ -499,7 +499,7 @@ fn D_GGX(NdotH: f32, alphaRoughness: f32) -> f32
 fn BRDF_lambertian(f0: vec3f, f90: vec3f, diffuseColor: vec3f, specularWeight: f32, VdotH: f32) -> vec3f
 {
     // see https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
-    return (1.0 - specularWeight * F_Schlick(f0, f90, VdotH)) * (diffuseColor / M_PI);
+    return (1.0 - specularWeight * F_Schlick(f0, f90, VdotH)) * (diffuseColor );
 }
 
 //  https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
@@ -626,8 +626,8 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
 
     let triplanarColor = calculateTriplanarColor(fract(in.world_position),in.world_normal);
     var materialInfo = MaterialInfo(
-        //getColor(in.texture_coords),
-        triplanarColor,
+        getColor(in.texture_coords),
+        // triplanarColor,
         vec3f(0.04),
         vec3f(1.0),
         vec3f(0.0),
