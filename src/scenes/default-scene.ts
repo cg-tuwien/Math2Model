@@ -7,7 +7,7 @@ import type { ImportFilesList } from "@/stores/fs-store";
 import sceneJson from "./example-scene/heart-sphere-morph/scene.json?raw";
 import heartSphereGraph from "./example-scene/heart-sphere-morph/heart-sphere.graph?raw";
 import heartSphereGraphWgsl from "./example-scene/heart-sphere-morph/heart-sphere.graph.wgsl?raw";
-import heartTextureUrl from "./example-scene/heart-sphere-morph/heart-texture.jpg";
+import heartTextureUrl from "./example-scene/heart-sphere-morph/heart-texture.png";
 
 const textEncoder = new TextEncoder();
 
@@ -28,7 +28,7 @@ export const DefaultScene: ImportFilesList = {
       value: textEncoder.encode(heartSphereGraphWgsl),
     },
     {
-      name: "heart-texture.jpg",
+      name: "heart-texture.png",
       value: await fetch(heartTextureUrl).then((v) => v.arrayBuffer()),
     },
   ],

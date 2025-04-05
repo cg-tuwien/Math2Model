@@ -5,16 +5,32 @@
       "type": "model",
       "id": "756110ea-ad90-46bb-8217-0ec926722489",
       "name": "MorphHeartSphere",
-      "position": [0, 2, 0],
-      "rotation": [-1.5707963267948966, 0, 1.5707963267948966],
+      "position": [
+        0,
+        2,
+        0
+      ],
+      "rotation": [
+        -1.5707963267948966,
+        0,
+        1.5707963267948966
+      ],
       "scale": 2.5,
       "parametricShader": "heart-sphere.graph.wgsl",
       "material": {
-        "color": [0.8948, 0.1675, 0.1882],
+        "color": [
+          0.8948,
+          0.1675,
+          0.1882
+        ],
         "roughness": 0.4471,
         "metallic": 0.15,
-        "emissive": [0.01, 0, 0],
-        "diffuseTexture": "heart-texture.jpg"
+        "emissive": [
+          0.01,
+          0,
+          0
+        ],
+        "diffuseTexture": "heart-texture.png"
       },
       "instanceCount": 1
     }
