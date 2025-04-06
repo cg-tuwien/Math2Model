@@ -58,4 +58,7 @@ cargo bench -p renderer-core -- --baseline base
 
 - WGPU Tutorial https://sotrh.github.io/learn-wgpu/#what-is-wgpu
 - WGSL to Rust library https://github.com/ScanMountGoat/wgsl_to_wgpu
-- Math library https://docs.rs/glamour/latest/glamour/
+
+The high level structure is that `renderer-core` implements the actual rendering logic, and is then used by `desktop` and `wasm` for the desktop and wasm backends.
+
+Each crate has its own bit of documentation. 
