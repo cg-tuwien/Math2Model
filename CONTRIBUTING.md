@@ -98,6 +98,13 @@ From there `App.vue` gets loaded, which is responsible for the overall layout of
 
 `HomeView.vue` asynchronously loads the filesystem code, and WebGPU engine. They're a bit slow to initialize, so we load them very early, and we're avoiding doing hot module reloading with them. Once they've finished loading, we create our `EditorAndOutput.vue` component.
 
+We then store the code on the user's machine, with the origin private filesystem. Editing the code is done with the Monaco code editor, and with the Rete.js graph editing library.
+
+The scene state is made reactive and editable with typical Vue.js frontend code.
+
+Rendering happens via the WebGPU API, which is used by [parametric-renderer-core](./parametric-renderer-core/), which is implemented in Rust and compiled to WebAssembly.
+
+Exporting then happens in Typescript land, where we use the same WebGPU device from Typescript.
 
 ## Deployment
 
