@@ -1,5 +1,3 @@
-import { number } from "zod";
-
 export class ExporterInstance {
   public vertPositions: { x: number; y: number; z: number }[] = [];
   public tris: number[] = [];

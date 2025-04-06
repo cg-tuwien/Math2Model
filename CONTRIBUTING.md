@@ -37,28 +37,44 @@ npm run build
 - [Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss) for slightly better Tailwind CSS suggestions
 
 
-I also totally recommend trying out the following browser extensions
+I also recommend trying out the following browser extension
 
 - [Vue Devtools](https://devtools.vuejs.org/) to get top-notch Vue.js debugging support
 
 ### Code Structure
 
-- `public/` contains files that are simply copied to the output. Very rarely used.
-- `src/` has all the code.
-- `src/assets/` contains assets like pictures or CSS files that do not have a better location. Rarely used.
-- `src/components/` contains proper Vue.js components that can be used everywhere.
-- `src/filesystem/` deals with saving and loading files. Uses the latest filesystem API together with a sandboxed "origin private filesystem".
-- `src/router/` contains the Vue.js router stuff, reponsible for mapping URLs to different pages/views.
-- `src/scenes/` contains the CPU state of the scenes.
+- `parametric-renderer-core/` - Rust implementation of the renderer. [See Readme there](./parametric-renderer-core/README.md)
+- `public/` - files that are directly copied to the generated website
+- `src/` - frontend code
+- `src/assets/` - assets like pictures or CSS files
+- `src/components/` - Vue.js components
+- `src/components/exporter/` - code for exporting, turns a vertex buffer into a 3D model (.obj or .glb)
+- `src/components/input/` - reusable components for dealing with user input
+- `src/components/node-tree/` - used by the side bar for displaying the scene tree and files
+- `src/components/visual-programming/` - node graph rendering components
+- `src/components/CodeEditor.vue` - Monaco code editor integraton
+- `src/components/EditorAndOutput.vue` - Main component, manages the renderer and code editor (either Monaco or visual programming)
+- `src/components/FileBrowser.vue` - Displays the filesystem
+- `src/components/FocusObject.vue` - Dropdown for selecting the focused object
+- `src/components/SceneHierarchy.vue` - Displays the scene, including the object inspector
+- `src/components/TopBar.vue` - Navigation Bar, with the `File`, `Export`, etc. menus
+- `src/components/WebGpu.vue` - Custom WebGPU code that is exclusively used by the exporter
+- `src/content-store/` - a reworked filesystem abstraction, unused
+- `src/engine/` - glue code for the native renderer (parametric-renderer-core)
+- `src/engine/sync-filesystem.ts` - syncs the textures with the native renderer
+- `src/engine/wgpu-engine.ts` - glue code, lets users ignore some messy async-await details
+- `src/filesystem/` - deals with saving and loading files. Uses the latest filesystem API together with a sandboxed "origin private filesystem".
+- `src/filesystem/scene-file.ts` - type definitions for the scene.json, also generates a JSON schema that we check against
+- `src/scenes/` - the CPU state of the scenes
+- `src/scenes/example-scene/` - the example scenes
+- `src/scenes/aggregate-model-state.ts` - combines multiple models into one state. Used for editing multiple models simultaneously
 - `src/stores/` contains Pinia stores. They're globally accessible, reactive objects.
 - `src/views/` contains the different pages. Currently the HomeView.vue is the only one that matters.
-- `src/App.vue` is the main Vue.js file.
+- `src/App.vue` is the Vue.js rendering entrypoint, it sets up the theme, top bar and the router
 - `src/main.ts` is the Typescript entrypoint.
 - `index.html` is the entrypoint for the website.
 - `package.json` is the dependency file. It also includes "scripts" that can be started with `npm run`.
-- `tsconfig.json` is required to tell Typescript what to do. It's split up, because there are technically multiple different Typescript configs that apply to our code.
-  - `tsconfig.app.json` is for the website.
-  - `tsconfig.node.json` is for configuration files, like the `vite.config.ts`.
+- `tsconfig.json` is required to tell Typescript what to do.
 - `vite.config.ts` is the configuration file for the Vite bundler.
 
 
