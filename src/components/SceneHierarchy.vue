@@ -218,12 +218,17 @@ const shadersDropdown = computed<SelectMixedOption[]>(() => {
 });
 
 const texturesDropdown = computed<SelectMixedOption[]>(() => {
-  return [...textureFiles.value].toSorted().map(
+  const options = [...textureFiles.value].toSorted().map(
     (fileName): SelectMixedOption => ({
       label: fileName,
       value: fileName,
     })
   );
+  options.unshift({
+    label: "no texture",
+    value: undefined,
+  });
+  return options;
 });
 
 function startAddModel() {
