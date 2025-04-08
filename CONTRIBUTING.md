@@ -12,6 +12,12 @@ Features are developed in another branch or fork. After the feature is ready, a 
 npm install
 ```
 
+and then compile the Rust renderer
+```sh
+cd parametric-renderer-core
+npm run build
+```
+
 ### Compile and Hot-Reload for Development
 
 ```sh
