@@ -12,11 +12,11 @@ use super::{
 pub struct LogarithmicDistance(f32);
 impl LogarithmicDistance {
     pub fn new(distance: f32) -> Self {
-        Self(distance.ln())
+        Self(distance.ln() * 5.0)
     }
 
   pub  fn distance(&self) -> f32 {
-        self.0.exp()
+        (self.0 * 0.2).exp()
     }
 }
 
@@ -65,7 +65,7 @@ impl OrbitcamController {
         }
 
         self.logarithmic_distance.0 +=
-            -1.0 * (input.mouse.scroll_delta.y as f32) * 0.1 * delta_time;
+            -1.0 * (input.mouse.scroll_delta.y as f32) * 0.01;
 
         cursor_capture
     }
