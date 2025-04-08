@@ -15,6 +15,7 @@ fn getColor(input: vec2f) -> vec3f {
     return material.color_roughness.rgb;
   }
 }
+//// END getColor
 
 // following https://www.martinpalko.com/triplanar-mapping/
 fn calculateTriplanarColor(input: vec3f, normal: vec3f) -> vec3f {
@@ -33,7 +34,6 @@ fn calculateTriplanarColor(input: vec3f, normal: vec3f) -> vec3f {
     return material.color_roughness.rgb;
   }
 }
-//// END getColor
 
 var<private> instance_id: u32;
 
@@ -620,14 +620,16 @@ struct FragmentOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> FragmentOutput {
+    if(false) {
+      // silly hack to get the auto layout to pick up on the uniforms
+      let a = sampleObject(vec2f(0.0)); 
+    }
     let v = normalize(camera.world_position.xyz - in.world_position);
     // let n = normalize(in.world_normal);
     let n = normalize(-cross(dpdxFine(in.world_position), dpdyFine(in.world_position)));
 
-    let triplanarColor = calculateTriplanarColor(fract(in.world_position),in.world_normal);
     var materialInfo = MaterialInfo(
         getColor(in.texture_coords),
-        // triplanarColor,
         vec3f(0.04),
         vec3f(1.0),
         vec3f(0.0),
