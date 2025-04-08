@@ -1,60 +1,3 @@
-fn Heart(input2: vec2f) -> vec3f {
-	var PI = 3.14159265359;
-	var HALF_PI = 3.14159265359 / 2.0;
-	var TWO_PI = 3.14159265359 * 2.0;
-	let pos = vec3(input2.x, 0.0, 2. * input2.y) * PI;
-
-    let x2 = sin(pos.x) * (15. * sin(pos.z) - 4. * sin(3. * pos.z));
-    let y2 = 8. * cos(pos.x);
-    let z2 = sin(pos.x) * (15. * cos(pos.z) - 5. * cos(2. * pos.z) - 2. * cos(3. * pos.z) - cos(2. * pos.z));
-    let heart = vec3(x2, y2, z2) * 0.2;
-    
-    return heart;
-}
-fn Sphere(input2: vec2f) -> vec3f {
-	var PI = 3.14159265359;
-	var HALF_PI = 3.14159265359 / 2.0;
-	var TWO_PI = 3.14159265359 * 2.0;
-    var u = input2.x * PI;
-    var v = input2.y * TWO_PI;
-	var sx = sin(u);
-	var sy = sin(v);
-	var cx = cos(u);
-	var cy = cos(v);
-	var x = sx * cy;
-	var y = sx * sy;
-	var result = vec3f(x, y, cx);
-	return result;
-}
-fn Plane(input2: vec2f) -> vec3f {
-	return vec3f(input2.x, 0, input2.y);
-}
-fn Cylinder(input2: vec2f) -> vec3f {
-    let pos = vec3(2. * input2.x, 0.0, 2. * input2.y) * 3.14159265359;
-    var y = input2.x;
-
-    var sx = sin(pos.x);
-    var sy = sin(pos.z);
-    var cx = cos(pos.x);
-    var cy = cos(pos.z);
-
-    var x = cy;
-    var z = sy;
-
-    return vec3f(x, y, z);
-}
-fn Cube(input2: vec2f) -> vec3f {
-	var PI = 3.14159265359;
-	var HALF_PI = 3.14159265359 / 2.0;
-	var TWO_PI = 3.14159265359 * 2.0;
-    var u = input2.x * TWO_PI;
-    var v = input2.y * TWO_PI;
-    let x = sign(sin(u));
-    let y = sign(sin(u * v));
-    let z = sign(sin(v));
-	var result = vec3f(x, y, z);
-	return result;
-}
 fn mod289(x: vec4f) -> vec4f
 {
   return x - floor(x * (1.0 / 289.0)) * 289.0;
@@ -161,7 +104,7 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var ref_96e8f_2 = input2[1];
 	var ref_0f4d7 = vec2f(ref_96e8f_1, ref_96e8f_2);
 	var ref_64b01 = vec2f(ref_96e8f_2, ref_96e8f_1);
-	var hillyness = 1.30000000000000004441;
+	var hillyness = 2.80000000000000004441;
 	var hillHeight = 0.40000000000000002220;
 	var ref_3ce74 = hillyness * 2;
 	var ref_9d2a3 = hillyness * 0.5;
@@ -179,7 +122,34 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var ref_3c079 = ref_c49d3 + ref_d17b8;
 	var ref_52c00 = ref_3c079 + ref_41355;
 	var ref_03492 = vec3f(ref_96e8f_1, ref_52c00, ref_96e8f_2);
-	var ref_fd03c = mat3x3(vec3f(100.00000000000000000000,0.0,0.0), vec3f(0.0,10.00000000000000000000,0.0), vec3f(0.0,0.0,100.00000000000000000000)) * ref_03492;
+	var ref_fd03c = mat3x3(vec3f(100,0.0,0.0), vec3f(0.0,10,0.0), vec3f(0.0,0.0,100)) * ref_03492;
 	return ref_fd03c;
 
+}
+
+fn getColor(input: vec2f) -> vec3f {
+    let height = sampleObject(input).y;
+    var offset = 0.0;
+    let thresh = -0.3;
+    let d = 1.2;
+    if(height > thresh + d) {
+        offset = 1;
+    } else if(height > thresh - d) {
+        offset = smoothstep(0, 1, (height - (thresh-d)) * (1.0/(2*d)));
+    }
+
+    let uv = clamp((abs(input * 3)%1) * vec2f(0.5, 1), vec2f(0.001), vec2f(0.999));
+
+    let ground = textureSample(t_diffuse, linear_sampler, uv + vec2f(0, 0)).rgb;
+    let grass = textureSample(t_diffuse, linear_sampler, uv + vec2f(0.5, 0)).rgb;
+    
+    return mix(ground, grass, offset);
+    // return vec3f(uv, 0.0);
+}
+
+fn triangle(v: f32) -> f32 {
+    return abs(v%2 - 1);
+}
+fn triangle2(v: vec2f) -> vec2f {
+    return abs(v%2 - 1);
 }
