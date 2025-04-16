@@ -539,9 +539,9 @@ function uploadFile(data: {
             </n-upload-dragger>
           </n-upload>
           <n-text style="font-size: 16px">
-            Click or drag an image file to this area to upload a texture.
+            Click or drag an image file to the empty area above to upload a
+            texture.
           </n-text>
-          >
         </div>
       </n-flex>
     </div>
