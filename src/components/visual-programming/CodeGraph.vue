@@ -415,6 +415,7 @@ async function createEditor() {
         label: "Delete (del)",
         key: "delete",
         async handler() {
+          shouldUpdate = false;
           if ("source" in context && "target" in context) {
             // connection
             const connectionId = context.id;
@@ -432,6 +433,7 @@ async function createEditor() {
             for (const connection of connections) {
               await editor.removeConnection(connection.id);
             }
+            shouldUpdate = true;
             await editor.removeNode(nodeId);
           }
         },
