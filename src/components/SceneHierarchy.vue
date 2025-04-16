@@ -4,7 +4,7 @@ import {
   ReadonlyVector3,
   type VirtualModelState,
 } from "@/scenes/scene-state";
-import { computed, h, ref, watchEffect, type DeepReadonly } from "vue";
+import { computed, h, ref, watch, watchEffect, type DeepReadonly } from "vue";
 import { NButton, NInput, NText, type UploadFileInfo } from "naive-ui";
 import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import NumberInput from "@/components/input/NumberInput.vue";
@@ -27,6 +27,7 @@ import {
 } from "./node-tree/NodeTreeHelper";
 import { ObjectUpdate, type ObjectPathPart } from "./input/object-update";
 import { useExportStore } from "@/stores/export-store";
+import { watchDebounced, watchImmediate } from "@vueuse/core";
 
 const exportStore = useExportStore();
 const props = defineProps<{
@@ -95,6 +96,25 @@ const selectedKeys = computed(() => {
   return selected;
 });
 let currentModel = ref<DeepReadonly<VirtualModelState> | null>(null);
+const currentDiffuseTexture = computed(
+  () => currentModel.value?.material.diffuseTexture ?? ""
+);
+const currentModelTexture = ref<UploadFileInfo[] | undefined>(undefined);
+
+watchImmediate(currentDiffuseTexture, () => {
+  props.fs.readFile(makeFilePath(currentDiffuseTexture.value))?.then((file) => {
+    currentModelTexture.value = [
+      {
+        id: file.name,
+        name: file.name,
+        status: "finished",
+        file: file,
+        type: file.type,
+      },
+    ];
+  });
+});
+
 let toAddModel = ref<[string, FilePath]>([
   "New Model",
   makeFilePath("new-model"),
@@ -503,8 +523,12 @@ function uploadFile(data: {
           <n-upload
             directory-dnd
             accept="image/*"
-            :max="1"
+            :max="2"
             v-on:before-upload="uploadFile"
+            :file-list="currentModelTexture"
+            list-type="image-card"
+            style="margin-top: 0.5rem"
+            :show-remove-button="false"
           >
             <n-upload-dragger>
               <div style="margin-bottom: 12px">
@@ -512,11 +536,12 @@ function uploadFile(data: {
                   <mdi-archive-arrow-down />
                 </n-icon>
               </div>
-              <n-text style="font-size: 16px">
-                Click or drag an image file to this area to upload a texture.
-              </n-text>
             </n-upload-dragger>
           </n-upload>
+          <n-text style="font-size: 16px">
+            Click or drag an image file to this area to upload a texture.
+          </n-text>
+          >
         </div>
       </n-flex>
     </div>
