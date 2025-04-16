@@ -20,20 +20,17 @@ _Listing 1:_ Code for describing a sphere model in our code editor.
 
 The code from Listing 1 produces the output shown in Figure 1.
 
-![Parametrically modelled sphere](docs/resources/sphere-model.png "Parametrically modelled sphere")
-
+![Parametrically modelled sphere](docs/resources/sphere-model.png "Parametrically modelled sphere")     
 _Figure 1:_ Parametrically described sphere, rendered with Math2Model.
 
 ## Who is Math2Model for?
 
 Math2Model is a tool for everyone who wants to render mathematical functions in real time, or for creating parametric models with feedback in real time. It features two user interfaces: One for programmers where they can directly describe those mathematical objects in source code (see Figure 2), and another user interface for non-programmers, which allows parametric modelling through a node editor (see Figure 3).
 
-![Math2Model's code editor](docs/resources/sphere-code-editor.png "Math2Model's code editor")
-
+![Math2Model's code editor](docs/resources/sphere-code-editor.png "Math2Model's code editor")      
 _Figure 2:_ Image of Math2Model's code editor for describing parametric objects in [WGSL](https://www.w3.org/TR/WGSL/) source code.
 
-![Math2Model's node editor](docs/resources/sphere-node-editor.png "Math2Model's node editor")
-
+![Math2Model's node editor](docs/resources/sphere-node-editor.png "Math2Model's node editor")     
 _Figure 3:_ Image of Math2Model's node editor for describing parametric objects through graphical modelling.
 
 ## How does it work?
