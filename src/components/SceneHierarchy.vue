@@ -102,17 +102,23 @@ const currentDiffuseTexture = computed(
 const currentModelTexture = ref<UploadFileInfo[] | undefined>(undefined);
 
 watchImmediate(currentDiffuseTexture, () => {
-  props.fs.readFile(makeFilePath(currentDiffuseTexture.value))?.then((file) => {
-    currentModelTexture.value = [
-      {
-        id: file.name,
-        name: file.name,
-        status: "finished",
-        file: file,
-        type: file.type,
-      },
-    ];
-  });
+  props.fs
+    .readFile(makeFilePath(currentDiffuseTexture.value))
+    ?.then((file) => {
+      currentModelTexture.value = [
+        {
+          id: file.name,
+          name: file.name,
+          status: "finished",
+          file: file,
+          type: file.type,
+        },
+      ];
+    })
+    .catch((error) => {
+      currentModelTexture.value = [];
+      console.error(error);
+    });
 });
 
 let toAddModel = ref<[string, FilePath]>([
