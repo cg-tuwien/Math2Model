@@ -17,6 +17,18 @@ const theme = computed(() => (store.isDark ? darkTheme : lightTheme));
       class="h-full flex items-stretch flex-col"
     >
       <TopBar></TopBar>
+      <n-modal
+        :show="fsStore.importProjectDialog !== null"
+        :mask-closable="false"
+      >
+        <ImportDialog
+          v-if="fsStore.importProjectDialog !== null"
+          :dialog="fsStore.importProjectDialog"
+          @finish="(v) => fsStore.finishImport(v)"
+        ></ImportDialog>
+        <div v-else></div>
+      </n-modal>
+
       <RouterView> </RouterView>
     </n-config-provider>
   </div>
