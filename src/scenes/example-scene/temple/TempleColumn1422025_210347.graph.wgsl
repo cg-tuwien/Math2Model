@@ -47,13 +47,19 @@ fn Cube(input2: vec2f) -> vec3f {
 	var PI = 3.14159265359;
 	var HALF_PI = 3.14159265359 / 2.0;
 	var TWO_PI = 3.14159265359 * 2.0;
-    var u = input2.x * TWO_PI;
-    var v = input2.y * TWO_PI;
-    let x = sign(sin(u));
-    let y = sign(sin(u * v));
-    let z = sign(sin(v));
-	var result = vec3f(x, y, z);
-	return result;
+    var p = vec3f(input2.x * TWO_PI, input2.y, 0.0);
+    let adjusted_angle = p.x + TWO_PI / 8.0;
+    var s = sin(adjusted_angle);
+    var c = cos(adjusted_angle);
+    var y0 = (step(0.001,fract(p.y)));
+    var a = abs(s) + abs(c);
+
+    var box = vec3f(
+        (s + c) / a * y0,
+        input2.y,
+        (s - c) / a * y0
+    );
+    return box;
 }
 fn mod289(x: vec4f) -> vec4f
 {
@@ -168,7 +174,6 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var ref_0e1f8 = Sphere(input2);
 	var ref_d8db2 = 1.00000000000000000000;
 	var ref_e2e36 = 0.50000000000000000000;
-	var TempleColumnsFront_instances = f32(2);
 	var ref_46672 = f32(2);
 	var ref_b8259 = ref_46672 / 2;
 	var ref_714b0 = 0 - ref_b8259;

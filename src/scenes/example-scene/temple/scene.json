@@ -3,53 +3,33 @@
   "models": [
     {
       "type": "model",
-      "id": "464bacb8-a15c-4294-8bfc-a359c0eaca42",
-      "name": "TempleRoofRight",
-      "position": [8.4, 6, 0.25],
-      "rotation": [0, 3.141592653589793, 0],
-      "scale": 4,
-      "parametricShader": "TempleRoof1422025_203146.graph.wgsl",
-      "material": {
-        "color": [0.5074354177958615, 0.36017203351679994, 0.34748524667486724],
-        "roughness": 0.10399402602285512,
-        "metallic": 0.7758696698380521,
-        "emissive": [0, 0, 0],
-        "diffuseTexture": "istockphoto-492651372-612x612.jpg"
-      },
-      "instanceCount": 1
-    },
-    {
-      "type": "model",
-      "id": "1e950bf0-71ef-40d2-9a33-1542bba2aa6c",
-      "name": "TempleRoofLeft",
-      "position": [-6.4, 6, 0.25],
-      "rotation": [0, 0, 0],
-      "scale": 4,
-      "parametricShader": "TempleRoof1422025_203146.graph.wgsl",
-      "material": {
-        "color": [
-          0.7014533193289731, 0.058272169914288074, 0.21595627543896057
-        ],
-        "roughness": 0.5419016718370271,
-        "metallic": 0.6463496799215889,
-        "emissive": [0, 0, 0],
-        "diffuseTexture": "istockphoto-492651372-612x612.jpg"
-      },
-      "instanceCount": 1
-    },
-    {
-      "type": "model",
       "id": "5df2b917-337b-48f4-a615-a33f7a5d31c6",
       "name": "TempleColumnsFront",
-      "position": [0, -3.5, 2],
-      "rotation": [0, 0, 0],
+      "position": [
+        0,
+        -3.5,
+        2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
       "scale": 1,
       "parametricShader": "TempleColumn1422025_210347.graph.wgsl",
       "material": {
-        "color": [0.5888446573788153, 0.3017523668131159, 0.9084812640566402],
+        "color": [
+          0.5888446573788153,
+          0.3017523668131159,
+          0.9084812640566402
+        ],
         "roughness": 0.32827078627498296,
         "metallic": 0.31885313113834,
-        "emissive": [0, 0, 0],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
         "diffuseTexture": "istockphoto-1360384091-170667a.jpg"
       },
       "instanceCount": 2
@@ -58,52 +38,65 @@
       "type": "model",
       "id": "d077fc59-5eab-4df0-b595-e353c20a03de",
       "name": "TempleColumnsBack",
-      "position": [2, -3.5, 2],
-      "rotation": [0, 0, 0],
+      "position": [
+        2,
+        -3.5,
+        2
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
       "scale": 1,
       "parametricShader": "TempleColumn1422025_210347.graph.wgsl",
       "material": {
-        "color": [0.9610469544940379, 0.8401397717445944, 0.03840651025774955],
+        "color": [
+          0.9610469544940379,
+          0.8401397717445944,
+          0.03840651025774955
+        ],
         "roughness": 0.20214497180460356,
         "metallic": 0.2862182199883301,
-        "emissive": [0, 0, 0],
+        "emissive": [
+          0,
+          0,
+          0
+        ],
         "diffuseTexture": "istockphoto-1360384091-170667a.jpg"
       },
       "instanceCount": 2
     },
     {
       "type": "model",
-      "id": "61c1db69-2a01-4c98-a6bc-d71670968f23",
-      "name": "TempleRoofPatternFace",
-      "position": [1, 7.15, 0.25],
-      "rotation": [0, 0, 0],
+      "id": "0c059d05-5702-4668-98d5-7115cae37a1d",
+      "name": "TempleRoof",
+      "position": [
+        1,
+        9,
+        0.25
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
       "scale": 1,
-      "parametricShader": "TempleRoofPattern1832025_115259.graph.wgsl",
-      "material": {
-        "color": [0.14148370530514498, 0.7588683470062704, 0.5777919840023414],
-        "roughness": 0.29033757559345474,
-        "metallic": 0.20388292406366149,
-        "emissive": [0, 0, 0],
-        "diffuseTexture": "istockphoto-1360384091-170667a.jpg"
-      },
-      "instanceCount": 13
-    },
-    {
-      "type": "model",
-      "id": "96b84fcc-4cfa-4110-82e0-5e122b8fa1e3",
-      "name": "TempleRoofBox",
-      "position": [1, 7.5, 0.25],
-      "rotation": [0, 0, 0],
-      "scale": 1,
-      "parametricShader": "TempleRoofPattern1832025_114242.graph.wgsl",
+      "parametricShader": "TempleRoof1742025_122200.graph.wgsl",
       "material": {
         "color": [
-          0.16470588235294117, 0.16470588235294117, 0.16470588235294117
+          0.1428632865346271,
+          0.16905750834304967,
+          0.05572378709262793
         ],
-        "roughness": 0.8149940301630674,
-        "metallic": 0.057861059663913084,
-        "emissive": [0, 0, 0],
-        "diffuseTexture": "marble.jpg"
+        "roughness": 0.5037068901407168,
+        "metallic": 0.4032188549319633,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "istockphoto-492651372-612x612.jpg"
       },
       "instanceCount": 1
     }
