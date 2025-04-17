@@ -10,6 +10,7 @@ import { homepage, version } from "@/../package.json";
 import { useFsStore } from "@/stores/fs-store";
 import { useExportStore } from "@/stores/export-store";
 import { ExampleProjects } from "@/scenes/example-scenes";
+import { createNewProject } from "@/scenes/default-scene";
 import { NText } from "naive-ui";
 
 const store = useStore();
@@ -48,6 +49,13 @@ const exampleProjectsDropdown = ExampleProjects.map(
 const inputFileElement = ref<HTMLInputElement | null>(null);
 const fileOptions = computed((): ActionDropdownOption[] => {
   return [
+    {
+      label: "New",
+      key: "new",
+      action: async () => {
+        await fsStore.importProject(createNewProject());
+      },
+    },
     {
       label: "Open",
       key: "open",

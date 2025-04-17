@@ -34,8 +34,7 @@ export const DefaultScene: ImportFilesList = {
   ],
 };
 
-// Unused, shows how to programmatically create an example scene.
-function createDefaultProject(): ImportFilesList {
+export function createNewProject(): ImportFilesList {
   const shaderName = makeFilePath("my-shader.wgsl");
   const shader = DefaultParametric;
 
@@ -51,9 +50,9 @@ function createDefaultProject(): ImportFilesList {
         rotation: ReadonlyEulerAngles.identity.serialize(),
         scale: 1,
         material: {
-          color: [1, 0, 0],
-          roughness: 0.5,
-          metallic: 0.5,
+          color: [45 / 255, 255 / 255, 150 / 255],
+          roughness: 0.67,
+          metallic: 0.0,
           emissive: [0, 0, 0],
         },
       },
