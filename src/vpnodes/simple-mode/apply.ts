@@ -63,16 +63,16 @@ export class CombineNode extends VPNode {
   }
 
   data(inputs: {
-    param1: NodeReturn[];
-    param2: NodeReturn[];
-    param3: NodeReturn[];
+    param1?: NodeReturn;
+    param2?: NodeReturn;
+    param3?: NodeReturn;
   }): {
     value: NodeReturn;
   } {
     const { param1, param2, param3 } = inputs;
-    const p1 = param1 ? param1[0].refId : "vec3f(0.0, 0.0, 0.0)";
-    const p2 = param2 ? param2[0].refId : "vec3f(0.0, 0.0, 0.0)";
-    const p3 = param3 ? param3[0].refId : this.cfControl.sliderValue;
+    const p1 = param1 ? param1.refId : "vec3f(0.0, 0.0, 0.0)";
+    const p2 = param2 ? param2.refId : "vec3f(0.0, 0.0, 0.0)";
+    const p3 = param3 ? param3.refId : this.cfControl.sliderValue;
     if (param3 && this.hasControl("cfactor")) {
       this.removeControl("cfactor");
     } else if (!param3 && !this.hasControl("cfactor")) {
@@ -180,7 +180,7 @@ export class MathFunctionNode extends VPNode {
     this.updateSize();
   }
 
-  data(inputs: { param: NodeReturn[] }): { value: NodeReturn } {
+  data(inputs: { param?: NodeReturn }): { value: NodeReturn } {
     let funcCall = this.func;
     let { param } = inputs;
 
@@ -188,7 +188,7 @@ export class MathFunctionNode extends VPNode {
       "input2",
       String(
         param
-          ? (param[0].refId ?? param[0].value)
+          ? (param.refId ?? param.value)
           : this.inputType == "any"
             ? "input2"
             : typeToValueCode(this.inputType)
@@ -201,7 +201,7 @@ export class MathFunctionNode extends VPNode {
         funcCall = funcCall.replaceAll(
           k[0],
           typeToValueStringCode(
-            valueToType(param ? param[0].value : vec2.create(0.0, 0.0)),
+            valueToType(param ? param.value : vec2.create(0.0, 0.0)),
             control?.sliderValue ?? "0.0",
             control?.sliderValue ?? "0.0",
             control?.sliderValue ?? "0.0",
@@ -224,11 +224,13 @@ export class MathFunctionNode extends VPNode {
 
     var code = `${this.isApply ? nodeToVariableDeclaration(this) + "_1" : nodeToVariableDeclaration(this)} = ${funcCall};`;
     if (this.isApply)
-      code += `\n\t${nodeToVariableDeclaration(this)} = vec3f(${param ? param[0].refId + ".x" : 0.0}, ${idToVariableName(this.id)}_1.x * ${idToVariableName(this.id)}_1.y, ${param ? param[0].refId + ".z" : 0.0});`;
+      code += `\n\t${nodeToVariableDeclaration(this)} = vec3f(${param ? param.refId + ".x" : 0.0}, ${idToVariableName(
+        this.id
+      )}_1.x * ${idToVariableName(this.id)}_1.y, ${param ? param.refId + ".z" : 0.0});`;
 
     return {
       value: {
-        value: param ? param[0].value : 0.0,
+        value: param ? param.value : 0.0,
         code: code,
         refId: idToVariableName(this.id),
       },

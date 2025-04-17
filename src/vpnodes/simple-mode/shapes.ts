@@ -32,7 +32,7 @@ export class ShapeNode extends VPNode {
     );
   }
 
-  data(inputs: { param: NodeReturn[] }): {
+  data(inputs: { param?: NodeReturn }): {
     function: NodeReturn;
     value: NodeReturn;
   } {
@@ -44,7 +44,7 @@ export class ShapeNode extends VPNode {
       },
       value: {
         value: vec3.zero(),
-        code: `${nodeToVariableDeclaration(this)} = ${this.name}(${param ? (param[0].refId ?? param[0].value) : "vec2f(0.0, 0.0)"});`,
+        code: `${nodeToVariableDeclaration(this)} = ${this.name}(${param ? (param.refId ?? param.value) : "vec2f(0.0, 0.0)"});`,
         refId: idToVariableName(this.id),
       },
     };

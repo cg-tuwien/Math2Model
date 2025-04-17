@@ -35,7 +35,7 @@ export class FunctionScopeNode extends BlockNode {
     this.addInput("context", new ClassicPreset.Input(reteSocket, "Context"));
   }
 
-  data(input: { context: NodeReturn[]; reference: NodeReturn[] }): {
+  data(input: { context?: NodeReturn; reference?: NodeReturn }): {
     value: NodeReturn;
   } {
     const { context, reference } = input;
@@ -53,9 +53,9 @@ export class FunctionScopeNode extends BlockNode {
       return result;
     }
 
-    result.value.value = reference[0].value ?? 0;
+    result.value.value = reference.value ?? 0;
     result.value.code = `}`;
-    result.value.refId = reference[0].refId ?? "";
+    result.value.refId = reference.refId ?? "";
 
     return result;
   }
@@ -339,15 +339,15 @@ export class CallCustomFunctionNode extends VPNode {
   }
 
   data(input: {
-    arg0: NodeReturn[];
-    arg1: NodeReturn[];
-    arg2: NodeReturn[];
-    arg3: NodeReturn[];
-    arg4: NodeReturn[];
-    arg5: NodeReturn[];
-    arg6: NodeReturn[];
-    arg7: NodeReturn[];
-    arg8: NodeReturn[];
+    arg0?: NodeReturn;
+    arg1?: NodeReturn;
+    arg2?: NodeReturn;
+    arg3?: NodeReturn;
+    arg4?: NodeReturn;
+    arg5?: NodeReturn;
+    arg6?: NodeReturn;
+    arg7?: NodeReturn;
+    arg8?: NodeReturn;
   }): { value: NodeReturn } {
     const func = this.funcControl.selected
       ? getCustomFunction(this.funcControl.selected)
@@ -366,8 +366,8 @@ export class CallCustomFunctionNode extends VPNode {
     if (func.nControl.value) {
       for (let i = 0; i < func.nControl.value; i++) {
         const arg = args[i];
-        if (arg && arg.length > 0) {
-          result.value.code += arg[0].refId ?? arg[0].value;
+        if (arg) {
+          result.value.code += arg.refId ?? arg.value;
         } else {
           result.value.code += typeToValueCode(
             func.paramControls[i].cont.selected ?? "i32"

@@ -61,7 +61,7 @@ export class LogicScopeNode extends BlockNode {
     this.updateSize();
   }
 
-  data(input: { context: NodeReturn[]; reference: NodeReturn[] }): {
+  data(input: { context?: NodeReturn; reference?: NodeReturn }): {
     value: NodeReturn;
   } {
     const { context, reference } = input;
@@ -80,9 +80,9 @@ export class LogicScopeNode extends BlockNode {
       this.varOutNode.ref === "" &&
       this.varInNode.ref === ""
     ) {
-      this.varOutNode.ref = reference[0].refId;
-      this.varOutNode.value = reference[0].value;
-      this.varInNode.ref = reference[0].refId ?? "";
+      this.varOutNode.ref = reference.refId;
+      this.varOutNode.value = reference.value;
+      this.varInNode.ref = reference.refId ?? "";
 
       this.addNode(this.varOutNode);
       this.addNode(this.varInNode);
@@ -103,9 +103,9 @@ export class LogicScopeNode extends BlockNode {
       return result;
     }
 
-    result.value.value = reference[0].value ?? 0;
+    result.value.value = reference.value ?? 0;
     result.value.code = `}`;
-    result.value.refId = reference[0].refId ?? "";
+    result.value.refId = reference.refId ?? "";
 
     return result;
   }

@@ -56,10 +56,10 @@ export class VectorNode extends VPNode {
   }
 
   data(inputs: {
-    x?: NodeReturn[];
-    y?: NodeReturn[];
-    z?: NodeReturn[];
-    w?: NodeReturn[];
+    x?: NodeReturn;
+    y?: NodeReturn;
+    z?: NodeReturn;
+    w?: NodeReturn;
   }): { value: NodeReturn } {
     let xVal = this.xControl?.value ?? 0;
     let yVal = this.yControl?.value ?? 0;
@@ -73,30 +73,30 @@ export class VectorNode extends VPNode {
     const { x, y, z, w } = inputs;
 
     if (x) {
-      xVal = x[0].value ?? xVal;
-      xRef = x[0].refId ?? "";
+      xVal = x.value ?? xVal;
+      xRef = x.refId ?? "";
       if (this.hasControl("x")) this.removeControl("x");
     } else {
       if (!this.hasControl("x")) this.addControl("x", this.xControl);
     }
     if (y) {
-      yVal = y[0].value ?? yVal;
-      yRef = y[0].refId ?? "";
+      yVal = y.value ?? yVal;
+      yRef = y.refId ?? "";
       if (this.hasControl("y")) this.removeControl("y");
     } else {
       if (!this.hasControl("y")) this.addControl("y", this.xControl);
     }
     if (z) {
-      zVal = z[0].value ?? zVal;
-      zRef = z[0].refId ?? "";
+      zVal = z.value ?? zVal;
+      zRef = z.refId ?? "";
       if (this.hasControl("z")) this.removeControl("z");
     } else {
       if (!this.hasControl("z") && this.n >= 3)
         this.addControl("z", this.xControl);
     }
     if (w) {
-      wVal = w[0].value ?? wVal;
-      wRef = w[0].refId ?? "";
+      wVal = w.value ?? wVal;
+      wRef = w.refId ?? "";
       if (this.hasControl("w")) this.removeControl("w");
     } else {
       if (!this.hasControl("w") && this.n === 4)
@@ -222,18 +222,18 @@ export class SeparateNode extends VPNode {
     this.updateSize();
   }
 
-  data(inputs: { vector?: NodeReturn[] }): { x: NodeReturn; y: NodeReturn } {
+  data(inputs: { vector?: NodeReturn }): { x: NodeReturn; y: NodeReturn } {
     const vector = inputs.vector;
 
     let result = {
       x: {
-        value: vector ? vector[0].value[0] : 0,
-        code: `${nodeToVariableDeclaration(this)}_1 = ${vector ? vector[0].refId + "[0]" : "0"};`,
+        value: vector ? vector.value[0] : 0,
+        code: `${nodeToVariableDeclaration(this)}_1 = ${vector ? vector.refId + "[0]" : "0"};`,
         refId: idToVariableName(this.id) + "_1",
       },
       y: {
-        value: vector ? vector[0].value[1] : 0,
-        code: `${nodeToVariableDeclaration(this)}_2 = ${vector ? vector[0].refId + "[1]" : "0"};`,
+        value: vector ? vector.value[1] : 0,
+        code: `${nodeToVariableDeclaration(this)}_2 = ${vector ? vector.refId + "[1]" : "0"};`,
         refId: idToVariableName(this.id) + "_2",
       },
       z: {
@@ -248,9 +248,9 @@ export class SeparateNode extends VPNode {
       },
     };
 
-    if (vector && vector[0].value.length >= 3) {
-      result.z.value = vector[0].value[2];
-      result.z.code = `${nodeToVariableDeclaration(this)}_3 = ${vector ? vector[0].refId + "[2]" : "0"};`;
+    if (vector && vector.value.length >= 3) {
+      result.z.value = vector.value[2];
+      result.z.code = `${nodeToVariableDeclaration(this)}_3 = ${vector ? vector.refId + "[2]" : "0"};`;
       if (!this.hasOutput("z")) {
         this.addOutput("z", this.zOutput);
 
@@ -264,9 +264,9 @@ export class SeparateNode extends VPNode {
       if (this.update) this.update(this);
     }
 
-    if (vector && vector[0].value.length >= 4) {
-      result.w.value = vector[0].value[3];
-      result.w.code = `${nodeToVariableDeclaration(this)}_4 = ${vector ? vector[0].refId + "[3]" : "0"};`;
+    if (vector && vector.value.length >= 4) {
+      result.w.value = vector.value[3];
+      result.w.code = `${nodeToVariableDeclaration(this)}_4 = ${vector ? vector.refId + "[3]" : "0"};`;
       if (!this.hasOutput("w")) {
         this.addOutput("w", this.wOutput);
 
@@ -317,20 +317,20 @@ export class JoinNode extends VPNode {
   }
 
   data(inputs: {
-    x?: NodeReturn[];
-    y?: NodeReturn[];
-    z?: NodeReturn[];
-    w?: NodeReturn[];
+    x?: NodeReturn;
+    y?: NodeReturn;
+    z?: NodeReturn;
+    w?: NodeReturn;
   }): { value: NodeReturn } {
     const { x, y, z, w } = inputs;
-    let xVal = x ? x[0].value : 0;
-    let yVal = y ? y[0].value : 0;
-    let zVal = z ? z[0].value : 0;
-    let wVal = w ? w[0].value : 0;
-    let xRef = x ? (x[0].refId ?? "") : "";
-    let yRef = y ? (y[0].refId ?? "") : "";
-    let zRef = z ? (z[0].refId ?? "") : "";
-    let wRef = w ? (w[0].refId ?? "") : "";
+    let xVal = x ? x.value : 0;
+    let yVal = y ? y.value : 0;
+    let zVal = z ? z.value : 0;
+    let wVal = w ? w.value : 0;
+    let xRef = x ? (x.refId ?? "") : "";
+    let yRef = y ? (y.refId ?? "") : "";
+    let zRef = z ? (z.refId ?? "") : "";
+    let wRef = w ? (w.refId ?? "") : "";
 
     let result = {
       value: {
