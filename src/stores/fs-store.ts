@@ -89,12 +89,6 @@ export const useFsStore = defineStore("fs-store", () => {
    */
   const importProjectDialog = ref<ImportProjectDialog | null>(null);
 
-  function hasProject(): Promise<boolean> {
-    return filesystemCommands.add((sceneFiles) =>
-      Promise.resolve(sceneFiles.hasFile(SceneFileName))
-    );
-  }
-
   /**
    * Can trigger an import dialog.
    */
@@ -102,10 +96,8 @@ export const useFsStore = defineStore("fs-store", () => {
     const maybeProject = await tryImportProject(files);
     if (maybeProject !== null) {
       importProjectDialog.value = maybeProject;
-      const noProject = !(await hasProject());
-      if (noProject) {
-        await finishImport("project");
-      }
+      // Disabled the file importing
+      await finishImport("project");
     } else {
       addFiles({ type: "files", value: files });
     }
@@ -118,10 +110,8 @@ export const useFsStore = defineStore("fs-store", () => {
     importProjectDialog.value = {
       data: filesToImport,
     };
-    const noProject = !(await hasProject());
-    if (noProject) {
-      await finishImport("project");
-    }
+    // Disabled the file importing
+    await finishImport("project");
   }
 
   /** Forcibly imports files */
