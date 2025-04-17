@@ -14,7 +14,7 @@ fn Cylinder(input2: vec2f) -> vec3f {
 }
 
 fn sampleObject(input: vec2f) -> vec3f {
-  var positionUpdated = Cylinder(input);
+  var positionUpdated = bricks(input);
   var x = positionUpdated.x;
   var y = positionUpdated.y;
   var z = positionUpdated.z;
@@ -51,11 +51,51 @@ fn sampleObject(input: vec2f) -> vec3f {
     + nrmCircleOnY * aphi * stepC; // circle-based
   }
 
-  positionUpdated.x *= 1.0 + strength * exp(-positionUpdated.y * heightAffected);
-  positionUpdated.z *= 1.0 + strength * exp(-positionUpdated.y * heightAffected);
+  positionUpdated.x *= 15.0 + strength * exp(-positionUpdated.y * heightAffected);
+  positionUpdated.z *= 15.0 + strength * exp(-positionUpdated.y * heightAffected);
   positionUpdated.y -= 0.41;
 
   positionUpdated.y *= 18.0;
 
   return positionUpdated;
+}
+
+// Constants not to be changed
+const tau = 2. * 3.14159265359;
+const height = 1.04;
+const radiusBottom = 0.17;
+const radiusTop = 0.1;
+
+// HERE to change the size of the space between bricks
+const brickSpacing = 0.1;
+fn bricks(input: vec2f) -> vec3f {
+    let te = time.elapsed;
+    let pos = vec3(input.x*tau, 0.0, input.y);
+    let prog = pos.x;
+    let radius = mix(radiusBottom, radiusTop, input.y);
+    var cyl = vec3f(sin(prog)*radius,input.y*height,cos(prog)*radius);
+    let normal = normalize(vec3f(cyl.x,0,cyl.z));
+    let sOffset = calcSurfaceOffset(pos);
+    cyl+=normal*sOffset*0.01;
+    return cyl;
+}
+
+fn calcSurfaceOffset(pos: vec3f) -> f32 {
+    let te = time.elapsed*0.1;
+
+    // HERE to change the frequency of bricks vertically
+    let vSteps = 20.;
+    let vstep = ceil(fract(pos.z)*vSteps)/vSteps;
+
+    // HERE to change the frequency of bricks horizontally
+    let hSteps = 10.;
+    var sOffset = step(0.,(fract(pos.z*vSteps)-fract(pos.z*vSteps-brickSpacing)));
+
+    sOffset*= step(0.,(fract((pos.x/tau+vstep)*hSteps)-fract((pos.x/tau+vstep)*hSteps-brickSpacing)));
+    return sOffset;
+}
+
+fn getColor(input: vec2f) -> vec3f {
+    let posUv = vec3(input.x*tau, 0.0, input.y);
+    return material.color_roughness.rgb*(calcSurfaceOffset(posUv)+0.4);
 }

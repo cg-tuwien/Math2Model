@@ -19,18 +19,17 @@
       "parametricShader": "TowerBase1722025_203221.wgsl",
       "material": {
         "color": [
-          0.34210909026029324,
-          0.9760456176582692,
-          0.7515107906238254
+          0.2549019607843137,
+          0.2549019607843137,
+          0.2549019607843137
         ],
-        "roughness": 0.5649958444386076,
-        "metallic": 0.7398848448241044,
+        "roughness": 0.5249958444386076,
+        "metallic": 0.11988484482410443,
         "emissive": [
           0,
           0,
           0
-        ],
-        "diffuseTexture": "towerbrick.jpg"
+        ]
       },
       "instanceCount": 1
     },
@@ -52,9 +51,9 @@
       "parametricShader": "TowerWindows1722025_205728.graph.wgsl",
       "material": {
         "color": [
-          0.19644285494701919,
-          0.20336142342462493,
-          2.4845837206208627
+          0.3254901960784314,
+          0.807843137254902,
+          1
         ],
         "roughness": 0.925357642434665,
         "metallic": 0.8475262222252853,
@@ -66,39 +65,6 @@
         "diffuseTexture": "lightblue.jpg"
       },
       "instanceCount": 5
-    },
-    {
-      "type": "model",
-      "id": "145c670e-e888-4d80-ac4b-3f943475c8e4",
-      "name": "TowerBricks",
-      "position": [
-        -1.5,
-        1.5,
-        -0.5999999999999999
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ],
-      "scale": 1.5,
-      "parametricShader": "TowerBricks1722025_211748.wgsl",
-      "material": {
-        "color": [
-          0.34546595154178616,
-          0.8214257823258868,
-          0.702049997404689
-        ],
-        "roughness": 0.9954003836679017,
-        "metallic": 0.6320121198090056,
-        "emissive": [
-          0,
-          0,
-          0
-        ],
-        "diffuseTexture": "black-painted-wall-texture.jpg"
-      },
-      "instanceCount": 1
     },
     {
       "type": "model",
@@ -118,54 +84,20 @@
       "parametricShader": "TowerTop.graph.wgsl",
       "material": {
         "color": [
-          0.09128361141152919,
-          0.2319490429652189,
-          0.04872287822641197
+          0.17254901960784313,
+          0.17254901960784313,
+          0.17254901960784313
         ],
-        "roughness": 0.5195607776293911,
-        "metallic": 0.519243008263726,
+        "roughness": 0.699560777629391,
+        "metallic": 0.8792430082637261,
         "emissive": [
           0,
           0,
           0
-        ],
-        "diffuseTexture": "black-painted-wall-texture.jpg"
-      },
-      "instanceCount": 1
-    },
-    {
-      "type": "model",
-      "id": "a5889402-6c4e-4824-b18b-08eca91a78c4",
-      "name": "TowerBricksBack",
-      "position": [
-        1.6,
-        1.5,
-        0.6
-      ],
-      "rotation": [
-        0,
-        3.141592653589793,
-        0
-      ],
-      "scale": 1.5,
-      "parametricShader": "TowerBricks1722025_211748.wgsl",
-      "material": {
-        "color": [
-          0.9150591514817492,
-          0.5967566381379561,
-          0.42866148018334604
-        ],
-        "roughness": 0.6263497272189454,
-        "metallic": 0.35058850988022094,
-        "emissive": [
-          0,
-          0,
-          0
-        ],
-        "diffuseTexture": "black-painted-wall-texture.jpg"
+        ]
       },
       "instanceCount": 1
     }
   ],
-  "description": "This is a procedurally generated tower. You can change the bricks on the bottom part of the tower. The code parts are marked with 'HERE' comments. Change the 'brickCount' to change the overall amount of bricks along the wall. Change the 'height', 'brickSpacingX' and 'brickSpacingY' to change the size of empty space between the bricks. The number of windows can be changed as well, by adjusting the 'Instance Count' attribute on the model. There can be no more than 5 windows with the current graph, although the calculations in the graph can be adjusted."
+  "description": "This is a procedurally generated tower. You can change the bricks on the bottom part of the tower. The code parts are marked with 'HERE' comments. Change the 'brickSpacing' to change the overall amount of space between bricks. Change the 'vSteps' and 'hSteps' to change the frequency of bricks along the wall either vertically or horizontally. The number of windows can be changed as well, by adjusting the 'Instance Count' attribute on the model. There can be no more than 5 windows with the current graph, although the calculations in the graph can be adjusted."
 }
