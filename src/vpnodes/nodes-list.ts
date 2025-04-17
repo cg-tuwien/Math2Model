@@ -515,6 +515,29 @@ export function useUiNodes(
           },
         ],
         [
+          "Smooth Step",
+          {
+            name: "Smooth Step",
+            type: "APPLY",
+            prefix: "",
+            image: WaveSquare,
+            get: () => {
+              return new MathFunctionNode(
+                "Smooth Step",
+                "smoothstep({edge1 (< edge2),0,10,-10,0.001,same}, {edge2 (> edge1),1,10,-10,0.001,same}, input2)",
+                (id) => genericUpdate(id, editor, area, engine, update),
+                (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
+                (id) => callGenericUpdate(id, editor, area, engine, update),
+                false,
+                "any",
+                "any"
+              );
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
+        [
           "Normalize",
           {
             name: "Normalize",

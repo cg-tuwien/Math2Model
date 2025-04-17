@@ -47,13 +47,19 @@ fn Cube(input2: vec2f) -> vec3f {
 	var PI = 3.14159265359;
 	var HALF_PI = 3.14159265359 / 2.0;
 	var TWO_PI = 3.14159265359 * 2.0;
-    var u = input2.x * TWO_PI;
-    var v = input2.y * TWO_PI;
-    let x = sign(sin(u));
-    let y = sign(sin(u * v));
-    let z = sign(sin(v));
-	var result = vec3f(x, y, z);
-	return result;
+    var p = vec3f(input2.x * TWO_PI, input2.y, 0.0);
+    let adjusted_angle = p.x + TWO_PI / 8.0;
+    var s = sin(adjusted_angle);
+    var c = cos(adjusted_angle);
+    var y0 = (step(0.001,fract(p.y)));
+    var a = abs(s) + abs(c);
+
+    var box = vec3f(
+        (s + c) / a * y0,
+        input2.y,
+        (s - c) / a * y0
+    );
+    return box;
 }
 fn mod289(x: vec4f) -> vec4f
 {
@@ -157,25 +163,50 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var PI = 3.14159265359;
 	var HALF_PI = 3.14159265359 / 2.0;
 	var TWO_PI = 3.14159265359 * 2.0;
-	var ref_73429 = Cylinder(input2);
-	var ref_79318 = mat3x3(vec3f(1.7,0.0,0.0), vec3f(0.0,1,0.0), vec3f(0.0,0.0,0.2)) * ref_73429;
-	var ref_4292c_1 = ref_79318[0];
-	var ref_4292c_2 = ref_79318[1];
-	var ref_4292c_3 = ref_79318[2];
-	var instanceId = f32(instance_id);
-	var ref_77ca1 = instanceId / 2;
-	var ref_2391c = instanceId + 1;
-	var ref_96472 = ref_2391c / 2;
-	var ref_1044e = instanceId % 2;
-	var ref_002d3 = -0.5 * ref_77ca1;
-	var ref_49567 = 0.5 * ref_96472;
-	var ref_56536 = ref_4292c_3 + ref_002d3;
-	var ref_4eef6 = ref_4292c_3 + ref_49567;
-	var ref_6c3d4 = ref_4eef6 * ref_1044e;
-	var ref_d27b8 = 1 - ref_1044e;
-	var ref_b61fc = ref_56536 * ref_d27b8;
-	var ref_ff3f6 = ref_b61fc + ref_6c3d4;
-	var ref_2e4d2 = vec3f(ref_4292c_1, ref_4292c_2, ref_ff3f6);
-	return ref_2e4d2;
+	var ref_8b1b8 = Cube(input2);
+	var ref_477c6_1 = input2[0];
+	var ref_477c6_2 = input2[1];
+	var ref_e07b5_1 = ref_8b1b8[0];
+	var ref_e07b5_2 = ref_8b1b8[1];
+	var ref_e07b5_3 = ref_8b1b8[2];
+	var ref_b30cb = ((1 * ref_477c6_2) - floor(1 * ref_477c6_2));
+	var ref_027aa = step(0.0001, ref_b30cb);
+	var ref_79dd9 = 1.000000001 / 8.000001;
+	var ref_9807d = ref_477c6_1 + ref_79dd9;
+	var ref_aa7b9 = ((1 * ref_9807d) - floor(1 * ref_9807d));
+	var ref_d28e0 = ref_aa7b9 * 4;
+	var ref_ce1ba = ceil(ref_d28e0);
+	var ref_cf597 = ref_ce1ba / 4;
+	var ref_cf3fc = ((1 * ref_cf597) - floor(1 * ref_cf597));
+	var ref_16c2e = ref_cf3fc + 0.25;
+	var ref_289cf = ref_16c2e * TWO_PI;
+	var ref_82c7e = ref_289cf + PI;
+	var ref_0ee22 = sin(1 * ref_82c7e + 0);
+	var ref_6ea11 = cos(1 * ref_82c7e + 0);
+	var ref_4132e = 0.00000000000000000000;
+	var ref_47aa8 = ref_477c6_1 * 100;
+	var ref_5f75b = ref_47aa8 + 0;
+	var ref_caec5 = f32(2);
+	var ref_7361c = smoothstep(-0.04, 0.5, ref_477c6_2);
+	var ref_44b9e = ref_e07b5_1 * ref_7361c;
+	var ref_a6d20 = ref_e07b5_3 * ref_7361c;
+	var ref_a9a6a = vec3f(ref_44b9e, ref_e07b5_2, ref_a6d20);
+	var ref_dde6c = ref_7361c * ref_027aa;
+	var ref_49045 = vec3f(ref_6ea11, ref_4132e, ref_0ee22);
+	var ref_13bcc = ref_dde6c * ref_49045;
+	var ref_7c2e7 = sin(1.3 * ref_5f75b + 0.6);
+	var ref_a4c76 = step(0.3, ref_7c2e7);
+	var ref_16da9 = ref_7c2e7 * ref_a4c76;
+	var ref_7116d = ref_16da9 * 0.05;
+	var ref_25602 = ref_13bcc * ref_7116d;
+	var ref_a59e1 = ref_25602 + ref_a9a6a;
+	var ref_86f70 = mat3x3(vec3f(2,0.0,0.0), vec3f(0.0,2.5,0.0), vec3f(0.0,0.0,1.5)) * ref_a59e1;
+	var ref_3bd26_1 = ref_86f70[0];
+	var ref_3bd26_2 = ref_86f70[1];
+	var ref_3bd26_3 = ref_86f70[2];
+	var ref_b0f83 = ref_3bd26_2 * -1;
+	var ref_3eb0a = ref_3bd26_3 * ref_caec5;
+	var ref_270e3 = vec3f(ref_3bd26_1, ref_b0f83, ref_3eb0a);
+	return ref_270e3;
 
 }
