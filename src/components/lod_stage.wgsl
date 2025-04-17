@@ -251,7 +251,8 @@ fn split_patch(quad_encoded: EncodedPatch, quad: Patch, u_length: array<f32, U_Y
         ||
          ((planarity >= planarityThreshold) && export_config.ignorePlanarity != 0u)
          ||
-         (planarity < 0. && curvature >= 6.-EPSILON)
+         (planarity < 0. && curvature >= 6.-EPSILON) // Here, we check for the fallback case of the patch being a perfect plane, and the curvature metric is 6,
+         // even when curvature is supposed to be ignored. A perfect plane does not benefit from being subdivided further
       );
 
     // debugBuffer.patch_infos[debug_index].planarity = planarity;
@@ -445,7 +446,8 @@ fn main(@builtin(workgroup_id) workgroup_id: vec3<u32>,
         let lambda_min = 1.0 / lambda_inv;
         let trace = cov[0][0] + cov[1][1] + cov[2][2];
         var planarity_local = 1.0 - (lambda_min);
-        // wgsl hack, if planarity would be exactly one, aka a perfect plane, the function breaks down and returns NaN, but min() returns the non NaN value when possible
+        // wgsl hack, if planarity would be exactly one, aka a perfect plane, the function breaks down and returns NaN, but max() returns the non NaN value when possible.
+        // Usually a value of NaN in the principal component analysis indicates that the patch is already a perfect plane
         planarity_local = max(-1.,planarity_local); 
         planarity_score = planarity_local;
         if(patch_index <= 1000000u)

@@ -437,7 +437,7 @@ watchImmediate(
               </div>
             </LabeledFormItem>
 
-            <LabeledFormItem tooltip="TODO: fill this out">
+            <LabeledFormItem tooltip="Stops further tesselation of the model if the normals of the 4 patches the patch is split into are similar enough.">
               <template #label>
                 <n-checkbox
                   v-model:checked="ignoreCurvature"
@@ -459,7 +459,7 @@ watchImmediate(
               </div>
             </LabeledFormItem>
 
-            <LabeledFormItem tooltip="TODO: fill this out">
+            <LabeledFormItem tooltip="Attempt to detect almost perfect planes with given threshold to stop quad tesselation early">
               <template #label>
                 <n-checkbox
                   v-model:checked="ignorePlanarity"
