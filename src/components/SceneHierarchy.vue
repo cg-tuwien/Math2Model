@@ -27,7 +27,7 @@ import {
 } from "./node-tree/NodeTreeHelper";
 import { ObjectUpdate, type ObjectPathPart } from "./input/object-update";
 import { useExportStore } from "@/stores/export-store";
-import { watchDebounced, watchImmediate } from "@vueuse/core";
+import { computedAsync } from "@vueuse/core";
 
 const exportStore = useExportStore();
 const props = defineProps<{
@@ -96,30 +96,25 @@ const selectedKeys = computed(() => {
   return selected;
 });
 let currentModel = ref<DeepReadonly<VirtualModelState> | null>(null);
-const currentDiffuseTexture = computed(
-  () => currentModel.value?.material.diffuseTexture ?? ""
-);
-const currentModelTexture = ref<UploadFileInfo[] | undefined>(undefined);
 
-watchImmediate(currentDiffuseTexture, () => {
-  props.fs
-    .readFile(makeFilePath(currentDiffuseTexture.value))
-    ?.then((file) => {
-      currentModelTexture.value = [
-        {
-          id: file.name,
-          name: file.name,
-          status: "finished",
-          file: file,
-          type: file.type,
-        },
-      ];
-    })
-    .catch((error) => {
-      currentModelTexture.value = [];
-      console.error(error);
-    });
-});
+const currentModelTexture = computedAsync<UploadFileInfo[]>(async () => {
+  const diffuseTexture = currentModel.value?.material.diffuseTexture ?? null;
+  console.log("changed", diffuseTexture);
+  if (diffuseTexture === null) return [];
+
+  const filePromise = props.fs.readFile(makeFilePath(diffuseTexture));
+  if (filePromise === null) return [];
+  const file = await filePromise;
+  return [
+    {
+      id: file.name,
+      name: file.name,
+      status: "finished",
+      file: file,
+      type: file.type,
+    },
+  ];
+}, []);
 
 let toAddModel = ref<[string, FilePath]>([
   "New Model",
