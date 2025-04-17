@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { AreaExtensions, AreaPlugin } from "rete-area-plugin";
 import { Presets as VuePresets, VuePlugin } from "rete-vue-plugin";
-import { ClassicPreset, NodeEditor } from "rete";
+import { ClassicPreset, NodeEditor, type NodeId } from "rete";
 import {
   computed,
   type DeepReadonly,
@@ -28,7 +28,7 @@ import {
 import { DataflowEngine } from "rete-engine";
 import { structures } from "rete-structures";
 import { Presets as ScopesPresets, ScopesPlugin } from "rete-scopes-plugin";
-import { ConditionNode, LogicScopeNode } from "@/vpnodes/basic/logic";
+import { LogicScopeNode } from "@/vpnodes/basic/logic";
 import type { Structures } from "rete-structures/_types/types";
 import {
   useThrottleFn,
@@ -596,56 +596,6 @@ async function getNodesCode(
     fullCode += indent + nodeData.y.code + "\n";
     fullCode += nodeData.z.code !== "" ? indent + nodeData.z.code + "\n" : "";
     fullCode += nodeData.w.code !== "" ? indent + nodeData.w.code + "\n" : "";
-  } else if (node instanceof ConditionNode) {
-    // TODO Decide if ConditionNodes are to be removed
-    let trueCode = "";
-    let falseCode = "";
-
-    const blockContent = graph.outgoers(node.id).nodes();
-    for (let content of blockContent) {
-      const scopeIncomers = graph.incomers(content.id).nodes();
-      let incomersCode = "";
-      if (scopeIncomers.length > 0) {
-        incomersCode += await orderedCode(scopeIncomers, visited, indent);
-      }
-      fullCode += incomersCode;
-    }
-    for (let content of blockContent) {
-      if (content.label != "True") continue;
-      visited.push(content.id);
-      const scopeChildren = editor
-        .getNodes()
-        .filter((n) => n.parent === content.id);
-      if (scopeChildren.length > 0) {
-        trueCode += await getScopeCode(scopeChildren, visited, indent);
-      }
-
-      fullCode +=
-        indent +
-        nodeData.true.code +
-        "\n" +
-        trueCode +
-        (await getNodesCode(content, visited, graph, indent));
-    }
-
-    // fullCode += "\t" + nodeData.false.code + "\n";
-    for (let content of blockContent) {
-      if (content.label != "False") continue;
-      visited.push(content.id);
-      const scopeChildren = editor
-        .getNodes()
-        .filter((n) => n.parent === content.id);
-      if (scopeChildren.length > 0) {
-        falseCode += await getScopeCode(scopeChildren, visited, indent);
-      }
-
-      fullCode +=
-        indent +
-        nodeData.false.code +
-        "\n" +
-        falseCode +
-        (await getNodesCode(content, visited, graph, indent));
-    }
   } else if (node instanceof InstanceCountNode) {
     const icNode = node as InstanceCountNode;
     const instanceCount = props.models.find(
@@ -864,9 +814,6 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
       break;
     case "LogicScope":
       node = new LogicScopeNode("", (n) => area.update("node", n.id));
-      break;
-    case "Condition":
-      node = new ConditionNode("", "==");
       break;
     case "Shape":
       node = new ShapeNode("", "");

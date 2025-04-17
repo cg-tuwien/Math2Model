@@ -41,7 +41,7 @@ import type {
   CallCustomFunctionNode,
   FunctionScopeNode,
 } from "./basic/functions";
-import type { ConditionNode, LogicScopeNode } from "./basic/logic";
+import type { LogicScopeNode } from "./basic/logic";
 import type { Control } from "rete/_types/presets/classic";
 import { useDebounceFn } from "@vueuse/core";
 import type { DataflowEngine } from "rete-engine";
@@ -57,7 +57,6 @@ export type Nodes =
   | VectorNode
   | SeparateNode
   | JoinNode
-  | ConditionNode
   | LogicScopeNode
   | ReturnNode
   | FunctionCallNode
@@ -85,14 +84,9 @@ export type Conns =
   | Connection<SeparateNode, JoinNode>
   | Connection<JoinNode, SeparateNode>
   | Connection<NumberNode, JoinNode>
-  | Connection<ConditionNode, JoinNode>
-  | Connection<ConditionNode, NumberNode>
-  | Connection<ConditionNode, SeparateNode>
-  | Connection<ConditionNode, MathOpNode>
   | Connection<ReturnNode, VectorNode>
   | Connection<NumberNode, FunctionCallNode>
   | Connection<InitializeNode, LogicScopeNode>
-  | Connection<ConditionNode, LogicScopeNode>
   | Connection<CustomFunctionNode, FunctionScopeNode>
   | Connection<InstanceCountNode, VectorNode>;
 
