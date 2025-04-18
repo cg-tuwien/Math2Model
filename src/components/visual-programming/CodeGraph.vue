@@ -2,14 +2,7 @@
 import { AreaExtensions, AreaPlugin } from "rete-area-plugin";
 import { Presets as VuePresets, VuePlugin } from "rete-vue-plugin";
 import { ClassicPreset, NodeEditor, type NodeId } from "rete";
-import {
-  computed,
-  type DeepReadonly,
-  onMounted,
-  onUnmounted,
-  ref,
-  watch,
-} from "vue";
+import { computed, type DeepReadonly, onUnmounted, ref, watch } from "vue";
 import {
   ConnectionPlugin,
   Presets as ConnectionPresets,
@@ -19,7 +12,6 @@ import {
   FunctionCallNode,
   InitializeNode,
   InstanceCountNode,
-  NothingNode,
   ReturnNode,
   VariableInNode,
   VariableOutNode,
@@ -155,9 +147,7 @@ watch(container, (container) => {
   container?.append(area.container);
 });
 
-onMounted(() => {
-  createEditor();
-});
+createEditor();
 
 onUnmounted(() => {
   document.removeEventListener("keydown", keyListener);
@@ -183,7 +173,6 @@ async function addNodeAtPosition(node: Nodes, x: number, y: number) {
 async function rearrange() {
   await arrange.layout({ applier });
   showInfo("Your nodes got automatically arranged! To undo press CTRL+Z.");
-  return new NothingNode();
 }
 
 function copy() {
@@ -237,7 +226,6 @@ async function del() {
       (toDelete.length > 1 ? "s" : "") +
       ". Press CTRL + Z to undo deletion of last deleted node."
   );
-  await editor.addNode(new NothingNode());
 }
 
 async function duplicate() {
@@ -276,7 +264,6 @@ async function paste() {
       (nodeClipBoard.length > 1 ? "s" : "") +
       " from clipboard."
   );
-  await editor.addNode(new NothingNode());
 }
 
 function keyListener(e: KeyboardEvent) {
@@ -299,7 +286,6 @@ function keyListener(e: KeyboardEvent) {
       e.preventDefault();
       e.stopPropagation();
       showInfo("You don't need to save!");
-      editor.addNode(new NothingNode());
       break;
     case "KeyC":
       copy();
@@ -350,11 +336,9 @@ async function checkForUnsafeConnections(
     );
     return;
   }
-
-  await editor.addNode(new NothingNode());
 }
 
-async function createEditor() {
+function createEditor() {
   const contextMenu = new ContextMenuPlugin<Schemes>({
     items(context) {
       if (context === "root") {
@@ -546,10 +530,6 @@ async function createEditor() {
 
     return context;
   });
-
-  await deserialize(props.keyedGraph?.code ?? "");
-
-  await logCode();
 }
 
 function update() {
@@ -557,8 +537,9 @@ function update() {
   saveGraphThrottled();
 }
 
-async function saveGraph() {
-  await Promise.all([serialize(), logCode()]);
+function saveGraph() {
+  serialize();
+  logCode();
 }
 const saveGraphThrottled = useThrottleFn(saveGraph, 500, true, false);
 
@@ -599,7 +580,7 @@ function getNodesCode(node: Nodes, nodeData: NodeData, indent: string = "") {
   return fullCode;
 }
 
-async function logCode() {
+function logCode() {
   const returnNodes = editor.getNodes().filter((n) => n instanceof ReturnNode);
 
   if (returnNodes.length <= 0) return;
@@ -679,7 +660,7 @@ function orderedCode(startNodes: Nodes[], indent: string = "") {
   return fullCode;
 }
 
-async function serialize() {
+function serialize() {
   const sg = new SerializedGraph();
   for (let node of editor.getNodes()) {
     const sn = new SerializedNode();
@@ -702,55 +683,45 @@ async function serialize() {
   emit("save", sg.toJSON());
 }
 
-async function deserialize(json: string, parent?: string) {
+async function deserialize(json: string) {
   shouldUpdate = false;
   if (json === "") {
     json = BasicGraph;
-    emit("save", json);
   }
   const sg = graphFromJSON(json);
   const nodes = new Map<string, Nodes>();
-
+  const promises = [];
   for (let snObj of sg.graph) {
+    if (snObj.nodeType === "NothingNode") continue;
     const sn = toSerializedNode(snObj);
     const node = serializedNodeToNode(sn);
     nodes.set(sn.uuid, node);
     node.deserialize(sn);
-    await editor.addNode(node);
     node.id = sn.uuid;
-    if (sn.position)
-      void area.translate(node.id, { x: sn.position[0], y: sn.position[1] });
+    promises.push(editor.addNode(node));
   }
+  await Promise.all(promises);
+  promises.length = 0;
 
   for (let snObj of sg.graph) {
     const sn = toSerializedNode(snObj);
     const node = nodes.get(sn.uuid);
-    if (
-      node &&
-      !node.parent &&
-      !sn.parent &&
-      sn.nodeType !== "CustomFunction" &&
-      sn.nodeType !== "FunctionScope"
-    ) {
-      node.parent = parent;
-      scopes
-        .update(parent ?? node.id)
-        .catch((reason) => showError("Could not update parent", reason));
-    } else if (node && !node.parent && sn.parent) {
-      // node.parent = idMap.get(sn.parent);
-      node.parent = sn.parent;
-      scopes
-        .update(node.parent ?? node.id)
-        .catch((reason) => showError("Could not update parent", reason));
+    assert(node);
+    if (sn.position) {
+      promises.push(
+        area.translate(node.id, { x: sn.position[0], y: sn.position[1] })
+      );
     }
     for (let input of sn.inputs) {
       if (input.type === "node") {
-        await editor.addConnection(
-          new ClassicPreset.Connection(
-            editor.getNodes().filter((n) => n.id === input.value)[0],
-            input.keyFrom,
-            editor.getNodes().filter((n) => n.id === sn.uuid)[0],
-            input.keyTo
+        promises.push(
+          editor.addConnection(
+            new ClassicPreset.Connection(
+              editor.getNodes().filter((n) => n.id === input.value)[0],
+              input.keyFrom,
+              editor.getNodes().filter((n) => n.id === sn.uuid)[0],
+              input.keyTo
+            )
           )
         );
       }
@@ -758,10 +729,11 @@ async function deserialize(json: string, parent?: string) {
     node?.updateSize(area);
   }
 
+  await Promise.all(promises);
+  promises.length = 0;
+
   shouldUpdate = true;
-  await editor.addNode(new NothingNode());
-  await history.clear();
-  // await rearrange();
+  history.clear();
 }
 
 function serializedNodeToNode(sn: SerializedNode): Nodes {
@@ -830,7 +802,8 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
       node = new InstanceCountNode("");
       break;
     default:
-      return new NothingNode();
+      console.error(sn);
+      throw new Error("Invalid node");
   }
   node.id = sn.uuid;
   return node;

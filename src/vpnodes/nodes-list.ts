@@ -9,7 +9,6 @@ import {
   FunctionCallNode,
   InitializeNode,
   InstanceCountNode,
-  NothingNode,
   ReturnNode,
   VariableInNode,
   VariableOutNode,
@@ -62,7 +61,6 @@ export type Nodes =
   | VariableOutNode
   | VariableInNode
   | InitializeNode
-  | NothingNode
   | CustomFunctionNode
   | CallCustomFunctionNode
   | FunctionScopeNode

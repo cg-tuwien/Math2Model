@@ -51,28 +51,6 @@ export function applyOperator(
   return result;
 }
 
-export class NothingNode extends ClassicPreset.Node {
-  width = 0;
-  height = 0;
-  parent?: string;
-
-  constructor() {
-    super("");
-  }
-
-  data(): {} {
-    return {};
-  }
-
-  updateSize(area?: AreaPlugin<any, any>) {}
-  serialize(sn: SerializedNode) {
-    return sn;
-  }
-
-  deserialize(sn: SerializedNode) {}
-  clone() {}
-}
-
 export class VPNode extends ClassicPreset.Node {
   width = 180;
   height = 140;
