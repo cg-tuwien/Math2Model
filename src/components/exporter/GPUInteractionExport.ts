@@ -39,8 +39,7 @@ const shaderPipelinesMap = ref<
 >(new Map());
 
 function parseOutDebugInfo(buf: ArrayBuffer) {
-  if(!DEBUGGER_ACTIVE)
-  {
+  if (!DEBUGGER_ACTIVE) {
     console.log("Debugger inactive");
     return;
   }
@@ -343,19 +342,19 @@ export async function mainExport(
   const debugBufferSize = 64 * 1024; // 64KB Debug Buffer
 
   const debugInfoBuffer = device.createBuffer({
-        label: "Debug info buffer",
-        size: debugBufferSize,
-        usage:
-          GPUBufferUsage.COPY_DST |
-          GPUBufferUsage.COPY_SRC |
-          GPUBufferUsage.STORAGE,
-      });
+    label: "Debug info buffer",
+    size: debugBufferSize,
+    usage:
+      GPUBufferUsage.COPY_DST |
+      GPUBufferUsage.COPY_SRC |
+      GPUBufferUsage.STORAGE,
+  });
 
   const debugOutBuffer = device.createBuffer({
-        label: "Debug out buffer",
-        size: debugBufferSize,
-        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
-      });
+    label: "Debug out buffer",
+    size: debugBufferSize,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  });
 
   let numberBuffersArray: GPUBuffer[] = [];
   for (let i = 0; i < 200; i++) {
@@ -706,8 +705,7 @@ export async function mainExport(
       if (import.meta.env.DEV && DEBUGGER_ACTIVE)
         simpleB2BSameSize(debugInfoBuffer, debugOutBuffer, commandEncoder);
       setTimeout(() => {
-        if (import.meta.env.DEV  && DEBUGGER_ACTIVE) 
-          {
+        if (import.meta.env.DEV && DEBUGGER_ACTIVE) {
           debugOutBuffer
             .mapAsync(GPUMapMode.READ, 0, debugOutBuffer.size)
             .then(() => {
@@ -751,6 +749,5 @@ export async function mainExport(
       }, 1);
     }
   }
-  await props.engine.setLodStage(lodStageCallback);
   return lodStageCallback;
 }

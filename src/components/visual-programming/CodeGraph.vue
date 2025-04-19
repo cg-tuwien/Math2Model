@@ -1,16 +1,8 @@
 <script setup lang="ts">
 import { AreaExtensions, AreaPlugin } from "rete-area-plugin";
 import { Presets as VuePresets, VuePlugin } from "rete-vue-plugin";
-import { ClassicPreset, NodeEditor } from "rete";
-import {
-  computed,
-  type DeepReadonly,
-  onDeactivated,
-  onMounted,
-  onUnmounted,
-  ref,
-  watch,
-} from "vue";
+import { ClassicPreset, NodeEditor, type NodeId } from "rete";
+import { computed, type DeepReadonly, onUnmounted, ref, watch } from "vue";
 import {
   ConnectionPlugin,
   Presets as ConnectionPresets,
@@ -20,24 +12,15 @@ import {
   FunctionCallNode,
   InitializeNode,
   InstanceCountNode,
-  NothingNode,
   ReturnNode,
   VariableInNode,
   VariableOutNode,
+  type NodeData,
 } from "@/vpnodes/basic/nodes";
-import { DataflowEngine } from "rete-engine";
 import { structures } from "rete-structures";
 import { Presets as ScopesPresets, ScopesPlugin } from "rete-scopes-plugin";
-import { ConditionNode, LogicScopeNode } from "@/vpnodes/basic/logic";
-import type { Structures } from "rete-structures/_types/types";
-import {
-  useThrottleFn,
-  watchArray,
-  watchDebounced,
-  watchDeep,
-  watchImmediate,
-  watchThrottled,
-} from "@vueuse/core";
+import { LogicScopeNode } from "@/vpnodes/basic/logic";
+import { useThrottleFn, watchArray } from "@vueuse/core";
 import {
   ArrangeAppliers,
   AutoArrangePlugin,
@@ -53,7 +36,6 @@ import {
   type FilePath,
   type ReactiveFilesystem,
 } from "@/filesystem/reactive-files";
-import type { SelectMixedOption } from "naive-ui/es/select/src/interface";
 import { showError, showInfo } from "@/notification";
 import BasicGraph from "@/../parametric-renderer-core/graphs/BasicGraph.graph?raw";
 import HeartWGSL from "@/../parametric-renderer-core/graphs/Heart.graph.wgsl?raw";
@@ -80,7 +62,6 @@ import SocketStyle from "@/components/visual-programming/CustomNodeStyles/Socket
 import ConnectionStyle from "@/components/visual-programming/CustomNodeStyles/ConnectionStyle.vue";
 import {
   callGenericUpdate,
-  Connection,
   genericUpdate,
   genericUpdateControl,
   sliderUpdateConrol,
@@ -95,6 +76,7 @@ import NumberComponent from "@/vpnodes/components/NumberComponent.vue";
 import type { Item } from "rete-context-menu-plugin/_types/types";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
 import type { VirtualModelState } from "@/scenes/scene-state";
+import { assert } from "@stefnotch/typestef/assert";
 
 const emit = defineEmits<{
   update: [content: string];
@@ -134,7 +116,6 @@ watchArray(instanceCounts, () => {
   update();
 });
 
-const engine = new DataflowEngine<Schemes>();
 const arrange = new AutoArrangePlugin<Schemes>();
 const area: AreaPlugin<Schemes, AreaExtra> = new AreaPlugin<Schemes, AreaExtra>(
   document.createElement("div")
@@ -158,14 +139,7 @@ const selector = AreaExtensions.selector();
 AreaExtensions.selectableNodes(area, selector, {
   accumulating: AreaExtensions.accumulateOnCtrl(),
 });
-const nodes = useUiNodes(
-  editor,
-  area,
-  engine,
-  props.engine,
-  update,
-  props.models
-);
+const nodes = useUiNodes(editor, area, props.engine, update, props.models);
 let uiNodes: Map<string, Map<string, UINode>> = nodes.uiNodes;
 let shouldUpdate = true;
 
@@ -173,9 +147,7 @@ watch(container, (container) => {
   container?.append(area.container);
 });
 
-onMounted(() => {
-  createEditor();
-});
+createEditor();
 
 onUnmounted(() => {
   document.removeEventListener("keydown", keyListener);
@@ -201,7 +173,6 @@ async function addNodeAtPosition(node: Nodes, x: number, y: number) {
 async function rearrange() {
   await arrange.layout({ applier });
   showInfo("Your nodes got automatically arranged! To undo press CTRL+Z.");
-  return new NothingNode();
 }
 
 function copy() {
@@ -255,7 +226,6 @@ async function del() {
       (toDelete.length > 1 ? "s" : "") +
       ". Press CTRL + Z to undo deletion of last deleted node."
   );
-  await editor.addNode(new NothingNode());
 }
 
 async function duplicate() {
@@ -294,7 +264,6 @@ async function paste() {
       (nodeClipBoard.length > 1 ? "s" : "") +
       " from clipboard."
   );
-  await editor.addNode(new NothingNode());
 }
 
 function keyListener(e: KeyboardEvent) {
@@ -317,7 +286,6 @@ function keyListener(e: KeyboardEvent) {
       e.preventDefault();
       e.stopPropagation();
       showInfo("You don't need to save!");
-      editor.addNode(new NothingNode());
       break;
     case "KeyC":
       copy();
@@ -350,7 +318,6 @@ async function checkForUnsafeConnections(
   }
 
   shouldUpdate = false;
-  // await editor.removeConnection(connection.id);
 
   const graph = structures(editor);
 
@@ -369,11 +336,9 @@ async function checkForUnsafeConnections(
     );
     return;
   }
-
-  await editor.addNode(new NothingNode());
 }
 
-async function createEditor() {
+function createEditor() {
   const contextMenu = new ContextMenuPlugin<Schemes>({
     items(context) {
       if (context === "root") {
@@ -535,7 +500,6 @@ async function createEditor() {
   scopes.addPreset(ScopesPresets.classic.setup());
 
   editor.use(area);
-  editor.use(engine);
   area.use(connection);
   area.use(render);
   area.use(scopes);
@@ -566,86 +530,42 @@ async function createEditor() {
 
     return context;
   });
-
-  await deserialize(props.keyedGraph?.code ?? "");
-
-  await logCode();
 }
 
 function update() {
   if (!shouldUpdate) return;
-  engine.reset();
   saveGraphThrottled();
 }
 
-async function saveGraph() {
-  await Promise.all([serialize(), logCode()]);
+function saveGraph() {
+  serialize();
+  logCode();
 }
 const saveGraphThrottled = useThrottleFn(saveGraph, 500, true, false);
 
-async function getNodesCode(
-  node: Nodes,
-  visited: string[],
-  graph: Structures<Nodes, Conns>,
-  indent: string = ""
-) {
-  const nodeData = await engine.fetch(node.id);
+/** Returns all connections. Can be queried with `.get(nodeId)[inputName]` */
+function inputConnections() {
+  const inputs = new Map<NodeId, { [key: string]: Conns }>();
+  editor.getConnections().forEach((c) => {
+    const obj = inputs.get(c.target);
+    if (obj === undefined) {
+      inputs.set(c.target, {
+        [c.targetInput]: c,
+      });
+    } else {
+      obj[c.targetInput] = c;
+    }
+  });
+  return inputs;
+}
+
+function getNodesCode(node: Nodes, nodeData: NodeData, indent: string = "") {
   let fullCode = "";
   if (node instanceof SeparateNode) {
     fullCode += indent + nodeData.x.code + "\n";
     fullCode += indent + nodeData.y.code + "\n";
     fullCode += nodeData.z.code !== "" ? indent + nodeData.z.code + "\n" : "";
     fullCode += nodeData.w.code !== "" ? indent + nodeData.w.code + "\n" : "";
-  } else if (node instanceof ConditionNode) {
-    // TODO Decide if ConditionNodes are to be removed
-    let trueCode = "";
-    let falseCode = "";
-
-    const blockContent = graph.outgoers(node.id).nodes();
-    for (let content of blockContent) {
-      const scopeIncomers = graph.incomers(content.id).nodes();
-      let incomersCode = "";
-      if (scopeIncomers.length > 0) {
-        incomersCode += await orderedCode(scopeIncomers, visited, indent);
-      }
-      fullCode += incomersCode;
-    }
-    for (let content of blockContent) {
-      if (content.label != "True") continue;
-      visited.push(content.id);
-      const scopeChildren = editor
-        .getNodes()
-        .filter((n) => n.parent === content.id);
-      if (scopeChildren.length > 0) {
-        trueCode += await getScopeCode(scopeChildren, visited, indent);
-      }
-
-      fullCode +=
-        indent +
-        nodeData.true.code +
-        "\n" +
-        trueCode +
-        (await getNodesCode(content, visited, graph, indent));
-    }
-
-    // fullCode += "\t" + nodeData.false.code + "\n";
-    for (let content of blockContent) {
-      if (content.label != "False") continue;
-      visited.push(content.id);
-      const scopeChildren = editor
-        .getNodes()
-        .filter((n) => n.parent === content.id);
-      if (scopeChildren.length > 0) {
-        falseCode += await getScopeCode(scopeChildren, visited, indent);
-      }
-
-      fullCode +=
-        indent +
-        nodeData.false.code +
-        "\n" +
-        falseCode +
-        (await getNodesCode(content, visited, graph, indent));
-    }
   } else if (node instanceof InstanceCountNode) {
     const icNode = node as InstanceCountNode;
     const instanceCount = props.models.find(
@@ -653,30 +573,18 @@ async function getNodesCode(
     )?.instanceCount;
     fullCode += indent + nodeData.value.code + "f32(" + instanceCount + ");\n";
   } else {
-    if (nodeData.value.code !== "")
+    if (nodeData.value && nodeData.value.code !== "")
       fullCode += indent + nodeData.value.code + "\n";
   }
 
   return fullCode;
 }
 
-async function getScopeCode(
-  scopeChildren: Nodes[],
-  visited: string[],
-  prevIndent: string
-) {
-  if (scopeChildren.length <= 0) return;
+function logCode() {
+  const returnNodes = editor.getNodes().filter((n) => n instanceof ReturnNode);
 
-  return await orderedCode(scopeChildren, visited, prevIndent + "\t");
-}
+  if (returnNodes.length <= 0) return;
 
-async function logCode() {
-  const graph = structures(editor);
-  const allNodes = graph.nodes().filter((n) => !n.parent);
-
-  if (allNodes.length <= 0) return;
-
-  let visited: string[] = [];
   /**
    * Order of code assembling
    *  1. Write all custom function blocks outside of main (sampleObject) method
@@ -696,48 +604,63 @@ async function logCode() {
     "\n" +
     NoiseFunction +
     "\n\nfn sampleObject(input2: vec2f) -> vec3f {\n" +
-    (await orderedCode(allNodes, visited, "\t"));
+    orderedCode(returnNodes, "\t");
 
   fullCode += "\n}";
   emit("update", fullCode);
 }
 
-async function orderedCode(
-  allNodes: Nodes[],
-  visited: string[],
-  indent: string = ""
-) {
-  if (allNodes.length <= 0) return "";
-  const graph = structures(editor);
+function orderedCode(startNodes: Nodes[], indent: string = "") {
+  const allConnections = inputConnections();
   let fullCode = "";
-  let nodeQueue = allNodes;
 
-  while (nodeQueue.length > 0) {
-    const node = nodeQueue.shift();
-    if (!node) break;
-    if (visited.includes(node.id)) continue;
-    if (node instanceof NothingNode) {
-      await editor.removeNode(node.id);
-      continue;
-    }
-    const incomers = graph.incomers(node.id).nodes();
-    // Check if any incomers of current node weren't visited yet and ignore this node for now if so
-    if (
-      incomers.some((inc) => !visited.includes(inc.id)) ||
-      (node instanceof ReturnNode && nodeQueue.length > 0)
-    ) {
-      nodeQueue.push(node);
-      continue;
+  // Permanent mark
+  const nodeOutput = new Map<NodeId, NodeData>();
+  const temporaryMark = new Set<NodeId>();
+
+  // https://en.wikipedia.org/wiki/Topological_sorting#Depth-first_search
+  function visit(node: Nodes) {
+    if (nodeOutput.has(node.id)) return;
+    if (temporaryMark.has(node.id)) {
+      showError("Graph is cyclic!");
+      return;
     }
 
-    visited.push(node.id);
-    fullCode += await getNodesCode(node, visited, graph, indent);
+    temporaryMark.add(node.id);
+
+    const connections = allConnections.get(node.id) ?? {};
+    for (const connection of Object.values(connections)) {
+      const child = editor.getNode(connection.source);
+      assert(child, "invalid connection");
+      visit(child);
+    }
+
+    const inputKeys = Object.keys(node.inputs);
+
+    const inputData: Partial<NodeData> = Object.fromEntries(
+      inputKeys.map((v) => {
+        const connection = connections[v];
+        if (connection) {
+          return [
+            v,
+            nodeOutput.get(connection.source)?.[connection.sourceOutput],
+          ];
+        } else {
+          return [v, undefined];
+        }
+      })
+    );
+    const nodeData = node.data(inputData);
+    nodeOutput.set(node.id, nodeData);
+    fullCode += getNodesCode(node, nodeData, indent);
   }
+
+  startNodes.forEach((n) => visit(n));
 
   return fullCode;
 }
 
-async function serialize() {
+function serialize() {
   const sg = new SerializedGraph();
   for (let node of editor.getNodes()) {
     const sn = new SerializedNode();
@@ -760,55 +683,45 @@ async function serialize() {
   emit("save", sg.toJSON());
 }
 
-async function deserialize(json: string, parent?: string) {
+async function deserialize(json: string) {
   shouldUpdate = false;
   if (json === "") {
     json = BasicGraph;
-    emit("save", json);
   }
   const sg = graphFromJSON(json);
   const nodes = new Map<string, Nodes>();
-
+  const promises = [];
   for (let snObj of sg.graph) {
+    if (snObj.nodeType === "NothingNode") continue;
     const sn = toSerializedNode(snObj);
     const node = serializedNodeToNode(sn);
     nodes.set(sn.uuid, node);
     node.deserialize(sn);
-    await editor.addNode(node);
     node.id = sn.uuid;
-    if (sn.position)
-      void area.translate(node.id, { x: sn.position[0], y: sn.position[1] });
+    promises.push(editor.addNode(node));
   }
+  await Promise.all(promises);
+  promises.length = 0;
 
   for (let snObj of sg.graph) {
     const sn = toSerializedNode(snObj);
     const node = nodes.get(sn.uuid);
-    if (
-      node &&
-      !node.parent &&
-      !sn.parent &&
-      sn.nodeType !== "CustomFunction" &&
-      sn.nodeType !== "FunctionScope"
-    ) {
-      node.parent = parent;
-      scopes
-        .update(parent ?? node.id)
-        .catch((reason) => showError("Could not update parent", reason));
-    } else if (node && !node.parent && sn.parent) {
-      // node.parent = idMap.get(sn.parent);
-      node.parent = sn.parent;
-      scopes
-        .update(node.parent ?? node.id)
-        .catch((reason) => showError("Could not update parent", reason));
+    assert(node);
+    if (sn.position) {
+      promises.push(
+        area.translate(node.id, { x: sn.position[0], y: sn.position[1] })
+      );
     }
     for (let input of sn.inputs) {
       if (input.type === "node") {
-        await editor.addConnection(
-          new ClassicPreset.Connection(
-            editor.getNodes().filter((n) => n.id === input.value)[0],
-            input.keyFrom,
-            editor.getNodes().filter((n) => n.id === sn.uuid)[0],
-            input.keyTo
+        promises.push(
+          editor.addConnection(
+            new ClassicPreset.Connection(
+              editor.getNodes().filter((n) => n.id === input.value)[0],
+              input.keyFrom,
+              editor.getNodes().filter((n) => n.id === sn.uuid)[0],
+              input.keyTo
+            )
           )
         );
       }
@@ -816,10 +729,11 @@ async function deserialize(json: string, parent?: string) {
     node?.updateSize(area);
   }
 
+  await Promise.all(promises);
+  promises.length = 0;
+
   shouldUpdate = true;
-  await editor.addNode(new NothingNode());
-  await history.clear();
-  // await rearrange();
+  history.clear();
 }
 
 function serializedNodeToNode(sn: SerializedNode): Nodes {
@@ -827,14 +741,14 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
   switch (sn.nodeType) {
     case "Number":
       node = new NumberNode(
-        (id) => genericUpdate(id, editor, area, engine, update),
+        (id) => genericUpdate(id, editor, area, update),
         (cont) => genericUpdateControl(cont, area)
       );
       break;
     case "Math":
       node = new MathOpNode(
         "+",
-        (id) => genericUpdate(id, editor, area, engine, update),
+        (id) => genericUpdate(id, editor, area, update),
         (cont) => genericUpdateControl(cont, area)
       );
       break;
@@ -865,33 +779,31 @@ function serializedNodeToNode(sn: SerializedNode): Nodes {
     case "LogicScope":
       node = new LogicScopeNode("", (n) => area.update("node", n.id));
       break;
-    case "Condition":
-      node = new ConditionNode("", "==");
-      break;
     case "Shape":
       node = new ShapeNode("", "");
       break;
     case "Combine":
       node = new CombineNode(
-        (id) => genericUpdate(id, editor, area, engine, update),
+        (id) => genericUpdate(id, editor, area, update),
         (cont) => sliderUpdateConrol(cont, area, props.engine),
-        (id) => callGenericUpdate(id, editor, area, engine, update)
+        (id) => callGenericUpdate(id, editor, area, update)
       );
       break;
     case "MathFunction":
       node = new MathFunctionNode(
         "",
         "",
-        (id) => genericUpdate(id, editor, area, engine, update),
+        (id) => genericUpdate(id, editor, area, update),
         (cont) => sliderUpdateConrol(cont, area, props.engine),
-        (id) => callGenericUpdate(id, editor, area, engine, update)
+        (id) => callGenericUpdate(id, editor, area, update)
       );
       break;
     case "InstanceCount":
       node = new InstanceCountNode("");
       break;
     default:
-      return new NothingNode();
+      console.error(sn);
+      throw new Error("Invalid node");
   }
   node.id = sn.uuid;
   return node;

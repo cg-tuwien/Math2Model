@@ -59,28 +59,6 @@ export function applyOperator(
   return result;
 }
 
-export class NothingNode extends ClassicPreset.Node {
-  width = 0;
-  height = 0;
-  parent?: string;
-
-  constructor() {
-    super("");
-  }
-
-  data(): {} {
-    return {};
-  }
-
-  updateSize(area?: AreaPlugin<any, any>) {}
-  serialize(sn: SerializedNode) {
-    return sn;
-  }
-
-  deserialize(sn: SerializedNode) {}
-  clone() {}
-}
-
 export class VPNode extends ClassicPreset.Node {
   width = 180;
   height = 140;
@@ -113,6 +91,10 @@ export class VPNode extends ClassicPreset.Node {
   deserialize(sn: SerializedNode) {}
 
   clone(): Nodes | void {}
+
+  data(input: Partial<NodeData>): NodeData {
+    return {};
+  }
 }
 
 export class NodeReturn {
@@ -122,6 +104,8 @@ export class NodeReturn {
     public refId?: string
   ) {}
 }
+
+export type NodeData = { [key: string]: NodeReturn };
 
 export class ReturnNode extends VPNode {
   constructor(
@@ -136,7 +120,7 @@ export class ReturnNode extends VPNode {
     );
   }
 
-  data(inputs: { returnIn: NodeReturn[] }): { value: NodeReturn } {
+  data(inputs: { returnIn?: NodeReturn }): { value: NodeReturn } {
     const result = {
       value: {
         value: this.def,
@@ -146,9 +130,9 @@ export class ReturnNode extends VPNode {
     const { returnIn } = inputs;
 
     if (returnIn) {
-      result.value.value = returnIn[0].value;
+      result.value.value = returnIn.value;
       result.value.code =
-        "return " + (returnIn[0].refId ?? returnIn[0].value.toString()) + ";";
+        "return " + (returnIn.refId ?? returnIn.value.toString()) + ";";
     }
 
     return result;
@@ -236,13 +220,13 @@ export class VariableInNode extends VPNode {
     this.updateSize();
   }
 
-  data(inputs: { value: NodeReturn[] }): { value: NodeReturn } {
+  data(inputs: { value?: NodeReturn }): { value: NodeReturn } {
     const { value } = inputs;
 
     return {
       value: {
-        value: value ? value[0].value : 0,
-        code: `${this.ref} = ${value ? (value[0].refId ?? value[0].value) : this.ref};`,
+        value: value ? value.value : 0,
+        code: `${this.ref} = ${value ? (value.refId ?? value.value) : this.ref};`,
         refId: this.ref,
       },
     };
@@ -295,10 +279,10 @@ export class FunctionCallNode extends VPNode {
   }
 
   data(inputs: {
-    param1: NodeReturn[];
-    param2: NodeReturn[];
-    param3: NodeReturn[];
-    param4: NodeReturn[];
+    param1?: NodeReturn;
+    param2?: NodeReturn;
+    param3?: NodeReturn;
+    param4?: NodeReturn;
   }): { value: NodeReturn } {
     const result = {
       value: {
@@ -312,19 +296,19 @@ export class FunctionCallNode extends VPNode {
     if (this.numParams) {
       if (this.numParams >= 1) {
         result.value.code +=
-          (param1 ? (param1[0].refId ?? param1[0].value) : "0.0") + ", ";
+          (param1 ? (param1.refId ?? param1.value) : "0.0") + ", ";
       }
       if (this.numParams >= 2) {
         result.value.code +=
-          (param2 ? (param2[0].refId ?? param2[0].value) : "0.0") + ", ";
+          (param2 ? (param2.refId ?? param2.value) : "0.0") + ", ";
       }
       if (this.numParams >= 3) {
         result.value.code +=
-          (param3 ? (param3[0].refId ?? param3[0].value) : "0.0") + ", ";
+          (param3 ? (param3.refId ?? param3.value) : "0.0") + ", ";
       }
       if (this.numParams === 4) {
         result.value.code +=
-          (param4 ? (param4[0].refId ?? param4[0].value) : "0.0") + ", ";
+          (param4 ? (param4.refId ?? param4.value) : "0.0") + ", ";
       }
     }
 

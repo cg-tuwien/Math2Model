@@ -61,7 +61,7 @@ export class LogicScopeNode extends BlockNode {
     this.updateSize();
   }
 
-  data(input: { context: NodeReturn[]; reference: NodeReturn[] }): {
+  data(input: { context?: NodeReturn; reference?: NodeReturn }): {
     value: NodeReturn;
   } {
     const { context, reference } = input;
@@ -80,9 +80,9 @@ export class LogicScopeNode extends BlockNode {
       this.varOutNode.ref === "" &&
       this.varInNode.ref === ""
     ) {
-      this.varOutNode.ref = reference[0].refId;
-      this.varOutNode.value = reference[0].value;
-      this.varInNode.ref = reference[0].refId ?? "";
+      this.varOutNode.ref = reference.refId;
+      this.varOutNode.value = reference.value;
+      this.varInNode.ref = reference.refId ?? "";
 
       this.addNode(this.varOutNode);
       this.addNode(this.varInNode);
@@ -103,9 +103,9 @@ export class LogicScopeNode extends BlockNode {
       return result;
     }
 
-    result.value.value = reference[0].value ?? 0;
+    result.value.value = reference.value ?? 0;
     result.value.code = `}`;
-    result.value.refId = reference[0].refId ?? "";
+    result.value.refId = reference.refId ?? "";
 
     return result;
   }
@@ -122,76 +122,6 @@ export class LogicScopeNode extends BlockNode {
         if (info.key === "name") {
           this.name = info.value;
           this.label = info.value;
-        }
-      }
-    }
-
-    super.deserialize(sn);
-  }
-}
-
-export class ConditionNode extends VPNode {
-  constructor(
-    private name: string,
-    private operator: "==" | "!=" | ">" | "<" | ">=" | "<="
-  ) {
-    super(name);
-
-    this.addInput("left", new ClassicPreset.Input(reteSocket, "Left"));
-    this.addInput("right", new ClassicPreset.Input(reteSocket, "Right"));
-
-    this.addOutput("true", new ClassicPreset.Output(reteSocket, "True"));
-    this.addOutput("false", new ClassicPreset.Output(reteSocket, "False"));
-
-    //this.updateSize();
-  }
-
-  data(input: { left?: NodeReturn[]; right?: NodeReturn[] }): {
-    true: NodeReturn;
-    false: NodeReturn;
-  } {
-    const { left, right } = input;
-
-    return {
-      true: {
-        value: applyLogic(
-          left ? left[0].value : 0,
-          right ? right[0].value : 0,
-          this.operator
-        ),
-        code: `if(${left ? (left[0].refId ?? left[0].value) : 0} ${this.operator} ${right ? (right[0].refId ?? right[0].value) : 0}) {`,
-      },
-      false: {
-        value: applyLogic(
-          left ? left[0].value : 0,
-          right ? right[0].value : 0,
-          this.operator
-        ),
-        code: `else {`,
-      },
-    };
-  }
-
-  serialize(sn: SerializedNode): SerializedNode {
-    sn.nodeType = "Condition";
-
-    sn.extraStringInformation = [
-      { key: "name", value: this.name },
-      { key: "op", value: this.operator },
-    ];
-
-    return super.serialize(sn);
-  }
-
-  deserialize(sn: SerializedNode) {
-    if (sn.extraStringInformation) {
-      for (let info of sn.extraStringInformation) {
-        if (info.key === "name") {
-          this.name = info.value;
-          this.label = info.value;
-        }
-        if (info.key === "op") {
-          this.operator = info.value as "==" | ">=" | "<=" | ">" | "<" | "!=";
         }
       }
     }

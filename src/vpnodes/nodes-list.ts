@@ -9,7 +9,6 @@ import {
   FunctionCallNode,
   InitializeNode,
   InstanceCountNode,
-  NothingNode,
   ReturnNode,
   VariableInNode,
   VariableOutNode,
@@ -41,10 +40,9 @@ import type {
   CallCustomFunctionNode,
   FunctionScopeNode,
 } from "./basic/functions";
-import type { ConditionNode, LogicScopeNode } from "./basic/logic";
+import type { LogicScopeNode } from "./basic/logic";
 import type { Control } from "rete/_types/presets/classic";
 import { useDebounceFn } from "@vueuse/core";
-import type { DataflowEngine } from "rete-engine";
 import type { WgpuEngine } from "@/engine/wgpu-engine";
 import type { SliderControl } from "./controls/slider";
 import type { VirtualModelState } from "@/scenes/scene-state";
@@ -57,14 +55,12 @@ export type Nodes =
   | VectorNode
   | SeparateNode
   | JoinNode
-  | ConditionNode
   | LogicScopeNode
   | ReturnNode
   | FunctionCallNode
   | VariableOutNode
   | VariableInNode
   | InitializeNode
-  | NothingNode
   | CustomFunctionNode
   | CallCustomFunctionNode
   | FunctionScopeNode
@@ -85,14 +81,9 @@ export type Conns =
   | Connection<SeparateNode, JoinNode>
   | Connection<JoinNode, SeparateNode>
   | Connection<NumberNode, JoinNode>
-  | Connection<ConditionNode, JoinNode>
-  | Connection<ConditionNode, NumberNode>
-  | Connection<ConditionNode, SeparateNode>
-  | Connection<ConditionNode, MathOpNode>
   | Connection<ReturnNode, VectorNode>
   | Connection<NumberNode, FunctionCallNode>
   | Connection<InitializeNode, LogicScopeNode>
-  | Connection<ConditionNode, LogicScopeNode>
   | Connection<CustomFunctionNode, FunctionScopeNode>
   | Connection<InstanceCountNode, VectorNode>;
 
@@ -106,10 +97,8 @@ export async function callGenericUpdate(
   id: string,
   editor: NodeEditor<Schemes>,
   area: AreaPlugin<Schemes, AreaExtra>,
-  engine: DataflowEngine<Schemes>,
   update: () => void
 ) {
-  engine.reset(id);
   update();
 }
 
@@ -132,7 +121,6 @@ async function callSliderUpdateControl(
 export function useUiNodes(
   editor: NodeEditor<Schemes>,
   area: AreaPlugin<Schemes, AreaExtra>,
-  engine: DataflowEngine<Schemes>,
   wgpuEngine: WgpuEngine,
   update: () => void,
   models: VirtualModelState[]
@@ -229,9 +217,9 @@ export function useUiNodes(
             get: () => {
               //addNode(n);
               return new CombineNode(
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => callSliderUpdateControl(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update)
+                (id) => callGenericUpdate(id, editor, area, update)
               );
             },
             create: createUINode,
@@ -249,9 +237,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Scale",
                 "mat3x3(vec3f({scale x,1,100,-100,0.1,f32},0.0,0.0), vec3f(0.0,{scale y,1,100,-100,0.1,f32},0.0), vec3f(0.0,0.0,{scale z,1,100,-100,0.1,f32})) * input2",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "vec3f",
                 "vec3f"
@@ -272,9 +260,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Abs",
                 "abs(input2)",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "vec3f",
                 "vec3f"
@@ -295,9 +283,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Sine",
                 "sin({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
@@ -318,9 +306,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Cosine",
                 "cos({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
@@ -341,9 +329,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "asin",
                 "asin({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
@@ -364,9 +352,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "atan2",
                 "atan2(input2.x, input2.y)",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "vec2f",
                 "any"
@@ -387,9 +375,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "acos",
                 "acos({angular frequency,0.0,3.14159,-3.14159,0.1,f32} * input2 + {phase,0.0,3.14159,-3.14159,0.1,f32})",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
@@ -410,9 +398,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Sawtooth",
                 "(({sawtooth count,0,10,-10,0.1,f32} * input2) - floor({sawtooth count,0,10,-10,0.1,f32} * input2))",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
@@ -433,9 +421,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Pow",
                 "pow(input2, {x1,0,10,-10,0.1,same})",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
@@ -456,9 +444,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Square",
                 "sign(sin(input2*{frequency,1,10,-10,0.1,f32}))",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
@@ -479,9 +467,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Rectangle",
                 "fract(input2 * {frequency,1,10,-10,0.001,f32}) - fract(input2 * {frequency,1,10,-10,0.001,f32} - {offset,0,10,-10,0.001,same})",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
@@ -502,9 +490,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Step",
                 "step({edge,1,10,-10,0.001,same}, input2)",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
@@ -525,9 +513,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Smooth Step",
                 "smoothstep({edge1 (< edge2),0,10,-10,0.001,same}, {edge2 (> edge1),1,10,-10,0.001,same}, input2)",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
@@ -548,9 +536,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Normalize",
                 "normalize(input2)",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
@@ -571,9 +559,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Perlin Noise",
                 "cnoise(input2)",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "vec2f",
                 "f32"
@@ -630,7 +618,7 @@ export function useUiNodes(
             image: MathFunction,
             get: () => {
               return new NumberNode(
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => genericUpdateControl(cont, area)
               );
             },
@@ -648,7 +636,7 @@ export function useUiNodes(
             get: () => {
               return new MathOpNode(
                 "+",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => genericUpdateControl(cont, area)
               );
             },
@@ -666,7 +654,7 @@ export function useUiNodes(
             get: () => {
               return new MathOpNode(
                 "-",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => genericUpdateControl(cont, area)
               );
             },
@@ -684,7 +672,7 @@ export function useUiNodes(
             get: () => {
               return new MathOpNode(
                 "*",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => genericUpdateControl(cont, area)
               );
             },
@@ -702,7 +690,7 @@ export function useUiNodes(
             get: () => {
               return new MathOpNode(
                 "/",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => genericUpdateControl(cont, area)
               );
             },
@@ -720,7 +708,7 @@ export function useUiNodes(
             get: () => {
               return new MathOpNode(
                 "%",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => genericUpdateControl(cont, area)
               );
             },
@@ -739,9 +727,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Square Root",
                 "sqrt(input2)",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
@@ -762,9 +750,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Floor",
                 "floor(input2)",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
@@ -785,9 +773,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Ceil",
                 "ceil(input2)",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
@@ -808,9 +796,9 @@ export function useUiNodes(
               return new MathFunctionNode(
                 "Exp",
                 "exp(input2)",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => sliderUpdateConrol(cont, area, wgpuEngine),
-                (id) => callGenericUpdate(id, editor, area, engine, update),
+                (id) => callGenericUpdate(id, editor, area, update),
                 false,
                 "any",
                 "any"
