@@ -820,6 +820,42 @@ export function useUiNodes(
             draggable: true,
           },
         ],
+        [
+          "Max",
+          {
+            name: "Max",
+            type: "CALCULATE",
+            prefix: "",
+            image: MathFunction,
+            get: () => {
+              return new MathOpNode(
+                "max",
+                (id) => genericUpdate(id, editor, area, engine, update),
+                (cont) => genericUpdateControl(cont, area)
+              );
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
+        [
+          "Min",
+          {
+            name: "Min",
+            type: "CALCULATE",
+            prefix: "",
+            image: MathFunction,
+            get: () => {
+              return new MathOpNode(
+                "min",
+                (id) => genericUpdate(id, editor, area, engine, update),
+                (cont) => genericUpdateControl(cont, area)
+              );
+            },
+            create: createUINode,
+            draggable: true,
+          },
+        ],
       ]),
     ],
     [

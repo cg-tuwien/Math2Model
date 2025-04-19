@@ -107,7 +107,7 @@ export class MathOpNode extends VPNode {
   private leftControl: NumberControl;
   private rightControl: NumberControl;
   constructor(
-    private operator: "+" | "-" | "/" | "*" | "%",
+    private operator: "+" | "-" | "/" | "*" | "%" | "max" | "min",
     private update?: (node: string) => void,
     private updateControl?: (control: Control) => void
   ) {
@@ -185,13 +185,20 @@ export class MathOpNode extends VPNode {
     }
 
     const value = applyOperator(leftValue, rightValue, this.operator);
-    const code =
+    let code =
       nodeToVariableDeclaration(this) +
       " = " +
-      (leftId === "" ? leftValue.toString() : leftId) +
+      (leftId === "" ? leftValue.toFixed(20).toString() : leftId) +
       ` ${this.operator} ` +
-      (rightId === "" ? rightValue.toString() : rightId) +
+      (rightId === "" ? rightValue.toFixed(20).toString() : rightId) +
       ";";
+
+    if (this.operator === "max" || this.operator === "min") {
+      code =
+        nodeToVariableDeclaration(this) +
+        " = " +
+        `${this.operator}(${leftId === "" ? leftValue.toFixed(20).toString() : leftId}, ${rightId === "" ? rightValue.toFixed(20).toString() : rightId});`;
+    }
 
     // const control: ClassicPreset.InputControl<"number", number> | undefined =
     //   this.controls?.result as ClassicPreset.InputControl<"number", number>;

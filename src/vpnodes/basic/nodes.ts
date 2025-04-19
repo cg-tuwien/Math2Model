@@ -15,7 +15,9 @@ export function idToVariableName(id: string): string {
   return `ref_${id.substring(0, 5)}`;
 }
 
-export function opToName(op: "+" | "-" | "/" | "*" | "%"): string {
+export function opToName(
+  op: "+" | "-" | "/" | "*" | "%" | "max" | "min"
+): string {
   return op === "+"
     ? "Add"
     : op === "-"
@@ -24,13 +26,17 @@ export function opToName(op: "+" | "-" | "/" | "*" | "%"): string {
         ? "Divide"
         : op === "*"
           ? "Multiply"
-          : "Modulo";
+          : op === "%"
+            ? "Modulo"
+            : op === "max"
+              ? "Max"
+              : "Min";
 }
 
 export function applyOperator(
   left: any,
   right: any,
-  op: "+" | "-" | "/" | "*" | "%"
+  op: "+" | "-" | "/" | "*" | "%" | "max" | "min"
 ): any {
   let result = left;
 
@@ -46,7 +52,9 @@ export function applyOperator(
   else if (op === "-") result -= right;
   else if (op === "/") result /= right === 0 ? 1 : right;
   else if (op === "*") result *= right;
-  else result %= right;
+  else if (op === "%") result %= right;
+  else if (op === "max") result = Math.max(left, right);
+  else result = Math.min(left, right);
 
   return result;
 }
