@@ -20,7 +20,7 @@ import {
 import { structures } from "rete-structures";
 import { Presets as ScopesPresets, ScopesPlugin } from "rete-scopes-plugin";
 import { LogicScopeNode } from "@/vpnodes/basic/logic";
-import { useThrottleFn, watchArray } from "@vueuse/core";
+import { useThrottleFn, watchArray, watchImmediate } from "@vueuse/core";
 import {
   ArrangeAppliers,
   AutoArrangePlugin,
@@ -153,7 +153,7 @@ onUnmounted(() => {
   document.removeEventListener("keydown", keyListener);
 });
 
-watch(
+watchImmediate(
   () => props.keyedGraph?.id,
   async () => {
     shouldUpdate = false;
@@ -559,6 +559,21 @@ function inputConnections() {
   return inputs;
 }
 
+function outputConnections() {
+  const outputs = new Map<NodeId, { [key: string]: Conns }>();
+  editor.getConnections().forEach((c) => {
+    const obj = outputs.get(c.source);
+    if (obj === undefined) {
+      outputs.set(c.source, {
+        [c.sourceOutput]: c,
+      });
+    } else {
+      obj[c.sourceOutput] = c;
+    }
+  });
+  return outputs;
+}
+
 function getNodesCode(node: Nodes, nodeData: NodeData, indent: string = "") {
   let fullCode = "";
   if (node instanceof SeparateNode) {
@@ -585,6 +600,14 @@ function logCode() {
 
   if (returnNodes.length <= 0) return;
 
+  // Make sure to update the nodes that are unused.
+  {
+    const outputs = outputConnections();
+    const unusedNodes = editor
+      .getNodes()
+      .filter((n) => !(n instanceof ReturnNode) && !outputs.has(n.id));
+    orderedCode(unusedNodes, "");
+  }
   /**
    * Order of code assembling
    *  1. Write all custom function blocks outside of main (sampleObject) method
