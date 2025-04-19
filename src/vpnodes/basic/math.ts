@@ -9,8 +9,6 @@ import {
   VPNode,
 } from "@/vpnodes/basic/nodes";
 import { type SerializedNode } from "@/vpnodes/serialization/node";
-import { valueToType } from "./functions";
-import { SliderControl } from "../controls/slider";
 import type { Control } from "rete/_types/presets/classic";
 import { NumberControl } from "../controls/number";
 import type { Nodes } from "../nodes-list";
@@ -153,7 +151,7 @@ export class MathOpNode extends VPNode {
     this.updateSize();
   }
 
-  data(inputs: { left?: NodeReturn[]; right?: NodeReturn[] }): {
+  data(inputs: { left?: NodeReturn; right?: NodeReturn }): {
     value: NodeReturn;
   } {
     const { left, right } = inputs;
@@ -161,8 +159,8 @@ export class MathOpNode extends VPNode {
     let leftValue = this.leftControl.value ?? 0.0;
     let leftId = "";
     if (left) {
-      leftValue = left[0].value;
-      leftId = left[0].refId ? left[0].refId : "";
+      leftValue = left.value;
+      leftId = left.refId ? left.refId : "";
 
       if (this.hasControl("left")) this.removeControl("left");
     } else {
@@ -175,8 +173,8 @@ export class MathOpNode extends VPNode {
 
     let rightId = "";
     if (right) {
-      rightValue = right[0].value;
-      rightId = right[0].refId ? right[0].refId : "";
+      rightValue = right.value;
+      rightId = right.refId ? right.refId : "";
 
       if (this.hasControl("right")) this.removeControl("right");
     } else {
