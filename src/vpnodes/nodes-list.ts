@@ -818,7 +818,7 @@ export function useUiNodes(
             get: () => {
               return new MathOpNode(
                 "max",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => genericUpdateControl(cont, area)
               );
             },
@@ -836,7 +836,7 @@ export function useUiNodes(
             get: () => {
               return new MathOpNode(
                 "min",
-                (id) => genericUpdate(id, editor, area, engine, update),
+                (id) => genericUpdate(id, editor, area, update),
                 (cont) => genericUpdateControl(cont, area)
               );
             },
