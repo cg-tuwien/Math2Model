@@ -1,4 +1,4 @@
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 use renderer_core::{
     application::{AppCommand, Application, WasmCanvas},
     camera::camera_controller::{self, CameraController, IsCameraController},
@@ -59,6 +59,7 @@ pub fn run() -> anyhow::Result<()> {
             roughness: 0.7,
             metallic: 0.1,
             diffuse_texture: None,
+            texture_scale: Vec2::ONE,
         },
         shader_id,
         instance_count: 5,

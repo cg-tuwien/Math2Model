@@ -22,6 +22,8 @@ export function commonModelState(
       metallic: 0,
       emissive: ReadonlyVector3.zero,
       diffuseTexture: null,
+      textureWidth: 1,
+      textureHeight: 1,
     },
     instanceCount: 1,
   });

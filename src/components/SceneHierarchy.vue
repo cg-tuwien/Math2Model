@@ -509,6 +509,18 @@ function uploadFile(data: {
             @update="(v: ObjectUpdate) => change(['material', 'emissive'], v)"
           ></ColorInput>
           <n-text>Texture</n-text>
+          <div class="flex mb-2">
+            <NumberInput
+              :value="currentModel.material.textureWidth"
+              :step="0.1"
+              @update="(v) => change(['material', 'textureWidth'], v)"
+            ></NumberInput>
+            <NumberInput
+              :value="currentModel.material.textureHeight"
+              :step="0.1"
+              @update="(v) => change(['material', 'textureHeight'], v)"
+            ></NumberInput>
+          </div>
           <n-select
             placeholder="Select an existing texture or upload a new one for this model"
             :options="texturesDropdown"

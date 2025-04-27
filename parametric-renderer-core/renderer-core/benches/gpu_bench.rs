@@ -50,6 +50,7 @@ fn main() {
             roughness: 0.7,
             metallic: 0.1,
             diffuse_texture: None,
+            texture_scale: glam::Vec2::ONE,
         },
         shader_id,
         instance_count: 1,

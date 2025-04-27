@@ -140,6 +140,7 @@ watchEffect(() => {
         roughness: v.material.roughness,
         metallic: v.material.metallic,
         diffuse_texture: v.material.diffuseTexture,
+        texture_scale: [v.material.textureWidth, v.material.textureHeight],
       },
       shader_id: v.code,
       instance_count: v.instanceCount,
@@ -236,6 +237,8 @@ function addModel(name: string, shaderName: string) {
         metallic: Math.random(),
         emissive: new ReadonlyVector3(0, 0, 0),
         diffuseTexture: null,
+        textureWidth: 1,
+        textureHeight: 1,
       },
       instanceCount: 1,
     };
