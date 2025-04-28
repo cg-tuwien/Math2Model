@@ -112,6 +112,10 @@ Rendering happens via the WebGPU API, which is used by [parametric-renderer-core
 
 Exporting then happens in Typescript land, where we use the same WebGPU device from Typescript.
 
+## History of added features
+
+An overview of which features have been added over time can be found in the [CHANGELOG.md](./CHANGELOG.md). It also includes links directly to the relevant code.
+
 ## Deployment
 
 The website is hosted on GitHub Pages. It is deployed using a GitHub action called `deploy`. [The action needs to be manually triggered](https://github.com/cg-tuwien/Math2Model/actions/workflows/deploy.yml).

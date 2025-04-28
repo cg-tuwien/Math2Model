@@ -21,6 +21,7 @@ export default defineConfig({
         text: "Documentation",
         link: "/",
         items: [
+          { text: "UI Overview", link: "/ui-overview" },
           { text: "Graph Based Shapes", link: "/graph-based-shapes" },
           { text: "Programmatic Shapes", link: "/programmatic-shapes" },
           { text: "Exporter", link: "/exporter" },

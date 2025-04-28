@@ -16,6 +16,7 @@
   "dependencies": {
     "@gltf-transform/core": "^4.1.1",
     "@iconify-json/mdi": "^1.2.3",
+    "@img-comparison-slider/vue": "^8.0.0",
     "@stefnotch/typestef": "^1.0.3",
     "@vueuse/core": "^12.7.0",
     "@zip.js/zip.js": "^2.7.57",
