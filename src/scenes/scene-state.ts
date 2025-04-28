@@ -78,6 +78,8 @@ export type MaterialParameter = {
   metallic: number;
   emissive: ReadonlyVector3;
   diffuseTexture: string | null;
+  textureWidth: number;
+  textureHeight: number;
 };
 
 export type VirtualModelState = {
@@ -183,6 +185,7 @@ function serializeModel(model: VirtualModelState): SerializedModel {
       metallic: model.material.metallic,
       emissive: model.material.emissive.serialize(),
       diffuseTexture: model.material.diffuseTexture ?? undefined,
+      textureScale: [model.material.textureWidth, model.material.textureHeight],
     },
     instanceCount: model.instanceCount,
   };
@@ -203,6 +206,8 @@ function deserializeModel(data: SerializedModel): VirtualModelState {
       metallic: data.material.metallic,
       emissive: ReadonlyVector3.fromSerialized(data.material.emissive),
       diffuseTexture: data.material.diffuseTexture ?? null,
+      textureWidth: data.material.textureScale?.[0] ?? 1,
+      textureHeight: data.material.textureScale?.[1] ?? 1,
     },
     instanceCount: data.instanceCount,
   };

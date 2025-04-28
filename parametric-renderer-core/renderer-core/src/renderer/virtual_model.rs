@@ -11,7 +11,7 @@ use crate::{
 use super::{MAX_PATCH_COUNT, PATCH_SIZES, wgpu_context::WgpuContext};
 use std::sync::Arc;
 
-use glam::{Vec3, Vec4};
+use glam::{Vec2, Vec3, Vec4};
 use uuid::Uuid;
 use wgpu::ShaderModule;
 
@@ -133,13 +133,9 @@ impl MaterialInfo {
     pub fn to_shader(&self) -> shader::Material {
         shader::Material {
             color_roughness: Vec4::new(self.color.x, self.color.y, self.color.z, self.roughness),
-            emissive_metallic: Vec4::new(
-                self.emissive.x,
-                self.emissive.y,
-                self.emissive.z,
-                self.metallic,
-            ),
+            emissive_metallic: self.emissive.extend(self.metallic),
             has_texture: if self.diffuse_texture.is_some() { 1 } else { 0 },
+            texture_scale: self.texture_scale,
         }
     }
 
@@ -150,6 +146,7 @@ impl MaterialInfo {
             roughness: 0.7,
             metallic: 0.0,
             diffuse_texture: None,
+            texture_scale: Vec2::ONE,
         }
     }
 }
@@ -161,6 +158,7 @@ impl Default for MaterialInfo {
             roughness: 0.0,
             metallic: 0.0,
             diffuse_texture: None,
+            texture_scale: Vec2::ONE,
         }
     }
 }

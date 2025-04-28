@@ -92,9 +92,9 @@ impl SceneData {
                 wgpu::BufferUsages::COPY_DST,
             ),
             linear_sampler: device.create_sampler(&wgpu::SamplerDescriptor {
-                address_mode_u: wgpu::AddressMode::ClampToEdge,
-                address_mode_v: wgpu::AddressMode::ClampToEdge,
-                address_mode_w: wgpu::AddressMode::ClampToEdge,
+                address_mode_u: wgpu::AddressMode::Repeat,
+                address_mode_v: wgpu::AddressMode::Repeat,
+                address_mode_w: wgpu::AddressMode::Repeat,
                 mag_filter: wgpu::FilterMode::Linear,
                 min_filter: wgpu::FilterMode::Linear,
                 mipmap_filter: wgpu::FilterMode::Nearest,

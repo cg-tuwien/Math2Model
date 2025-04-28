@@ -10,7 +10,7 @@ fn sampleObject(input: vec2f) -> vec3f {
 //// START getColor
 fn getColor(input: vec2f) -> vec3f {
   if material.has_texture != 0u {
-    return textureSample(t_diffuse, linear_sampler, input).rgb;
+    return textureSample(t_diffuse, linear_sampler, input * material.texture_scale).rgb;
   } else {
     return material.color_roughness.rgb;
   }
@@ -223,7 +223,8 @@ struct Material {
     // emissive_metallic.a is the metallicness of the material
     emissive_metallic: vec4<f32>,
     // is a boolean
-    has_texture: u32
+    has_texture: u32,
+    texture_scale: vec2f
 }
 
 @group(0) @binding(4) var<uniform> camera: Camera;

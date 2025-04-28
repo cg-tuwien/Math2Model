@@ -62,6 +62,7 @@ pub struct WasmMaterialInfo {
     pub roughness: f32,
     pub metallic: f32,
     pub diffuse_texture: Option<String>,
+    pub texture_scale: [f32; 2],
 }
 
 impl From<WasmMaterialInfo> for renderer_core::game::MaterialInfo {
@@ -72,6 +73,7 @@ impl From<WasmMaterialInfo> for renderer_core::game::MaterialInfo {
             roughness: v.roughness,
             metallic: v.metallic,
             diffuse_texture: v.diffuse_texture.map(TextureId),
+            texture_scale: v.texture_scale.into(),
         }
     }
 }
