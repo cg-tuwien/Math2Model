@@ -160,26 +160,18 @@ fn pnoise(P: vec2f, rep: vec2f) -> f32
 }
 
 fn sampleObject(input2: vec2f) -> vec3f {
-	var PI = 3.14159265359;
-	var HALF_PI = 3.14159265359 / 2.0;
-	var TWO_PI = 3.14159265359 * 2.0;
 	var ref_1b67e = Sphere(input2);
 	var ref_fb3af_1 = ref_1b67e[0];
 	var ref_fb3af_2 = ref_1b67e[1];
 	var ref_fb3af_3 = ref_1b67e[2];
-	var ref_75fae = sign(sin(ref_1b67e*1));
 	var instanceId = f32(instance_id);
+	var HALF_PI = 3.14159265359 / 2.0;
 	var ref_2733c = instanceId * HALF_PI;
-	var ref_480cf = ref_fb3af_2 * 1.5;
-	var ref_f7960_1 = ref_75fae[0];
-	var ref_f7960_2 = ref_75fae[1];
-	var ref_f7960_3 = ref_75fae[2];
-	var ref_b7133 = sin(1 * ref_2733c + 0);
 	var ref_7efc3 = cos(1 * ref_2733c + 0);
-	var ref_b07c1 = ref_b7133 * ref_f7960_3;
-	var ref_76e38 = ref_fb3af_1 * ref_7efc3;
 	var ref_a33df = ref_fb3af_1 + ref_7efc3;
+	var ref_b7133 = sin(1 * ref_2733c + 0);
 	var ref_23d6d = ref_b7133 + ref_fb3af_3;
+	var ref_480cf = ref_fb3af_2 * 1.50000000000000000000;
 	var ref_f57c4 = vec3f(ref_a33df, ref_480cf, ref_23d6d);
 	return ref_f57c4;
 

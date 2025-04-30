@@ -5,31 +5,15 @@
       "type": "model",
       "id": "5df2b917-337b-48f4-a615-a33f7a5d31c6",
       "name": "TempleColumnsFront",
-      "position": [
-        0,
-        -3.5,
-        2
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ],
+      "position": [0, -3.5, 2],
+      "rotation": [0, 0, 0],
       "scale": 1,
-      "parametricShader": "TempleColumn1422025_210347.graph.wgsl",
+      "parametricShader": "TempleColumn.graph.wgsl",
       "material": {
-        "color": [
-          0.5888446573788153,
-          0.3017523668131159,
-          0.9084812640566402
-        ],
+        "color": [0.5888446573788153, 0.3017523668131159, 0.9084812640566402],
         "roughness": 0.32827078627498296,
         "metallic": 0.31885313113834,
-        "emissive": [
-          0,
-          0,
-          0
-        ],
+        "emissive": [0, 0, 0],
         "diffuseTexture": "istockphoto-1360384091-170667a.jpg"
       },
       "instanceCount": 2
@@ -38,31 +22,15 @@
       "type": "model",
       "id": "d077fc59-5eab-4df0-b595-e353c20a03de",
       "name": "TempleColumnsBack",
-      "position": [
-        2,
-        -3.5,
-        2
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ],
+      "position": [2, -3.5, 2],
+      "rotation": [0, 0, 0],
       "scale": 1,
-      "parametricShader": "TempleColumn1422025_210347.graph.wgsl",
+      "parametricShader": "TempleColumn.graph.wgsl",
       "material": {
-        "color": [
-          0.9610469544940379,
-          0.8401397717445944,
-          0.03840651025774955
-        ],
+        "color": [0.9610469544940379, 0.8401397717445944, 0.03840651025774955],
         "roughness": 0.20214497180460356,
         "metallic": 0.2862182199883301,
-        "emissive": [
-          0,
-          0,
-          0
-        ],
+        "emissive": [0, 0, 0],
         "diffuseTexture": "istockphoto-1360384091-170667a.jpg"
       },
       "instanceCount": 2
@@ -71,31 +39,15 @@
       "type": "model",
       "id": "0c059d05-5702-4668-98d5-7115cae37a1d",
       "name": "TempleRoof",
-      "position": [
-        1,
-        9,
-        0.25
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ],
+      "position": [1, 9, 0.25],
+      "rotation": [0, 0, 0],
       "scale": 1,
-      "parametricShader": "TempleRoof1742025_122200.graph.wgsl",
+      "parametricShader": "TempleRoof.graph.wgsl",
       "material": {
-        "color": [
-          0.1428632865346271,
-          0.16905750834304967,
-          0.05572378709262793
-        ],
+        "color": [0.1428632865346271, 0.16905750834304967, 0.05572378709262793],
         "roughness": 0.5037068901407168,
         "metallic": 0.4032188549319633,
-        "emissive": [
-          0,
-          0,
-          0
-        ],
+        "emissive": [0, 0, 0],
         "diffuseTexture": "istockphoto-492651372-612x612.jpg"
       },
       "instanceCount": 1

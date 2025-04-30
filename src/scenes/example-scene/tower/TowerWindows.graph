@@ -3,7 +3,7 @@
     {
       "position": [
         12,
-        1232
+        1152
       ],
       "uuid": "4efd311a0e537573",
       "inputs": [],
@@ -30,33 +30,8 @@
     },
     {
       "position": [
-        242,
-        839.5
-      ],
-      "uuid": "66f5e00b4d0ed82f",
-      "inputs": [],
-      "nodeType": "VariableOut",
-      "extraStringInformation": [
-        {
-          "key": "code",
-          "value": "var PI = 3.14159265359;"
-        },
-        {
-          "key": "ref",
-          "value": "PI"
-        }
-      ],
-      "extraNumberInformation": [
-        {
-          "key": "value",
-          "value": 3.14159265359
-        }
-      ]
-    },
-    {
-      "position": [
         12,
-        1412
+        972
       ],
       "uuid": "33be6ecb8d2d3459",
       "inputs": [],
@@ -80,33 +55,8 @@
     },
     {
       "position": [
-        12,
-        1592
-      ],
-      "uuid": "17df413a4bb55b4f",
-      "inputs": [],
-      "nodeType": "VariableOut",
-      "extraStringInformation": [
-        {
-          "key": "code",
-          "value": "var TWO_PI = 3.14159265359 * 2.0;"
-        },
-        {
-          "key": "ref",
-          "value": "TWO_PI"
-        }
-      ],
-      "extraNumberInformation": [
-        {
-          "key": "value",
-          "value": 6.28318530718
-        }
-      ]
-    },
-    {
-      "position": [
-        1741,
-        394.5
+        1746.3278928436157,
+        808.8152142783358
       ],
       "uuid": "4759e78cbc1c0614",
       "inputs": [
@@ -131,8 +81,8 @@
     },
     {
       "position": [
-        242,
-        1137
+        281.5,
+        1057
       ],
       "uuid": "1b67e7d5883f296a",
       "inputs": [
@@ -153,8 +103,8 @@
     },
     {
       "position": [
-        854.5,
-        567
+        719,
+        902
       ],
       "uuid": "fb3af90df40d76e7",
       "inputs": [
@@ -169,69 +119,8 @@
     },
     {
       "position": [
-        854.5,
-        1147
-      ],
-      "uuid": "f7960198aff56e86",
-      "inputs": [
-        {
-          "type": "node",
-          "value": "75fae77fe5212ca6",
-          "keyFrom": "value",
-          "keyTo": "vector"
-        }
-      ],
-      "nodeType": "Separate"
-    },
-    {
-      "position": [
-        534,
-        1282
-      ],
-      "uuid": "75fae77fe5212ca6",
-      "inputs": [
-        {
-          "key": "isApply",
-          "value": 0,
-          "type": "number"
-        },
-        {
-          "type": "node",
-          "value": "1b67e7d5883f296a",
-          "keyFrom": "value",
-          "keyTo": "param"
-        }
-      ],
-      "nodeType": "MathFunction",
-      "extraStringInformation": [
-        {
-          "key": "name",
-          "value": "Square"
-        },
-        {
-          "key": "func",
-          "value": "sign(sin(input2*{frequency,1,10,-10,0.1,f32}))"
-        },
-        {
-          "key": "inputType",
-          "value": "any"
-        },
-        {
-          "key": "outputType",
-          "value": "any"
-        }
-      ],
-      "extraNumberInformation": [
-        {
-          "key": "{frequency,1,10,-10,0.1,f32}/f32",
-          "value": 1
-        }
-      ]
-    },
-    {
-      "position": [
-        1511,
-        469.5
+        1403,
+        822
       ],
       "uuid": "f57c464a92968069",
       "inputs": [
@@ -258,8 +147,8 @@
     },
     {
       "position": [
-        242,
-        659.5
+        12,
+        612
       ],
       "uuid": "c3375054bb469203",
       "inputs": [],
@@ -283,8 +172,8 @@
     },
     {
       "position": [
-        854.5,
-        807
+        719,
+        1377
       ],
       "uuid": "b7133194052403da",
       "inputs": [
@@ -332,8 +221,8 @@
     },
     {
       "position": [
-        854.5,
-        127
+        719,
+        212
       ],
       "uuid": "7efc35c3f22f790e",
       "inputs": [
@@ -381,8 +270,8 @@
     },
     {
       "position": [
-        534,
-        589.5
+        276.5,
+        599.5
       ],
       "uuid": "2733c58ea67196c8",
       "inputs": [
@@ -409,64 +298,8 @@
     },
     {
       "position": [
-        1179.5,
-        727
-      ],
-      "uuid": "b07c10b64d9cfad4",
-      "inputs": [
-        {
-          "type": "node",
-          "value": "f7960198aff56e86",
-          "keyFrom": "z",
-          "keyTo": "right"
-        },
-        {
-          "type": "node",
-          "value": "b7133194052403da",
-          "keyFrom": "value",
-          "keyTo": "left"
-        }
-      ],
-      "nodeType": "Math",
-      "extraStringInformation": [
-        {
-          "key": "op",
-          "value": "*"
-        }
-      ]
-    },
-    {
-      "position": [
-        1179.5,
-        487
-      ],
-      "uuid": "76e381c8dff512e3",
-      "inputs": [
-        {
-          "type": "node",
-          "value": "7efc35c3f22f790e",
-          "keyFrom": "value",
-          "keyTo": "right"
-        },
-        {
-          "type": "node",
-          "value": "fb3af90df40d76e7",
-          "keyFrom": "x",
-          "keyTo": "left"
-        }
-      ],
-      "nodeType": "Math",
-      "extraStringInformation": [
-        {
-          "key": "op",
-          "value": "*"
-        }
-      ]
-    },
-    {
-      "position": [
-        1179.5,
-        12
+        1094,
+        527
       ],
       "uuid": "a33df07c99420161",
       "inputs": [
@@ -493,8 +326,8 @@
     },
     {
       "position": [
-        1179.5,
-        1072
+        1094,
+        1212
       ],
       "uuid": "23d6d2e4b23a9ae3",
       "inputs": [
@@ -521,8 +354,8 @@
     },
     {
       "position": [
-        1485.21513330226,
-        823.3899973300571
+        1094,
+        907
       ],
       "uuid": "480cfe80a00e5ecb",
       "inputs": [

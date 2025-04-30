@@ -160,31 +160,28 @@ fn pnoise(P: vec2f, rep: vec2f) -> f32
 }
 
 fn sampleObject(input2: vec2f) -> vec3f {
-	var PI = 3.14159265359;
-	var HALF_PI = 3.14159265359 / 2.0;
-	var TWO_PI = 3.14159265359 * 2.0;
 	var ref_de289_1 = input2[0];
 	var ref_de289_2 = input2[1];
 	var ref_56f1a = vec2f(ref_de289_2, ref_de289_1);
 	var ref_5465b = Sphere(ref_56f1a);
+	var ref_1c3cd_1 = ref_5465b[0];
+	var ref_1c3cd_2 = ref_5465b[1];
+	var ref_1c3cd_3 = ref_5465b[2];
 	var ref_75e78 = sign(sin(ref_5465b*1));
 	var ref_330f3_1 = ref_75e78[0];
 	var ref_330f3_2 = ref_75e78[1];
 	var ref_330f3_3 = ref_75e78[2];
-	var ref_1c3cd_1 = ref_5465b[0];
-	var ref_1c3cd_2 = ref_5465b[1];
-	var ref_1c3cd_3 = ref_5465b[2];
+	var ref_f158a = step(1, ref_330f3_2);
 	var ref_34873 = ref_1c3cd_1 * ref_1c3cd_1;
 	var ref_54a6e = ref_1c3cd_3 * ref_1c3cd_3;
-	var ref_f158a = step(1, ref_330f3_2);
-	var ref_6f211 = vec2f(ref_1c3cd_1, ref_1c3cd_3);
 	var ref_874aa = ref_34873 + ref_54a6e;
 	var ref_0abb1 = step(0.684, ref_874aa);
 	var ref_4bd63 = ref_0abb1 * ref_f158a;
+	var ref_6f211 = vec2f(ref_1c3cd_1, ref_1c3cd_3);
 	var ref_ce2b3 = atan2(ref_6f211.x, ref_6f211.y);
 	var ref_94d0e = sign(sin(ref_ce2b3*7));
-	var ref_d0963 = ref_94d0e + 1;
-	var ref_24844 = ref_d0963 * 0.5;
+	var ref_d0963 = ref_94d0e + 1.00000000000000000000;
+	var ref_24844 = ref_d0963 * 0.50000000000000000000;
 	var ref_11bc7 = ref_24844 * ref_4bd63;
 	var ref_0f286 = ref_330f3_2 + ref_11bc7;
 	var ref_9bf38 = vec3f(ref_1c3cd_1, ref_0f286, ref_1c3cd_3);
