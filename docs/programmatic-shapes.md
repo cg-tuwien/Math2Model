@@ -7,6 +7,8 @@ We recommend familarizing yourself with the WGSL shader syntax before continuing
 - [WebGPU Fundamentals' chapter on WGSL](https://webgpufundamentals.org/webgpu/lessons/webgpu-wgsl.html)
 - [Tour of WGSL](https://google.github.io/tour-of-wgsl)
 
+![Programmatically defined heart shape](resources/prog-heart.png)
+
 ## Defining a shape
 
 Our shaders have an entrypoint `fn sampleObject(input2: vec2f) -> vec3f`. This function repeatedly get evaluated to get all 3D coordinates for the mesh. The input coordinates are in the unit square (0 to 1 range).
@@ -59,7 +61,10 @@ fn sampleObject(input2: vec2f) -> vec3f {
 }
 ```
 
+![Cylinder](resources/prog-cylinder.png)
+
 ## Globals
+
 ### Time
 
 - `time.elapsed` (f32) - number of seconds since program start
@@ -82,8 +87,8 @@ fn sampleObject(input2: vec2f) -> vec3f {
 
 ### Screen
 
-- `screen.resolution` (vec2<u32>) - size of the screen in pixels
-- `screen.inv_resolution` (vec2f) - convenience accessor for `1/screen.resolution`
+- `screen.resolution` (vec2&lt;u32&gt;) - size of the screen in pixels
+- `screen.inv_resolution` (vec2f) - convenience accessor for `1./screen.resolution`
 
 ### Mouse
 
@@ -103,6 +108,8 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	return vec3f(x, y, z);
 }
 ```
+
+![Animated wave](./resources/prog-anim-wave.png)
 
 ## Coloring a shape
 
@@ -155,6 +162,8 @@ fn getColor(input: vec2f) -> vec3f {
 }
 ```
 
+![Diamond Pattern](resources/prog-diamond-pattern.png)
+
 ### Globals for coloring
 
 When writing custom coloring routines, it is rare to use any of the built-in globals.
@@ -168,7 +177,7 @@ For completeness, all usable globals are as follows
 - `material.has_texture` (u32) - 1 if there is a texture, otherwise 0
 - `material.texture_scale` (vec2f) - user supplied scaling of the texture
 
-- `t_diffuse` (texture2d<f32>) - user supplied texture
+- `t_diffuse` (texture2d&lt;f32&gt;) - user supplied texture
 - `linear_sampler` (sampler) - a linear sampler that wraps around
 
 ### Default coloring function
