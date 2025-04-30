@@ -1,4 +1,4 @@
-# ShadertoyOfParametricModeling
+# Math2Model: Web-Based Real-Time Parametric Modeling Tool
 
 Welcome to [Math2Model](https://cg-tuwien.github.io/Math2Model/), an online editor for parametric modelling of objects described through mathematical functions. It features two ways of user input: Code-based modelling and node-based modelling.
 
