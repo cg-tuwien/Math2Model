@@ -20,14 +20,6 @@ To run the benchmarks
 cargo bench
 ```
 
-## Controls
-
-- Right click, and then `W` `A` `S` `D` to move the camera.
-- Right click, and then `Space` `Shift` to move the camera up and down.
-- `P` to get a benchmark of the current frame. It gets written to a `profile-*.json` file and can be viewed on [ui.perfetto.dev](https://ui.perfetto.dev/).
-
-
-
 ## To update the WGSL shaders
 
 Whenever you are editing the WGSL shaders, you might want to update their "imports". To do so, run
@@ -38,7 +30,7 @@ cargo run --bin copy-includes
 
 ## Benchmarking
 
-We have multiple forms of benchmarking. The simplest one is pressing `P` at runtime, which will save a profile of the current frame. 
+We have multiple forms of benchmarking. The simplest one is pressing `P` at runtime in the desktop environment, which will save a profile of the current frame. 
 
 The proper one uses the `criterion` library. To compare two commits, check out the first one, then run
 
@@ -61,4 +53,11 @@ cargo bench -p renderer-core -- --baseline base
 
 The high level structure is that `renderer-core` implements the actual rendering logic, and is then used by `desktop` and `wasm` for the desktop and wasm backends.
 
-Each crate has its own bit of documentation. 
+## Documentation of each part
+
+Each crate has its own bit of documentation. Notably
+
+- [copy-includes](./copy-includes) is responsible for copy-pasting code in our shader code
+- [desktop](./desktop) has the bindings for running the renderer in a desktop environment (as opposed to running the renderer in a web environment)
+- [renderer-core](./renderer-core) is the core implementation of the renderer.
+- [wasm](./wasm) has the bindings for running the renderer in a web environment
