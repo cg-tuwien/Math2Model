@@ -160,53 +160,15 @@ fn pnoise(P: vec2f, rep: vec2f) -> f32
 }
 
 fn sampleObject(input2: vec2f) -> vec3f {
-	var ref_477c6_1 = input2[0];
-	var ref_477c6_2 = input2[1];
-	var ref_7361c = smoothstep(-0.04, 0.5, ref_477c6_2);
-	var ref_b30cb = ((1 * ref_477c6_2) - floor(1 * ref_477c6_2));
-	var ref_027aa = step(0.0001, ref_b30cb);
-	var ref_dde6c = ref_7361c * ref_027aa;
-	var ref_4132e = 0.00000000000000000000;
-	var TWO_PI = 3.14159265359 * 2.0;
-	var ref_79dd9 = 1.00000000100000008274 / 8.00000099999999925160;
-	var ref_9807d = ref_477c6_1 + ref_79dd9;
-	var ref_aa7b9 = ((1 * ref_9807d) - floor(1 * ref_9807d));
-	var ref_d28e0 = ref_aa7b9 * 4.00000000000000000000;
-	var ref_ce1ba = ceil(ref_d28e0);
-	var ref_cf597 = ref_ce1ba / 4.00000000000000000000;
-	var ref_cf3fc = ((1 * ref_cf597) - floor(1 * ref_cf597));
-	var ref_16c2e = ref_cf3fc + 0.25000000000000000000;
-	var ref_289cf = ref_16c2e * TWO_PI;
-	var PI = 3.14159265359;
-	var ref_82c7e = ref_289cf + PI;
-	var ref_6ea11 = cos(1 * ref_82c7e + 0);
-	var ref_0ee22 = sin(1 * ref_82c7e + 0);
-	var ref_49045 = vec3f(ref_6ea11, ref_4132e, ref_0ee22);
-	var ref_13bcc = ref_dde6c * ref_49045;
-	var ref_47aa8 = ref_477c6_1 * 100.00000000000000000000;
-	var ref_5f75b = ref_47aa8 + 0.00000000000000000000;
-	var ref_7c2e7 = sin(1.3 * ref_5f75b + 0.6);
-	var ref_a4c76 = step(0.3, ref_7c2e7);
-	var ref_16da9 = ref_7c2e7 * ref_a4c76;
-	var ref_7116d = ref_16da9 * 0.05000000000000000278;
-	var ref_25602 = ref_13bcc * ref_7116d;
-	var ref_8b1b8 = Cube(input2);
-	var ref_e07b5_1 = ref_8b1b8[0];
-	var ref_e07b5_2 = ref_8b1b8[1];
-	var ref_e07b5_3 = ref_8b1b8[2];
-	var ref_44b9e = ref_e07b5_1 * ref_7361c;
-	var ref_a6d20 = ref_e07b5_3 * ref_7361c;
-	var ref_a9a6a = vec3f(ref_44b9e, ref_e07b5_2, ref_a6d20);
-	var ref_a59e1 = ref_25602 + ref_a9a6a;
-	var ref_86f70 = mat3x3(vec3f(7,0.0,0.0), vec3f(0.0,4,0.0), vec3f(0.0,0.0,1.5)) * ref_a59e1;
-	var ref_3bd26_1 = ref_86f70[0];
-	var ref_3bd26_2 = ref_86f70[1];
-	var ref_3bd26_3 = ref_86f70[2];
-	var ref_b0f83 = ref_3bd26_2 * -1.00000000000000000000;
-	var ref_5fc75 = f32(8);
-	var ref_31bd1 = ref_5fc75 * 0.50000000000000000000;
-	var ref_3eb0a = ref_3bd26_3 * ref_31bd1;
-	var ref_270e3 = vec3f(ref_3bd26_1, ref_b0f83, ref_3eb0a);
-	return ref_270e3;
+	var ref_58504 = Cube(input2);
+	var ref_3498a = mat3x3(vec3f(3.5,0.0,0.0), vec3f(0.0,10,0.0), vec3f(0.0,0.0,0.6)) * ref_58504;
+	var ref_578c8 = 1.00000000000000000000;
+	var ref_e8658 = f32(8);
+	var ref_c8440 = ref_e8658 * 1.19999999999999995559;
+	var ref_d944a = vec3f(ref_578c8, ref_578c8, ref_c8440);
+	var ref_0e240 = ref_d944a * ref_3498a;
+	var ref_985dd = ref_d944a * 0.50000000000000000000;
+	var ref_99140 = ref_0e240 + ref_985dd;
+	return ref_99140;
 
 }

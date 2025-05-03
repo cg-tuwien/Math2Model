@@ -3,52 +3,149 @@
   "models": [
     {
       "type": "model",
-      "id": "5df2b917-337b-48f4-a615-a33f7a5d31c6",
-      "name": "TempleColumnsFront",
-      "position": [0, -3.5, 2],
-      "rotation": [0, 0, 0],
-      "scale": 1,
-      "parametricShader": "TempleColumn.graph.wgsl",
-      "material": {
-        "color": [0.5888446573788153, 0.3017523668131159, 0.9084812640566402],
-        "roughness": 0.32827078627498296,
-        "metallic": 0.31885313113834,
-        "emissive": [0, 0, 0],
-        "diffuseTexture": "istockphoto-1360384091-170667a.jpg"
-      },
-      "instanceCount": 2
-    },
-    {
-      "type": "model",
-      "id": "d077fc59-5eab-4df0-b595-e353c20a03de",
-      "name": "TempleColumnsBack",
-      "position": [2, -3.5, 2],
-      "rotation": [0, 0, 0],
-      "scale": 1,
-      "parametricShader": "TempleColumn.graph.wgsl",
-      "material": {
-        "color": [0.9610469544940379, 0.8401397717445944, 0.03840651025774955],
-        "roughness": 0.20214497180460356,
-        "metallic": 0.2862182199883301,
-        "emissive": [0, 0, 0],
-        "diffuseTexture": "istockphoto-1360384091-170667a.jpg"
-      },
-      "instanceCount": 2
-    },
-    {
-      "type": "model",
       "id": "0c059d05-5702-4668-98d5-7115cae37a1d",
       "name": "TempleRoof",
-      "position": [1, 9, 0.25],
-      "rotation": [0, 0, 0],
+      "position": [
+        5.699999999999999,
+        13.300000000000002,
+        4.95
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
       "scale": 1,
       "parametricShader": "TempleRoof.graph.wgsl",
       "material": {
-        "color": [0.1428632865346271, 0.16905750834304967, 0.05572378709262793],
+        "color": [
+          0.9294117647058824,
+          0.9294117647058824,
+          0.8666666666666667
+        ],
         "roughness": 0.5037068901407168,
-        "metallic": 0.4032188549319633,
-        "emissive": [0, 0, 0],
-        "diffuseTexture": "istockphoto-492651372-612x612.jpg"
+        "metallic": 0.05321885493196326,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "marble.jpg",
+        "textureScale": [
+          1.56,
+          0.5299999999999988
+        ]
+      },
+      "instanceCount": 1
+    },
+    {
+      "type": "model",
+      "id": "08d5fa1e-bb84-4e7d-9eb1-a7282987f139",
+      "name": "TempleColumns",
+      "position": [
+        0,
+        1,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "parametricShader": "TempleColumns512025_122219_AM.graph.wgsl",
+      "material": {
+        "color": [
+          0.9882352941176471,
+          0.9882352941176471,
+          0.9882352941176471
+        ],
+        "roughness": 0.1663611261235766,
+        "metallic": 0.1,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "marble.jpg",
+        "textureScale": [
+          1,
+          1
+        ]
+      },
+      "instanceCount": 8
+    },
+    {
+      "type": "model",
+      "id": "65a23c99-a5d9-438e-9847-a71ceeffe0c8",
+      "name": "TempleBody",
+      "position": [
+        8.000000000000004,
+        1,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "parametricShader": "New_Model512025_125752_AM.graph.wgsl",
+      "material": {
+        "color": [
+          0.7098039215686275,
+          0.7019607843137254,
+          0.7019607843137254
+        ],
+        "roughness": 0.4777508046071641,
+        "metallic": 0.39797224525705743,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "marble.jpg",
+        "textureScale": [
+          2.8,
+          1
+        ]
+      },
+      "instanceCount": 1
+    },
+    {
+      "type": "model",
+      "id": "d2fc9a96-4a24-41e9-b465-3bc96ca38f04",
+      "name": "TempleSteps",
+      "position": [
+        -11.699999999999998,
+        -1.5,
+        -10.4
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": 1,
+      "parametricShader": "TempleSteps352025_094631.wgsl",
+      "material": {
+        "color": [
+          0.12198924231019437,
+          0.8628038190708884,
+          0.889877453485456
+        ],
+        "roughness": 0.8123048473437252,
+        "metallic": 0.12002947299039524,
+        "emissive": [
+          0,
+          0,
+          0
+        ],
+        "diffuseTexture": "istockphoto-1360384091-170667a.jpg",
+        "textureScale": [
+          6,
+          1.3100000000000003
+        ]
       },
       "instanceCount": 1
     }
