@@ -20,6 +20,19 @@ To run the benchmarks
 cargo bench
 ```
 
+
+## Documentation of each part
+
+The high level structure is that `renderer-core` implements the actual rendering logic, and is then used by `desktop` and `wasm` for the desktop and wasm backends.
+
+Each crate has its own bit of documentation. Notably
+
+- [copy-includes](./copy-includes) is responsible for copy-pasting code in our shader code
+- [desktop](./desktop) has the bindings for running the renderer in a desktop environment (as opposed to running the renderer in a web environment)
+- [renderer-core](./renderer-core) is the core implementation of the renderer.
+- [wasm](./wasm) has the bindings for running the renderer in a web environment
+
+
 ## To update the WGSL shaders
 
 Whenever you are editing the WGSL shaders, you might want to update their "imports". To do so, run
@@ -45,19 +58,3 @@ cargo bench -p renderer-core -- --baseline base
 ```
 
 [Documentation link](https://bheisler.github.io/criterion.rs/book/user_guide/command_line_options.html#baselines).
-
-## Developer Notes
-
-- WGPU Tutorial https://sotrh.github.io/learn-wgpu/#what-is-wgpu
-- WGSL to Rust library https://github.com/ScanMountGoat/wgsl_to_wgpu
-
-The high level structure is that `renderer-core` implements the actual rendering logic, and is then used by `desktop` and `wasm` for the desktop and wasm backends.
-
-## Documentation of each part
-
-Each crate has its own bit of documentation. Notably
-
-- [copy-includes](./copy-includes) is responsible for copy-pasting code in our shader code
-- [desktop](./desktop) has the bindings for running the renderer in a desktop environment (as opposed to running the renderer in a web environment)
-- [renderer-core](./renderer-core) is the core implementation of the renderer.
-- [wasm](./wasm) has the bindings for running the renderer in a web environment
