@@ -80,6 +80,20 @@ fn bricks(input: vec2f) -> vec3f {
     return cyl;
 }
 
+// HERE to change the y-position of the windows
+const windowStart = 0.7;
+// HERE to change the height of the windows
+const windowHeight = 0.1;
+// HERE to change the amount of windows
+const windowCount = 7;
+// HERE to change the width of the windows
+const windowWidth = 0.2;
+
+// HERE to change the outer color of the windows (R, G, B)
+const windowOuterColor = vec3f(0.2, 0.2, 0.2);
+// HERE to change the inner color of the windows (R, G, B)
+const windowInnerColor = vec3f(1, 1, 0.2);
+
 fn calcSurfaceOffset(pos: vec3f) -> f32 {
     let te = time.elapsed*0.1;
 
@@ -92,10 +106,47 @@ fn calcSurfaceOffset(pos: vec3f) -> f32 {
     var sOffset = step(0.,(fract(pos.z*vSteps)-fract(pos.z*vSteps-brickSpacing)));
 
     sOffset*= step(0.,(fract((pos.x/tau+vstep)*hSteps)-fract((pos.x/tau+vstep)*hSteps-brickSpacing)));
+
+    var window = calcWindowOffset(pos);
+    var windowOuter = discreteWindow(window, 1);
+
+    sOffset *= windowOuter;
+    sOffset+=1*1-(windowOuter);
+    sOffset+=discreteWindow(window,0.9);
     return sOffset;
+}
+
+fn discreteWindow(sdf: f32, threshold: f32) -> f32 {
+    return step(threshold, sdf);
+}
+
+fn calcWindowOffset(pos: vec3f) -> f32 {
+    var prog = fract(pos.x/tau*(windowCount));
+    var windist = abs(0.5-prog);
+    var isWindowHeight = (smoothstep(windowStart,windowStart+windowHeight,pos.z)*
+    smoothstep(pos.z,pos.z+windowHeight,windowStart+windowHeight+windist*windist*0.2));
+
+    var windowBasic = smoothstep(windowWidth,windowWidth+0.4,windist);
+    isWindowHeight=min(isWindowHeight,windowBasic);
+    return 1-isWindowHeight;
+}
+
+fn calcWindowPattern(pos: vec3f) -> f32 {
+    return pos.x;
 }
 
 fn getColor(input: vec2f) -> vec3f {
     let posUv = vec3(input.x*tau, 0.0, input.y);
-    return material.color_roughness.rgb*(calcSurfaceOffset(posUv)+0.4);
+    let baseTower = material.color_roughness.rgb*(calcSurfaceOffset(posUv)+0.4);
+
+    var color = baseTower;
+    var window = calcWindowOffset(posUv);
+    var windowOuter = discreteWindow(window, 1);
+
+    color *= windowOuter; // this should eliminate color in window outer
+    let winBorderColor = mix(windowOuterColor,material.color_roughness.rgb,0.7);
+    let winCenterColor = mix(windowInnerColor,material.color_roughness.rgb,0.3);
+    color+=(1-windowOuter)*
+        mix(winCenterColor,winBorderColor,discreteWindow(window,0.89));
+    return color;
 }
