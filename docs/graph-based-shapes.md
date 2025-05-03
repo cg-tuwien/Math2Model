@@ -6,10 +6,10 @@ This purely graphical shader programming solution has been designed to provide e
 
 Creating a new code graph will initialize it with the necessary nodes to render a sphere. There are two nodes that every code graph needs to have. They are essential entry and exit points for node-based parametric modeling:
 
-- **input2**: This is the parameter to the `evaluateImage` function. It represents the two input parameters to parametric modeling.
-- **Return**: This is always the last line in the `evaluateImage` function and will return whatever value comes from the connected node. It is important to note, that the `Return` node requires a `vec3f` as an input value, so for example just connecting the `input2` node would not work.
+- **input2**: This is the starting point. It represents the two input parameters to parametric modeling.
+- **Return**: This is the node that receives the final 3D coordinates. It is important to note that the `Return` node requires a `vec3f` as an input value, so just connecting the `input2` node would not work.
 
-There are two important user-controlled parts to every code graph, which will be described in detail now:
+Graph-based parametric modeling is performend with nodes and connections.
 
 ### Nodes
 
