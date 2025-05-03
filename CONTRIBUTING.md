@@ -3,6 +3,7 @@
 Features are developed in another branch or fork. After the feature is ready, a pull request to the master branch should be opened.
 
 ## Prerequisites
+
 - Node 20 or greater. Don't install Chocolatey.
 - A code editor, like VSCode or Webstorm.
 
@@ -13,6 +14,7 @@ npm install
 ```
 
 and then compile the Rust renderer
+
 ```sh
 cd parametric-renderer-core
 npm run build
@@ -41,7 +43,8 @@ npm run build
   - Settings &rarr; Format On Save &rarr; Enable (`"editor.formatOnSave": true,`)
   - If you are using autosave: Settings &rarr; Autosave &rarr; On Focus Change (`"files.autoSave": "onFocusChange",`)
 - [Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss) for slightly better Tailwind CSS suggestions
-
+- [Rete.js Vue Plugin](https://retejs.org/docs/api/rete-vue-plugin) for the external library `rete.js` setup used for the code graph
+- [Rete.js Area Plugin](https://retejs.org/docs/api/rete-area-plugin) for the code graph rendering
 
 I also recommend trying out the following browser extension
 
@@ -76,6 +79,7 @@ I also recommend trying out the following browser extension
 - `src/scenes/aggregate-model-state.ts` - combines multiple models into one state. Used for editing multiple models simultaneously
 - `src/stores/` contains Pinia stores. They're globally accessible, reactive objects.
 - `src/views/` contains the different pages. Currently the HomeView.vue is the only one that matters.
+- `src/vpnodes/` contains the different custom nodes of the code graph, as well as the setup file for the UI `nodes-list.ts`
 - `src/App.vue` is the Vue.js rendering entrypoint, it sets up the theme, top bar and the router
 - `src/main.ts` is the Typescript entrypoint.
 - `index.html` is the entrypoint for the website.
@@ -83,19 +87,19 @@ I also recommend trying out the following browser extension
 - `tsconfig.json` is required to tell Typescript what to do.
 - `vite.config.ts` is the configuration file for the Vite bundler.
 
-
 ## Useful Documentation
 
 - Vue.js documentation
 - TailwindCSS documentation
 - [NaiveUI Components](https://www.naiveui.com/en-US/os-theme/components/button)
 - [Material Design Icons](https://icon-sets.iconify.design/mdi/), use them with `mdi-icon-name` (e.g. `<mdi-hamburger-menu />`)
+- [Rete.js Documentation](https://retejs.org/docs)
 
 Other libraries where one can look up the documentation as needed are
+
 - Typescript
 - Pinia: For the `src/stores/`
 - Vitest: For unit tests
-
 
 ## High Level Structure
 
@@ -105,6 +109,8 @@ From there `App.vue` gets loaded, which is responsible for the overall layout of
 `HomeView.vue` asynchronously loads the filesystem code, and WebGPU engine. They're a bit slow to initialize, so we load them very early, and we're avoiding doing hot module reloading with them. Once they've finished loading, we create our `EditorAndOutput.vue` component.
 
 We then store the code on the user's machine, with the origin private filesystem. Editing the code is done with the Monaco code editor, and with the Rete.js graph editing library.
+
+The code graph generates `wgsl` code and stores it into a separate `.wgsl` file. The serialized graph, containing relevant data for all nodes in `json` format, is stored in a `.graph` file. Make sure to include any new custom node in the `uinodes` map structure, found in the `src/vpnodes/nodes-list.ts` file.
 
 The scene state is made reactive and editable with typical Vue.js frontend code.
 
