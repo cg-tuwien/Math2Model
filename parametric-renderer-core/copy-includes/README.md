@@ -1,6 +1,8 @@
 # Copy Include
 
-Copies code from one shader into another one.
+Copies code from one shader into another one. Currently, WGSL needs all shader code to be in the same file.
+
+We run the copying step beforehand, such that WGSL language servers can actually understand and analyze the code. The second tool that relies on this is [wgsl_to_wgpu](https://github.com/ScanMountGoat/wgsl_to_wgpu), which we run at build time to generate type-safe Rust bindings for our shader code.
 
 ## Usage
 
