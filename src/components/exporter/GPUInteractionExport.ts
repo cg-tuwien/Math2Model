@@ -192,7 +192,42 @@ export async function mainExport(
     device
   );
   const indirectDispatchRebalancePipeline = v.pipeline;
+  function extractWgslFunction(
+    code: string,
+    functionName: string
+  ): { func: string | null; strippedCode: string } {
+    const fnPattern = new RegExp(`fn\\s+${functionName}\\s*\\(`);
+    const startMatch = code.match(fnPattern);
+    if (!startMatch || startMatch.index === undefined) {
+      return { func: null, strippedCode: code };
+    }
 
+    let startIndex = startMatch.index;
+    let openBraces = 0;
+    let inBody = false;
+    let endIndex = -1;
+
+    for (let i = startIndex; i < code.length; i++) {
+      if (code[i] === "{") {
+        openBraces++;
+        inBody = true;
+      } else if (code[i] === "}") {
+        openBraces--;
+        if (inBody && openBraces === 0) {
+          endIndex = i + 1;
+          break;
+        }
+      }
+    }
+
+    if (endIndex === -1) {
+      return { func: null, strippedCode: code }; // Malformed function
+    }
+
+    const func = code.slice(startIndex, endIndex);
+    const strippedCode = code.slice(0, startIndex) + code.slice(endIndex);
+    return { func, strippedCode };
+  }
   async function fetchAndInjectShaderCode(
     fs: ReactiveFilesystem,
     key: FilePath
@@ -210,13 +245,20 @@ export async function mainExport(
       code: code,
     };
     if (code !== null) {
-      const replaceWithCode = (v: string) =>
-        v.replace(
+      debugger;
+      var code2 = extractWgslFunction(code,"getColor").strippedCode;
+      const replaceWithCode = (v: string) => {
+        v = v.replace(
           /\/\/\/\/ START sampleObject([^]+?)\/\/\/\/ END sampleObject/,
-          code
+          code2
         );
+        return v;
+      };
+
       result.lodStage = replaceWithCode(result.lodStage);
       result.verticesStage = replaceWithCode(result.verticesStage);
+      console.log(result.lodStage);
+      console.log(result.verticesStage);
     }
     return result;
   }
