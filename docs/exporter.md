@@ -32,16 +32,16 @@ How many times the patch should be subdivided into 4, this number is doubled, so
 The following options can be set under the `File Configuration` category:
 
 ### File Format
-Choose between GLTF Binary/GLB and OBJ file format to download
+Select either GLTF Binary/GLB or OBJ file format for the download
 
 ### Merge Model Files
-If all models should be merged into the same file, or if they should be downloaded one after the other
+This toggle controls If all models should be merged into the same file, or if they should be downloaded one after the other (This may result in downloading many files)
 
 ### Include UVs
-If UVs should be included in model exports, UVs are used for texturing the model
+If UVs should be included in model exports, UVs are used for texturing the model and may assist in reapplying textures the same way they are applied in Math2Model
 
 ### Normal Direction
-Which directions normals should be facing, if your model looks strange, try flipping from default to inverse or the other way around. If your model is not closed and you want it to be visible from both sides, try double sided normals, though this will increase file size by a margin of about 30% 
+Which directions normals should be facing, if output models look strange, flipping the normals from default to inverse or the other way around may correct it. If the model is not closed and should be visible from both sides, double sided normals may be the best solution, at the cost of an around 30% increased file size.
 
 ## Download
-Start the download process, this will display a progress bar. If the download freezes for a few seconds to a minute, leave it be, it should continue eventually once GPU readback of data is complete. Otherwise, use the cancel button to end downloading.
+Start the download process, this will display a progress bar. This process may take a while, if it appears to freeze during export of a complex model with many instances it should be left to run and will terminate eventually. If it appears to be stuck, the cancel button should be used to end downloading.

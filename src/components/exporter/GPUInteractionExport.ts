@@ -245,7 +245,7 @@ export async function mainExport(
       code: code,
     };
     if (code !== null) {
-      debugger;
+
       var code2 = extractWgslFunction(code,"getColor").strippedCode;
       const replaceWithCode = (v: string) => {
         v = v.replace(
