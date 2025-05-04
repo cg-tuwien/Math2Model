@@ -34,10 +34,9 @@ import { ImgComparisonSlider } from '@img-comparison-slider/vue';
 # Documentation for Math2Model
 
 Math2Model is a tool for creating scenes with parametrically defined 3D objects.
+It offers two modeling modes: Code-based and node-based modeling.
 
-It offers two main modes, targeted at different audiences.
-
-At the end, the objects can be exported into a standard 3D mesh file format.
+The modeled objects can be exported into 3D mesh file formats.
 
 <ImgComparisonSlider hover="hover">
 <figure slot="first" class="before">
@@ -52,7 +51,7 @@ At the end, the objects can be exported into a standard 3D mesh file format.
 
 ## What is Math2Model?
 
-It is a tool that allows the instant rendering of mathematical functions given in parametric form (with parameters `u` and `v` as input). One simple example would be rendering a sphere model in parametric format:
+It is a tool that allows the instant rendering of mathematical functions given in parametric form (with two parameters as input). One simple example would be rendering a sphere model in parametric format:
 
 ```js
 fn sampleObject(input: vec2f) -> vec3f {
@@ -70,7 +69,7 @@ This code produces the following output:
 
 ## Who is Math2Model for?
 
-Math2Model is a tool for everyone who wants to render mathematical functions in real time, or for creating parametric models with feedback in real time. It features two user interfaces: One for programmers where they can directly describe those mathematical objects in source code, and another user interface for non-programmers, which allows parametric modelling through a node editor.
+Math2Model is a tool for anyone who wants to render mathematical functions in real time or create parametric models with feedback in real time. It features two user interfaces: One for programmers, where they can directly describe those mathematical objects in source code, and another user interface for non-programmers, which allows parametric modelling through a node editor.
 
 ![Image of sphere in code editor](resources/sphere-code-editor.png)
 _Sphere example in code editor_
@@ -84,27 +83,21 @@ To start a new project, go to [math2model.cg.tuwien.ac.at](https://math2model.cg
 
 ## UI Overview
 
-The Math2Model UI supports a lot of features. We recommend reading the documentation!
+The Math2Model user interface (UI) supports a set of features that are described on the [UI Overview](./ui-overview.md) page.
 
-[Read more](./ui-overview.md)
+## Graph-based objects
 
-## Graph based objects
-
-Build your 3D objects using a visual, node-based editor.
-This is the recommended approach for rapid prototyping.
-
-[Read more](./graph-based-shapes.md)
+3D objects can be modeled using a visual, node-based editor that is described on the [Graph-based shapes](./graph-based-shapes.md) page.
 
 ## Programmatic objects
 
-Build your 3D objects using code.
-This lower level approach is useful for expressing things
-that are difficult to express in the graph based approach.
-It assumes basic GPU shader programming knowledge.
+An alternative way to model 3D objects is through code.
+This approach allows for more freedom and flexibility than node-based modeling, and allows the creation of shapes that are difficult to express in the graph-based approach.
+However, this approach requires coding or scripting skills---preferably with a shader programming language. 
 
-[Read more](./programmatic-shapes.md)
+More details are described on the [Programmatic shapes](./programmatic-shapes.md) page.
 
 ## Exporting scenes
 
-Export your 3D objects to commonly used mesh based 3D file formats for further usage.
-[Read more](./exporter.md)
+Parametrically modeled objects can be exported to 3D file formats for further usage.
+This is described on the [Exporter](./exporter.md) page.

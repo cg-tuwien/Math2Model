@@ -1,15 +1,15 @@
-# Graph Based Shapes
+# Graph-Based Shapes
 
-This purely graphical shader programming solution has been designed to provide easier access to parametric modelling for people who are not that proficient with programming. Creating a new model and selecting the `New Graph` option will create a `<filename>.graph` and a `<filename>.graph.wgsl` file. The `.wgsl` file is automatically generated from the code graph and always updated when changes occur.
+This purely graphical shader programming solution has been designed to provide easier access to parametric modelling for people who prefer node-based modeling or are not proficient with programming or scripting. Creating a new model and selecting the `New Graph` option will create a `<filename>.graph` and a `<filename>.graph.wgsl` file. The `.wgsl` file is automatically generated from the code graph and is always updated when changes occur.
 
 ## General Usage
 
-The flow of code graphs is designed to be rather easy. Creating a new code graph will greet you with the necessary nodes to render a sphere. These two nodes, that every code graph has, are essential to actually parametically define your shape:
+Creating a new code graph will initialize it with the necessary nodes to render a sphere. There are two nodes that every code graph needs to have. They are essential entry and exit points for node-based parametric modeling:
 
-- **input2**: this is the parameter to the `evaluateImage` function. It contains the vertex coordinates of the basic plane `[u, v]`.
-- **Return**: this is always the last line in the `evaluateImage` function and will return whatever value comes from the connected node. It is important to note, that the `Return` node requires a `vec3f` as an input value, so for example just connecting the `input2` node would not work.
+- **input2**: This is the starting point. It represents the two input parameters to parametric modeling.
+- **Return**: This is the node that receives the final 3D coordinates. It is important to note that the `Return` node requires a `vec3f` as an input value, so just connecting the `input2` node would not work.
 
-There are two important user-controlled parts to every code graph, which will be described in detail now:
+Graph-based parametric modeling is performend with nodes and connections.
 
 ### Nodes
 

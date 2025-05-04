@@ -1,9 +1,12 @@
 # Exporter
-The exporter allows exporting of parametric models to common 3D file formats.
-The export is based on subdividing the plane in coordinate space into subplanes depending on the export configuration.
-These subplanes are known as "Patches", and the subdivisions will always divide a patch into 4 equally sized patches in the input coordinate space.
+The exporter allows exporting of parametric models into two common 3D file formats: GLTF Binary/GLB and OBJ.
+The export is based on subdividing the 2D input parameters into subregions of parameters depending on the export configuration.
+These subregions will always divide 1:4, i.e., one input region into four output regions uniformly.
 
 ## LOD Configuration
+
+The following options can be set under the `LOD Configuration` category:
+
 ### Preview
 The export preview can be toggled, when enabled it will filter for the meshes that were selected for export in the main viewport.
 The meshes will be displayed at the level of detail that was set in the exporter window, though unstitched, making it only a rough preview of how the final export will look.
@@ -24,7 +27,10 @@ Set the minimal planarity of each patch that is rendered, planarity is calculate
 ### Divsion Steps
 How many times the patch should be subdivided into 4, this number is doubled, so the upper limit for patch count is 4 to the power of (div steps * 2), unless the LOD stages criteria above cause an early exit.
 
-## Export Settings
+## File Configuration
+
+The following options can be set under the `File Configuration` category:
+
 ### File Format
 Choose between GLTF Binary/GLB and OBJ file format to download
 
