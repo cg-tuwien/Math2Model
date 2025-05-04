@@ -1277,7 +1277,7 @@
         },
         {
           "type": "node",
-          "value": "3eb0a657b92a1349",
+          "value": "7fa1ef2ce60b6857",
           "keyFrom": "value",
           "keyTo": "z"
         }
@@ -1367,8 +1367,8 @@
     },
     {
       "position": [
-        5314.250000000001,
-        1320.5
+        5324.890086492531,
+        1435.767603669074
       ],
       "uuid": "5fc752c13f201540",
       "inputs": [],
@@ -1408,6 +1408,116 @@
         {
           "key": "op",
           "value": "*"
+        }
+      ]
+    },
+    {
+      "position": [
+        6355.6490782710725,
+        890.6738425155046
+      ],
+      "uuid": "7fa1ef2ce60b6857",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "3eb0a657b92a1349",
+          "keyFrom": "value",
+          "keyTo": "left"
+        },
+        {
+          "type": "node",
+          "value": "17576f39a6d21cc7",
+          "keyFrom": "value",
+          "keyTo": "right"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "-"
+        }
+      ]
+    },
+    {
+      "position": [
+        6014.721016270428,
+        1373.5436699719683
+      ],
+      "uuid": "17576f39a6d21cc7",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "5fc752c13f201540",
+          "keyFrom": "value",
+          "keyTo": "left"
+        },
+        {
+          "type": "node",
+          "value": "69c013093142917c",
+          "keyFrom": "value",
+          "keyTo": "right"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "/"
+        }
+      ]
+    },
+    {
+      "position": [
+        5575.201837358646,
+        1681.782056914021
+      ],
+      "uuid": "1fb748a2f746ab10",
+      "inputs": [
+        {
+          "type": "number",
+          "value": 10,
+          "key": "right"
+        },
+        {
+          "type": "node",
+          "value": "5fc752c13f201540",
+          "keyFrom": "value",
+          "keyTo": "left"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "-"
+        }
+      ]
+    },
+    {
+      "position": [
+        5907.500063793472,
+        1705.9542351979233
+      ],
+      "uuid": "69c013093142917c",
+      "inputs": [
+        {
+          "type": "number",
+          "value": 2,
+          "key": "right"
+        },
+        {
+          "type": "node",
+          "value": "1fb748a2f746ab10",
+          "keyFrom": "value",
+          "keyTo": "left"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "max"
         }
       ]
     }

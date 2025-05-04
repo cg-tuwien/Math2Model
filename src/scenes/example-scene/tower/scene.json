@@ -74,5 +74,5 @@
       "instanceCount": 1
     }
   ],
-  "description": "This is a procedurally generated tower. You can change the bricks on the bottom part of the tower. The code parts are marked with 'HERE' comments. Change the 'brickSpacing' to change the overall amount of space between bricks. Change the 'vSteps' and 'hSteps' to change the frequency of bricks along the wall either vertically or horizontally. The number of windows can be changed as well, by adjusting the 'Instance Count' attribute on the model. There can be no more than 5 windows with the current graph, although the calculations in the graph can be adjusted."
+  "description": "This is a procedurally generated tower. You can change various attributes of the tower's base which is equivalent to the 'TowerBase' parametric object in the scene view. All changeable attributes are marked with 'HERE' comments in the code editor. The spacing between bricks and the vertical and horizontal frequency of bricks can be changed at the appropriate locations. The windows can be adjusted in y-position, height, amount, width, outer color, inner color and depth at the appropriate locations in the code editor."
 }

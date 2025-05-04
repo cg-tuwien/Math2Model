@@ -93,6 +93,10 @@ const windowWidth = 0.2;
 const windowOuterColor = vec3f(0.2, 0.2, 0.2);
 // HERE to change the inner color of the windows (R, G, B)
 const windowInnerColor = vec3f(1, 1, 0.2);
+// HERE to offset the depth the windows are embedded at
+const windowDepthOffset = 0.5;
+
+const windowThickness = 1.;
 
 fn calcSurfaceOffset(pos: vec3f) -> f32 {
     let te = time.elapsed*0.1;
@@ -112,7 +116,8 @@ fn calcSurfaceOffset(pos: vec3f) -> f32 {
 
     sOffset *= windowOuter;
     sOffset+=1*1-(windowOuter);
-    sOffset+=discreteWindow(window,0.9);
+    sOffset+=(discreteWindow(window,0.9)-windowDepthOffset)*(1-(windowOuter))*windowThickness;
+
     return sOffset;
 }
 
@@ -131,10 +136,6 @@ fn calcWindowOffset(pos: vec3f) -> f32 {
     return 1-isWindowHeight;
 }
 
-fn calcWindowPattern(pos: vec3f) -> f32 {
-    return pos.x;
-}
-
 fn getColor(input: vec2f) -> vec3f {
     let posUv = vec3(input.x*tau, 0.0, input.y);
     let baseTower = material.color_roughness.rgb*(calcSurfaceOffset(posUv)+0.4);
@@ -150,3 +151,4 @@ fn getColor(input: vec2f) -> vec3f {
         mix(winCenterColor,winBorderColor,discreteWindow(window,0.89));
     return color;
 }
+

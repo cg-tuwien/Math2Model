@@ -169,6 +169,12 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var ref_0e240 = ref_d944a * ref_3498a;
 	var ref_985dd = ref_d944a * 0.50000000000000000000;
 	var ref_99140 = ref_0e240 + ref_985dd;
-	return ref_99140;
+	var ref_1a80b_1 = ref_99140[0];
+	var ref_1a80b_2 = ref_99140[1];
+	var ref_1a80b_3 = ref_99140[2];
+	var ref_a3d2f = ref_e8658 / 2.00000000000000000000;
+	var ref_3354f = ref_1a80b_3 - ref_a3d2f;
+	var ref_7d947 = vec3f(ref_1a80b_1, ref_1a80b_2, ref_3354f);
+	return ref_7d947;
 
 }

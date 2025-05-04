@@ -206,7 +206,11 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var ref_5fc75 = f32(8);
 	var ref_31bd1 = ref_5fc75 * 0.50000000000000000000;
 	var ref_3eb0a = ref_3bd26_3 * ref_31bd1;
-	var ref_270e3 = vec3f(ref_3bd26_1, ref_b0f83, ref_3eb0a);
+	var ref_1fb74 = ref_5fc75 - 10.00000000000000000000;
+	var ref_69c01 = max(ref_1fb74, 2.00000000000000000000);
+	var ref_17576 = ref_5fc75 / ref_69c01;
+	var ref_7fa1e = ref_3eb0a - ref_17576;
+	var ref_270e3 = vec3f(ref_3bd26_1, ref_b0f83, ref_7fa1e);
 	return ref_270e3;
 
 }

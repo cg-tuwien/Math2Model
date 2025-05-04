@@ -7,7 +7,7 @@
       "name": "TempleRoof",
       "position": [
         5.699999999999999,
-        13.300000000000002,
+        13.900000000000002,
         4.95
       ],
       "rotation": [
@@ -130,25 +130,25 @@
       "parametricShader": "TempleSteps352025_094631.wgsl",
       "material": {
         "color": [
-          0.12198924231019437,
-          0.8628038190708884,
-          0.889877453485456
+          0.24313725490196078,
+          0.24313725490196078,
+          0.24313725490196078
         ],
-        "roughness": 0.8123048473437252,
-        "metallic": 0.12002947299039524,
+        "roughness": 0.5323048473437256,
+        "metallic": 1.1300294729903955,
         "emissive": [
           0,
           0,
           0
         ],
-        "diffuseTexture": "istockphoto-1360384091-170667a.jpg",
+        "diffuseTexture": "marble.jpg",
         "textureScale": [
-          6,
-          1.3100000000000003
+          1,
+          1
         ]
       },
       "instanceCount": 1
     }
   ],
-  "description": "This example shows a temple made of various parametric models. You can change the size of the temple by adjusting the 'Instance Count' attribute of the 'TempleColumnsFront' model. Then select the 'TempleRoofBox' and 'TempleRoofRight'/'TempleRoofLeft' models to apply the changes. To fit the Pattern into the newly sized roof, you need to adjust the 'Instance Count' attribute of the 'TempleRoofPatternFace' model."
+  "description": "This example shows a temple made of various parametric models. You can change the size of the temple by adjusting the 'Instance Count' attribute of the 'TempleColumns' model. Then select the 'TempleRoof', 'TempleBody' and 'TempleSteps' models to apply the changes. In the code graphs you need to re-apply any connection, while in the code editor you need to adjust the 'n_columns' variable to match the 'TempleColumns' instance count."
 }

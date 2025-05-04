@@ -1,5 +1,6 @@
 fn sampleObject(input2: vec2f) -> vec3f {
-    let mouse_pos_normalized = mouse.pos.x*screen.inv_resolution.x;
+    // HERE to adjust floor to columns count
+    let n_columns = 8.;
 
     let inp = vec2f(0.5) - input2;
     let dist = 5.-pyramid(inp) * 10.;
@@ -13,7 +14,7 @@ fn sampleObject(input2: vec2f) -> vec3f {
     let y = min(dist, top_cutoff);
     let z = input2.y * 10.0;
 
-    return vec3f(x * 3.5, y, z * 3.) - 0.1 * n3 * steps;
+    return vec3f(x * 3.5, y, z * n_columns / 2 - n_columns * 1.2) - 0.1 * n3 * steps;
 }
 
 fn pyramid(a: vec2f) -> f32 {
@@ -23,22 +24,6 @@ fn pyramid(a: vec2f) -> f32 {
 
 
 fn pyramid_normal(a: vec2f) -> vec2f {
-    // We have f(x,y)=max(abs(x),abs(y));
-    // We want d/dx f and d/dy f
-    // f(x, y)
-    // = (abs(x) + abs(y) + |abs(x)-abs(y)|)/2
-    // = abs(x)*0.5 + abs(y)*0.5 + abs(abs(x)-abs(y))*0.5
-
-    // f_x =
-    // = sign(x)*0.5 + sign(abs(x)-abs(y))*0.5*(sign(x))
-
-    // f_y =
-    // = sign(y)*0.5 + sign(abs(x)-abs(y))*0.5*(sign(y))
-
-    // Note:
-    // abs' = sign
-    // max(x,y) = (x + y + |x-y|)/2
-
     let n = vec2f(
         sign(a.x) + sign(abs(a.x) - abs(a.y)) * sign(a.x),
         sign(a.y) + sign(abs(a.x) - abs(a.y)) * -sign(a.y),

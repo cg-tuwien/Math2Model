@@ -184,13 +184,16 @@ fn sampleObject(input2: vec2f) -> vec3f {
 	var ref_a26c1 = ref_e1bd6 + ref_481c0;
 	var ref_07213 = 0.00000000000000000000;
 	var instanceId = f32(instance_id);
+	var ref_6f597 = instanceId % 2.00000000000000000000;
+	var ref_b6cd7 = ref_6f597 * 3.00000000000000000000;
 	var ref_9d3cc = instanceId / 2.00000000000000000000;
 	var ref_3be67 = floor(ref_9d3cc);
 	var ref_47062 = ref_3be67 * 2.00000000000000000000;
 	var ref_2df4e = ref_47062 * 1.50000000000000000000;
-	var ref_6f597 = instanceId % 2.00000000000000000000;
-	var ref_b6cd7 = ref_6f597 * 3.00000000000000000000;
-	var ref_81f81 = vec3f(ref_b6cd7, ref_07213, ref_2df4e);
+	var ref_62e9e = f32(8);
+	var ref_2ae8d = ref_62e9e / 2.00000000000000000000;
+	var ref_b590a = ref_2df4e - ref_2ae8d;
+	var ref_81f81 = vec3f(ref_b6cd7, ref_07213, ref_b590a);
 	var ref_5517c = ref_a26c1 + ref_81f81;
 	return ref_5517c;
 

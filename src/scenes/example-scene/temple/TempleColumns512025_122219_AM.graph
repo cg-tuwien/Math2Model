@@ -2,8 +2,8 @@
   "graph": [
     {
       "position": [
-        -321.6975616505159,
-        1311.150402063734
+        12,
+        1785.5
       ],
       "uuid": "7e5ce4217d03bfc8",
       "inputs": [],
@@ -30,8 +30,8 @@
     },
     {
       "position": [
-        3281.583339357112,
-        695.1255034730844
+        3449.0999999999995,
+        393
       ],
       "uuid": "f31d28786c21c0d5",
       "inputs": [
@@ -56,21 +56,11 @@
     },
     {
       "position": [
-        233.46277558071966,
-        1318.1776913155124
+        600.35,
+        1313
       ],
       "uuid": "dc7f0cf3df87d558",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
-        {
-          "type": "number",
-          "value": 0,
-          "key": "right"
-        },
         {
           "type": "node",
           "value": "0c994a0c74c66827",
@@ -94,8 +84,8 @@
     },
     {
       "position": [
-        -227.9719585549151,
-        1542.511569389518
+        242,
+        1890.5
       ],
       "uuid": "f4884040be60810f",
       "inputs": [
@@ -114,8 +104,8 @@
     },
     {
       "position": [
-        -242.46353946230718,
-        766.0259732579835
+        242,
+        953.75
       ],
       "uuid": "107552106743f0e1",
       "inputs": [],
@@ -139,8 +129,8 @@
     },
     {
       "position": [
-        518.5206225283096,
-        648.7471076526205
+        936.85,
+        647
       ],
       "uuid": "88b27c2c6a63b72b",
       "inputs": [
@@ -188,21 +178,11 @@
     },
     {
       "position": [
-        11.580103697915888,
-        787.6561867584929
+        600.35,
+        788.75
       ],
       "uuid": "11910ec1c6c5d736",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
-        {
-          "type": "number",
-          "value": 0,
-          "key": "right"
-        },
         {
           "type": "node",
           "value": "107552106743f0e1",
@@ -226,8 +206,8 @@
     },
     {
       "position": [
-        -138.86946827126945,
-        1148.9784954429804
+        242,
+        1630.5
       ],
       "uuid": "0c994a0c74c66827",
       "inputs": [
@@ -242,8 +222,8 @@
     },
     {
       "position": [
-        520.2677301809301,
-        1021.94215305241
+        936.85,
+        1011.25
       ],
       "uuid": "cddccbe5062e6684",
       "inputs": [
@@ -291,8 +271,8 @@
     },
     {
       "position": [
-        1168.053016090712,
-        1072.9140750899894
+        1521.9499999999998,
+        970
       ],
       "uuid": "c1dcde95daf8a235",
       "inputs": [
@@ -319,8 +299,8 @@
     },
     {
       "position": [
-        1132.5,
-        602
+        1522.783333333333,
+        573.25
       ],
       "uuid": "2aaca7d54db183ea",
       "inputs": [
@@ -341,21 +321,11 @@
     },
     {
       "position": [
-        2049.5138126356474,
-        475.27273716310674
+        2489.5499999999997,
+        259.5
       ],
       "uuid": "e1bd683d2f42b14a",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
-        {
-          "type": "number",
-          "value": 0,
-          "key": "right"
-        },
         {
           "type": "node",
           "value": "c1dcde95daf8a235",
@@ -379,21 +349,11 @@
     },
     {
       "position": [
-        1698.620211460408,
-        412.215571179924
+        2162.35,
+        424.5
       ],
       "uuid": "e78a80aa9f0c2a6d",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
-        {
-          "type": "number",
-          "value": 0,
-          "key": "right"
-        },
         {
           "type": "node",
           "value": "2aaca7d54db183ea",
@@ -417,7 +377,7 @@
     },
     {
       "position": [
-        1362.5,
+        1524.4499999999998,
         12
       ],
       "uuid": "1c4ba1fd36924296",
@@ -457,7 +417,7 @@
     },
     {
       "position": [
-        1132.5,
+        1176.85,
         107
       ],
       "uuid": "a7101b106b74771f",
@@ -506,16 +466,11 @@
     },
     {
       "position": [
-        828,
+        931.85,
         342
       ],
       "uuid": "ea4c03ab15ed22ff",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
         {
           "type": "number",
           "value": 10,
@@ -538,16 +493,11 @@
     },
     {
       "position": [
-        1704.3410006060724,
-        -36.27416107338853
+        1918.6499999999999,
+        643
       ],
       "uuid": "69e249a87140f3c6",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
         {
           "type": "number",
           "value": -0.05,
@@ -570,8 +520,8 @@
     },
     {
       "position": [
-        1347.439325070119,
-        1275.7100647252528
+        605.35,
+        1618
       ],
       "uuid": "23d501ee52543eb9",
       "inputs": [
@@ -619,21 +569,11 @@
     },
     {
       "position": [
-        2352.448415004013,
-        584.0996168873896
+        2809.8999999999996,
+        496.25
       ],
       "uuid": "a26c134a75783cd4",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
-        {
-          "type": "number",
-          "value": 0,
-          "key": "right"
-        },
         {
           "type": "node",
           "value": "e1bd683d2f42b14a",
@@ -657,21 +597,11 @@
     },
     {
       "position": [
-        1897.0216039900413,
-        843.9909217907767
+        1918.6499999999999,
+        1098
       ],
       "uuid": "481c03362e694263",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
-        {
-          "type": "number",
-          "value": 0,
-          "key": "right"
-        },
         {
           "type": "node",
           "value": "2aaca7d54db183ea",
@@ -695,16 +625,11 @@
     },
     {
       "position": [
-        1570.1751271740814,
-        1113.2500803675498
+        931.85,
+        1453
       ],
       "uuid": "94c5f17f65f96ae2",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
         {
           "type": "number",
           "value": 0.4,
@@ -727,8 +652,8 @@
     },
     {
       "position": [
-        1565.4744328858842,
-        1509.3774072355748
+        1181.85,
+        2121.5
       ],
       "uuid": "373827c5c3a0b837",
       "inputs": [],
@@ -752,16 +677,11 @@
     },
     {
       "position": [
-        2629.7889371380325,
-        1597.287157553036
+        2489.5499999999997,
+        1686.5
       ],
       "uuid": "2df4e5d767b5b7d5",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
         {
           "type": "number",
           "value": 1.5,
@@ -784,8 +704,8 @@
     },
     {
       "position": [
-        2809.033618438468,
-        1129.1712902526913
+        2812.3999999999996,
+        1464
       ],
       "uuid": "81f8105c75aa70e9",
       "inputs": [
@@ -797,36 +717,26 @@
         },
         {
           "type": "node",
-          "value": "2df4e5d767b5b7d5",
-          "keyFrom": "value",
-          "keyTo": "z"
-        },
-        {
-          "type": "node",
           "value": "b6cd7b38fde71c02",
           "keyFrom": "value",
           "keyTo": "x"
+        },
+        {
+          "type": "node",
+          "value": "b590acc37fa8cfed",
+          "keyFrom": "value",
+          "keyTo": "z"
         }
       ],
       "nodeType": "Join"
     },
     {
       "position": [
-        3009.2927461016307,
-        704.1660626072922
+        3209.0999999999995,
+        468
       ],
       "uuid": "5517c7898a288477",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
-        {
-          "type": "number",
-          "value": 0,
-          "key": "right"
-        },
         {
           "type": "node",
           "value": "a26c134a75783cd4",
@@ -850,8 +760,8 @@
     },
     {
       "position": [
-        2142.630203874517,
-        1399.325111781528
+        2499.5499999999997,
+        1446.5
       ],
       "uuid": "072135bdaa7aaec0",
       "inputs": [
@@ -870,16 +780,11 @@
     },
     {
       "position": [
-        2134.485165549404,
-        1090.5895375982425
+        1918.6499999999999,
+        1558
       ],
       "uuid": "6f597d2d223c35e6",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
         {
           "type": "number",
           "value": 2,
@@ -902,16 +807,11 @@
     },
     {
       "position": [
-        2429.4664444530326,
-        1043.7218839286004
+        2162.35,
+        1393
       ],
       "uuid": "b6cd7b38fde71c02",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
         {
           "type": "number",
           "value": 3,
@@ -934,16 +834,11 @@
     },
     {
       "position": [
-        1823.5613689368483,
-        1653.0062674984733
+        1519.4499999999998,
+        2111.5
       ],
       "uuid": "9d3ccdd598be01ba",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
         {
           "type": "number",
           "value": 2,
@@ -966,8 +861,8 @@
     },
     {
       "position": [
-        2059.438605590151,
-        1724.3436171624915
+        1923.6499999999999,
+        2016.5
       ],
       "uuid": "3be670bdec675358",
       "inputs": [
@@ -1006,16 +901,11 @@
     },
     {
       "position": [
-        2342.0041076739694,
-        1705.2188276895563
+        2162.35,
+        1851.5
       ],
       "uuid": "47062ce03dbd8c71",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
         {
           "type": "number",
           "value": 2,
@@ -1038,16 +928,11 @@
     },
     {
       "position": [
-        800.1584564117641,
-        673.736750495458
+        1171.85,
+        482
       ],
       "uuid": "35579b2c6add7ed4",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
         {
           "type": "number",
           "value": 0.8,
@@ -1070,16 +955,11 @@
     },
     {
       "position": [
-        832.1813735423896,
-        1013.196740223774
+        1171.85,
+        846.25
       ],
       "uuid": "ae8548ae542f7268",
       "inputs": [
-        {
-          "type": "number",
-          "value": 0,
-          "key": "left"
-        },
         {
           "type": "number",
           "value": 0.8,
@@ -1097,6 +977,80 @@
         {
           "key": "op",
           "value": "*"
+        }
+      ]
+    },
+    {
+      "position": [
+        2778.94801175024,
+        1843.1293226732141
+      ],
+      "uuid": "b590acc37fa8cfed",
+      "inputs": [
+        {
+          "type": "node",
+          "value": "2df4e5d767b5b7d5",
+          "keyFrom": "value",
+          "keyTo": "left"
+        },
+        {
+          "type": "node",
+          "value": "2ae8dbae2695590e",
+          "keyFrom": "value",
+          "keyTo": "right"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "-"
+        }
+      ]
+    },
+    {
+      "position": [
+        2735.757379053108,
+        2190.227774913785
+      ],
+      "uuid": "2ae8dbae2695590e",
+      "inputs": [
+        {
+          "type": "number",
+          "value": 2,
+          "key": "right"
+        },
+        {
+          "type": "node",
+          "value": "62e9e95c87a4038f",
+          "keyFrom": "value",
+          "keyTo": "left"
+        }
+      ],
+      "nodeType": "Math",
+      "extraStringInformation": [
+        {
+          "key": "op",
+          "value": "/"
+        }
+      ]
+    },
+    {
+      "position": [
+        2358.5179488634108,
+        2243.91184767155
+      ],
+      "uuid": "62e9e95c87a4038f",
+      "inputs": [],
+      "nodeType": "InstanceCount",
+      "extraStringInformation": [
+        {
+          "key": "modelId",
+          "value": "08d5fa1e-bb84-4e7d-9eb1-a7282987f139"
+        },
+        {
+          "key": "name",
+          "value": "TempleColumns Instance Count"
         }
       ]
     }
