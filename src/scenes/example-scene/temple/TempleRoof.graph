@@ -1231,44 +1231,11 @@
     },
     {
       "position": [
-        5983.250000000001,
-        625.5
-      ],
-      "uuid": "b0f835156fee49b9",
-      "inputs": [
-        {
-          "type": "number",
-          "value": -1,
-          "key": "right"
-        },
-        {
-          "type": "node",
-          "value": "3bd2697fdb878143",
-          "keyFrom": "y",
-          "keyTo": "left"
-        }
-      ],
-      "nodeType": "Math",
-      "extraStringInformation": [
-        {
-          "key": "op",
-          "value": "*"
-        }
-      ]
-    },
-    {
-      "position": [
         6284.100000000001,
         531.25
       ],
       "uuid": "270e3dec4b4387ba",
       "inputs": [
-        {
-          "type": "node",
-          "value": "b0f835156fee49b9",
-          "keyFrom": "value",
-          "keyTo": "y"
-        },
         {
           "type": "node",
           "value": "3bd2697fdb878143",
@@ -1280,6 +1247,12 @@
           "value": "7fa1ef2ce60b6857",
           "keyFrom": "value",
           "keyTo": "z"
+        },
+        {
+          "type": "node",
+          "value": "3bd2697fdb878143",
+          "keyFrom": "y",
+          "keyTo": "y"
         }
       ],
       "nodeType": "Join"

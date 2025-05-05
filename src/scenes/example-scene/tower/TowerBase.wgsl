@@ -70,10 +70,10 @@ const radiusTop = 0.1;
 const brickSpacing = 0.1;
 fn bricks(input: vec2f) -> vec3f {
     let te = time.elapsed;
-    let pos = vec3(input.x*tau, 0.0, input.y);
+    let pos = vec3(input.y*tau, 0.0, input.x);
     let prog = pos.x;
-    let radius = mix(radiusBottom, radiusTop, input.y);
-    var cyl = vec3f(sin(prog)*radius,input.y*height,cos(prog)*radius);
+    let radius = mix(radiusBottom, radiusTop, input.x);
+    var cyl = vec3f(sin(prog)*radius,input.x*height,cos(prog)*radius);
     let normal = normalize(vec3f(cyl.x,0,cyl.z));
     let sOffset = calcSurfaceOffset(pos);
     cyl+=normal*sOffset*0.01;
@@ -137,7 +137,7 @@ fn calcWindowOffset(pos: vec3f) -> f32 {
 }
 
 fn getColor(input: vec2f) -> vec3f {
-    let posUv = vec3(input.x*tau, 0.0, input.y);
+    let posUv = vec3(input.y*tau, 0.0, input.x);
     let baseTower = material.color_roughness.rgb*(calcSurfaceOffset(posUv)+0.4);
 
     var color = baseTower;
