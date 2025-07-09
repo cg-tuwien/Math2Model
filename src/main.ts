@@ -8,6 +8,16 @@ import "@/monaco-setup";
 import App from "./App.vue";
 import router from "./views/router";
 
+if (globalThis.navigator.gpu === undefined) {
+  showError(
+    "WebGPU not supported\nPlease switch a more modern browser (Chrome or Firefox 141)",
+    {
+      error: "WebGPU not supported",
+    }
+  );
+  throw new Error("a");
+}
+
 globalThis.addEventListener("unhandledrejection", (event) => {
   showError(event.reason, {
     title: "Unhandled Promise Rejection",
